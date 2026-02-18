@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/dragan/PROJECTS/PRIVATE/ki-bundestag log --oneline -5)",
+      "Bash(git -C /Users/dragan/PROJECTS/PRIVATE/ki-bundestag log --oneline --all)",
+      "Bash(node --version:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(sqlite3:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(node -e:*)",
+      "Bash(node:*)",
+      "mcp__ide__getDiagnostics",
+      "WebSearch",
+      "WebFetch(domain:www.bundeswahlleiterin.de)",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__navigate_page",
+      "Bash(chmod:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(echo:*)",
+      "mcp__chrome-devtools__list_pages"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "chrome-devtools"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-plan-remind.sh",
+            "statusMessage": "Checking architecture docs..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": []
+  }
+}

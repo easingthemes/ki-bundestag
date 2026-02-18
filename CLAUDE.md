@@ -1,0 +1,115 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+KI Bundestag is an AI-powered simulation of the German parliament. Six political parties, each driven by Claude Haiku, propose bills, debate, vote, and issue statements day by day. After elections, parties negotiate coalition terms over multiple rounds. Results are stored in SQLite and served via a REST API to a React frontend with news feed, polls, and party profiles.
+
+## Commands (run from monorepo root)
+
+```bash
+npm run seed              # Fresh start: wipe DB, seed 6 parties + initial state (backs up first)
+npm run migrate           # Apply schema changes without clearing data (safe to run repeatedly)
+npm run simulate          # Run simulation days (e.g., npm run simulate 5)
+npm run simulate:auto     # Continuous simulation loop (default 30s interval)
+npm run trigger:election  # Force next simulate run to trigger an election (testing)
+npm run dev:api           # Express API on port 3001
+npm run dev:web           # Vite dev server on port 5173 (proxies /api → :3001)
+npm run build             # Build all packages via turbo
+npm run typecheck         # Typecheck all packages via turbo
+```
+
+No test or lint scripts exist yet.
+
+## Architecture
+
+Monorepo with npm workspaces + Turborepo. Four packages:
+
+- **`types`** — Pure TypeScript type definitions (`emitDeclarationOnly`), no runtime code
+- **`engine`** — Core simulation: AI agent calls, DB access (Drizzle + better-sqlite3), simulation loop
+- **`api`** — Express REST server, imports from engine + types
+- **`web`** — React 19 SPA (Vite + React Router v7), has its own local type copies in `api.ts`
+
+Dependency chain: `types` ← `engine` ← `api`. Web is standalone (no workspace deps).
+
+## Critical: Package Export Pattern
+
+Both `types` and `engine` point `"import"` and `"default"` exports to `./src/index.ts` (not `dist/`). This ensures `tsx` always loads source files. If `"default"` ever points to `dist/`, tsx may load stale compiled code — this previously caused a DB path resolution bug.
+
+## Database
+
+- SQLite at `data/simulation.db`, WAL mode, foreign keys enabled
+- Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory
+- Override with `DATABASE_PATH` env var
+- Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM)
+- Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`
+- `national_state` has `provisional_budget` (boolean); `simulation_meta` has `budget_retry_day`; `budgets` has `revision_attempt`
+- Use `getSqlite()` from connection module for raw sqlite3 access — never access drizzle internals
+
+## Model Configuration
+
+Three model keys in `packages/engine/src/agent/client.ts`, each overridable via env var:
+
+| Key | Default | Env Var | Used for |
+|-----|---------|---------|----------|
+| `daily` | claude-haiku-4-5-20251001 | `MODEL_DAILY` | Daily party agent calls |
+| `negotiation` | claude-haiku-4-5-20251001 | `MODEL_NEGOTIATION` | Coalition negotiation rounds |
+| `synthesis` | claude-sonnet-4-5-20250929 | `MODEL_SYNTHESIS` | Coalition agreement synthesis |
+
+## Simulation Flow
+
+`npm run simulate` → `runner.ts` → `runDay()` loop in `packages/engine/src/simulation/loop.ts`:
+
+1. Increment day, load full state (parties, bills, national economy, recent events)
+2. Apply economic drift (mean-reversion + noise on all 4 indicators)
+3. Process pending injections (user-injected crises, elections, economic shocks, budget triggers) + crisis system (8% daily / 25% monthly trigger chance, max 2 concurrent); provisional budget GDP drag (−0.01/day)
+4. Check election status:
+   - If `"negotiation"`: run negotiation round (skip normal agents). After 3 rounds, synthesize agreement + form government + form cabinet (Chancellor + 8 Ministers).
+   - If `"voting"`: calculate results, transition to `"negotiation"` (skip normal agents).
+   - Otherwise: advance election phase normally.
+5. If not in election special phase: advance bill pipeline (proposed → 1st reading → committee → 2nd reading → 3rd reading; govt bills skip 1st reading), run each party agent, process proposals/amendments/votes/statements/motions/interpellations/confidence votes.
+5b. Process confidence votes: Vertrauensfrage (coalition leader; 10% defection risk; failed → dissolve govt + trigger snap election) and Konstruktives Misstrauensvotum (opposition; 85% other-opposition join; passed → swap coalition roles + form new cabinet immediately, no election).
+5c. Process constitutional challenges: first valid `file_constitutional_challenge` action → 30% strike-down → if struck down: reverse bill economic impact, adjust sentiment, update bill status to `"struck_down"`; approval impacts on filing/proposing parties.
+5d. Presidential veto check on each passing bill: 3–16% probability based on bill impact magnitude; veto → bill stays `rejected` with `vetoedByPresident: true`, proposer −0.5 approval.
+6. Answer pending citizen questions (max 3/day via Haiku)
+6b. Answer pending interpellations (max 2/day via Haiku as minister, 14-day deadline) + expire unanswered + apply sentiment
+7. Apply approval drift + sentiment mean-reversion (baseline 45, range 5–75)
+8. Resolve expired polls + referendums; on weekly days: generate new polls + opinion recalc; on monthly days: economic report
+9. Maybe generate referendum (every 30 days via Haiku)
+9b. Budget cycle (every 60 days, or admin injection): generate coalition-weighted 300B EUR allocations, sentiment-adjusted vote (97/90/82/72% coalition yes by tier); passed → economy effects + sentiment +0.5, clear provisional; rejected → `provisionalBudget=true`, retry scheduled day+7, asymmetric approval penalties.
+9c. Budget retry (on `budgetRetryDay`): revised allocations (3% centrist shift), retry vote (+5pp coalition boost); passed → clear provisional + sentiment +0.3; rejected again → sentiment −2.0 + dissolve govt + snap election.
+10. Generate daily media articles (2–3 AI-written articles from biased outlets, skipped on quiet days)
+11. Apply media sentiment influence (±0.5/day max)
+12. Generate daily narrative summary (Haiku): returns `{narrative, mood}` JSON, stored as JSON string in `simulation_meta.daily_summary`; 7 mood labels
+13. Record party history snapshot, save state, persist events
+
+Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment + 1 motion + 1 interpellation + 1 constitutional challenge + 1 statement per turn, must vote on all third-reading bills. Interpellations are opposition+Fraktion only. Constitutional challenges require Fraktion and target passed bills ≤14 days old.
+
+## Web Pages
+
+- **Dashboard**: Coalition bar, Federal Government (Chancellor + 8 ministers), economy stats, sentiment, active crises; amber provisional budget banner when Art. 111 GG active; "Today in Berlin" summary with colored mood badge (7 labels); "Ask a Party" widget at bottom
+- **Parties**: Clickable cards → **Party Detail** (approval chart, bills, votes, statements, question form); Vote Alignment Matrix below party grid (pairwise vote-agreement %, color-coded)
+- **Bills**: Grouped by status with vote breakdowns, "Govt. Bill" badge on government bills, "Vetoed by President" amber badge on vetoed bills
+- **Elections**: Hemicycle, bar chart, result table, negotiation rounds, coalition agreement; Coalition Calculator at bottom (interactive party checkboxes, seat counter, majority indicator, ideological spread)
+- **Budget**: Budget cycle cards with ministry allocation bars, seat vote bar, economic effects, party vote breakdown; "Revised" badge on revision attempts; "Retry Day X" note on pending retries
+- **News**: Filterable event timeline with breaking news styling, day separators, pagination
+- **Polls**: Active polls with voting, results bar chart, past polls
+- **Media**: Newspaper-style AI-generated articles from 3 outlets (left/center/right bias), expandable cards
+- **Questions**: Citizen questions to parties with AI-generated responses, party/status filters
+- **Motions**: Motions (Antrag) and resolutions (Entschließung) with type badges, vote breakdowns
+- **Anfragen**: Interpellations (Kleine/Große Anfrage) with type+status badges, expandable cards showing question + minister response
+- **Vertrauensvoten**: Confidence votes (Vertrauensfrage + Misstrauensvotum) with type/status filters, seat vote bars, outcome text, expandable party breakdown
+- **Verfassungsgericht**: Constitutional court challenges to passed bills with status/decision filters, collapsible cards showing arguments + court reasoning
+- **Referendums (Votes)**: AI-generated referendums with user voting, impact on simulation
+- **Log**: Expandable day-by-day simulation events
+- **About**: Project overview and tech stack info
+- **Admin**: Inject events (crisis, snap election, economic shock, invalidate election, trigger budget cycle); AI model config table; simulation actions reference (27 actions, AI vs Algorithmic, expandable detail)
+
+## Environment
+
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
+
+## ESM
+
+All packages use `"type": "module"`. Internal imports within engine use `.js` extensions (Node16 ESM requirement). Base tsconfig: `module: Node16`, `moduleResolution: Node16`, target `ES2022`.

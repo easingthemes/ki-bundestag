@@ -1,0 +1,27 @@
+{
+  "name": "ki-bundestag",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.6.1",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev:api": "turbo run dev --filter=@ki-bundestag/api",
+    "dev:web": "turbo run dev --filter=@ki-bundestag/web",
+    "typecheck": "turbo run typecheck",
+    "seed": "tsx packages/engine/src/seed.ts",
+    "migrate": "tsx packages/engine/src/migrate.ts",
+    "simulate": "tsx packages/engine/src/runner.ts",
+    "simulate:3": "npm run simulate 3",
+    "simulate:6": "npm run simulate 6",
+    "simulate:auto": "tsx packages/engine/src/runner-auto.ts",
+    "trigger:election": "tsx packages/engine/src/trigger-election.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0"
+  }
+}
