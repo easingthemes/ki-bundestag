@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { api, CrisisTemplate } from "../api";
 
 // ─── Action reference data ────────────────────────────────────────────────────
@@ -508,8 +508,8 @@ export function Admin() {
             </thead>
             <tbody>
               {MODEL_CONFIG.map(m => (
-                <>
-                  <tr key={m.key} className={expandedModels.has(m.key) ? "admin-row-expanded" : ""}>
+                <Fragment key={m.key}>
+                  <tr className={expandedModels.has(m.key) ? "admin-row-expanded" : ""}>
                     <td><code>{m.key}</code></td>
                     <td style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{m.model}</td>
                     <td style={{ textAlign: "right" }}>{m.maxTokens.toLocaleString()}</td>
@@ -526,7 +526,7 @@ export function Admin() {
                     </td>
                   </tr>
                   {expandedModels.has(m.key) && (
-                    <tr key={`${m.key}-detail`} className="admin-row-detail">
+                    <tr className="admin-row-detail">
                       <td colSpan={6}>
                         <div className="admin-detail-block">
                           <div className="admin-detail-row">
@@ -545,7 +545,7 @@ export function Admin() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -587,8 +587,8 @@ export function Admin() {
                 const key = a.action;
                 const isOpen = expandedActions.has(key);
                 return (
-                  <>
-                    <tr key={key} className={isOpen ? "admin-row-expanded" : ""}>
+                  <Fragment key={key}>
+                    <tr className={isOpen ? "admin-row-expanded" : ""}>
                       <td><code style={{ fontSize: "0.8rem" }}>{a.action}</code></td>
                       <td style={{ fontSize: "0.8rem", color: "#555" }}>{a.category}</td>
                       <td>
@@ -609,7 +609,7 @@ export function Admin() {
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr key={`${key}-detail`} className="admin-row-detail">
+                      <tr className="admin-row-detail">
                         <td colSpan={6}>
                           <div className="admin-detail-block">
                             <p style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.6 }}>{a.detail}</p>
@@ -617,7 +617,7 @@ export function Admin() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

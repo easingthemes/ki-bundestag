@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
 import { useUser } from "../userContext";
 
 const ROLE_BADGE: Record<string, string> = {
@@ -85,9 +86,9 @@ export function PartyDetail() {
   const [questionText, setQuestionText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
-  const [visibleBills, setVisibleBills] = useState(20);
-  const [visibleVotes, setVisibleVotes] = useState(20);
-  const [visibleStatements, setVisibleStatements] = useState(20);
+  const [visibleBills, setVisibleBills] = useState(5);
+  const [visibleVotes, setVisibleVotes] = useState(5);
+  const [visibleStatements, setVisibleStatements] = useState(5);
   const [proposals, setProposals] = useState<InternalProposal[]>([]);
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [propTitle, setPropTitle] = useState("");
@@ -352,16 +353,12 @@ export function PartyDetail() {
                 ))}
               </tbody>
             </table>
-            {bills.length > visibleBills && (
-              <div style={{ padding: "10px 12px", borderTop: "1px solid #eee" }}>
-                <button
-                  onClick={() => setVisibleBills(v => v + 20)}
-                  style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}
-                >
-                  Load more ({bills.length - visibleBills} remaining)
-                </button>
-              </div>
-            )}
+            <ShowMoreButton
+              total={bills.length}
+              visible={Math.min(visibleBills, bills.length)}
+              increment={5}
+              onShowMore={() => setVisibleBills(v => v + 5)}
+            />
           </div>
         )}
       </div>
@@ -402,16 +399,12 @@ export function PartyDetail() {
                 ))}
               </tbody>
             </table>
-            {votes.length > visibleVotes && (
-              <div style={{ padding: "10px 12px", borderTop: "1px solid #eee" }}>
-                <button
-                  onClick={() => setVisibleVotes(v => v + 20)}
-                  style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}
-                >
-                  Load more ({votes.length - visibleVotes} remaining)
-                </button>
-              </div>
-            )}
+            <ShowMoreButton
+              total={votes.length}
+              visible={Math.min(visibleVotes, votes.length)}
+              increment={5}
+              onShowMore={() => setVisibleVotes(v => v + 5)}
+            />
           </div>
         )}
       </div>
@@ -520,14 +513,12 @@ export function PartyDetail() {
                 <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>{s.description}</div>
               </div>
             ))}
-            {statements.length > visibleStatements && (
-              <button
-                onClick={() => setVisibleStatements(v => v + 20)}
-                style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500, marginTop: 4 }}
-              >
-                Load more ({statements.length - visibleStatements} remaining)
-              </button>
-            )}
+            <ShowMoreButton
+              total={statements.length}
+              visible={Math.min(visibleStatements, statements.length)}
+              increment={5}
+              onShowMore={() => setVisibleStatements(v => v + 5)}
+            />
           </div>
         )}
       </div>
@@ -610,8 +601,16 @@ export function PartyDetail() {
         )}
 
         {proposals.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "0.9rem" }}>
-            No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}
+          <div style={{ color: "#888", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span>No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}</span>
+            {user?.partyId !== id && (
+              <button
+                onClick={() => { setShowJoinForm(true); document.querySelector(".card")?.scrollIntoView({ behavior: "smooth" }); }}
+                style={{ fontSize: "0.83rem", padding: "4px 12px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, cursor: "pointer" }}
+              >
+                Join {party.name}
+              </button>
+            )}
           </div>
         ) : (
           <div>

@@ -1,4 +1,4 @@
-import { StrictMode, useState, useEffect, useCallback, useRef } from "react";
+import { StrictMode, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
@@ -20,7 +20,7 @@ import { Budget } from "./pages/Budget";
 import { Admin } from "./pages/Admin";
 import { About } from "./pages/About";
 import { BillDetail } from "./pages/BillDetail";
-import { api, setErrorHandler, setUserToken, type User } from "./api";
+import { api, setErrorHandler, setUserToken, type User, type SimulationStatus } from "./api";
 import { UserContext, loadStoredToken, saveToken, clearToken } from "./userContext";
 import "./styles.css";
 
@@ -129,6 +129,62 @@ function MobileNav({ user }: { user: User | null }) {
   );
 }
 
+/* ── Simulation status indicator ───────────────────────────────── */
+
+function SimStatus() {
+  const [status, setStatus] = useState<SimulationStatus | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const load = () => api.getSimulationStatus().then(setStatus).catch(() => {});
+    load();
+    const id = setInterval(load, 3_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Tick every second for progress bar
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { running, pct } = useMemo(() => {
+    if (!status?.dayStartedAt) return { running: false, pct: 0 };
+    const started = new Date(status.dayStartedAt).getTime();
+    const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
+
+    // Day is currently running: started > completed (or no completed yet)
+    if (started > completed) {
+      const elapsed = now - started;
+      // Cap at 95% while running (we don't know the actual duration)
+      return { running: true, pct: Math.min(Math.round((elapsed / 30_000) * 95), 95) };
+    }
+
+    // Day completed: show 100% briefly, then track idle time toward next day
+    const sinceCompleted = now - completed;
+    if (sinceCompleted < 2_000) return { running: false, pct: 100 };
+    // After 2s, consider simulation idle
+    return { running: false, pct: 0 };
+  }, [status, now]);
+
+  if (!status) return null;
+
+  return (
+    <div className="sim-status">
+      <div className="sim-status-label">
+        <span className={`sim-status-dot${running ? " sim-status-dot-active" : ""}`} />
+        <span>Tag {status.currentDay}</span>
+      </div>
+      <div className="sim-status-bar">
+        <div
+          className={`sim-status-bar-fill${running ? "" : pct === 100 ? " sim-status-bar-done" : " sim-status-bar-idle"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -202,6 +258,7 @@ function App() {
               <NavLink to="/media">Presse</NavLink>
             </NavGroup>
           </div>
+          <SimStatus />
           <div className="nav-user">
             {user ? (
               <span className="nav-user-badge">

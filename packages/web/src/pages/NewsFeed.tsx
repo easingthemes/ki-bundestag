@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, SimulationEvent, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
 
 const EVENT_CATEGORIES: Record<string, { label: string; types: string[] }> = {
   legislative: {
@@ -59,6 +60,7 @@ const EVENT_BORDER_COLOR: Record<string, string> = {
 };
 
 const PAGE_SIZE = 50;
+const DAY_INITIAL = 5;
 
 export function NewsFeed() {
   const [events, setEvents] = useState<SimulationEvent[]>([]);
@@ -66,6 +68,7 @@ export function NewsFeed() {
   const [offset, setOffset] = useState(0);
   const [parties, setParties] = useState<Party[]>([]);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [dayLimits, setDayLimits] = useState<Record<number, number>>({});
 
   const activeTypeString = activeFilters.size > 0
     ? Array.from(activeFilters).join(",")
@@ -117,6 +120,7 @@ export function NewsFeed() {
 
   const clearFilters = () => {
     setOffset(0);
+    setDayLimits({});
     setActiveFilters(new Set());
   };
 
@@ -178,65 +182,76 @@ export function NewsFeed() {
         <div className="loading">No events yet. Run the simulation first.</div>
       ) : (
         <div>
-          {dayGroups.map(group => (
-            <div key={group.dayNumber}>
-              <div className="news-day-separator">Day {group.dayNumber}</div>
-              {group.events.filter(e => e.type !== "day_start").map(ev => {
-                const isBreaking = BREAKING_TYPES.has(ev.type);
-                const isHighBreaking = HIGH_BREAKING_TYPES.has(ev.type);
-                const isCrisisHigh = ev.type === "crisis_start" && ev.data?.severity === "high";
-                const showBreaking = isBreaking || isCrisisHigh;
+          {dayGroups.map(group => {
+            const dayEvents = group.events.filter(e => e.type !== "day_start");
+            const limit = dayLimits[group.dayNumber] ?? DAY_INITIAL;
+            const visible = dayEvents.slice(0, limit);
+            return (
+              <div key={group.dayNumber}>
+                <div className="news-day-separator">Day {group.dayNumber} ({dayEvents.length})</div>
+                {visible.map(ev => {
+                  const isBreaking = BREAKING_TYPES.has(ev.type);
+                  const isHighBreaking = HIGH_BREAKING_TYPES.has(ev.type);
+                  const isCrisisHigh = ev.type === "crisis_start" && ev.data?.severity === "high";
+                  const showBreaking = isBreaking || isCrisisHigh;
 
-                return (
-                  <div
-                    key={ev.id}
-                    className={`news-card ${showBreaking ? "news-card-breaking" : ""}`}
-                    style={{
-                      borderLeftColor: EVENT_BORDER_COLOR[ev.type] || "#888",
-                      ...(isHighBreaking ? { background: "#f8f9ff" } : {}),
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        {showBreaking && (
-                          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#dc3545", textTransform: "uppercase", marginBottom: 2 }}>
-                            Breaking
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`news-card ${showBreaking ? "news-card-breaking" : ""}`}
+                      style={{
+                        borderLeftColor: EVENT_BORDER_COLOR[ev.type] || "#888",
+                        ...(isHighBreaking ? { background: "#f8f9ff" } : {}),
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          {showBreaking && (
+                            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#dc3545", textTransform: "uppercase", marginBottom: 2 }}>
+                              Breaking
+                            </div>
+                          )}
+                          <div style={{ fontWeight: 600, fontSize: showBreaking ? "1rem" : "0.9rem" }}>
+                            {ev.title}
                           </div>
-                        )}
-                        <div style={{ fontWeight: 600, fontSize: showBreaking ? "1rem" : "0.9rem" }}>
-                          {ev.title}
+                          <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>
+                            {ev.description}
+                          </div>
                         </div>
-                        <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>
-                          {ev.description}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                        <span style={{
-                          fontSize: "0.65rem",
-                          padding: "1px 6px",
-                          borderRadius: 3,
-                          background: "#f0f0f0",
-                          color: "#666",
-                          whiteSpace: "nowrap",
-                        }}>
-                          {ev.type.replace(/_/g, " ")}
-                        </span>
-                        {ev.actor !== "system" && (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
                           <span style={{
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                            color: getPartyColor(ev.actor),
+                            fontSize: "0.65rem",
+                            padding: "1px 6px",
+                            borderRadius: 3,
+                            background: "#f0f0f0",
+                            color: "#666",
+                            whiteSpace: "nowrap",
                           }}>
-                            {getPartyName(ev.actor)}
+                            {ev.type.replace(/_/g, " ")}
                           </span>
-                        )}
+                          {ev.actor !== "system" && (
+                            <span style={{
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                              color: getPartyColor(ev.actor),
+                            }}>
+                              {getPartyName(ev.actor)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                  );
+                })}
+                <ShowMoreButton
+                  total={dayEvents.length}
+                  visible={visible.length}
+                  increment={5}
+                  onShowMore={() => setDayLimits(prev => ({ ...prev, [group.dayNumber]: limit + 5 }))}
+                />
+              </div>
+            );
+          })}
 
           {/* Load more */}
           {events.length < total && (

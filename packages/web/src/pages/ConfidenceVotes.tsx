@@ -21,12 +21,11 @@ export function ConfidenceVotes() {
 
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
+  useEffect(() => { setVisibleCount(5); }, [statusFilter, typeFilter]);
 
   if (parties.length === 0) return <div className="loading">Loading...</div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
-
-  useEffect(() => { setVisibleCount(5); }, [statusFilter, typeFilter]);
 
   const filtered = votes.filter(v => {
     if (statusFilter !== "all" && v.status !== statusFilter) return false;

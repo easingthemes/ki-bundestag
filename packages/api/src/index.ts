@@ -303,6 +303,7 @@ app.get("/api/simulation/status", (_req, res) => {
   res.json({
     currentDay: meta.currentDay,
     lastRunAt: meta.lastRunAt,
+    dayStartedAt: (meta as any).dayStartedAt ?? null,
     nextElectionDay: meta.nextElectionDay,
     budgetRetryDay: (meta as any).budgetRetryDay ?? null,
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,

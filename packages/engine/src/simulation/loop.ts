@@ -66,6 +66,12 @@ export async function runDay(): Promise<number> {
   const currentDay = meta.currentDay + 1;
   console.log(`\n=== DAY ${currentDay} ===`);
 
+  // Write currentDay + dayStartedAt immediately so the API reflects the new day in real time
+  db.update(schema.simulationMeta)
+    .set({ currentDay, dayStartedAt: new Date().toISOString() } as any)
+    .where(eq(schema.simulationMeta.id, meta.id))
+    .run();
+
   // 2. Load all data
   const allParties = db.select().from(schema.parties).all() as unknown as Party[];
   const stateRows = db.select().from(schema.nationalState).all();

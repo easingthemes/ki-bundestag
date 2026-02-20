@@ -51,6 +51,9 @@ export function Bills() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
+  // Reset per-group limits when filters change
+  useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
+
   if (parties.length === 0) return <div className="loading">Loading...</div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
@@ -67,9 +70,6 @@ export function Bills() {
     status,
     bills: filteredBills.filter(b => b.status === status),
   })).filter(g => g.bills.length > 0);
-
-  // Reset per-group limits when filters change
-  useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
 
   const hasFilters = !!(filterCategory || filterParty || filterSearch || filterStatus);
 

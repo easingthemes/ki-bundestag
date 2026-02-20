@@ -87,6 +87,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentDay: integer("current_day").notNull().default(0),
   lastRunAt: text("last_run_at"),
+  dayStartedAt: text("day_started_at"),
   nextElectionDay: integer("next_election_day").notNull().default(120),
   lowSentimentStreak: integer("low_sentiment_streak").notNull().default(0),
   budgetRetryDay: integer("budget_retry_day"),
