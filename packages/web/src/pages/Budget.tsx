@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { api, Budget as BudgetRecord, BudgetAllocations, Party, SimulationStatus } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
 
 const MINISTRY_LABELS: Record<keyof BudgetAllocations, string> = {
   finance: "Finance",
@@ -32,6 +33,7 @@ export function Budget() {
   const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
   const [filter, setFilter] = useState<"all" | "passed" | "rejected">("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(3);
 
   const refresh = useCallback(() => {
     api.getBudgets().then(setBudgets).catch(console.error);
@@ -45,6 +47,8 @@ export function Budget() {
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
   const filtered = filter === "all" ? budgets : budgets.filter(b => b.status === filter);
+
+  useEffect(() => { setVisibleCount(3); }, [filter]);
 
   const passedCount = budgets.filter(b => b.status === "passed").length;
   const rejectedCount = budgets.filter(b => b.status === "rejected").length;
@@ -85,7 +89,7 @@ export function Budget() {
         </div>
       )}
 
-      {filtered.map(budget => {
+      {filtered.slice(0, visibleCount).map(budget => {
         const isOpen = expanded.has(budget.id);
         return (
           <div
@@ -219,6 +223,12 @@ export function Budget() {
           </div>
         );
       })}
+      <ShowMoreButton
+        total={filtered.length}
+        visible={Math.min(visibleCount, filtered.length)}
+        increment={3}
+        onShowMore={() => setVisibleCount(c => c + 3)}
+      />
     </div>
   );
 }

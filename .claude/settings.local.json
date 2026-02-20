@@ -21,7 +21,11 @@
       "Bash(chmod:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(echo:*)",
-      "mcp__chrome-devtools__list_pages"
+      "mcp__chrome-devtools__list_pages",
+      "WebFetch(domain:www.politico.eu)",
+      "WebFetch(domain:www.tagesschau.de)",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__evaluate_script"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -88,7 +88,7 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 
 ## Web Pages
 
-- **Dashboard**: Coalition bar, Federal Government (Chancellor + 8 ministers), economy stats, sentiment, active crises; amber provisional budget banner when Art. 111 GG active; "Today in Berlin" summary with colored mood badge (7 labels); "Ask a Party" widget at bottom
+- **Dashboard**: 2-column grid layout (main + sidebar). Main: hero summary with mood badge, Bundestag seat bar + coalition/opposition chips, economy 4-stat grid, 3 latest events, 2 media highlights. Sidebar: Chancellor card, engagement CTAs (user-aware), public sentiment gauge, active crises, active election, Ask a Party widget. Full-width "Decision of the Month" + "Party of the Month" featured section. Provisional budget amber banner when Art. 111 GG active
 - **Parties**: Clickable cards → **Party Detail** (approval chart, bills, votes, statements, question form); Vote Alignment Matrix below party grid (pairwise vote-agreement %, color-coded)
 - **Bills**: Grouped by status with vote breakdowns, "Govt. Bill" badge on government bills, "Vetoed by President" amber badge on vetoed bills
 - **Elections**: Hemicycle, bar chart, result table, negotiation rounds, coalition agreement; Coalition Calculator at bottom (interactive party checkboxes, seat counter, majority indicator, ideological spread)

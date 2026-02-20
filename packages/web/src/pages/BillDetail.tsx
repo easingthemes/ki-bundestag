@@ -170,6 +170,12 @@ export function BillDetail() {
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
         <div className="section">
           <h2>Member Signals</h2>
+          {/* Signal nudge for members who haven't signaled yet */}
+          {user && user.partyId && signals && signals.userSignal === null && (
+            <div className="nudge-banner">
+              This bill is in {STATUS_LABELS[bill.status] ?? bill.status} — signal your position to influence your party's vote.
+            </div>
+          )}
           <div className="card">
             {signals ? (() => {
               const total = signals.yes + signals.no;

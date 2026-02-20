@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { api, Poll } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
+import { useUser } from "../userContext";
 
 const VOTED_KEY = "ki-bundestag-voted-polls";
 
@@ -22,9 +25,11 @@ function markVoted(pollId: string) {
 const BAR_COLORS = ["#004b91", "#28a745", "#dc3545", "#ffc107", "#6f42c1", "#17a2b8"];
 
 export function Polls() {
+  const { user } = useUser();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(getVotedPolls);
   const [showClosed, setShowClosed] = useState(false);
+  const [closedVisible, setClosedVisible] = useState(5);
   const [voting, setVoting] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -52,9 +57,25 @@ export function Polls() {
   const activePolls = polls.filter(p => p.active);
   const closedPolls = polls.filter(p => !p.active);
 
+  const unvotedCount = activePolls.filter(p => !votedPolls.has(p.id)).length;
+
   return (
     <div>
       <h1>Public Opinion Polls</h1>
+
+      {/* Registration prompt */}
+      {!user && activePolls.length > 0 && (
+        <div className="nudge-banner">
+          <Link to="/parties">Register and join a party</Link> to participate in the simulation — vote on polls, submit questions, and more.
+        </div>
+      )}
+
+      {/* Unvoted nudge */}
+      {unvotedCount > 0 && (
+        <div className="nudge-banner nudge-action">
+          {unvotedCount} active poll{unvotedCount !== 1 ? "s" : ""} awaiting your vote.
+        </div>
+      )}
 
       {activePolls.length === 0 && closedPolls.length === 0 && (
         <div className="loading">No polls yet. Run the simulation until day 7 for the first polls.</div>
@@ -95,7 +116,7 @@ export function Polls() {
           </button>
           {showClosed && (
             <div style={{ marginTop: 12 }}>
-              {closedPolls.map(poll => (
+              {closedPolls.slice(0, closedVisible).map(poll => (
                 <PollCard
                   key={poll.id}
                   poll={poll}
@@ -104,6 +125,12 @@ export function Polls() {
                   onVote={() => {}}
                 />
               ))}
+              <ShowMoreButton
+                total={closedPolls.length}
+                visible={Math.min(closedVisible, closedPolls.length)}
+                increment={5}
+                onShowMore={() => setClosedVisible(c => c + 5)}
+              />
             </div>
           )}
         </div>

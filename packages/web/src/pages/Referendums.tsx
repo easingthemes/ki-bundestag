@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { api, Referendum } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
+import { useUser } from "../userContext";
 
 const STATUS_BADGE: Record<string, string> = {
   active: "ref-badge-active",
@@ -21,9 +24,11 @@ const CATEGORY_BORDER: Record<string, string> = {
 };
 
 export function Referendums() {
+  const { user } = useUser();
   const [referendums, setReferendums] = useState<Referendum[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  const [pastVisible, setPastVisible] = useState(5);
 
   const refresh = useCallback(() => {
     api.getReferendums(filterStatus || undefined)
@@ -44,12 +49,30 @@ export function Referendums() {
     }
   };
 
+  useEffect(() => { setPastVisible(5); }, [filterStatus]);
+
   const active = referendums.filter(r => r.status === "active");
   const past = referendums.filter(r => r.status !== "active");
+
+  const unvotedActive = active.filter(r => !votedIds.has(r.id));
 
   return (
     <div>
       <h1>Referendums</h1>
+
+      {/* Registration prompt */}
+      {!user && active.length > 0 && (
+        <div className="nudge-banner">
+          <Link to="/parties">Register and join a party</Link> to participate — vote on referendums and shape policy.
+        </div>
+      )}
+
+      {/* Unvoted nudge */}
+      {unvotedActive.length > 0 && (
+        <div className="nudge-banner nudge-action">
+          {unvotedActive.length} active referendum{unvotedActive.length !== 1 ? "s" : ""} awaiting your vote.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <select
@@ -82,7 +105,7 @@ export function Referendums() {
       {past.length > 0 && (
         <div className="section">
           <h2>Past Referendums</h2>
-          {past.map(ref => (
+          {past.slice(0, pastVisible).map(ref => (
             <ReferendumCard
               key={ref.id}
               referendum={ref}
@@ -90,6 +113,12 @@ export function Referendums() {
               onVote={handleVote}
             />
           ))}
+          <ShowMoreButton
+            total={past.length}
+            visible={Math.min(pastVisible, past.length)}
+            increment={5}
+            onShowMore={() => setPastVisible(c => c + 5)}
+          />
         </div>
       )}
 

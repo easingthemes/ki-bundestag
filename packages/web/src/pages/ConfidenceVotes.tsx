@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ConfidenceVote, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
 
 const STATUS_OPTIONS = ["all", "passed", "failed"] as const;
 const TYPE_OPTIONS = ["all", "vertrauensfrage", "misstrauensvotum"] as const;
@@ -11,6 +12,7 @@ export function ConfidenceVotes() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const refresh = useCallback(() => {
     api.getConfidenceVotes().then(setVotes).catch(console.error);
@@ -23,6 +25,8 @@ export function ConfidenceVotes() {
   if (parties.length === 0) return <div className="loading">Loading...</div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
+
+  useEffect(() => { setVisibleCount(5); }, [statusFilter, typeFilter]);
 
   const filtered = votes.filter(v => {
     if (statusFilter !== "all" && v.status !== statusFilter) return false;
@@ -90,7 +94,7 @@ export function ConfidenceVotes() {
         </div>
       )}
 
-      {filtered.map(vote => (
+      {filtered.slice(0, visibleCount).map(vote => (
         <ConfidenceVoteCard
           key={vote.id}
           vote={vote}
@@ -99,6 +103,12 @@ export function ConfidenceVotes() {
           onToggle={() => setExpandedId(expandedId === vote.id ? null : vote.id)}
         />
       ))}
+      <ShowMoreButton
+        total={filtered.length}
+        visible={Math.min(visibleCount, filtered.length)}
+        increment={5}
+        onShowMore={() => setVisibleCount(c => c + 5)}
+      />
     </div>
   );
 }

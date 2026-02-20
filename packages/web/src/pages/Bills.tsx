@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Bill, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/ui";
+import { useUser } from "../userContext";
+
+const GROUP_INITIAL = 5;
 
 const STATUS_BADGE: Record<string, string> = {
   passed: "badge-passed",
@@ -30,12 +34,14 @@ const STATUS_ORDER = ["third_reading", "second_reading", "committee", "first_rea
 const BILL_CATEGORIES = ["economy", "social", "environment", "immigration", "defense", "education", "healthcare", "infrastructure"];
 
 export function Bills() {
+  const { user } = useUser();
   const [bills, setBills] = useState<Bill[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterParty, setFilterParty] = useState<string>("");
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [groupLimits, setGroupLimits] = useState<Record<string, number>>({});
 
   const refresh = useCallback(() => {
     api.getBills().then(setBills).catch(console.error);
@@ -62,11 +68,30 @@ export function Bills() {
     bills: filteredBills.filter(b => b.status === status),
   })).filter(g => g.bills.length > 0);
 
+  // Reset per-group limits when filters change
+  useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
+
   const hasFilters = !!(filterCategory || filterParty || filterSearch || filterStatus);
+
+  const signalReadyCount = filteredBills.filter(b => b.status === "second_reading" || b.status === "third_reading").length;
 
   return (
     <div>
       <h1>Bills</h1>
+
+      {/* Registration prompt */}
+      {!user && signalReadyCount > 0 && (
+        <div className="nudge-banner">
+          <Link to="/parties">Register and join a party</Link> to signal your vote on bills in 2nd and 3rd reading.
+        </div>
+      )}
+
+      {/* Signal-ready nudge for members */}
+      {user && user.partyId && signalReadyCount > 0 && (
+        <div className="nudge-banner nudge-action">
+          {signalReadyCount} bill{signalReadyCount !== 1 ? "s" : ""} in reading stage — click to signal your position.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>
         <input
@@ -105,16 +130,26 @@ export function Bills() {
       {bills.length === 0 && (
         <div className="loading">No bills yet. Run the simulation to see bills appear.</div>
       )}
-      {grouped.map(group => (
-        <div key={group.status} className="section">
-          <h2>
-            {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
-          </h2>
-          {group.bills.map(bill => (
-            <BillCard key={bill.id} bill={bill} partyMap={partyMap} />
-          ))}
-        </div>
-      ))}
+      {grouped.map(group => {
+        const limit = groupLimits[group.status] ?? GROUP_INITIAL;
+        const visible = group.bills.slice(0, limit);
+        return (
+          <div key={group.status} className="section">
+            <h2>
+              {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
+            </h2>
+            {visible.map(bill => (
+              <BillCard key={bill.id} bill={bill} partyMap={partyMap} />
+            ))}
+            <ShowMoreButton
+              total={group.bills.length}
+              visible={visible.length}
+              increment={5}
+              onShowMore={() => setGroupLimits(prev => ({ ...prev, [group.status]: limit + 5 }))}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

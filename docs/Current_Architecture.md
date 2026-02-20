@@ -156,4 +156,4 @@ All ESM (`"type": "module"`), exports point to `./src/index.ts` (not dist/).
 ## Related Docs
 
 - `docs/Phase4_Implementation.md` — design decisions and implementation notes for Phases 4.1–4.3 (Fraktionen, Government, Budget)
-- `docs/PROGRESS.md` — full feature checklist across all phases
+- `docs/phases.md` — full feature checklist across all phases
