@@ -13,6 +13,7 @@ npm run seed              # Fresh start: wipe DB, seed 6 parties + initial state
 npm run migrate           # Apply schema changes without clearing data (safe to run repeatedly)
 npm run simulate          # Run simulation days (e.g., npm run simulate 5)
 npm run simulate:auto     # Continuous simulation loop (default 30s interval)
+npm run simulate:visitors # Launch 5 Chrome visitors with random actions (needs dev servers)
 npm run trigger:election  # Force next simulate run to trigger an election (testing)
 npm run dev:api           # Express API on port 3001
 npm run dev:web           # Vite dev server on port 5173 (proxies /api → :3001)

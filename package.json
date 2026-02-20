@@ -17,11 +17,13 @@
     "simulate:3": "npm run simulate 3",
     "simulate:6": "npm run simulate 6",
     "simulate:auto": "tsx packages/engine/src/runner-auto.ts",
-    "trigger:election": "tsx packages/engine/src/trigger-election.ts"
+    "trigger:election": "tsx packages/engine/src/trigger-election.ts",
+    "simulate:visitors": "tsx scripts/simulate-visitors.ts"
   },
   "devDependencies": {
+    "playwright": "^1.58.2",
+    "tsx": "^4.19.0",
     "turbo": "^2.4.0",
-    "typescript": "^5.7.0",
-    "tsx": "^4.19.0"
+    "typescript": "^5.7.0"
   }
 }
