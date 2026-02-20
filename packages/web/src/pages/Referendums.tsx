@@ -2,26 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Referendum } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "ref-badge-active",
-  passed: "ref-badge-passed",
-  rejected: "ref-badge-rejected",
-  expired: "ref-badge-expired",
-};
-
-const CATEGORY_BORDER: Record<string, string> = {
-  economy: "#2196F3",
-  social: "#9C27B0",
-  environment: "#4CAF50",
-  immigration: "#FF9800",
-  defense: "#607D8B",
-  education: "#00BCD4",
-  healthcare: "#E91E63",
-  infrastructure: "#795548",
-};
+const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Referendums() {
   const { user } = useUser();
@@ -62,24 +49,20 @@ export function Referendums() {
 
       {/* Registration prompt */}
       {!user && active.length > 0 && (
-        <div className="nudge-banner">
-          <Link to="/parties">Register and join a party</Link> to participate — vote on referendums and shape policy.
+        <div className={`${ALERT_STYLES.info} mb-4`}>
+          <Link to="/parties" className="text-primary font-semibold hover:underline">Register and join a party</Link> to participate — vote on referendums and shape policy.
         </div>
       )}
 
       {/* Unvoted nudge */}
       {unvotedActive.length > 0 && (
-        <div className="nudge-banner nudge-action">
+        <div className={`${ALERT_STYLES.warning} mb-4`}>
           {unvotedActive.length} active referendum{unvotedActive.length !== 1 ? "s" : ""} awaiting your vote.
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.85rem" }}
-        >
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
           <option value="">All</option>
           <option value="active">Active</option>
           <option value="passed">Passed</option>
@@ -89,7 +72,7 @@ export function Referendums() {
       </div>
 
       {active.length > 0 && (
-        <div className="section">
+        <div className="mb-8">
           <h2>Active Referendums</h2>
           {active.map(ref => (
             <ReferendumCard
@@ -103,7 +86,7 @@ export function Referendums() {
       )}
 
       {past.length > 0 && (
-        <div className="section">
+        <div className="mb-8">
           <h2>Past Referendums</h2>
           {past.slice(0, pastVisible).map(ref => (
             <ReferendumCard
@@ -123,9 +106,11 @@ export function Referendums() {
       )}
 
       {referendums.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: "2rem", color: "#888" }}>
-          No referendums yet. They are generated automatically every 30 simulation days.
-        </div>
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No referendums yet. They are generated automatically every 30 simulation days.
+          </CardContent>
+        </Card>
       )}
     </div>
   );
@@ -141,77 +126,70 @@ function ReferendumCard({
   onVote: (id: string, option: string) => void;
 }) {
   const totalVotes = Object.values(referendum.votes).reduce((s, v) => s + v, 0);
-  const borderColor = CATEGORY_BORDER[referendum.category] || "#888";
   const showResults = hasVoted || referendum.status !== "active";
 
   return (
-    <div
-      className="ref-card"
-      style={{ borderLeftColor: borderColor }}
-    >
-      <div className="ref-header">
-        <span className={`badge ${STATUS_BADGE[referendum.status] || ""}`}>
-          {referendum.status}
-        </span>
-        <span style={{ fontSize: "0.75rem", color: "#888" }}>
-          {referendum.category}
-        </span>
-        <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto" }}>
-          Day {referendum.createdOnDay} — Closes Day {referendum.closesOnDay}
-        </span>
-      </div>
-
-      <div className="ref-title">{referendum.title}</div>
-      <div className="ref-desc">{referendum.description}</div>
-
-      {referendum.status === "active" && !hasVoted ? (
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          {referendum.options.map(opt => (
-            <button
-              key={opt}
-              className="ref-vote-btn"
-              onClick={() => onVote(referendum.id, opt)}
-            >
-              {opt}
-            </button>
-          ))}
+    <Card className="mb-2.5">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Badge variant="outline" className={STATUS_BADGE[referendum.status] || ""}>
+            {referendum.status}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{referendum.category}</span>
+          <span className="text-xs text-muted-foreground ml-auto">
+            Day {referendum.createdOnDay} — Closes Day {referendum.closesOnDay}
+          </span>
         </div>
-      ) : (
-        <div style={{ marginTop: 12 }}>
-          {referendum.options.map(opt => {
-            const count = referendum.votes[opt] || 0;
-            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-            const isWinner = referendum.result === opt;
-            return (
-              <div key={opt} className="poll-result-bar" style={{ background: "#f5f5f5" }}>
-                <div
-                  className="poll-result-bar-fill"
-                  style={{
-                    width: `${pct}%`,
-                    background: isWinner ? "#28a745" : "#6c757d",
-                  }}
-                />
-                <span style={{ zIndex: 1, position: "relative" }}>
-                  {opt}: {count} votes ({pct}%)
-                  {isWinner && " ✓"}
-                </span>
-              </div>
-            );
-          })}
-          <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
-            {totalVotes} total votes {totalVotes < 10 && referendum.status === "active" && `(need ${10 - totalVotes} more for quorum)`}
+
+        <div className="font-bold text-[1.05rem] mb-1">{referendum.title}</div>
+        <p className="text-sm text-muted-foreground leading-relaxed">{referendum.description}</p>
+
+        {referendum.status === "active" && !hasVoted ? (
+          <div className="flex gap-2 mt-3">
+            {referendum.options.map(opt => (
+              <button
+                key={opt}
+                onClick={() => onVote(referendum.id, opt)}
+                className="py-2 px-6 border-2 border-primary rounded-full bg-card text-primary font-semibold text-sm cursor-pointer transition-colors hover:bg-primary hover:text-white"
+              >
+                {opt}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="mt-3">
+            {referendum.options.map(opt => {
+              const count = referendum.votes[opt] || 0;
+              const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+              const isWinner = referendum.result === opt;
+              return (
+                <div key={opt} className="h-8 rounded mb-1.5 flex items-center px-3 text-sm relative overflow-hidden bg-muted">
+                  <div
+                    className="absolute top-0 left-0 h-full rounded opacity-20"
+                    style={{ width: `${pct}%`, background: isWinner ? "#10b981" : "#71717a" }}
+                  />
+                  <span className="relative z-10">
+                    {opt}: {count} votes ({pct}%)
+                    {isWinner && " ✓"}
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalVotes} total votes {totalVotes < 10 && referendum.status === "active" && `(need ${10 - totalVotes} more for quorum)`}
+            </p>
+          </div>
+        )}
 
-      {showResults && referendum.impact && referendum.status === "passed" && (
-        <div style={{ marginTop: 8, fontSize: "0.8rem", color: "#555" }}>
-          Impact: {Object.entries(referendum.impact)
-            .filter(([, v]) => v != null && v !== 0)
-            .map(([k, v]) => `${k}: ${(v as number) > 0 ? "+" : ""}${v}`)
-            .join(", ")}
-        </div>
-      )}
-    </div>
+        {showResults && referendum.impact && referendum.status === "passed" && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Impact: {Object.entries(referendum.impact)
+              .filter(([, v]) => v != null && v !== 0)
+              .map(([k, v]) => `${k}: ${(v as number) > 0 ? "+" : ""}${v}`)
+              .join(", ")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

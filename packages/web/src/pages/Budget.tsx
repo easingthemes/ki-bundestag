@@ -1,7 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { api, Budget as BudgetRecord, BudgetAllocations, Party, SimulationStatus } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { STATUS_BADGE, VOTE_COLORS, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 
 const MINISTRY_LABELS: Record<keyof BudgetAllocations, string> = {
   finance: "Finance",
@@ -65,16 +69,21 @@ export function Budget() {
   return (
     <div>
       <h1>Bundeshaushalt</h1>
-      <p style={{ color: "#555", marginBottom: "1.5rem", fontSize: "0.9rem" }}>
+      <p className="text-sm text-muted-foreground mb-6">
         Annual budget cycles — every 60 simulation days, the coalition proposes a 300B EUR budget across 8 ministries.
       </p>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+      <div className="flex gap-2 mb-6 flex-wrap">
         {(["all", "passed", "rejected"] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`filter-btn${filter === f ? " active" : ""}`}
+            className={cn(
+              "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
+              filter === f
+                ? "bg-foreground text-background border-foreground"
+                : "bg-background text-foreground border-input hover:bg-accent"
+            )}
           >
             {f === "all" ? `All (${budgets.length})` : f === "passed" ? `Passed (${passedCount})` : `Rejected (${rejectedCount})`}
           </button>
@@ -82,145 +91,133 @@ export function Budget() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="loading">
+        <p className="text-center py-8 text-muted-foreground">
           {budgets.length === 0
             ? "No budget cycles yet. Budget votes occur every 60 simulation days."
             : "No budgets match the current filter."}
-        </div>
+        </p>
       )}
 
       {filtered.slice(0, visibleCount).map(budget => {
         const isOpen = expanded.has(budget.id);
         return (
-          <div
+          <Card
             key={budget.id}
-            className={`budget-card ${budget.status === "passed" ? "budget-passed" : "budget-rejected"}`}
-            style={{ marginBottom: "1rem" }}
+            className="mb-4"
+            style={{ borderLeft: `4px solid ${budget.status === "passed" ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative}` }}
           >
-            <div
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-              onClick={() => toggleExpand(budget.id)}
-            >
-              <div>
-                <strong>Budget Cycle {budget.cycleNumber}</strong>
-                <span style={{ marginLeft: "0.75rem", fontSize: "0.85rem", color: "#666" }}>
-                  Day {budget.proposedOnDay}
-                </span>
-                {budget.revisionAttempt > 0 && (
-                  <span className="badge badge-revision" style={{ marginLeft: 6 }}>Revised</span>
-                )}
-                {budget.status === "rejected" && budget.revisionAttempt === 0 && simStatus?.budgetRetryDay != null && (
-                  <span style={{ marginLeft: 8, fontSize: "0.78rem", color: "#856404" }}>
-                    Retry Day {simStatus.budgetRetryDay}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <span className={`badge ${budget.status === "passed" ? "badge-budget-passed" : "badge-budget-rejected"}`}>
-                  {budget.status === "passed" ? "Passed" : "Rejected"}
-                </span>
-                <span style={{ color: "#888", fontSize: "0.8rem" }}>{isOpen ? "▲" : "▼"}</span>
-              </div>
-            </div>
-
-            {/* Seat vote bar */}
-            <div style={{ marginTop: "0.75rem" }}>
-              <div style={{ fontSize: "0.8rem", color: "#666", marginBottom: "0.25rem" }}>
-                Parliament vote — Yes: {budget.yesSeats ?? 0} / No: {budget.noSeats ?? 0} seats
-              </div>
-              <div className="vote-bar">
-                <div
-                  className="vote-bar-yes"
-                  style={{ width: `${((budget.yesSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
-                />
-                <div
-                  className="vote-bar-no"
-                  style={{ width: `${((budget.noSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {isOpen && (
-              <div style={{ marginTop: "1rem", borderTop: "1px solid #eee", paddingTop: "1rem" }}>
-                {/* Ministry allocations */}
-                <div style={{ marginBottom: "1rem" }}>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                    Ministry Allocations (Total: {budget.totalAmount}B EUR)
-                  </div>
-                  {(Object.keys(budget.allocations) as (keyof BudgetAllocations)[]).map(k => {
-                    const amount = budget.allocations[k];
-                    const share = (amount / budget.totalAmount) * 100;
-                    const color = MINISTRY_COLORS[k] || "#999";
-                    return (
-                      <div key={k} className="budget-allocation-row">
-                        <div style={{ minWidth: "140px", fontSize: "0.8rem" }}>
-                          {MINISTRY_LABELS[k]}
-                        </div>
-                        <div style={{ minWidth: "70px", fontSize: "0.8rem", textAlign: "right", color: "#444" }}>
-                          {amount.toFixed(1)}B
-                        </div>
-                        <div style={{ minWidth: "44px", fontSize: "0.75rem", color: "#888", textAlign: "right" }}>
-                          {share.toFixed(1)}%
-                        </div>
-                        <div className="budget-allocation-bar" style={{ flex: 1 }}>
-                          <div
-                            className="budget-allocation-fill"
-                            style={{ width: `${share}%`, background: color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+            <CardContent className="p-5">
+              <div
+                className="flex justify-between items-center cursor-pointer"
+                onClick={() => toggleExpand(budget.id)}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <strong>Budget Cycle {budget.cycleNumber}</strong>
+                  <span className="text-sm text-muted-foreground">Day {budget.proposedOnDay}</span>
+                  {budget.revisionAttempt > 0 && (
+                    <Badge variant="outline" className={REVISED_BADGE}>Revised</Badge>
+                  )}
+                  {budget.status === "rejected" && budget.revisionAttempt === 0 && simStatus?.budgetRetryDay != null && (
+                    <span className="text-xs text-amber-600">Retry Day {simStatus.budgetRetryDay}</span>
+                  )}
                 </div>
+                <div className="flex gap-2 items-center">
+                  <Badge variant="outline" className={budget.status === "passed"
+                    ? STATUS_BADGE.passed
+                    : STATUS_BADGE.rejected
+                  }>
+                    {budget.status === "passed" ? "Passed" : "Rejected"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{isOpen ? "▲" : "▼"}</span>
+                </div>
+              </div>
 
-                {/* Economic effect */}
-                {budget.economicEffect && Object.keys(budget.economicEffect).length > 0 && (
-                  <div style={{ marginBottom: "1rem" }}>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.25rem" }}>
-                      Economic Effects
+              {/* Seat vote bar */}
+              <div className="mt-3">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Parliament vote — Yes: {budget.yesSeats ?? 0} / No: {budget.noSeats ?? 0} seats
+                </div>
+                <div className="flex h-5 rounded overflow-hidden my-2">
+                  <div
+                    className={VOTE_COLORS.yes}
+                    style={{ width: `${((budget.yesSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
+                  />
+                  <div
+                    className={VOTE_COLORS.no}
+                    style={{ width: `${((budget.noSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {isOpen && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  {/* Ministry allocations */}
+                  <div className="mb-4">
+                    <div className="text-sm font-semibold mb-2">
+                      Ministry Allocations (Total: {budget.totalAmount}B EUR)
                     </div>
-                    {Object.entries(budget.economicEffect).map(([key, delta]) => {
-                      const d = delta as number;
+                    {(Object.keys(budget.allocations) as (keyof BudgetAllocations)[]).map(k => {
+                      const amount = budget.allocations[k];
+                      const share = (amount / budget.totalAmount) * 100;
+                      const color = MINISTRY_COLORS[k] || "#999";
                       return (
-                        <div key={key} style={{ fontSize: "0.8rem", color: d > 0 ? "#155724" : "#721c24" }}>
-                          {key}: {d > 0 ? "+" : ""}{d}
+                        <div key={k} className="flex items-center gap-2 mb-1">
+                          <div className="min-w-36 text-xs">{MINISTRY_LABELS[k]}</div>
+                          <div className="min-w-18 text-xs text-right text-muted-foreground">{amount.toFixed(1)}B</div>
+                          <div className="min-w-11 text-xs text-right text-muted-foreground">{share.toFixed(1)}%</div>
+                          <div className="flex-1 bg-muted rounded h-3 overflow-hidden min-w-15">
+                            <div className="h-full rounded min-w-0.5" style={{ width: `${share}%`, background: color }} />
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                )}
 
-                {/* Party vote breakdown */}
-                {budget.votes.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.25rem" }}>
-                      Party Votes
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      {budget.votes.map(v => {
-                        const party = partyMap.get(v.partyId);
+                  {/* Economic effect */}
+                  {budget.economicEffect && Object.keys(budget.economicEffect).length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-sm font-semibold mb-1">Economic Effects</div>
+                      {Object.entries(budget.economicEffect).map(([key, delta]) => {
+                        const d = delta as number;
                         return (
-                          <span
-                            key={v.partyId}
-                            style={{
-                              fontSize: "0.75rem",
-                              padding: "0.1rem 0.4rem",
-                              borderRadius: "10px",
-                              background: v.vote === "yes" ? "#d4edda" : "#f8d7da",
-                              color: v.vote === "yes" ? "#155724" : "#721c24",
-                              border: `1px solid ${party?.color || "#ccc"}`,
-                            }}
-                          >
-                            {party?.name ?? v.partyId}: {v.vote} ({v.seats})
-                          </span>
+                          <div key={key} className="text-xs" style={{ color: d > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
+                            {key}: {d > 0 ? "+" : ""}{d}
+                          </div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                  )}
+
+                  {/* Party vote breakdown */}
+                  {budget.votes.length > 0 && (
+                    <div>
+                      <div className="text-sm font-semibold mb-1">Party Votes</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {budget.votes.map(v => {
+                          const party = partyMap.get(v.partyId);
+                          return (
+                            <Badge
+                              key={v.partyId}
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                v.vote === "yes"
+                                  ? STATUS_BADGE.passed
+                                  : STATUS_BADGE.rejected
+                              )}
+                              style={{ border: `1px solid ${party?.color || "#ccc"}` }}
+                            >
+                              {party?.name ?? v.partyId}: {v.vote} ({v.seats})
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         );
       })}
       <ShowMoreButton

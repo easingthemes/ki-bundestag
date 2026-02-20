@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, SimulationEvent, Party } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { SEMANTIC_HEX } from "@/lib/colors";
 
 const EVENT_CATEGORIES: Record<string, { label: string; types: string[] }> = {
   legislative: {
@@ -39,24 +43,24 @@ const HIGH_BREAKING_TYPES = new Set([
 ]);
 
 const EVENT_BORDER_COLOR: Record<string, string> = {
-  bill_proposed: "#17a2b8",
-  bill_debate: "#ffc107",
-  bill_passed: "#28a745",
-  bill_rejected: "#dc3545",
-  crisis_start: "#dc3545",
-  crisis_end: "#28a745",
-  election_announced: "#004b91",
-  election_campaign: "#6f42c1",
-  election_result: "#004b91",
-  government_formed: "#004b91",
-  negotiation_round: "#6f42c1",
-  negotiation_complete: "#004b91",
-  statement: "#555",
-  vote_cast: "#888",
-  economy_update: "#6c757d",
-  weekly_report: "#6c757d",
-  monthly_report: "#6c757d",
-  day_start: "#adb5bd",
+  bill_proposed: "#0891b2",
+  bill_debate: "#f59e0b",
+  bill_passed: "#10b981",
+  bill_rejected: "#ef4444",
+  crisis_start: "#ef4444",
+  crisis_end: "#10b981",
+  election_announced: "#1d4ed8",
+  election_campaign: "#7c3aed",
+  election_result: "#1d4ed8",
+  government_formed: "#1d4ed8",
+  negotiation_round: "#7c3aed",
+  negotiation_complete: "#1d4ed8",
+  statement: "#71717a",
+  vote_cast: "#a1a1aa",
+  economy_update: "#71717a",
+  weekly_report: "#71717a",
+  monthly_report: "#71717a",
+  day_start: "#d4d4d8",
 };
 
 const PAGE_SIZE = 50;
@@ -148,104 +152,108 @@ export function NewsFeed() {
       <h1>News Feed</h1>
 
       {/* Filter bar */}
-      <div className="news-filter-bar">
-        {Object.entries(EVENT_CATEGORIES).map(([catKey, cat]) => (
-          <div key={catKey} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-            <button
-              className={`news-filter-btn ${cat.types.every(t => activeFilters.has(t)) ? "active" : ""}`}
-              onClick={() => toggleCategory(cat.types)}
-              style={{ fontWeight: 600, fontSize: "0.8rem" }}
-            >
-              {cat.label}
-            </button>
-            {cat.types.map(type => (
+      <Card className="mb-6">
+        <CardContent className="p-4 flex flex-wrap gap-2">
+          {Object.entries(EVENT_CATEGORIES).map(([catKey, cat]) => (
+            <div key={catKey} className="flex items-center gap-1 flex-wrap">
               <button
-                key={type}
-                className={`news-filter-btn ${activeFilters.has(type) ? "active" : ""}`}
-                onClick={() => toggleFilter(type)}
-                style={{ borderLeftColor: EVENT_BORDER_COLOR[type] || "#888" }}
+                className={cn(
+                  "px-3 py-1 border rounded-full text-xs font-semibold cursor-pointer transition-colors",
+                  cat.types.every(t => activeFilters.has(t))
+                    ? "bg-primary border-primary text-white"
+                    : "bg-card border-input text-muted-foreground hover:bg-accent hover:border-border"
+                )}
+                onClick={() => toggleCategory(cat.types)}
               >
-                {type.replace(/_/g, " ")}
+                {cat.label}
               </button>
-            ))}
-          </div>
-        ))}
-        {activeFilters.size > 0 && (
-          <button className="news-filter-btn" onClick={clearFilters} style={{ color: "#dc3545" }}>
-            Clear filters
-          </button>
-        )}
-      </div>
+              {cat.types.map(type => (
+                <button
+                  key={type}
+                  className={cn(
+                    "px-3 py-1 border rounded-full text-xs font-medium cursor-pointer transition-colors",
+                    activeFilters.has(type)
+                      ? "bg-primary border-primary text-white"
+                      : "bg-card border-input text-muted-foreground hover:bg-accent hover:border-border"
+                  )}
+                  onClick={() => toggleFilter(type)}
+                  style={{ borderLeftColor: EVENT_BORDER_COLOR[type] || "#888" }}
+                >
+                  {type.replace(/_/g, " ")}
+                </button>
+              ))}
+            </div>
+          ))}
+          {activeFilters.size > 0 && (
+            <button
+              className="px-3 py-1 border border-input rounded-full text-xs font-medium cursor-pointer text-destructive bg-card hover:bg-accent"
+              onClick={clearFilters}
+            >
+              Clear filters
+            </button>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Event stream */}
       {dayGroups.length === 0 ? (
-        <div className="loading">No events yet. Run the simulation first.</div>
+        <p className="text-center py-8 text-muted-foreground">No events yet. Run the simulation first.</p>
       ) : (
         <div>
           {dayGroups.map(group => {
             const dayEvents = group.events.filter(e => e.type !== "day_start");
             const limit = dayLimits[group.dayNumber] ?? DAY_INITIAL;
-            const visible = dayEvents.slice(0, limit);
+            const visibleEvents = dayEvents.slice(0, limit);
             return (
               <div key={group.dayNumber}>
-                <div className="news-day-separator">Day {group.dayNumber} ({dayEvents.length})</div>
-                {visible.map(ev => {
+                <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">
+                  Day {group.dayNumber} ({dayEvents.length})
+                </div>
+                {visibleEvents.map(ev => {
                   const isBreaking = BREAKING_TYPES.has(ev.type);
                   const isHighBreaking = HIGH_BREAKING_TYPES.has(ev.type);
                   const isCrisisHigh = ev.type === "crisis_start" && ev.data?.severity === "high";
                   const showBreaking = isBreaking || isCrisisHigh;
 
                   return (
-                    <div
+                    <Card
                       key={ev.id}
-                      className={`news-card ${showBreaking ? "news-card-breaking" : ""}`}
+                      className={cn("mb-1.5", showBreaking && "border-l-[5px]")}
                       style={{
-                        borderLeftColor: EVENT_BORDER_COLOR[ev.type] || "#888",
-                        ...(isHighBreaking ? { background: "#f8f9ff" } : {}),
+                        borderLeftColor: showBreaking ? SEMANTIC_HEX.negative : (EVENT_BORDER_COLOR[ev.type] || "#888"),
+                        borderLeftWidth: 4,
+                        ...(isHighBreaking ? { background: "var(--color-muted)" } : {}),
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                        <div style={{ flex: 1 }}>
-                          {showBreaking && (
-                            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#dc3545", textTransform: "uppercase", marginBottom: 2 }}>
-                              Breaking
+                      <CardContent className="p-3 px-4">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1">
+                            {showBreaking && (
+                              <div className="text-xs font-bold text-destructive uppercase mb-0.5">Breaking</div>
+                            )}
+                            <div className={cn("font-semibold", showBreaking ? "text-base" : "text-sm")}>
+                              {ev.title}
                             </div>
-                          )}
-                          <div style={{ fontWeight: 600, fontSize: showBreaking ? "1rem" : "0.9rem" }}>
-                            {ev.title}
+                            <p className="text-sm text-muted-foreground mt-1">{ev.description}</p>
                           </div>
-                          <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>
-                            {ev.description}
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge variant="outline" className="text-muted-foreground text-xs">
+                              {ev.type.replace(/_/g, " ")}
+                            </Badge>
+                            {ev.actor !== "system" && (
+                              <span className="text-xs font-semibold" style={{ color: getPartyColor(ev.actor) }}>
+                                {getPartyName(ev.actor)}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                          <span style={{
-                            fontSize: "0.65rem",
-                            padding: "1px 6px",
-                            borderRadius: 3,
-                            background: "#f0f0f0",
-                            color: "#666",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {ev.type.replace(/_/g, " ")}
-                          </span>
-                          {ev.actor !== "system" && (
-                            <span style={{
-                              fontSize: "0.7rem",
-                              fontWeight: 600,
-                              color: getPartyColor(ev.actor),
-                            }}>
-                              {getPartyName(ev.actor)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
                 <ShowMoreButton
                   total={dayEvents.length}
-                  visible={visible.length}
+                  visible={visibleEvents.length}
                   increment={5}
                   onShowMore={() => setDayLimits(prev => ({ ...prev, [group.dayNumber]: limit + 5 }))}
                 />
@@ -255,17 +263,10 @@ export function NewsFeed() {
 
           {/* Load more */}
           {events.length < total && (
-            <div style={{ textAlign: "center", padding: "1.5rem" }}>
+            <div className="text-center py-6">
               <button
                 onClick={() => setOffset(events.length)}
-                style={{
-                  padding: "0.5rem 2rem",
-                  borderRadius: 4,
-                  border: "1px solid #ccc",
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                }}
+                className="py-2 px-8 rounded border border-input bg-card cursor-pointer text-sm hover:bg-accent"
               >
                 Load more ({total - events.length} remaining)
               </button>

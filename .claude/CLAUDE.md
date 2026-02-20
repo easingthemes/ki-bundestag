@@ -29,7 +29,7 @@ Monorepo with npm workspaces + Turborepo. Four packages:
 - **`types`** — Pure TypeScript type definitions (`emitDeclarationOnly`), no runtime code
 - **`engine`** — Core simulation: AI agent calls, DB access (Drizzle + better-sqlite3), simulation loop
 - **`api`** — Express REST server, imports from engine + types
-- **`web`** — React 19 SPA (Vite + React Router v7), has its own local type copies in `api.ts`
+- **`web`** — React 19 SPA (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui), has its own local type copies in `api.ts`
 
 Dependency chain: `types` ← `engine` ← `api`. Web is standalone (no workspace deps).
 
@@ -105,6 +105,28 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 - **Log**: Expandable day-by-day simulation events
 - **About**: Project overview and tech stack info
 - **Admin**: Inject events (crisis, snap election, economic shock, invalidate election, trigger budget cycle); AI model config table; simulation actions reference (27 actions, AI vs Algorithmic, expandable detail)
+
+## Web UI Stack
+
+The web package uses **Tailwind CSS v4** + **shadcn/ui** for all styling:
+
+- **Tailwind v4**: `@import "tailwindcss"` + `@theme inline` block in `src/styles.css` (not v3 directives)
+- **shadcn/ui**: 15 components in `src/components/ui/` (card, badge, button, sheet, skeleton, etc.). Config in `components.json`
+- **`@` path alias**: `@/components/ui/card` etc. — configured in both `vite.config.ts` and `tsconfig.json`
+- **`cn()` utility**: `clsx` + `tailwind-merge` from `src/lib/utils.ts` — used for conditional class merging
+- **`src/components/shared.tsx`**: App-level wrappers (Button with variant mapping, SkeletonCard, SkeletonTitle, ShowMoreButton)
+- **Party colors**: Stay as inline `style={{ backgroundColor: party.color }}` — dynamic values can't be Tailwind classes
+- **Inter font**: Loaded via Google Fonts in `index.html`
+- **Global headings**: `h1`/`h2`/`h3` styled globally in `styles.css` (foreground color, semibold, tight tracking — no uppercase)
+- **`src/lib/colors.ts`**: Shared semantic color maps (19 exports): `STATUS_BADGE`, `ROLE_BADGE`, `VOTE_COLORS`, `VOTE_HEX`, `MOOD_BADGE`, `ALERT_STYLES`, `PHASE_BADGE`, `SEVERITY_BADGE`, `SEMANTIC_HEX`, etc. All pages import from here — no per-page color maps
+- **Common patterns across pages**:
+  - Cards: `<Card><CardContent className="p-5">...</CardContent></Card>`
+  - Badges: `<Badge variant="outline" className={STATUS_BADGE[status]}>` (using shared color maps from `colors.ts`)
+  - Filter pills: `cn("px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer", isActive ? "bg-foreground text-background" : "...")`
+  - Filter selects: `SELECT_CLS` constant with shadcn-style input classes
+  - Vote bars: `<div className="flex h-5 rounded overflow-hidden">` with `VOTE_COLORS.yes`/`.no`/`.abstain` children
+  - Alert banners: `ALERT_STYLES.info` (blue), `ALERT_STYLES.warning` (amber)
+  - Inline dynamic colors: `SEMANTIC_HEX.positive`/`.negative`/`.neutral`/`.warning` for `style={{ }}` attributes
 
 ## Environment
 

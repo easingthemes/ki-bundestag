@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { api, CrisisTemplate } from "../api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { MODEL_TYPE_BADGE } from "@/lib/colors";
 
 // ─── Action reference data ────────────────────────────────────────────────────
 
@@ -15,7 +19,6 @@ interface ActionRow {
 }
 
 const ACTIONS: ActionRow[] = [
-  // ── AI: daily party agent ──
   {
     action: "propose_bill",
     category: "Legislature",
@@ -152,7 +155,6 @@ const ACTIONS: ActionRow[] = [
     summary: "Creates a citizen referendum question with economic impact",
     detail: "Haiku generates a referendum based on active crises and recent legislation. Includes Yes/No options and projected economic impact. Users vote; 10-vote quorum required for the result to affect the simulation. Closes after 14 days.",
   },
-  // ── Algorithmic ──
   {
     action: "budget_vote",
     category: "Government",
@@ -275,17 +277,13 @@ const ACTIONS: ActionRow[] = [
   },
 ];
 
-const TYPE_BADGE: Record<ActionType, string> = {
-  "AI — Haiku":  "badge-ai-haiku",
-  "AI — Sonnet": "badge-ai-sonnet",
-  "Algorithmic": "badge-algorithmic",
-};
-
 const TYPE_LABEL: Record<ActionType, string> = {
   "AI — Haiku":  "AI · Haiku",
   "AI — Sonnet": "AI · Sonnet",
   "Algorithmic": "Algorithmic",
 };
+
+const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 // ─── Model config ─────────────────────────────────────────────────────────────
 
@@ -373,256 +371,283 @@ export function Admin() {
     <div>
       <h1>Admin</h1>
 
-      {/* ── User Actions ──────────────────────────────────────────── */}
-      <div className="section">
+      {/* ── Inject Events ──────────────────────────────────────────── */}
+      <div className="mb-8">
         <h2>Inject Events</h2>
-        <div className="card">
-          <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: "1rem" }}>
-            Manually trigger simulation events. All injections take effect at the start of the next simulation day.
-          </p>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground mb-4">
+              Manually trigger simulation events. All injections take effect at the start of the next simulation day.
+            </p>
 
-          {injectMsg && (
-            <div style={{
-              fontSize: "0.85rem", marginBottom: "1rem", padding: "8px 12px",
-              borderRadius: 4,
-              background: injectMsg.ok ? "#d4edda" : "#f8d7da",
-              color: injectMsg.ok ? "#155724" : "#721c24",
-            }}>
-              {injectMsg.text}
+            {injectMsg && (
+              <div className={cn(
+                "text-sm mb-4 px-3 py-2 rounded",
+                injectMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+              )}>
+                {injectMsg.text}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              {/* Crisis */}
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <strong>Trigger Crisis</strong>
+                    <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Injects a crisis from the 8 German templates. Daily economic drain + sentiment hit for its duration.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    value={selectedCrisis}
+                    onChange={e => setSelectedCrisis(e.target.value)}
+                    className={SELECT_CLS}
+                  >
+                    {crisisTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.severity})</option>
+                    ))}
+                  </select>
+                  <button
+                    className="px-3.5 py-1.5 rounded border border-primary bg-primary text-white text-sm cursor-pointer hover:bg-primary/90"
+                    onClick={() => { if (selectedCrisis) inject("crisis", { templateId: selectedCrisis }); }}
+                  >
+                    Inject
+                  </button>
+                </div>
+              </div>
+
+              {/* Snap Election */}
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <strong>Call Snap Election</strong>
+                    <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Schedules an election announcement on the next sim day. Overrides nextElectionDay.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    className="px-3.5 py-1.5 rounded border border-primary bg-primary text-white text-sm cursor-pointer hover:bg-primary/90"
+                    onClick={() => inject("election")}
+                  >
+                    Inject
+                  </button>
+                </div>
+              </div>
+
+              {/* Economic Shock */}
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <strong>Economic Shock</strong>
+                    <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Applies a fixed shock: budget −5B, unemployment +0.5pp, inflation +0.3pp, GDP −0.5pp, sentiment −5.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    className="px-3.5 py-1.5 rounded border border-amber-500 bg-amber-500 text-white text-sm cursor-pointer hover:bg-amber-600"
+                    onClick={() => inject("economic_shock", {
+                      impact: { budget: -5, unemployment: 0.5, inflation: 0.3, gdpGrowth: -0.5, publicSentiment: -5 },
+                    })}
+                  >
+                    Inject
+                  </button>
+                </div>
+              </div>
+
+              {/* Trigger Budget Cycle */}
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <strong>Trigger Budget Cycle</strong>
+                    <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Forces a budget vote on the next sim day, regardless of the 60-day cycle.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    className="px-3.5 py-1.5 rounded border border-primary bg-primary text-white text-sm cursor-pointer hover:bg-primary/90"
+                    onClick={() => inject("budget")}
+                  >
+                    Inject
+                  </button>
+                </div>
+              </div>
+
+              {/* Invalidate Election */}
+              <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <strong>Invalidate Election</strong>
+                    <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Cancels an active election in progress (announced/campaign phase). Resets nextElectionDay to +120.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    className="px-3.5 py-1.5 rounded border border-destructive bg-destructive text-white text-sm cursor-pointer hover:bg-destructive/90"
+                    onClick={() => inject("invalidate_election")}
+                  >
+                    Inject
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-            {/* Crisis */}
-            <div className="admin-inject-row">
-              <div className="admin-inject-label">
-                <strong>Trigger Crisis</strong>
-                <span className="badge badge-algorithmic" style={{ marginLeft: 8 }}>Algorithmic</span>
-                <p style={{ fontSize: "0.8rem", color: "#666", margin: "0.15rem 0 0" }}>
-                  Injects a crisis from the 8 German templates. Daily economic drain + sentiment hit for its duration.
-                </p>
-              </div>
-              <div className="admin-inject-controls">
-                <select
-                  value={selectedCrisis}
-                  onChange={e => setSelectedCrisis(e.target.value)}
-                  style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.85rem" }}
-                >
-                  {crisisTemplates.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.severity})</option>
-                  ))}
-                </select>
-                <button className="admin-btn" onClick={() => {
-                  if (selectedCrisis) inject("crisis", { templateId: selectedCrisis });
-                }}>
-                  Inject
-                </button>
-              </div>
-            </div>
-
-            {/* Snap Election */}
-            <div className="admin-inject-row">
-              <div className="admin-inject-label">
-                <strong>Call Snap Election</strong>
-                <span className="badge badge-algorithmic" style={{ marginLeft: 8 }}>Algorithmic</span>
-                <p style={{ fontSize: "0.8rem", color: "#666", margin: "0.15rem 0 0" }}>
-                  Schedules an election announcement on the next sim day. Overrides nextElectionDay.
-                </p>
-              </div>
-              <div className="admin-inject-controls">
-                <button className="admin-btn" onClick={() => inject("election")}>
-                  Inject
-                </button>
-              </div>
-            </div>
-
-            {/* Economic Shock */}
-            <div className="admin-inject-row">
-              <div className="admin-inject-label">
-                <strong>Economic Shock</strong>
-                <span className="badge badge-algorithmic" style={{ marginLeft: 8 }}>Algorithmic</span>
-                <p style={{ fontSize: "0.8rem", color: "#666", margin: "0.15rem 0 0" }}>
-                  Applies a fixed shock: budget −5B, unemployment +0.5pp, inflation +0.3pp, GDP −0.5pp, sentiment −5.
-                </p>
-              </div>
-              <div className="admin-inject-controls">
-                <button className="admin-btn admin-btn-warn" onClick={() => inject("economic_shock", {
-                  impact: { budget: -5, unemployment: 0.5, inflation: 0.3, gdpGrowth: -0.5, publicSentiment: -5 },
-                })}>
-                  Inject
-                </button>
-              </div>
-            </div>
-
-            {/* Trigger Budget Cycle */}
-            <div className="admin-inject-row">
-              <div className="admin-inject-label">
-                <strong>Trigger Budget Cycle</strong>
-                <span className="badge badge-algorithmic" style={{ marginLeft: 8 }}>Algorithmic</span>
-                <p style={{ fontSize: "0.8rem", color: "#666", margin: "0.15rem 0 0" }}>
-                  Forces a budget vote on the next sim day, regardless of the 60-day cycle. Useful for testing the provisional budget flow.
-                </p>
-              </div>
-              <div className="admin-inject-controls">
-                <button className="admin-btn" onClick={() => inject("budget")}>
-                  Inject
-                </button>
-              </div>
-            </div>
-
-            {/* Invalidate Election */}
-            <div className="admin-inject-row">
-              <div className="admin-inject-label">
-                <strong>Invalidate Election</strong>
-                <span className="badge badge-algorithmic" style={{ marginLeft: 8 }}>Algorithmic</span>
-                <p style={{ fontSize: "0.8rem", color: "#666", margin: "0.15rem 0 0" }}>
-                  Cancels an active election in progress (announced/campaign phase). Resets nextElectionDay to +120.
-                </p>
-              </div>
-              <div className="admin-inject-controls">
-                <button className="admin-btn admin-btn-danger" onClick={() => inject("invalidate_election")}>
-                  Inject
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── AI Model Configuration ─────────────────────────────────── */}
-      <div className="section">
+      <div className="mb-8">
         <h2>AI Model Configuration</h2>
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Key</th>
-                <th>Model</th>
-                <th>Tokens</th>
-                <th>Env Override</th>
-                <th>Used For</th>
-                <th style={{ width: 32 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {MODEL_CONFIG.map(m => (
-                <Fragment key={m.key}>
-                  <tr className={expandedModels.has(m.key) ? "admin-row-expanded" : ""}>
-                    <td><code>{m.key}</code></td>
-                    <td style={{ fontSize: "0.8rem", fontFamily: "monospace" }}>{m.model}</td>
-                    <td style={{ textAlign: "right" }}>{m.maxTokens.toLocaleString()}</td>
-                    <td><code style={{ fontSize: "0.75rem" }}>{m.envVar}</code></td>
-                    <td style={{ fontSize: "0.82rem", color: "#444" }}>{m.usedFor}</td>
-                    <td>
-                      <button
-                        className="admin-expand-btn"
-                        onClick={() => toggleModel(m.key)}
-                        title={expandedModels.has(m.key) ? "Collapse" : "Expand prompt/context details"}
-                      >
-                        {expandedModels.has(m.key) ? "▲" : "▼"}
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedModels.has(m.key) && (
-                    <tr className="admin-row-detail">
-                      <td colSpan={6}>
-                        <div className="admin-detail-block">
-                          <div className="admin-detail-row">
-                            <span className="admin-detail-label">System prompt</span>
-                            <span>{m.systemPrompt}</span>
-                          </div>
-                          <div className="admin-detail-row">
-                            <span className="admin-detail-label">User context</span>
-                            <span>{m.userContext}</span>
-                          </div>
-                          <div className="admin-detail-row">
-                            <span className="admin-detail-label">Notes</span>
-                            <span>{m.notes}</span>
-                          </div>
-                        </div>
+        <Card>
+          <CardContent className="p-0 overflow-hidden">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Key</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Model</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Tokens</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Env Override</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Used For</th>
+                  <th className="w-8 bg-muted/50 border-b-2 border-border"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {MODEL_CONFIG.map(m => (
+                  <Fragment key={m.key}>
+                    <tr className={expandedModels.has(m.key) ? "bg-muted/50" : ""}>
+                      <td className="px-3 py-2 border-b border-border align-middle"><code>{m.key}</code></td>
+                      <td className="px-3 py-2 border-b border-border align-middle text-xs font-mono">{m.model}</td>
+                      <td className="px-3 py-2 border-b border-border align-middle text-right">{m.maxTokens.toLocaleString()}</td>
+                      <td className="px-3 py-2 border-b border-border align-middle"><code className="text-xs">{m.envVar}</code></td>
+                      <td className="px-3 py-2 border-b border-border align-middle text-sm text-muted-foreground">{m.usedFor}</td>
+                      <td className="px-3 py-2 border-b border-border align-middle">
+                        <button
+                          className="bg-transparent border-none cursor-pointer text-xs text-muted-foreground px-1 py-0.5 rounded hover:bg-accent hover:text-foreground"
+                          onClick={() => toggleModel(m.key)}
+                          title={expandedModels.has(m.key) ? "Collapse" : "Expand"}
+                        >
+                          {expandedModels.has(m.key) ? "▲" : "▼"}
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    {expandedModels.has(m.key) && (
+                      <tr>
+                        <td colSpan={6} className="bg-muted/30 p-0">
+                          <div className="px-4 py-3 border-l-[3px] border-l-primary/30">
+                            <div className="flex gap-3 mb-1.5 text-sm leading-relaxed">
+                              <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">System prompt</span>
+                              <span>{m.systemPrompt}</span>
+                            </div>
+                            <div className="flex gap-3 mb-1.5 text-sm leading-relaxed">
+                              <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">User context</span>
+                              <span>{m.userContext}</span>
+                            </div>
+                            <div className="flex gap-3 text-sm leading-relaxed">
+                              <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">Notes</span>
+                              <span>{m.notes}</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Simulation Actions Reference ───────────────────────────── */}
-      <div className="section">
+      <div className="mb-8">
         <h2>Simulation Actions</h2>
 
         {/* Category filter */}
-        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div className="flex gap-1.5 flex-wrap mb-4">
           {categories.map(c => (
             <button
               key={c}
               onClick={() => setCategoryFilter(c)}
-              className={`filter-btn${categoryFilter === c ? " active" : ""}`}
-              style={{ textTransform: "capitalize" }}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors capitalize",
+                categoryFilter === c
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-background text-foreground border-input hover:bg-accent"
+              )}
             >
               {c === "all" ? `All (${ACTIONS.length})` : `${c} (${ACTIONS.filter(a => a.category === c).length})`}
             </button>
           ))}
         </div>
 
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Triggered By</th>
-                <th>Description</th>
-                <th style={{ width: 32 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => {
-                const key = a.action;
-                const isOpen = expandedActions.has(key);
-                return (
-                  <Fragment key={key}>
-                    <tr className={isOpen ? "admin-row-expanded" : ""}>
-                      <td><code style={{ fontSize: "0.8rem" }}>{a.action}</code></td>
-                      <td style={{ fontSize: "0.8rem", color: "#555" }}>{a.category}</td>
-                      <td>
-                        <span className={`badge ${TYPE_BADGE[a.type]}`} style={{ whiteSpace: "nowrap" }}>
-                          {TYPE_LABEL[a.type]}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: "0.8rem", color: "#444" }}>{a.triggeredBy}</td>
-                      <td style={{ fontSize: "0.82rem", color: "#333" }}>{a.summary}</td>
-                      <td>
-                        <button
-                          className="admin-expand-btn"
-                          onClick={() => toggleAction(key)}
-                          title={isOpen ? "Collapse" : "Show mechanics detail"}
-                        >
-                          {isOpen ? "▲" : "▼"}
-                        </button>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr className="admin-row-detail">
-                        <td colSpan={6}>
-                          <div className="admin-detail-block">
-                            <p style={{ margin: 0, fontSize: "0.82rem", lineHeight: 1.6 }}>{a.detail}</p>
-                          </div>
+        <Card>
+          <CardContent className="p-0 overflow-hidden">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Action</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Category</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Type</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Triggered By</th>
+                  <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Description</th>
+                  <th className="w-8 bg-muted/50 border-b-2 border-border"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(a => {
+                  const key = a.action;
+                  const isOpen = expandedActions.has(key);
+                  return (
+                    <Fragment key={key}>
+                      <tr className={isOpen ? "bg-muted/50" : ""}>
+                        <td className="px-3 py-2 border-b border-border align-middle"><code className="text-xs">{a.action}</code></td>
+                        <td className="px-3 py-2 border-b border-border align-middle text-xs text-muted-foreground">{a.category}</td>
+                        <td className="px-3 py-2 border-b border-border align-middle">
+                          <Badge className={`${MODEL_TYPE_BADGE[a.type]} whitespace-nowrap`}>{TYPE_LABEL[a.type]}</Badge>
+                        </td>
+                        <td className="px-3 py-2 border-b border-border align-middle text-xs text-muted-foreground">{a.triggeredBy}</td>
+                        <td className="px-3 py-2 border-b border-border align-middle text-sm">{a.summary}</td>
+                        <td className="px-3 py-2 border-b border-border align-middle">
+                          <button
+                            className="bg-transparent border-none cursor-pointer text-xs text-muted-foreground px-1 py-0.5 rounded hover:bg-accent hover:text-foreground"
+                            onClick={() => toggleAction(key)}
+                            title={isOpen ? "Collapse" : "Show detail"}
+                          >
+                            {isOpen ? "▲" : "▼"}
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      {isOpen && (
+                        <tr>
+                          <td colSpan={6} className="bg-muted/30 p-0">
+                            <div className="px-4 py-3 border-l-[3px] border-l-primary/30">
+                              <p className="m-0 text-sm leading-relaxed">{a.detail}</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,19 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, MediaArticle } from "../api";
 import { usePolling } from "../usePolling";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { BIAS_BADGE as SHARED_BIAS_BADGE } from "@/lib/colors";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  policy: "#004b91",
-  crisis: "#dc3545",
-  election: "#6f42c1",
-  opinion: "#17a2b8",
-  economy: "#28a745",
+  policy: "#1d4ed8",
+  crisis: "#ef4444",
+  election: "#7c3aed",
+  opinion: "#0891b2",
+  economy: "#10b981",
 };
 
-const BIAS_LABELS: Record<string, { label: string; className: string }> = {
-  left: { label: "Left", className: "media-bias-left" },
-  center: { label: "Center", className: "media-bias-center" },
-  right: { label: "Right", className: "media-bias-right" },
+const BIAS_LABELS: Record<string, string> = {
+  left: "Left",
+  center: "Center",
+  right: "Right",
 };
 
 export function Media() {
@@ -60,118 +63,120 @@ export function Media() {
   const latestDayArticles = dayGroups[0]?.articles ?? [];
   const frontPageMap = new Map(latestDayArticles.map(a => [a.outlet, a]));
 
-  if (loading && articles.length === 0) return <div className="loading">Loading media...</div>;
+  if (loading && articles.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading media...</p>;
 
   return (
     <div>
       <h1>Media</h1>
       {articles.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: "2rem", color: "#888" }}>
-          No articles yet. Run a simulation to generate media coverage.
-        </div>
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No articles yet. Run a simulation to generate media coverage.
+          </CardContent>
+        </Card>
       ) : (
         <>
           {/* Today's Front Pages */}
-          <h2 style={{ marginBottom: "0.75rem" }}>Today's Front Pages</h2>
-          <div className="front-pages-grid" style={{ marginBottom: "2rem" }}>
+          <h2 className="mb-3">Today's Front Pages</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {OUTLET_ORDER.map(outletName => {
               const article = frontPageMap.get(outletName);
-              const bias = article ? (BIAS_LABELS[article.bias] || BIAS_LABELS.center) : null;
               const borderColor = article ? (CATEGORY_COLORS[article.category] || "#888") : "#ddd";
               const isExpanded = article ? expanded.has(article.id) : false;
 
               if (!article) {
                 return (
-                  <div key={outletName} className="front-page-column front-page-column-empty">
-                    <div className="media-outlet" style={{ marginBottom: "0.5rem" }}>{outletName}</div>
-                    <div style={{ color: "#aaa", fontSize: "0.85rem" }}>No coverage today</div>
-                  </div>
+                  <Card key={outletName} className="opacity-50">
+                    <CardContent className="p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{outletName}</div>
+                      <p className="text-sm text-muted-foreground">No coverage today</p>
+                    </CardContent>
+                  </Card>
                 );
               }
 
               return (
-                <div
+                <Card
                   key={outletName}
-                  className="front-page-column"
+                  className="cursor-pointer transition-colors hover:border-border"
                   style={{ borderColor }}
                   onClick={() => toggleExpand(article.id)}
                 >
-                  <div className="media-header" style={{ marginBottom: "0.5rem" }}>
-                    <span className="media-outlet">{outletName}</span>
-                    {bias && <span className={`badge ${bias.className}`}>{bias.label}</span>}
-                  </div>
-                  <div className="media-headline" style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
-                    {article.headline}
-                  </div>
-                  <div style={{ fontSize: "0.85rem", color: "#555", lineHeight: 1.5 }}>
-                    {article.summary.length > 200 ? article.summary.slice(0, 200) + "…" : article.summary}
-                  </div>
-                  {isExpanded && (
-                    <div className="media-content">
-                      {article.content.split("\n").map((p, i) => (
-                        <p key={i}>{p}</p>
-                      ))}
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{outletName}</span>
+                      <Badge variant="outline" className={SHARED_BIAS_BADGE[article.bias] || SHARED_BIAS_BADGE.center}>
+                        {BIAS_LABELS[article.bias] || "Center"}
+                      </Badge>
                     </div>
-                  )}
-                  {!isExpanded && (
-                    <div className="media-expand-hint">Click to read full article</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <h2 style={{ marginBottom: "0.75rem" }}>Archive</h2>
-          {visible.map(group => (
-            <div key={group.day}>
-              <div className="news-day-separator">Day {group.day}</div>
-              {group.articles.map(article => {
-                const borderColor = CATEGORY_COLORS[article.category] || "#888";
-                const bias = BIAS_LABELS[article.bias] || BIAS_LABELS.center;
-                const isExpanded = expanded.has(article.id);
-
-                return (
-                  <div
-                    key={article.id}
-                    className="media-card"
-                    style={{ borderLeftColor: borderColor }}
-                    onClick={() => toggleExpand(article.id)}
-                  >
-                    <img
-                      src={`https://picsum.photos/seed/${article.id}/800/280`}
-                      alt={article.headline}
-                      style={{
-                        width: "100%",
-                        height: 160,
-                        objectFit: "cover",
-                        borderRadius: "4px 4px 0 0",
-                        display: "block",
-                        marginBottom: 10,
-                      }}
-                      loading="lazy"
-                    />
-                    <div className="media-header">
-                      <span className="media-outlet">{article.outlet}</span>
-                      <span className={`badge ${bias.className}`}>{bias.label}</span>
-                      <span className="badge" style={{
-                        background: `${borderColor}20`,
-                        color: borderColor,
-                        marginLeft: 4,
-                      }}>{article.category}</span>
-                    </div>
-                    <div className="media-headline">{article.headline}</div>
-                    <div className="media-summary">{article.summary}</div>
+                    <div className="font-bold text-base mb-2 leading-tight">{article.headline}</div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {article.summary.length > 200 ? article.summary.slice(0, 200) + "…" : article.summary}
+                    </p>
                     {isExpanded && (
-                      <div className="media-content">
+                      <div className="mt-3 pt-3 border-t border-border text-sm leading-[1.7]">
                         {article.content.split("\n").map((p, i) => (
-                          <p key={i}>{p}</p>
+                          <p key={i} className="mb-2 last:mb-0">{p}</p>
                         ))}
                       </div>
                     )}
                     {!isExpanded && (
-                      <div className="media-expand-hint">Click to read full article</div>
+                      <p className="text-xs text-muted-foreground mt-1.5">Click to read full article</p>
                     )}
-                  </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <h2 className="mb-3">Archive</h2>
+          {visible.map(group => (
+            <div key={group.day}>
+              <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">Day {group.day}</div>
+              {group.articles.map(article => {
+                const borderColor = CATEGORY_COLORS[article.category] || "#888";
+                const isExpanded = expanded.has(article.id);
+
+                return (
+                  <Card
+                    key={article.id}
+                    className="mb-2 cursor-pointer transition-colors hover:border-border"
+                    style={{ borderLeft: `4px solid ${borderColor}` }}
+                    onClick={() => toggleExpand(article.id)}
+                  >
+                    <CardContent className="p-4">
+                      <img
+                        src={`https://picsum.photos/seed/${article.id}/800/280`}
+                        alt={article.headline}
+                        className="w-full h-40 object-cover rounded-t mb-2.5"
+                        loading="lazy"
+                      />
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{article.outlet}</span>
+                        <Badge variant="outline" className={SHARED_BIAS_BADGE[article.bias] || SHARED_BIAS_BADGE.center}>
+                          {BIAS_LABELS[article.bias] || "Center"}
+                        </Badge>
+                        <Badge
+                          className="hover:opacity-80"
+                          style={{ background: `${borderColor}20`, color: borderColor }}
+                        >
+                          {article.category}
+                        </Badge>
+                      </div>
+                      <div className="font-bold text-[1.1rem] leading-tight mb-1">{article.headline}</div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{article.summary}</p>
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-border text-sm leading-[1.7]">
+                          {article.content.split("\n").map((p, i) => (
+                            <p key={i} className="mb-2 last:mb-0">{p}</p>
+                          ))}
+                        </div>
+                      )}
+                      {!isExpanded && (
+                        <p className="text-xs text-muted-foreground mt-1.5">Click to read full article</p>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -179,16 +184,7 @@ export function Media() {
           {visible.length < dayGroups.length && (
             <button
               onClick={() => setLimit(l => l + 50)}
-              style={{
-                display: "block",
-                margin: "1.5rem auto",
-                padding: "0.75rem 2rem",
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                background: "white",
-                cursor: "pointer",
-                fontSize: "0.9rem",
-              }}
+              className="block mx-auto my-6 py-3 px-8 border border-input rounded-md bg-card cursor-pointer text-sm hover:bg-accent"
             >
               Load more
             </button>
