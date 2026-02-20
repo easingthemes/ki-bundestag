@@ -22,6 +22,10 @@ import { About } from "./pages/About";
 import { BillDetail } from "./pages/BillDetail";
 import { api, setErrorHandler, setUserToken, type User, type SimulationStatus } from "./api";
 import { UserContext, loadStoredToken, saveToken, clearToken } from "./userContext";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Menu } from "lucide-react";
+import { cn } from "@/lib/utils";
 import "./styles.css";
 
 /* ── Navigation dropdown group ──────────────────────────────────── */
@@ -36,10 +40,8 @@ function NavGroup({ label, children }: NavGroupProps) {
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const location = useLocation();
 
-  // Close dropdown on route change
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -53,22 +55,31 @@ function NavGroup({ label, children }: NavGroupProps) {
 
   return (
     <div
-      className={`nav-group${open ? " nav-group-open" : ""}`}
+      className="relative"
       ref={ref}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
       <button
-        className="nav-group-trigger"
+        className={cn(
+          "flex items-center gap-1 px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-all duration-150",
+          "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
+          open && "text-white bg-white/[0.06]"
+        )}
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="true"
       >
         {label}
-        <span className="nav-group-arrow" />
+        <svg
+          className={cn("w-2 h-2 ml-0.5 transition-transform duration-150", open && "rotate-180")}
+          viewBox="0 0 8 8" fill="currentColor"
+        >
+          <polygon points="0,0 8,0 4,5" />
+        </svg>
       </button>
       {open && (
-        <div className="nav-dropdown">
+        <div className="absolute top-[calc(100%+4px)] left-0 min-w-[200px] bg-[#1e1e36] border border-white/[0.08] rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1.5 z-[200] animate-in fade-in slide-in-from-top-1.5 duration-150">
           {children}
         </div>
       )}
@@ -76,7 +87,23 @@ function NavGroup({ label, children }: NavGroupProps) {
   );
 }
 
-/* ── Mobile nav drawer ──────────────────────────────────────────── */
+/* ── Dropdown link styling helper ────────────────────────────────── */
+function DropdownLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => cn(
+        "block px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-150",
+        "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
+        isActive && "text-white bg-white/10 border-l-2 border-[#ffd700]"
+      )}
+    >
+      {children}
+    </NavLink>
+  );
+}
+
+/* ── Mobile nav drawer (shadcn Sheet) ─────────────────────────────── */
 function MobileNav({ user }: { user: User | null }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -84,48 +111,74 @@ function MobileNav({ user }: { user: User | null }) {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
-    <>
-      <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Toggle menu">
-        <span /><span /><span />
-      </button>
-      {open && <div className="nav-mobile-backdrop" onClick={() => setOpen(false)} />}
-      <div className={`nav-mobile-drawer${open ? " nav-mobile-drawer-open" : ""}`}>
-        <div className="nav-mobile-header">
-          <span>Menu</span>
-          <button className="nav-mobile-close" onClick={() => setOpen(false)}>&times;</button>
-        </div>
-        <div className="nav-mobile-links">
-          <NavLink to="/" end>Dashboard</NavLink>
-          <div className="nav-mobile-group-label">Parlament</div>
-          <NavLink to="/bills">Gesetze</NavLink>
-          <NavLink to="/motions">Antr&auml;ge</NavLink>
-          <NavLink to="/interpellations">Anfragen</NavLink>
-          <NavLink to="/confidence-votes">Vertrauensvoten</NavLink>
-          <NavLink to="/constitutional-court">Verfassungsgericht</NavLink>
-          <NavLink to="/budget">Haushalt</NavLink>
-          <div className="nav-mobile-group-label">Parteien &amp; Wahlen</div>
-          <NavLink to="/parties">Parteien</NavLink>
-          <NavLink to="/elections">Wahlen</NavLink>
-          <NavLink to="/polls">Umfragen</NavLink>
-          <div className="nav-mobile-group-label">Mitmachen</div>
-          <NavLink to="/questions">B&uuml;rgerfragen</NavLink>
-          <NavLink to="/referendums">Volksabstimmungen</NavLink>
-          <div className="nav-mobile-group-label">Nachrichten</div>
-          <NavLink to="/news">Newsticker</NavLink>
-          <NavLink to="/media">Presse</NavLink>
-          <div className="nav-mobile-sep" />
-          <NavLink to="/log">Protokoll</NavLink>
-          <NavLink to="/about">&Uuml;ber</NavLink>
-          <NavLink to="/admin">Admin</NavLink>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button className="md:hidden ml-auto p-1.5 text-[#b0b0c0] hover:text-white" aria-label="Toggle menu">
+          <Menu className="size-5" />
+        </button>
+      </SheetTrigger>
+      <SheetContent side="right" className="bg-[#1a1a2e] border-white/[0.08] w-[280px] p-0">
+        <SheetHeader className="px-5 pt-4 pb-3 border-b border-white/[0.08]">
+          <SheetTitle className="text-white font-bold">Menu</SheetTitle>
+        </SheetHeader>
+        <nav className="py-2">
+          <MobileLink to="/" end>Dashboard</MobileLink>
+          <MobileGroupLabel>Parlament</MobileGroupLabel>
+          <MobileLink to="/bills">Gesetze</MobileLink>
+          <MobileLink to="/motions">Antr&auml;ge</MobileLink>
+          <MobileLink to="/interpellations">Anfragen</MobileLink>
+          <MobileLink to="/confidence-votes">Vertrauensvoten</MobileLink>
+          <MobileLink to="/constitutional-court">Verfassungsgericht</MobileLink>
+          <MobileLink to="/budget">Haushalt</MobileLink>
+          <MobileGroupLabel>Parteien &amp; Wahlen</MobileGroupLabel>
+          <MobileLink to="/parties">Parteien</MobileLink>
+          <MobileLink to="/elections">Wahlen</MobileLink>
+          <MobileLink to="/polls">Umfragen</MobileLink>
+          <MobileGroupLabel>Mitmachen</MobileGroupLabel>
+          <MobileLink to="/questions">B&uuml;rgerfragen</MobileLink>
+          <MobileLink to="/referendums">Volksabstimmungen</MobileLink>
+          <MobileGroupLabel>Nachrichten</MobileGroupLabel>
+          <MobileLink to="/news">Newsticker</MobileLink>
+          <MobileLink to="/media">Presse</MobileLink>
+          <Separator className="bg-white/[0.08] mx-5 my-2" />
+          <MobileLink to="/log">Protokoll</MobileLink>
+          <MobileLink to="/about">&Uuml;ber</MobileLink>
+          <MobileLink to="/admin">Admin</MobileLink>
           {!user && (
             <>
-              <div className="nav-mobile-sep" />
-              <NavLink to="/parties" className="nav-mobile-cta">Partei beitreten</NavLink>
+              <Separator className="bg-white/[0.08] mx-5 my-2" />
+              <NavLink to="/parties" className="block px-5 py-2.5 text-sm font-semibold text-[#ffd700] hover:text-[#ffe44d]">
+                Partei beitreten
+              </NavLink>
             </>
           )}
-        </div>
-      </div>
-    </>
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function MobileLink({ to, end, children }: { to: string; end?: boolean; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => cn(
+        "block px-5 py-2.5 text-sm font-medium transition-all duration-150",
+        "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
+        isActive && "text-white bg-white/[0.06] border-l-2 border-[#ffd700]"
+      )}
+    >
+      {children}
+    </NavLink>
+  );
+}
+
+function MobileGroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-5 pt-3 pb-1.5 text-[0.7rem] font-bold text-[#666] uppercase tracking-[0.08em]">
+      {children}
+    </div>
   );
 }
 
@@ -142,7 +195,6 @@ function SimStatus() {
     return () => clearInterval(id);
   }, []);
 
-  // Tick every second for progress bar
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(id);
@@ -153,37 +205,55 @@ function SimStatus() {
     const started = new Date(status.dayStartedAt).getTime();
     const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
 
-    // Day is currently running: started > completed (or no completed yet)
     if (started > completed) {
       const elapsed = now - started;
-      // Cap at 95% while running (we don't know the actual duration)
       return { running: true, pct: Math.min(Math.round((elapsed / 30_000) * 95), 95) };
     }
 
-    // Day completed: show 100% briefly, then track idle time toward next day
     const sinceCompleted = now - completed;
     if (sinceCompleted < 2_000) return { running: false, pct: 100 };
-    // After 2s, consider simulation idle
     return { running: false, pct: 0 };
   }, [status, now]);
 
   if (!status) return null;
 
   return (
-    <div className="sim-status">
-      <div className="sim-status-label">
-        <span className={`sim-status-dot${running ? " sim-status-dot-active" : ""}`} />
+    <div className="ml-auto shrink-0 flex flex-col items-end gap-0.5 min-w-[80px]">
+      <div className="flex items-center gap-1.5 text-xs text-[#b0b0c0] tabular-nums whitespace-nowrap">
+        <span className={cn(
+          "w-[7px] h-[7px] rounded-full shrink-0",
+          running ? "bg-[#28a745] shadow-[0_0_4px_#28a745] animate-pulse" : "bg-[#6c757d]"
+        )} />
         <span>Tag {status.currentDay}</span>
       </div>
-      <div className="sim-status-bar">
+      <div className="w-full h-[3px] bg-white/[0.12] rounded-sm overflow-hidden">
         <div
-          className={`sim-status-bar-fill${running ? "" : pct === 100 ? " sim-status-bar-done" : " sim-status-bar-idle"}`}
+          className={cn(
+            "h-full rounded-sm",
+            running ? "bg-[#28a745] transition-[width] duration-1000 linear" :
+            pct === 100 ? "bg-[#28a745]" : "bg-transparent"
+          )}
           style={{ width: `${pct}%` }}
         />
       </div>
     </div>
   );
 }
+
+/* ── Error toast ──────────────────────────────────────────────────── */
+
+function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      className="fixed top-[70px] left-1/2 -translate-x-1/2 z-[1000] min-w-[300px] max-w-[500px] bg-[#dc3545] text-white px-5 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer animate-in fade-in slide-in-from-top-2 duration-300"
+      onClick={onDismiss}
+    >
+      {message}
+    </div>
+  );
+}
+
+/* ── App ──────────────────────────────────────────────────────────── */
 
 function App() {
   const [error, setError] = useState<string | null>(null);
@@ -195,14 +265,12 @@ function App() {
     setTimeout(() => setError(null), 6000);
   }, []);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
     const stored = loadStoredToken();
     if (stored) {
       setUserToken(stored);
       setToken(stored);
       api.getMe().then(u => setUser(u)).catch(() => {
-        // Token no longer valid — clear it
         clearToken();
         setUserToken(null);
         setToken(null);
@@ -231,52 +299,79 @@ function App() {
   return (
     <UserContext.Provider value={{ user, token, login, logout }}>
     <BrowserRouter>
-      <div className="app">
-        <nav className="nav">
-          <Link to="/" className="nav-brand">KI Bundestag</Link>
-          <div className="nav-links">
-            <NavLink to="/" end>Dashboard</NavLink>
+      <div className="min-h-screen flex flex-col">
+        {/* ── Top navigation bar ── */}
+        <nav className="sticky top-0 z-50 bg-[#1a1a2e] text-white px-4 md:px-8 flex items-center h-14 shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+          <Link to="/" className="font-bold text-[1.15rem] text-white no-underline mr-6 whitespace-nowrap shrink-0 tracking-tight hover:opacity-90">
+            KI Bundestag
+          </Link>
+
+          {/* Desktop links */}
+          <div className="hidden md:flex items-center gap-1 flex-1 overflow-visible">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) => cn(
+                "relative px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-all duration-150",
+                "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
+                isActive && "text-white bg-white/10 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:bg-[#ffd700] after:scale-x-100",
+                !isActive && "after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:bg-[#ffd700] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-150"
+              )}
+            >
+              Dashboard
+            </NavLink>
             <NavGroup label="Parlament">
-              <NavLink to="/bills">Gesetze</NavLink>
-              <NavLink to="/motions">Antr&auml;ge</NavLink>
-              <NavLink to="/interpellations">Anfragen</NavLink>
-              <NavLink to="/confidence-votes">Vertrauensvoten</NavLink>
-              <NavLink to="/constitutional-court">Verfassungsgericht</NavLink>
-              <NavLink to="/budget">Haushalt</NavLink>
+              <DropdownLink to="/bills">Gesetze</DropdownLink>
+              <DropdownLink to="/motions">Antr&auml;ge</DropdownLink>
+              <DropdownLink to="/interpellations">Anfragen</DropdownLink>
+              <DropdownLink to="/confidence-votes">Vertrauensvoten</DropdownLink>
+              <DropdownLink to="/constitutional-court">Verfassungsgericht</DropdownLink>
+              <DropdownLink to="/budget">Haushalt</DropdownLink>
             </NavGroup>
             <NavGroup label="Parteien &amp; Wahlen">
-              <NavLink to="/parties">Parteien</NavLink>
-              <NavLink to="/elections">Wahlen</NavLink>
-              <NavLink to="/polls">Umfragen</NavLink>
+              <DropdownLink to="/parties">Parteien</DropdownLink>
+              <DropdownLink to="/elections">Wahlen</DropdownLink>
+              <DropdownLink to="/polls">Umfragen</DropdownLink>
             </NavGroup>
             <NavGroup label="Mitmachen">
-              <NavLink to="/questions">B&uuml;rgerfragen</NavLink>
-              <NavLink to="/referendums">Volksabstimmungen</NavLink>
+              <DropdownLink to="/questions">B&uuml;rgerfragen</DropdownLink>
+              <DropdownLink to="/referendums">Volksabstimmungen</DropdownLink>
             </NavGroup>
             <NavGroup label="Nachrichten">
-              <NavLink to="/news">Newsticker</NavLink>
-              <NavLink to="/media">Presse</NavLink>
+              <DropdownLink to="/news">Newsticker</DropdownLink>
+              <DropdownLink to="/media">Presse</DropdownLink>
             </NavGroup>
           </div>
-          <SimStatus />
-          <div className="nav-user">
-            {user ? (
-              <span className="nav-user-badge">
-                <span className="nav-user-dot" />
-                {user.displayName}
-              </span>
-            ) : (
-              <NavLink to="/parties" className="nav-join-link">Partei beitreten</NavLink>
-            )}
+
+          {/* Sim status + user area (desktop) */}
+          <div className="hidden md:flex items-center ml-auto shrink-0 gap-3">
+            <SimStatus />
+            <div className="shrink-0 flex items-center">
+              {user ? (
+                <span className="text-xs text-[#ccc] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#28a745] inline-block" />
+                  {user.displayName}
+                </span>
+              ) : (
+                <NavLink
+                  to="/parties"
+                  className="text-xs text-[#b0b0c0] no-underline px-3 py-1.5 border border-white/15 rounded-full whitespace-nowrap transition-all duration-150 hover:text-white hover:border-white/35 hover:bg-white/[0.06]"
+                >
+                  Partei beitreten
+                </NavLink>
+              )}
+            </div>
           </div>
+
+          {/* Mobile hamburger */}
           <MobileNav user={user} />
         </nav>
-        {error && (
-          <div className="error-toast" onClick={() => setError(null)}>
-            {error}
-          </div>
-        )}
-        <main className="main">
+
+        {/* Error toast */}
+        {error && <ErrorToast message={error} onDismiss={() => setError(null)} />}
+
+        {/* Main content */}
+        <main className="mx-auto max-w-[1280px] flex-1 px-8 py-10 max-md:px-4 max-md:py-5">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/parties" element={<Parties />} />
@@ -299,14 +394,16 @@ function App() {
             <Route path="/about" element={<About />} />
           </Routes>
         </main>
-        <footer className="site-footer">
-          <div className="site-footer-inner">
-            <div className="site-footer-links">
-              <Link to="/log">Protokoll</Link>
-              <Link to="/about">&Uuml;ber</Link>
-              <Link to="/admin">Admin</Link>
+
+        {/* Footer */}
+        <footer className="bg-[#1a1a2e] text-[#888] mt-8">
+          <div className="max-w-[1280px] mx-auto px-8 py-6 flex justify-between items-center flex-wrap gap-4 max-md:flex-col max-md:text-center">
+            <div className="flex gap-6">
+              <Link to="/log" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">Protokoll</Link>
+              <Link to="/about" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">&Uuml;ber</Link>
+              <Link to="/admin" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">Admin</Link>
             </div>
-            <div className="site-footer-brand">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
+            <div className="text-xs text-[#555]">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>
         </footer>
       </div>

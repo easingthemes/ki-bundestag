@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, Motion, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/shared";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { STATUS_BADGE, MOTION_TYPE_BADGE, VOTE_COLORS } from "@/lib/colors";
 
 const STATUS_ORDER = ["passed", "rejected"];
 
@@ -17,12 +22,11 @@ export function Motions() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (parties.length === 0) return <div className="loading">Loading...</div>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
   const visibleMotions = motions.slice(0, visibleCount);
-  const remaining = motions.length - visibleCount;
 
   const grouped = STATUS_ORDER.map(status => ({
     status,
@@ -33,10 +37,10 @@ export function Motions() {
     <div>
       <h1>Motions & Resolutions</h1>
       {motions.length === 0 && (
-        <div className="loading">No motions yet. Run the simulation to see motions appear.</div>
+        <p className="text-center py-8 text-muted-foreground">No motions yet. Run the simulation to see motions appear.</p>
       )}
       {grouped.map(group => (
-        <div key={group.status} className="section">
+        <div key={group.status} className="mb-8">
           <h2>
             {group.status === "passed" ? "Passed" : "Rejected"} ({motions.filter(m => m.status === group.status).length})
           </h2>
@@ -45,23 +49,12 @@ export function Motions() {
           ))}
         </div>
       ))}
-      {remaining > 0 && (
-        <div style={{ textAlign: "center", margin: "1rem 0" }}>
-          <button
-            onClick={() => setVisibleCount(c => c + 10)}
-            style={{
-              padding: "0.5rem 1.5rem",
-              border: "1px solid #ccc",
-              borderRadius: 6,
-              background: "white",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-            }}
-          >
-            Show {Math.min(10, remaining)} more ({remaining} remaining)
-          </button>
-        </div>
-      )}
+      <ShowMoreButton
+        total={motions.length}
+        visible={Math.min(visibleCount, motions.length)}
+        increment={10}
+        onShowMore={() => setVisibleCount(c => c + 10)}
+      />
     </div>
   );
 }
@@ -69,8 +62,6 @@ export function Motions() {
 function MotionCard({ motion, partyMap }: { motion: Motion; partyMap: Map<string, Party> }) {
   const proposer = partyMap.get(motion.proposedBy);
   const typeLabel = motion.type === "motion" ? "Antrag" : "Entschließung";
-  const typeBadge = motion.type === "motion" ? "badge-motion" : "badge-resolution";
-  const statusBadge = motion.status === "passed" ? "badge-motion-passed" : "badge-motion-rejected";
 
   const totalSeats = motion.votes.reduce((sum, v) => {
     const p = partyMap.get(v.partyId);
@@ -85,52 +76,63 @@ function MotionCard({ motion, partyMap }: { motion: Motion; partyMap: Map<string
     .reduce((s, v) => s + (partyMap.get(v.partyId)?.seatCount ?? 0), 0);
 
   return (
-    <div className="card" style={{ marginBottom: "0.75rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <strong>{motion.title}</strong>
-          <span className={`badge ${typeBadge}`} style={{ marginLeft: "0.5rem" }}>
-            {typeLabel}
-          </span>
+    <Card className="mb-3">
+      <CardContent className="p-5">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <strong>{motion.title}</strong>
+            <Badge variant="outline" className={cn(
+              motion.type === "motion"
+                ? MOTION_TYPE_BADGE.motion
+                : MOTION_TYPE_BADGE.resolution
+            )}>
+              {typeLabel}
+            </Badge>
+          </div>
+          <Badge variant="outline" className={cn(
+            motion.status === "passed"
+              ? STATUS_BADGE.passed
+              : STATUS_BADGE.rejected
+          )}>
+            {motion.status}
+          </Badge>
         </div>
-        <span className={`badge ${statusBadge}`}>
-          {motion.status}
-        </span>
-      </div>
-      <div style={{ fontSize: "0.85rem", color: "#555", margin: "0.25rem 0" }}>
-        {motion.description}
-      </div>
-      <div style={{ fontSize: "0.8rem", color: "#888" }}>
-        Proposed by {proposer?.name ?? motion.proposedBy} on day {motion.dayNumber}
-      </div>
+        <p className="text-sm text-muted-foreground mt-1">{motion.description}</p>
+        <p className="text-xs text-muted-foreground">
+          Proposed by {proposer?.name ?? motion.proposedBy} on day {motion.dayNumber}
+        </p>
 
-      {motion.votes.length > 0 && totalSeats > 0 && (
-        <>
-          <div className="vote-bar">
-            {yesSeats > 0 && (
-              <div className="vote-bar-yes" style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
-            )}
-            {noSeats > 0 && (
-              <div className="vote-bar-no" style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
-            )}
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "#888" }}>
-            Yes: {yesSeats} · No: {noSeats}
-          </div>
-          <div style={{ marginTop: "0.5rem" }}>
-            {motion.votes.map(v => {
-              const p = partyMap.get(v.partyId);
-              return (
-                <div key={v.partyId} className="vote-detail">
-                  <span className={`vote-dot vote-dot-${v.vote}`} />
-                  <strong>{p?.name ?? v.partyId}</strong>
-                  <span style={{ color: "#666" }}>— {v.reason}</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
+        {motion.votes.length > 0 && totalSeats > 0 && (
+          <>
+            <div className="flex h-5 rounded overflow-hidden my-2">
+              {yesSeats > 0 && (
+                <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
+              )}
+              {noSeats > 0 && (
+                <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Yes: {yesSeats} · No: {noSeats}
+            </p>
+            <div className="mt-2">
+              {motion.votes.map(v => {
+                const p = partyMap.get(v.partyId);
+                return (
+                  <div key={v.partyId} className="flex items-center gap-2 text-sm py-1">
+                    <span className={cn(
+                      "size-2.5 rounded-full shrink-0",
+                      v.vote === "yes" ? VOTE_COLORS.yes : VOTE_COLORS.no
+                    )} />
+                    <strong>{p?.name ?? v.partyId}</strong>
+                    <span className="text-muted-foreground">— {v.reason}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

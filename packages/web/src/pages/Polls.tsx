@@ -2,8 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Poll } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
 
 const VOTED_KEY = "ki-bundestag-voted-polls";
 
@@ -65,25 +68,25 @@ export function Polls() {
 
       {/* Registration prompt */}
       {!user && activePolls.length > 0 && (
-        <div className="nudge-banner">
-          <Link to="/parties">Register and join a party</Link> to participate in the simulation — vote on polls, submit questions, and more.
+        <div className={`${ALERT_STYLES.info} mb-4`}>
+          <Link to="/parties" className="text-primary font-semibold hover:underline">Register and join a party</Link> to participate in the simulation — vote on polls, submit questions, and more.
         </div>
       )}
 
       {/* Unvoted nudge */}
       {unvotedCount > 0 && (
-        <div className="nudge-banner nudge-action">
+        <div className={`${ALERT_STYLES.warning} mb-4`}>
           {unvotedCount} active poll{unvotedCount !== 1 ? "s" : ""} awaiting your vote.
         </div>
       )}
 
       {activePolls.length === 0 && closedPolls.length === 0 && (
-        <div className="loading">No polls yet. Run the simulation until day 7 for the first polls.</div>
+        <p className="text-center py-8 text-muted-foreground">No polls yet. Run the simulation until day 7 for the first polls.</p>
       )}
 
       {/* Active polls */}
       {activePolls.length > 0 && (
-        <div className="section">
+        <div className="mb-8">
           <h2>Active Polls ({activePolls.length})</h2>
           {activePolls.map(poll => (
             <PollCard
@@ -99,23 +102,15 @@ export function Polls() {
 
       {/* Closed polls */}
       {closedPolls.length > 0 && (
-        <div className="section">
+        <div className="mb-8">
           <button
             onClick={() => setShowClosed(!showClosed)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "1rem",
-              fontWeight: 600,
-              color: "#555",
-              padding: 0,
-            }}
+            className="bg-transparent border-none cursor-pointer text-base font-semibold text-muted-foreground p-0"
           >
             {showClosed ? "▾" : "▸"} Past Polls ({closedPolls.length})
           </button>
           {showClosed && (
-            <div style={{ marginTop: 12 }}>
+            <div className="mt-3">
               {closedPolls.slice(0, closedVisible).map(poll => (
                 <PollCard
                   key={poll.id}
@@ -154,62 +149,64 @@ function PollCard({
   const showResults = hasVoted || !poll.active;
 
   return (
-    <div className="poll-card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: "1.05rem" }}>{poll.question}</div>
-          <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 2 }}>
-            Created Day {poll.createdOnDay}
-            {poll.expiresOnDay && ` · Expires Day ${poll.expiresOnDay}`}
-            {totalVotes > 0 && ` · ${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`}
+    <Card className="mb-4">
+      <CardContent className="p-5">
+        <div className="flex justify-between items-center mb-3">
+          <div>
+            <div className="font-semibold text-[1.05rem]">{poll.question}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Created Day {poll.createdOnDay}
+              {poll.expiresOnDay && ` · Expires Day ${poll.expiresOnDay}`}
+              {totalVotes > 0 && ` · ${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`}
+            </div>
           </div>
+          <Badge variant="outline" className={poll.active
+            ? STATUS_BADGE.active
+            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
+          }>
+            {poll.active ? "Active" : "Closed"}
+          </Badge>
         </div>
-        <span className={`badge ${poll.active ? "poll-badge-active" : "poll-badge-closed"}`}>
-          {poll.active ? "Active" : "Closed"}
-        </span>
-      </div>
 
-      {showResults ? (
-        // Results view
-        <div>
-          {poll.options.map((option, i) => {
-            const count = poll.votes[option] || 0;
-            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-            const color = BAR_COLORS[i % BAR_COLORS.length];
-            const isTop = totalVotes > 0 && count === Math.max(...Object.values(poll.votes));
+        {showResults ? (
+          <div>
+            {poll.options.map((option, i) => {
+              const count = poll.votes[option] || 0;
+              const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+              const color = BAR_COLORS[i % BAR_COLORS.length];
+              const isTop = totalVotes > 0 && count === Math.max(...Object.values(poll.votes));
 
-            return (
-              <div key={option} className="poll-result-bar" style={{ background: "#f5f5f5" }}>
-                <div
-                  className="poll-result-bar-fill"
-                  style={{ width: `${pct}%`, backgroundColor: color }}
-                />
-                <span style={{ position: "relative", zIndex: 1, fontWeight: isTop ? 700 : 400 }}>
-                  {option}
-                </span>
-                <span style={{ position: "relative", zIndex: 1, marginLeft: "auto", fontSize: "0.8rem", color: "#666" }}>
-                  {pct}% ({count})
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        // Voting view
-        <div>
-          {poll.options.map(option => (
-            <button
-              key={option}
-              className="poll-option-btn"
-              onClick={() => onVote(option)}
-              disabled={isVoting}
-              style={isVoting ? { opacity: 0.6, cursor: "wait" } : {}}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+              return (
+                <div key={option} className="h-8 rounded mb-1.5 flex items-center px-3 text-sm relative overflow-hidden bg-muted">
+                  <div
+                    className="absolute top-0 left-0 h-full rounded opacity-20"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                  />
+                  <span className="relative z-10" style={{ fontWeight: isTop ? 700 : 400 }}>
+                    {option}
+                  </span>
+                  <span className="relative z-10 ml-auto text-xs text-muted-foreground">
+                    {pct}% ({count})
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div>
+            {poll.options.map(option => (
+              <button
+                key={option}
+                onClick={() => onVote(option)}
+                disabled={isVoting}
+                className="block w-full py-2.5 px-4 mb-1.5 border border-input rounded-lg bg-card cursor-pointer text-sm text-left transition-colors hover:border-primary hover:bg-muted/50 disabled:opacity-60 disabled:cursor-wait"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

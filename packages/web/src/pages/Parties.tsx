@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import { api, type Party, type Fraktion, type AlignmentData } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ROLE_BADGE, FRAKTION_BADGE } from "@/lib/colors";
+import { cn } from "@/lib/utils";
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) return null;
@@ -14,19 +18,13 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
     `${(i / (values.length - 1)) * w},${h - ((v - min) / range) * (h - 2) - 1}`
   ).join(" ");
   const trend = values[values.length - 1] - values[0];
-  const lineColor = trend > 0.5 ? "#28a745" : trend < -0.5 ? "#dc3545" : color;
+  const lineColor = trend > 0.5 ? "#10b981" : trend < -0.5 ? "#ef4444" : color;
   return (
     <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
       <polyline points={pts} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
   );
 }
-
-const ROLE_BADGE: Record<string, string> = {
-  leader: "badge-leader",
-  junior: "badge-junior",
-  opposition: "badge-opposition",
-};
 
 function JoinModal({ party, onClose, onJoined }: {
   party: Party;
@@ -44,7 +42,6 @@ function JoinModal({ party, onClose, onJoined }: {
     try {
       let result;
       if (user) {
-        // Already registered — just switch party
         result = await api.joinParty(party.id);
       } else {
         result = await api.registerUser(name.trim(), party.id);
@@ -58,62 +55,60 @@ function JoinModal({ party, onClose, onJoined }: {
     }
   };
 
+  const displayColor = party.color === "#FFED00" ? "#c4a900" : party.color;
+
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }} onClick={onClose}>
-      <div style={{
-        background: "white", borderRadius: 8, padding: "1.75rem", width: 340,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-      }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: "0 0 1rem", fontSize: "1.1rem" }}>
-          Join {party.name}
-        </h3>
-        {!user && (
-          <>
-            <label style={{ fontSize: "0.85rem", color: "#555", display: "block", marginBottom: 4 }}>
-              Display name (public within the party)
-            </label>
-            <input
-              autoFocus
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              maxLength={30}
-              placeholder="Your name"
-              style={{ width: "100%", padding: "8px 10px", borderRadius: 4, border: "1px solid #ccc", fontSize: "0.9rem", boxSizing: "border-box" }}
-              onKeyDown={e => e.key === "Enter" && handle()}
-            />
-          </>
-        )}
-        {user && (
-          <p style={{ fontSize: "0.88rem", color: "#555", margin: "0 0 1rem" }}>
-            You'll join as <strong>{user.displayName}</strong>.
-            {user.partyId && <span style={{ color: "#888" }}> A 7-day switching cooldown will apply.</span>}
-          </p>
-        )}
-        {status === "error" && (
-          <div style={{ fontSize: "0.82rem", color: "#dc3545", margin: "8px 0" }}>{errMsg}</div>
-        )}
-        <div style={{ display: "flex", gap: 8, marginTop: "1rem", justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "7px 16px", borderRadius: 4, border: "1px solid #ccc", background: "white", cursor: "pointer" }}>
-            Cancel
-          </button>
-          <button
-            onClick={handle}
-            disabled={status === "loading" || (!user && name.trim().length < 2)}
-            style={{
-              padding: "7px 16px", borderRadius: 4, border: "none",
-              background: party.color === "#FFED00" ? "#c4a900" : party.color,
-              color: "white", fontWeight: 700, cursor: "pointer",
-              opacity: (status === "loading" || (!user && name.trim().length < 2)) ? 0.6 : 1,
-            }}
-          >
-            {status === "loading" ? "Joining…" : `Join ${party.name}`}
-          </button>
-        </div>
-      </div>
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45"
+      onClick={onClose}
+    >
+      <Card className="w-[340px] shadow-lg" onClick={e => e.stopPropagation()}>
+        <CardContent className="p-7">
+          <h3 className="text-lg font-semibold mb-4">Join {party.name}</h3>
+          {!user && (
+            <>
+              <label className="text-sm text-muted-foreground block mb-1">
+                Display name (public within the party)
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                maxLength={30}
+                placeholder="Your name"
+                className="w-full px-2.5 py-2 rounded border border-input text-sm"
+                onKeyDown={e => e.key === "Enter" && handle()}
+              />
+            </>
+          )}
+          {user && (
+            <p className="text-sm text-muted-foreground mb-4">
+              You'll join as <strong>{user.displayName}</strong>.
+              {user.partyId && <span className="text-muted-foreground/60"> A 7-day switching cooldown will apply.</span>}
+            </p>
+          )}
+          {status === "error" && (
+            <div className="text-xs text-destructive my-2">{errMsg}</div>
+          )}
+          <div className="flex gap-2 mt-4 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handle}
+              disabled={status === "loading" || (!user && name.trim().length < 2)}
+              className="px-4 py-1.5 rounded border-none text-white font-bold text-sm cursor-pointer disabled:opacity-60"
+              style={{ background: displayColor }}
+            >
+              {status === "loading" ? "Joining…" : `Join ${party.name}`}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -134,132 +129,122 @@ export function Parties() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (parties.length === 0) return <div className="loading">Loading...</div>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   return (
     <div>
       <h1>Parties</h1>
-      <div className="grid grid-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {parties.map(p => {
           const fraktion = fraktionen.find(f => f.partyId === p.id);
           const isMyParty = user?.partyId === p.id;
           const displayColor = p.color === "#FFED00" ? "#c4a900" : p.color;
           return (
-          <div key={p.id} style={{ position: "relative" }}>
-          <Link to={`/parties/${p.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-          <div className="card party-card" style={{ borderColor: p.color }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="party-name">{p.name}</div>
-              <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                {isMyParty && (
-                  <span style={{ fontSize: "0.7rem", fontWeight: 700, color: displayColor }}>Your Party ✓</span>
-                )}
-                <span
-                  className="badge"
-                  style={{
-                    background: fraktion ? "#28a745" : "#6c757d",
-                    color: "white",
-                    fontSize: "0.7rem",
-                    padding: "2px 6px",
-                  }}
-                >
-                  {fraktion ? "Fraktion" : "No Fraktion"}
-                </span>
-                <span className={`badge ${ROLE_BADGE[p.coalitionRole] || ""}`}>
-                  {p.coalitionRole}
-                </span>
-              </div>
+            <div key={p.id} className="relative">
+              <Link to={`/parties/${p.id}`} className="no-underline text-inherit">
+                <Card className="transition-colors hover:border-border" style={{ borderColor: p.color }}>
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-center">
+                      <div className="font-bold text-lg" style={{ color: displayColor }}>{p.name}</div>
+                      <div className="flex gap-1.5 items-center">
+                        {isMyParty && (
+                          <span className="text-xs font-bold" style={{ color: displayColor }}>Your Party ✓</span>
+                        )}
+                        <Badge className={fraktion
+                          ? FRAKTION_BADGE.active
+                          : FRAKTION_BADGE.none
+                        }>
+                          {fraktion ? "Fraktion" : "No Fraktion"}
+                        </Badge>
+                        <Badge className={ROLE_BADGE[p.coalitionRole] || ""}>
+                          {p.coalitionRole}
+                        </Badge>
+                      </div>
+                    </div>
+                    {fraktion && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Fraktion Leader: {fraktion.leaderName}
+                      </div>
+                    )}
+                    <div className="text-sm text-muted-foreground mt-1">{p.ideology}</div>
+
+                    <div className="flex gap-6 items-end mt-3">
+                      <div>
+                        <div className="text-2xl font-bold" style={{ color: displayColor }}>{p.seatCount}</div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Seats</div>
+                      </div>
+                      <div className="flex items-center justify-between flex-1">
+                        <div>
+                          <div className="text-2xl font-bold" style={{ color: displayColor }}>{p.approvalRating.toFixed(1)}%</div>
+                          <div className="text-xs uppercase tracking-wide text-muted-foreground">Approval</div>
+                        </div>
+                        {p.recentApprovals && p.recentApprovals.length >= 2 && (
+                          <Sparkline values={p.recentApprovals} color={displayColor} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">Policy Priorities</div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(p.policyPriorities).map(([key, val]) => (
+                          <span
+                            key={key}
+                            className={cn(
+                              "text-xs px-1.5 py-0.5 rounded",
+                              val > 0 ? "bg-emerald-50" : val < 0 ? "bg-red-50" : "bg-zinc-100"
+                            )}
+                          >
+                            {key}: {val > 0 ? "+" : ""}{val}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Member count + Join button */}
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-xs text-muted-foreground">
+                        👥 {p.memberCount} member{p.memberCount !== 1 ? "s" : ""}
+                        {p.memberCount > 0 && (() => {
+                          const bonus = Math.min(5, Math.log10(p.memberCount + 1) * 2.5) * 0.01;
+                          return <span className="ml-1 text-emerald-500">+{bonus.toFixed(3)}/day</span>;
+                        })()}
+                      </span>
+                      {!isMyParty && (
+                        <button
+                          onClick={e => { e.preventDefault(); setJoiningParty(p); }}
+                          className="text-xs px-2.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
+                          style={{ borderColor: displayColor, color: displayColor }}
+                        >
+                          Join
+                        </button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
-            {fraktion && (
-              <div style={{ fontSize: "0.8rem", color: "#555", marginTop: 2 }}>
-                Fraktion Leader: {fraktion.leaderName}
-              </div>
-            )}
-            <div className="party-meta">{p.ideology}</div>
-            <div style={{ marginTop: "0.75rem", display: "flex", gap: "1.5rem", alignItems: "flex-end" }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: "1.4rem" }}>{p.seatCount}</div>
-                <div className="stat-label">Seats</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
-                <div>
-                  <div className="stat-value" style={{ fontSize: "1.4rem" }}>{p.approvalRating.toFixed(1)}%</div>
-                  <div className="stat-label">Approval</div>
-                </div>
-                {p.recentApprovals && p.recentApprovals.length >= 2 && (
-                  <Sparkline
-                    values={p.recentApprovals}
-                    color={p.color === "#FFED00" ? "#c4a900" : p.color}
-                  />
-                )}
-              </div>
-            </div>
-            <div style={{ marginTop: "0.75rem" }}>
-              <div className="stat-label">Policy Priorities</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginTop: "0.25rem" }}>
-                {Object.entries(p.policyPriorities).map(([key, val]) => (
-                  <span
-                    key={key}
-                    style={{
-                      fontSize: "0.7rem",
-                      padding: "0.1rem 0.4rem",
-                      borderRadius: "4px",
-                      background: val > 0 ? "#d4edda" : val < 0 ? "#f8d7da" : "#e2e3e5",
-                    }}
-                  >
-                    {key}: {val > 0 ? "+" : ""}{val}
-                  </span>
-                ))}
-              </div>
-            </div>
-            {/* Member count + Join button */}
-            <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "0.78rem", color: "#888" }}>
-                👥 {p.memberCount} member{p.memberCount !== 1 ? "s" : ""}
-                {p.memberCount > 0 && (() => {
-                  const bonus = Math.min(5, Math.log10(p.memberCount + 1) * 2.5) * 0.01;
-                  return <span style={{ marginLeft: 4, color: "#28a745" }}>+{(bonus).toFixed(3)}/day</span>;
-                })()}
-              </span>
-              {!isMyParty && (
-                <button
-                  onClick={e => { e.preventDefault(); setJoiningParty(p); }}
-                  style={{
-                    fontSize: "0.75rem", padding: "3px 10px", borderRadius: 4,
-                    border: `1px solid ${displayColor}`, background: "white",
-                    color: displayColor, fontWeight: 600, cursor: "pointer",
-                  }}
-                >
-                  Join
-                </button>
-              )}
-            </div>
-          </div>
-          </Link>
-          </div>
           );
         })}
       </div>
 
       {/* Vote Alignment Matrix */}
       {alignment && (
-        <div className="section" style={{ marginTop: "2rem" }}>
+        <div className="mt-8">
           <h2>Vote Alignment</h2>
-          <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: 12 }}>
+          <p className="text-sm text-muted-foreground mb-3">
             Percentage of votes where each pair of parties voted the same way. Requires at least 3 shared votes to show a value.
           </p>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", fontSize: "0.82rem", minWidth: 400 }}>
+          <div className="overflow-x-auto">
+            <table className="border-collapse text-sm min-w-[400px]">
               <thead>
                 <tr>
-                  <th style={{ padding: "6px 10px", textAlign: "left", borderBottom: "2px solid #ccc", background: "#f8f8f8" }}>
-                    Party
-                  </th>
+                  <th className="px-2.5 py-1.5 text-left border-b-2 border-border bg-muted/50">Party</th>
                   {alignment.parties.map(p => {
                     const color = p.color === "#FFED00" ? "#c4a900" : p.color;
                     return (
-                      <th key={p.id} style={{ padding: "6px 8px", textAlign: "center", borderBottom: "2px solid #ccc", background: "#f8f8f8", whiteSpace: "nowrap" }}>
-                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: color, marginRight: 4 }} />
+                      <th key={p.id} className="px-2 py-1.5 text-center border-b-2 border-border bg-muted/50 whitespace-nowrap">
+                        <span className="inline-block size-2 rounded-full mr-1" style={{ backgroundColor: color }} />
                         {p.name}
                       </th>
                     );
@@ -271,8 +256,8 @@ export function Parties() {
                   const rowColor = rowParty.color === "#FFED00" ? "#c4a900" : rowParty.color;
                   return (
                     <tr key={rowParty.id}>
-                      <td style={{ padding: "6px 10px", fontWeight: 600, borderBottom: "1px solid #eee", whiteSpace: "nowrap" }}>
-                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: rowColor, marginRight: 6 }} />
+                      <td className="px-2.5 py-1.5 font-semibold border-b border-border whitespace-nowrap">
+                        <span className="inline-block size-2 rounded-full mr-1.5" style={{ backgroundColor: rowColor }} />
                         {rowParty.name}
                       </td>
                       {alignment.parties.map(colParty => {
@@ -285,15 +270,11 @@ export function Parties() {
                           textColor = val >= 60 ? "#1a5c2a" : val >= 40 ? "#5c3a00" : "#5c1a1a";
                         }
                         return (
-                          <td key={colParty.id} style={{
-                            padding: "6px 8px",
-                            textAlign: "center",
-                            borderBottom: "1px solid #eee",
-                            background: bg,
-                            color: textColor,
-                            fontWeight: val != null && !isSelf ? 600 : 400,
-                            minWidth: 56,
-                          }}>
+                          <td
+                            key={colParty.id}
+                            className="px-2 py-1.5 text-center border-b border-border min-w-14"
+                            style={{ background: bg, color: textColor, fontWeight: val != null && !isSelf ? 600 : 400 }}
+                          >
                             {isSelf ? "—" : val != null ? `${val}%` : "—"}
                           </td>
                         );

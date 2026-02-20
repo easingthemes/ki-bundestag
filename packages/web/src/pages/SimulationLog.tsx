@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, DaySummary, SimulationEvent } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
+import { Card, CardContent } from "@/components/ui/card";
 
 function formatRealDate(iso: string | null): string {
   if (!iso) return "";
@@ -46,29 +47,29 @@ export function SimulationLog() {
     <div>
       <h1>Simulation Log</h1>
       {days.length === 0 && (
-        <div className="loading">No simulation data yet. Run the simulation to see the log.</div>
+        <p className="text-center py-8 text-muted-foreground">No simulation data yet. Run the simulation to see the log.</p>
       )}
       {(() => {
         const reversed = [...days].reverse();
         return (
           <>
             {reversed.slice(0, visibleCount).map(day => (
-              <div key={day.dayNumber} style={{ marginBottom: "0.5rem" }}>
+              <div key={day.dayNumber} className="mb-2">
                 <div
-                  className="day-header"
+                  className="font-semibold py-3 px-3 bg-muted rounded cursor-pointer select-none mb-1 hover:bg-muted/80"
                   onClick={() => toggleDay(day.dayNumber)}
                 >
                   <span>
                     <strong>#{day.dayNumber}</strong>
-                    <span style={{ color: "#888", marginLeft: "0.5rem", fontSize: "0.85em" }}>
+                    <span className="text-muted-foreground ml-2 text-[0.85em]">
                       {bundestagDayLabel(day.dayNumber)}
                     </span>
                   </span>
-                  <span style={{ marginLeft: "1rem" }}>{day.eventCount} events</span>
-                  {day.summary && <span style={{ color: "#555", marginLeft: "1rem" }}>{day.summary}</span>}
-                  <span style={{ float: "right", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <span className="ml-4">{day.eventCount} events</span>
+                  {day.summary && <span className="text-muted-foreground ml-4">{day.summary}</span>}
+                  <span className="float-right flex items-center gap-3">
                     {day.simulatedAt && (
-                      <span style={{ color: "#666", fontSize: "0.8em", fontWeight: "normal" }}>
+                      <span className="text-muted-foreground text-[0.8em] font-normal">
                         {formatRealDate(day.simulatedAt)}
                       </span>
                     )}
@@ -76,15 +77,17 @@ export function SimulationLog() {
                   </span>
                 </div>
                 {expanded === day.dayNumber && (
-                  <div className="card">
-                    {dayEvents.map(ev => (
-                      <div key={ev.id} className="event-item">
-                        <div className="event-type">{ev.type.replace(/_/g, " ")}</div>
-                        <div className="event-title">{ev.title}</div>
-                        <div className="event-desc">{ev.description}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <Card>
+                    <CardContent className="p-5 divide-y divide-border">
+                      {dayEvents.map(ev => (
+                        <div key={ev.id} className="py-3 first:pt-0 last:pb-0">
+                          <div className="text-xs text-muted-foreground uppercase">{ev.type.replace(/_/g, " ")}</div>
+                          <div className="font-medium mt-0.5">{ev.title}</div>
+                          <div className="text-sm text-muted-foreground mt-0.5">{ev.description}</div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             ))}

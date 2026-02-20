@@ -3,27 +3,21 @@ import { useParams, Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { ROLE_BADGE, STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 
-const ROLE_BADGE: Record<string, string> = {
-  leader: "badge-leader",
-  junior: "badge-junior",
-  opposition: "badge-opposition",
+
+const PROPOSAL_STATUS: Record<string, string> = {
+  open: STATUS_BADGE.proposed,
+  accepted: STATUS_BADGE.passed,
+  declined: STATUS_BADGE.rejected,
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  passed: "badge-passed",
-  rejected: "badge-rejected",
-  debate: "badge-debate",
-  proposed: "badge-proposed",
-};
-
-const VOTE_COLOR: Record<string, string> = {
-  yes: "#28a745",
-  no: "#dc3545",
-  abstain: "#ffc107",
-};
+const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 function ApprovalChart({ history, color, partyId }: { history: PartyHistory[]; color: string; partyId: string }) {
   if (history.length < 2) return null;
@@ -113,7 +107,6 @@ export function PartyDetail() {
     api.getParties().then(setAllParties).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getFraktionen().then(all => {
-      // Find fraktion for this party (prefer active, fall back to most recent dissolved)
       const active = all.find(f => f.partyId === id && f.status === "active");
       if (active) {
         setFraktion(active);
@@ -146,266 +139,268 @@ export function PartyDetail() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (!party) return <div className="loading">Loading...</div>;
+  if (!party) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   const displayColor = party.color === "#FFED00" ? "#c4a900" : party.color;
 
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <Link to="/parties" style={{ fontSize: "0.85rem", color: "#666", textDecoration: "none" }}>&larr; All parties</Link>
+      <div className="mb-6">
+        <Link to="/parties" className="text-sm text-muted-foreground no-underline hover:text-foreground">&larr; All parties</Link>
       </div>
-      <div className="card" style={{ borderLeft: `4px solid ${displayColor}`, marginBottom: "2rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "1.5rem" }}>{party.name}</h1>
-            <div style={{ color: "#666", marginTop: 4 }}>{party.ideology}</div>
-          </div>
-          <span className={`badge ${ROLE_BADGE[party.coalitionRole] || ""}`} style={{ fontSize: "0.9rem", padding: "4px 12px" }}>
-            {party.coalitionRole}
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "2rem", marginTop: "1rem" }}>
-          <div>
-            <div className="stat-value" style={{ fontSize: "1.6rem" }}>{party.seatCount}</div>
-            <div className="stat-label">Seats</div>
-          </div>
-          <div>
-            <div className="stat-value" style={{ fontSize: "1.6rem" }}>{party.approvalRating}%</div>
-            <div className="stat-label">Approval</div>
-          </div>
-        </div>
-        <div style={{ marginTop: "0.75rem" }}>
-          <div className="stat-label">Policy Priorities</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginTop: "0.25rem" }}>
-            {Object.entries(party.policyPriorities).map(([key, val]) => (
-              <span
-                key={key}
-                style={{
-                  fontSize: "0.75rem",
-                  padding: "0.15rem 0.5rem",
-                  borderRadius: "4px",
-                  background: val > 0 ? "#d4edda" : val < 0 ? "#f8d7da" : "#e2e3e5",
-                }}
-              >
-                {key}: {val > 0 ? "+" : ""}{val}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Membership section */}
-        {(() => {
-          const isMyParty = user?.partyId === id;
-          const handleJoin = async () => {
-            if (joinStatus === "loading") return;
-            setJoinStatus("loading");
-            setJoinError("");
-            try {
-              let result;
-              if (user) {
-                result = await api.joinParty(id!);
-              } else {
-                if (joinName.trim().length < 2) return;
-                result = await api.registerUser(joinName.trim(), id!);
-              }
-              login(result.id, result);
-              setShowJoinForm(false);
-              setJoinStatus("idle");
-              api.getParty(id!).then(setParty).catch(console.error);
-            } catch (err) {
-              setJoinError(err instanceof Error ? err.message : "Failed to join");
-              setJoinStatus("error");
-            }
-          };
-          const handleLeave = async () => {
-            try {
-              const result = await api.leaveParty();
-              login(result.id, result);
-              api.getParty(id!).then(setParty).catch(console.error);
-            } catch { /* ignore */ }
-          };
-
-          return (
-            <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <span style={{ fontSize: "0.85rem", color: "#666" }}>
-                👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
-                {isMyParty && <span style={{ marginLeft: 8, color: displayColor, fontWeight: 700 }}>✓ You're a member</span>}
-              </span>
-              {isMyParty ? (
-                <button
-                  onClick={handleLeave}
-                  style={{ fontSize: "0.78rem", padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: "white", color: "#888", cursor: "pointer" }}
-                >
-                  Leave Party
-                </button>
-              ) : (
-                <div>
-                  {showJoinForm ? (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                      {!user && (
-                        <input
-                          autoFocus
-                          type="text"
-                          value={joinName}
-                          onChange={e => setJoinName(e.target.value)}
-                          maxLength={30}
-                          placeholder="Display name"
-                          style={{ padding: "5px 8px", borderRadius: 4, border: "1px solid #ccc", fontSize: "0.83rem", width: 140 }}
-                          onKeyDown={e => e.key === "Enter" && handleJoin()}
-                        />
-                      )}
-                      <button
-                        onClick={handleJoin}
-                        disabled={joinStatus === "loading" || (!user && joinName.trim().length < 2)}
-                        style={{ padding: "5px 12px", borderRadius: 4, border: "none", background: displayColor, color: "white", fontWeight: 700, fontSize: "0.83rem", cursor: "pointer" }}
-                      >
-                        {joinStatus === "loading" ? "Joining…" : `Join ${party.name}`}
-                      </button>
-                      <button onClick={() => setShowJoinForm(false)} style={{ padding: "5px 8px", borderRadius: 4, border: "1px solid #ccc", background: "white", fontSize: "0.83rem", cursor: "pointer" }}>
-                        Cancel
-                      </button>
-                      {joinStatus === "error" && <span style={{ fontSize: "0.78rem", color: "#dc3545" }}>{joinError}</span>}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowJoinForm(true)}
-                      style={{ fontSize: "0.83rem", padding: "5px 14px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      Join this Party
-                    </button>
-                  )}
-                </div>
-              )}
+      <Card className="mb-8" style={{ borderLeft: `4px solid ${displayColor}` }}>
+        <CardContent className="p-5">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <h1 className="m-0 text-2xl">{party.name}</h1>
+              <div className="text-muted-foreground mt-1">{party.ideology}</div>
             </div>
-          );
-        })()}
-      </div>
+            <Badge variant="outline" className={cn(ROLE_BADGE[party.coalitionRole], "text-sm px-3 py-1")}>
+              {party.coalitionRole}
+            </Badge>
+          </div>
+          <div className="flex gap-8 mt-4">
+            <div>
+              <div className="text-3xl font-bold" style={{ color: displayColor }}>{party.seatCount}</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Seats</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold" style={{ color: displayColor }}>{party.approvalRating}%</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Approval</div>
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Policy Priorities</div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {Object.entries(party.policyPriorities).map(([key, val]) => (
+                <span
+                  key={key}
+                  className={cn("text-xs px-2 py-0.5 rounded", val > 0 ? "bg-emerald-50" : val < 0 ? "bg-red-50" : "bg-zinc-100")}
+                >
+                  {key}: {val > 0 ? "+" : ""}{val}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Membership section */}
+          {(() => {
+            const isMyParty = user?.partyId === id;
+            const handleJoin = async () => {
+              if (joinStatus === "loading") return;
+              setJoinStatus("loading");
+              setJoinError("");
+              try {
+                let result;
+                if (user) {
+                  result = await api.joinParty(id!);
+                } else {
+                  if (joinName.trim().length < 2) return;
+                  result = await api.registerUser(joinName.trim(), id!);
+                }
+                login(result.id, result);
+                setShowJoinForm(false);
+                setJoinStatus("idle");
+                api.getParty(id!).then(setParty).catch(console.error);
+              } catch (err) {
+                setJoinError(err instanceof Error ? err.message : "Failed to join");
+                setJoinStatus("error");
+              }
+            };
+            const handleLeave = async () => {
+              try {
+                const result = await api.leaveParty();
+                login(result.id, result);
+                api.getParty(id!).then(setParty).catch(console.error);
+              } catch { /* ignore */ }
+            };
+
+            return (
+              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm text-muted-foreground">
+                  👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
+                  {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>✓ You're a member</span>}
+                </span>
+                {isMyParty ? (
+                  <button
+                    onClick={handleLeave}
+                    className="text-xs px-3 py-1 rounded border border-input bg-card text-muted-foreground cursor-pointer hover:bg-accent"
+                  >
+                    Leave Party
+                  </button>
+                ) : (
+                  <div>
+                    {showJoinForm ? (
+                      <div className="flex gap-1.5 items-center flex-wrap">
+                        {!user && (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={joinName}
+                            onChange={e => setJoinName(e.target.value)}
+                            maxLength={30}
+                            placeholder="Display name"
+                            className="px-2 py-1 rounded border border-input text-sm w-36"
+                            onKeyDown={e => e.key === "Enter" && handleJoin()}
+                          />
+                        )}
+                        <button
+                          onClick={handleJoin}
+                          disabled={joinStatus === "loading" || (!user && joinName.trim().length < 2)}
+                          className="px-3 py-1 rounded border-none text-white font-bold text-sm cursor-pointer disabled:opacity-50"
+                          style={{ background: displayColor }}
+                        >
+                          {joinStatus === "loading" ? "Joining…" : `Join ${party.name}`}
+                        </button>
+                        <button
+                          onClick={() => setShowJoinForm(false)}
+                          className="px-2 py-1 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
+                        >
+                          Cancel
+                        </button>
+                        {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowJoinForm(true)}
+                        className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
+                        style={{ borderColor: displayColor, color: displayColor }}
+                      >
+                        Join this Party
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       {/* Fraktion */}
       {fraktion && (
-        <div className="section">
+        <div className="mb-8">
           <h2>Fraktion</h2>
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>Fraktion Leader: {fraktion.leaderName}</div>
-                <div style={{ fontSize: "0.85rem", color: "#666", marginTop: 4 }}>Formed on Day {fraktion.formedOnDay}</div>
-                {fraktion.status === "dissolved" && fraktion.dissolvedOnDay != null && (
-                  <div style={{ fontSize: "0.85rem", color: "#dc3545", marginTop: 2 }}>Dissolved on Day {fraktion.dissolvedOnDay}</div>
-                )}
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="font-semibold">Fraktion Leader: {fraktion.leaderName}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Formed on Day {fraktion.formedOnDay}</div>
+                  {fraktion.status === "dissolved" && fraktion.dissolvedOnDay != null && (
+                    <div className="text-sm text-destructive mt-0.5">Dissolved on Day {fraktion.dissolvedOnDay}</div>
+                  )}
+                </div>
+                <Badge variant="outline" className={fraktion.status === "active" ? FRAKTION_BADGE.active : FRAKTION_BADGE.none}>
+                  {fraktion.status === "active" ? "Active" : "Dissolved"}
+                </Badge>
               </div>
-              <span
-                className="badge"
-                style={{
-                  background: fraktion.status === "active" ? "#28a745" : "#6c757d",
-                  color: "white",
-                  fontSize: "0.85rem",
-                  padding: "4px 10px",
-                }}
-              >
-                {fraktion.status === "active" ? "Active" : "Dissolved"}
-              </span>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Approval chart */}
       {history.length >= 2 && (
-        <div className="section">
+        <div className="mb-8">
           <h2>Approval Rating History</h2>
-          <div className="card">
-            <ApprovalChart history={history} color={party.color} partyId={party.id} />
-          </div>
+          <Card>
+            <CardContent className="p-5">
+              <ApprovalChart history={history} color={party.color} partyId={party.id} />
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Bills proposed */}
-      <div className="section">
+      <div className="mb-8">
         <h2>Bills Proposed ({bills.length})</h2>
         {bills.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "0.9rem" }}>No bills proposed yet.</div>
+          <p className="text-sm text-muted-foreground">No bills proposed yet.</p>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Title</th>
-                  <th style={{ textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Category</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Day</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.slice(0, visibleBills).map(b => (
-                  <tr key={b.id}>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee" }}>
-                      <Link to={`/bills/${b.id}`} style={{ color: "inherit", textDecoration: "none" }}>{b.title}</Link>
-                    </td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", color: "#666" }}>{b.category}</td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>{b.proposedOnDay}</td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>
-                      <span className={`badge ${STATUS_BADGE[b.status] || ""}`}>{b.status}</span>
-                    </td>
+          <Card>
+            <CardContent className="p-0">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left px-3 py-2 border-b-2 border-border">Title</th>
+                    <th className="text-left px-3 py-2 border-b-2 border-border">Category</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">Day</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <ShowMoreButton
-              total={bills.length}
-              visible={Math.min(visibleBills, bills.length)}
-              increment={5}
-              onShowMore={() => setVisibleBills(v => v + 5)}
-            />
-          </div>
+                </thead>
+                <tbody>
+                  {bills.slice(0, visibleBills).map(b => (
+                    <tr key={b.id}>
+                      <td className="px-3 py-2 border-b border-border">
+                        <Link to={`/bills/${b.id}`} className="text-inherit no-underline hover:text-primary">{b.title}</Link>
+                      </td>
+                      <td className="px-3 py-2 border-b border-border text-muted-foreground">{b.category}</td>
+                      <td className="px-3 py-2 border-b border-border text-center">{b.proposedOnDay}</td>
+                      <td className="px-3 py-2 border-b border-border text-center">
+                        <Badge variant="outline" className={STATUS_BADGE[b.status] || ""}>{b.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ShowMoreButton
+                total={bills.length}
+                visible={Math.min(visibleBills, bills.length)}
+                increment={5}
+                onShowMore={() => setVisibleBills(v => v + 5)}
+              />
+            </CardContent>
+          </Card>
         )}
       </div>
 
       {/* Voting record */}
-      <div className="section">
+      <div className="mb-8">
         <h2>Voting Record ({votes.length})</h2>
         {votes.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "0.9rem" }}>No votes yet.</div>
+          <p className="text-sm text-muted-foreground">No votes yet.</p>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Bill</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Day</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Vote</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", borderBottom: "2px solid #ddd" }}>Outcome</th>
-                </tr>
-              </thead>
-              <tbody>
-                {votes.slice(0, visibleVotes).map(({ bill, vote }) => (
-                  <tr key={bill.id}>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee" }}>
-                      <Link to={`/bills/${bill.id}`} style={{ color: "inherit", textDecoration: "none" }}>{bill.title}</Link>
-                      <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 2 }}>{vote.reason}</div>
-                    </td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>{bill.proposedOnDay}</td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>
-                      <span style={{ fontWeight: 600, color: VOTE_COLOR[vote.vote] || "#888" }}>
-                        {vote.vote.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>
-                      <span className={`badge ${STATUS_BADGE[bill.status] || ""}`}>{bill.status}</span>
-                    </td>
+          <Card>
+            <CardContent className="p-0">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left px-3 py-2 border-b-2 border-border">Bill</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">Day</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">Vote</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">Outcome</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <ShowMoreButton
-              total={votes.length}
-              visible={Math.min(visibleVotes, votes.length)}
-              increment={5}
-              onShowMore={() => setVisibleVotes(v => v + 5)}
-            />
-          </div>
+                </thead>
+                <tbody>
+                  {votes.slice(0, visibleVotes).map(({ bill, vote }) => (
+                    <tr key={bill.id}>
+                      <td className="px-3 py-2 border-b border-border">
+                        <Link to={`/bills/${bill.id}`} className="text-inherit no-underline hover:text-primary">{bill.title}</Link>
+                        <div className="text-xs text-muted-foreground mt-0.5">{vote.reason}</div>
+                      </td>
+                      <td className="px-3 py-2 border-b border-border text-center">{bill.proposedOnDay}</td>
+                      <td className="px-3 py-2 border-b border-border text-center">
+                        <span className="font-semibold" style={{ color: VOTE_HEX[vote.vote as keyof typeof VOTE_HEX] || "#888" }}>
+                          {vote.vote.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 border-b border-border text-center">
+                        <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>{bill.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ShowMoreButton
+                total={votes.length}
+                visible={Math.min(visibleVotes, votes.length)}
+                increment={5}
+                onShowMore={() => setVisibleVotes(v => v + 5)}
+              />
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -431,33 +426,35 @@ export function PartyDetail() {
         if (alignment.length === 0) return null;
 
         return (
-          <div className="section">
+          <div className="mb-8">
             <h2>Voting Alignment</h2>
-            <div className="card">
-              <div style={{ fontSize: "0.8rem", color: "#888", marginBottom: "0.75rem" }}>
-                Based on last 30 days ({sample === recentVotes ? recentVotes.length : votes.length} shared votes)
-              </div>
-              {alignment.map(({ party: other, pct, count }) => {
-                const otherColor = other.color === "#FFED00" ? "#c4a900" : other.color;
-                const barColor = (pct ?? 0) > 70 ? "#28a745" : (pct ?? 0) >= 40 ? "#6c757d" : "#dc3545";
-                return (
-                  <div key={other.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                    <div style={{ width: 140, flexShrink: 0, fontSize: "0.85rem" }}>
-                      <Link to={`/parties/${other.id}`} style={{ color: otherColor, fontWeight: 600, textDecoration: "none" }}>
-                        {other.name}
-                      </Link>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs text-muted-foreground mb-3">
+                  Based on last 30 days ({sample === recentVotes ? recentVotes.length : votes.length} shared votes)
+                </div>
+                {alignment.map(({ party: other, pct, count }) => {
+                  const otherColor = other.color === "#FFED00" ? "#c4a900" : other.color;
+                  const barColor = (pct ?? 0) > 70 ? SEMANTIC_HEX.positive : (pct ?? 0) >= 40 ? SEMANTIC_HEX.neutral : SEMANTIC_HEX.negative;
+                  return (
+                    <div key={other.id} className="flex items-center gap-3 mb-2">
+                      <div className="w-36 shrink-0 text-sm">
+                        <Link to={`/parties/${other.id}`} className="font-semibold no-underline" style={{ color: otherColor }}>
+                          {other.name}
+                        </Link>
+                      </div>
+                      <div className="flex-1 bg-muted rounded h-3 overflow-hidden">
+                        <div className="h-full rounded" style={{ width: `${pct}%`, background: barColor }} />
+                      </div>
+                      <div className="w-20 shrink-0 text-sm text-muted-foreground">
+                        <strong className="text-foreground">{pct}%</strong>
+                        <span className="ml-1 opacity-60">({count})</span>
+                      </div>
                     </div>
-                    <div style={{ flex: 1, background: "#e9ecef", borderRadius: 4, height: 12, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 4 }} />
-                    </div>
-                    <div style={{ width: 80, flexShrink: 0, fontSize: "0.82rem", color: "#555" }}>
-                      <strong>{pct}%</strong>
-                      <span style={{ color: "#aaa", marginLeft: 4 }}>({count})</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </div>
         );
       })()}
@@ -474,44 +471,40 @@ export function PartyDetail() {
         if (topCategories.length === 0) return null;
 
         return (
-          <div className="section">
+          <div className="mb-8">
             <h2>Policy Focus Areas</h2>
-            <div className="card">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {topCategories.map(([cat, count]) => (
-                  <span key={cat} style={{
-                    display: "inline-block",
-                    padding: "0.25rem 0.75rem",
-                    borderRadius: 16,
-                    background: "#e8f0fe",
-                    color: "#1a1a2e",
-                    fontSize: "0.85rem",
-                    fontWeight: 500,
-                  }}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)} <span style={{ color: "#666" }}>({count})</span>
-                  </span>
-                ))}
-              </div>
-            </div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex flex-wrap gap-2">
+                  {topCategories.map(([cat, count]) => (
+                    <span key={cat} className="inline-block px-3 py-1 rounded-full bg-sky-50 text-sm font-medium">
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)} <span className="text-muted-foreground">({count})</span>
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
       })()}
 
       {/* Statements */}
-      <div className="section">
+      <div className="mb-8">
         <h2>Statements ({statements.length})</h2>
         {statements.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "0.9rem" }}>No statements yet.</div>
+          <p className="text-sm text-muted-foreground">No statements yet.</p>
         ) : (
           <div>
             {statements.slice(0, visibleStatements).map(s => (
-              <div key={s.id} className="card" style={{ marginBottom: 8, borderLeft: `3px solid ${displayColor}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{s.title}</div>
-                  <div style={{ fontSize: "0.75rem", color: "#888" }}>Day {s.dayNumber}</div>
-                </div>
-                <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>{s.description}</div>
-              </div>
+              <Card key={s.id} className="mb-2" style={{ borderLeft: `3px solid ${displayColor}` }}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div className="font-semibold text-sm">{s.title}</div>
+                    <div className="text-xs text-muted-foreground">Day {s.dayNumber}</div>
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">{s.description}</div>
+                </CardContent>
+              </Card>
             ))}
             <ShowMoreButton
               total={statements.length}
@@ -524,13 +517,14 @@ export function PartyDetail() {
       </div>
 
       {/* Member Proposals */}
-      <div className="section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-          <h2 style={{ margin: 0 }}>Member Proposals ({proposals.length})</h2>
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="m-0">Member Proposals ({proposals.length})</h2>
           {user?.partyId === id && !showProposalForm && (
             <button
               onClick={() => setShowProposalForm(true)}
-              style={{ padding: "5px 14px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, fontSize: "0.83rem", cursor: "pointer" }}
+              className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
+              style={{ borderColor: displayColor, color: displayColor }}
             >
               + Propose a Bill
             </button>
@@ -538,75 +532,79 @@ export function PartyDetail() {
         </div>
 
         {showProposalForm && (
-          <div className="card" style={{ marginBottom: "1rem", borderLeft: `3px solid ${displayColor}` }}>
-            <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>New Member Proposal</div>
-            <input
-              type="text"
-              value={propTitle}
-              onChange={e => setPropTitle(e.target.value)}
-              placeholder="Bill title (10–120 chars)"
-              maxLength={120}
-              style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.88rem", marginBottom: "0.5rem", boxSizing: "border-box" }}
-            />
-            <textarea
-              value={propDesc}
-              onChange={e => setPropDesc(e.target.value)}
-              placeholder="Brief description (20–300 chars)"
-              maxLength={300}
-              rows={3}
-              style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.88rem", marginBottom: "0.5rem", resize: "vertical", boxSizing: "border-box" }}
-            />
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <select
-                value={propCategory}
-                onChange={e => setPropCategory(e.target.value)}
-                style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.85rem" }}
-              >
-                {["economy","social","environment","immigration","defense","education","healthcare","infrastructure"].map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                ))}
-              </select>
-              <button
-                onClick={async () => {
-                  if (propTitle.trim().length < 10 || propDesc.trim().length < 20) return;
-                  setPropSubmitting(true);
-                  setPropMsg(null);
-                  try {
-                    await api.createProposal(id!, { title: propTitle.trim(), description: propDesc.trim(), category: propCategory });
-                    setPropTitle(""); setPropDesc(""); setPropCategory("economy");
-                    setShowProposalForm(false);
-                    setPropMsg("Proposal submitted!");
-                    api.getPartyProposals(id!).then(setProposals).catch(console.error);
-                  } catch (e) {
-                    setPropMsg(e instanceof Error ? e.message : "Failed to submit");
-                  } finally {
-                    setPropSubmitting(false);
-                    setTimeout(() => setPropMsg(null), 4000);
-                  }
-                }}
-                disabled={propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20}
-                style={{ padding: "6px 14px", borderRadius: 4, border: "none", background: displayColor, color: "white", fontWeight: 600, fontSize: "0.83rem", cursor: "pointer", opacity: propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20 ? 0.5 : 1 }}
-              >
-                {propSubmitting ? "Submitting…" : "Submit"}
-              </button>
-              <button
-                onClick={() => { setShowProposalForm(false); setPropTitle(""); setPropDesc(""); }}
-                style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ccc", background: "white", fontSize: "0.83rem", cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-              {propMsg && <span style={{ fontSize: "0.8rem", color: propMsg.includes("Failed") ? "#dc3545" : "#28a745" }}>{propMsg}</span>}
-            </div>
-          </div>
+          <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
+            <CardContent className="p-5">
+              <div className="font-semibold mb-2">New Member Proposal</div>
+              <input
+                type="text"
+                value={propTitle}
+                onChange={e => setPropTitle(e.target.value)}
+                placeholder="Bill title (10–120 chars)"
+                maxLength={120}
+                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
+              />
+              <textarea
+                value={propDesc}
+                onChange={e => setPropDesc(e.target.value)}
+                placeholder="Brief description (20–300 chars)"
+                maxLength={300}
+                rows={3}
+                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
+              />
+              <div className="flex gap-2 items-center flex-wrap">
+                <select
+                  value={propCategory}
+                  onChange={e => setPropCategory(e.target.value)}
+                  className={SELECT_CLS}
+                >
+                  {["economy","social","environment","immigration","defense","education","healthcare","infrastructure"].map(c => (
+                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    if (propTitle.trim().length < 10 || propDesc.trim().length < 20) return;
+                    setPropSubmitting(true);
+                    setPropMsg(null);
+                    try {
+                      await api.createProposal(id!, { title: propTitle.trim(), description: propDesc.trim(), category: propCategory });
+                      setPropTitle(""); setPropDesc(""); setPropCategory("economy");
+                      setShowProposalForm(false);
+                      setPropMsg("Proposal submitted!");
+                      api.getPartyProposals(id!).then(setProposals).catch(console.error);
+                    } catch (e) {
+                      setPropMsg(e instanceof Error ? e.message : "Failed to submit");
+                    } finally {
+                      setPropSubmitting(false);
+                      setTimeout(() => setPropMsg(null), 4000);
+                    }
+                  }}
+                  disabled={propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20}
+                  className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
+                  style={{ background: displayColor }}
+                >
+                  {propSubmitting ? "Submitting…" : "Submit"}
+                </button>
+                <button
+                  onClick={() => { setShowProposalForm(false); setPropTitle(""); setPropDesc(""); }}
+                  className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                {propMsg && <span className={`text-xs ${propMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {proposals.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
             <span>No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}</span>
             {user?.partyId !== id && (
               <button
                 onClick={() => { setShowJoinForm(true); document.querySelector(".card")?.scrollIntoView({ behavior: "smooth" }); }}
-                style={{ fontSize: "0.83rem", padding: "4px 12px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, cursor: "pointer" }}
+                className="text-sm px-3 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
+                style={{ borderColor: displayColor, color: displayColor }}
               >
                 Join {party.name}
               </button>
@@ -618,72 +616,73 @@ export function PartyDetail() {
               const isOpen = p.status === "open";
               const daysLeft = p.reviewByDay - (simStatus?.currentDay ?? p.createdOnDay);
               return (
-                <div key={p.id} className="card" style={{ marginBottom: 8, opacity: isOpen ? 1 : 0.75 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: "0.93rem" }}>{p.title}</span>
-                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: "#e8f0fe", color: "#1a1a2e" }}>{p.category}</span>
-                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: p.proposedBy === "ai" ? "#e3d9f5" : "#d4edda", color: p.proposedBy === "ai" ? "#6f42c1" : "#155724" }}>
-                          {p.proposedBy === "ai" ? "AI" : "Member"}
-                        </span>
-                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: isOpen ? "#cce5ff" : p.status === "accepted" ? "#d4edda" : "#f8d7da", color: isOpen ? "#004085" : p.status === "accepted" ? "#155724" : "#721c24" }}>
-                          {p.status}
-                        </span>
+                <Card key={p.id} className="mb-2" style={{ opacity: isOpen ? 1 : 0.75 }}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <div className="flex gap-1.5 flex-wrap items-center mb-1">
+                          <span className="font-semibold text-sm">{p.title}</span>
+                          <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-50">{p.category}</Badge>
+                          <Badge variant="outline" className={p.proposedBy === "ai"
+                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-50"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                          }>
+                            {p.proposedBy === "ai" ? "AI" : "Member"}
+                          </Badge>
+                          <Badge variant="outline" className={PROPOSAL_STATUS[p.status] || ""}>{p.status}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{p.description}</div>
+                        {p.bundestagBillId && (
+                          <div className="text-xs text-emerald-500 mt-1">✓ Submitted to Bundestag</div>
+                        )}
+                        {p.declineReason && (
+                          <div className="text-xs text-muted-foreground mt-1 italic">Party: "{p.declineReason}"</div>
+                        )}
                       </div>
-                      <div style={{ fontSize: "0.84rem", color: "#555" }}>{p.description}</div>
-                      {p.bundestagBillId && (
-                        <div style={{ fontSize: "0.78rem", color: "#28a745", marginTop: 4 }}>
-                          ✓ Submitted to Bundestag
-                        </div>
-                      )}
-                      {p.declineReason && (
-                        <div style={{ fontSize: "0.78rem", color: "#6c757d", marginTop: 4, fontStyle: "italic" }}>
-                          Party: "{p.declineReason}"
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      {isOpen && user?.partyId === id ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <button
-                            onClick={async () => {
-                              const updated = p.userVote === 1
-                                ? await api.retractProposalVote(p.id)
-                                : await api.voteOnProposal(p.id, 1);
-                              setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
-                            }}
-                            title={p.userVote === 1 ? "Retract upvote" : "Upvote"}
-                            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "1.1rem", color: p.userVote === 1 ? "#28a745" : "#aaa", padding: "0 2px" }}
-                          >▲</button>
-                          <span style={{ fontWeight: 700, fontSize: "1rem", minWidth: 28, textAlign: "center", color: p.voteScore >= 0 ? "#28a745" : "#dc3545" }}>
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                        {isOpen && user?.partyId === id ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={async () => {
+                                const updated = p.userVote === 1
+                                  ? await api.retractProposalVote(p.id)
+                                  : await api.voteOnProposal(p.id, 1);
+                                setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
+                              }}
+                              title={p.userVote === 1 ? "Retract upvote" : "Upvote"}
+                              className="border-none bg-transparent cursor-pointer text-lg p-0"
+                              style={{ color: p.userVote === 1 ? SEMANTIC_HEX.positive : "#aaa" }}
+                            >▲</button>
+                            <span className="font-bold text-base min-w-7 text-center" style={{ color: p.voteScore >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
+                              {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const updated = p.userVote === -1
+                                  ? await api.retractProposalVote(p.id)
+                                  : await api.voteOnProposal(p.id, -1);
+                                setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
+                              }}
+                              title={p.userVote === -1 ? "Retract downvote" : "Downvote"}
+                              className="border-none bg-transparent cursor-pointer text-lg p-0"
+                              style={{ color: p.userVote === -1 ? SEMANTIC_HEX.negative : "#aaa" }}
+                            >▼</button>
+                          </div>
+                        ) : (
+                          <div className="font-bold text-base" style={{ color: p.voteScore >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
                             {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
-                          </span>
-                          <button
-                            onClick={async () => {
-                              const updated = p.userVote === -1
-                                ? await api.retractProposalVote(p.id)
-                                : await api.voteOnProposal(p.id, -1);
-                              setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
-                            }}
-                            title={p.userVote === -1 ? "Retract downvote" : "Downvote"}
-                            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "1.1rem", color: p.userVote === -1 ? "#dc3545" : "#aaa", padding: "0 2px" }}
-                          >▼</button>
-                        </div>
-                      ) : (
-                        <div style={{ fontWeight: 700, fontSize: "1rem", color: p.voteScore >= 0 ? "#28a745" : "#dc3545" }}>
-                          {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
-                        </div>
-                      )}
-                      <div style={{ fontSize: "0.72rem", color: "#888" }}>{p.totalVotes} vote{p.totalVotes !== 1 ? "s" : ""}</div>
-                      {isOpen && daysLeft >= 0 && (
-                        <div style={{ fontSize: "0.72rem", color: "#888" }}>
-                          {daysLeft === 0 ? "Reviewed today" : `${daysLeft}d left`}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">{p.totalVotes} vote{p.totalVotes !== 1 ? "s" : ""}</div>
+                        {isOpen && daysLeft >= 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {daysLeft === 0 ? "Reviewed today" : `${daysLeft}d left`}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -691,74 +690,57 @@ export function PartyDetail() {
       </div>
 
       {/* Ask a Question */}
-      <div className="section">
+      <div className="mb-8">
         <h2>Ask {party.name} a Question</h2>
-        <div className="card">
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="text"
-              value={questionText}
-              onChange={e => setQuestionText(e.target.value)}
-              placeholder="Type your question..."
-              maxLength={500}
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                borderRadius: 4,
-                border: "1px solid #ddd",
-                fontSize: "0.9rem",
-              }}
-              onKeyDown={e => { if (e.key === "Enter") handleSubmitQuestion(); }}
-            />
-            <button
-              onClick={handleSubmitQuestion}
-              disabled={submitting || questionText.trim().length < 5}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 4,
-                border: "none",
-                background: displayColor,
-                color: "white",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: submitting || questionText.trim().length < 5 ? "not-allowed" : "pointer",
-                opacity: submitting || questionText.trim().length < 5 ? 0.5 : 1,
-              }}
-            >
-              {submitting ? "..." : "Submit"}
-            </button>
-          </div>
-          {submitMsg && (
-            <div style={{ fontSize: "0.85rem", marginTop: 6, color: submitMsg.includes("Failed") ? "#dc3545" : "#28a745" }}>
-              {submitMsg}
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={questionText}
+                onChange={e => setQuestionText(e.target.value)}
+                placeholder="Type your question..."
+                maxLength={500}
+                className="flex-1 px-3 py-2 rounded border border-input text-sm"
+                onKeyDown={e => { if (e.key === "Enter") handleSubmitQuestion(); }}
+              />
+              <button
+                onClick={handleSubmitQuestion}
+                disabled={submitting || questionText.trim().length < 5}
+                className="px-4 py-2 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: displayColor }}
+              >
+                {submitting ? "..." : "Submit"}
+              </button>
             </div>
-          )}
-        </div>
+            {submitMsg && (
+              <div className={`text-sm mt-1.5 ${submitMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>
+                {submitMsg}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {questions.length > 0 && (
-          <div style={{ marginTop: "1rem" }}>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Recent Questions ({questions.length})</h3>
+          <div className="mt-4">
+            <h3 className="text-base mb-3">Recent Questions ({questions.length})</h3>
             {questions.slice(0, 10).map(q => (
-              <div
-                key={q.id}
-                className="question-card"
-                style={{ borderLeftColor: displayColor }}
-              >
-                <div className="question-header">
-                  <span className={`badge ${q.status === "pending" ? "question-badge-pending" : "question-badge-answered"}`}>
-                    {q.status}
-                  </span>
-                  <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto" }}>
-                    Day {q.createdOnDay}
-                  </span>
-                </div>
-                <div className="question-text">{q.question}</div>
-                {q.response && (
-                  <div className="question-response">
-                    <strong>{party.name}:</strong> {q.response}
+              <Card key={q.id} className="mb-2" style={{ borderLeft: `4px solid ${displayColor}` }}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Badge variant="outline" className={q.status === "pending" ? STATUS_BADGE.pending : STATUS_BADGE.answered}>
+                      {q.status}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground ml-auto">Day {q.createdOnDay}</span>
                   </div>
-                )}
-              </div>
+                  <p className="text-sm italic mb-1.5">{q.question}</p>
+                  {q.response && (
+                    <div className="bg-muted rounded p-2 px-3 text-sm leading-relaxed">
+                      <strong>{party.name}:</strong> {q.response}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

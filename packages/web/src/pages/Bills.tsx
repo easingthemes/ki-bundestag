@@ -2,21 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Bill, Party } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/ui";
+import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { STATUS_BADGE, VOTE_COLORS, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
 
 const GROUP_INITIAL = 5;
-
-const STATUS_BADGE: Record<string, string> = {
-  passed: "badge-passed",
-  rejected: "badge-rejected",
-  debate: "badge-debate",
-  proposed: "badge-proposed",
-  first_reading: "badge-first-reading",
-  committee: "badge-committee",
-  second_reading: "badge-second-reading",
-  third_reading: "badge-third-reading",
-};
 
 const STATUS_LABELS: Record<string, string> = {
   third_reading: "Third Reading",
@@ -27,11 +20,14 @@ const STATUS_LABELS: Record<string, string> = {
   passed: "Passed",
   rejected: "Rejected",
   debate: "Debate",
+  struck_down: "Struck Down",
 };
 
 const STATUS_ORDER = ["third_reading", "second_reading", "committee", "first_reading", "proposed", "passed", "rejected", "struck_down", "debate"];
 
 const BILL_CATEGORIES = ["economy", "social", "environment", "immigration", "defense", "education", "healthcare", "infrastructure"];
+
+const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Bills() {
   const { user } = useUser();
@@ -54,7 +50,7 @@ export function Bills() {
   // Reset per-group limits when filters change
   useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
 
-  if (parties.length === 0) return <div className="loading">Loading...</div>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -81,60 +77,59 @@ export function Bills() {
 
       {/* Registration prompt */}
       {!user && signalReadyCount > 0 && (
-        <div className="nudge-banner">
-          <Link to="/parties">Register and join a party</Link> to signal your vote on bills in 2nd and 3rd reading.
+        <div className={cn(ALERT_STYLES.info, "mb-4")}>
+          <Link to="/parties" className="text-blue-700 font-semibold hover:underline">Register and join a party</Link> to signal your vote on bills in 2nd and 3rd reading.
         </div>
       )}
 
       {/* Signal-ready nudge for members */}
       {user && user.partyId && signalReadyCount > 0 && (
-        <div className="nudge-banner nudge-action">
+        <div className={cn(ALERT_STYLES.warning, "mb-4")}>
           {signalReadyCount} bill{signalReadyCount !== 1 ? "s" : ""} in reading stage — click to signal your position.
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: "1rem", alignItems: "center" }}>
+      <div className="flex gap-2 flex-wrap mb-4 items-center">
         <input
           type="text"
           placeholder="Search bills..."
           value={filterSearch}
           onChange={e => setFilterSearch(e.target.value)}
-          style={{ padding: "0.3rem 0.6rem", border: "1px solid #ccc", borderRadius: 4, fontSize: "0.85rem", minWidth: 160 }}
+          className={cn(SELECT_CLS, "min-w-40")}
         />
-        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-          style={{ padding: "0.3rem 0.6rem", border: "1px solid #ccc", borderRadius: 4, fontSize: "0.85rem" }}>
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className={SELECT_CLS}>
           <option value="">All categories</option>
           {BILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={filterParty} onChange={e => setFilterParty(e.target.value)}
-          style={{ padding: "0.3rem 0.6rem", border: "1px solid #ccc", borderRadius: 4, fontSize: "0.85rem" }}>
+        <select value={filterParty} onChange={e => setFilterParty(e.target.value)} className={SELECT_CLS}>
           <option value="">All parties</option>
           {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding: "0.3rem 0.6rem", border: "1px solid #ccc", borderRadius: 4, fontSize: "0.85rem" }}>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
           <option value="">All statuses</option>
           {STATUS_ORDER.map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
         </select>
         {hasFilters && (
-          <button onClick={() => { setFilterCategory(""); setFilterParty(""); setFilterSearch(""); setFilterStatus(""); }}
-            style={{ padding: "0.3rem 0.6rem", fontSize: "0.8rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4, cursor: "pointer" }}>
+          <button
+            onClick={() => { setFilterCategory(""); setFilterParty(""); setFilterSearch(""); setFilterStatus(""); }}
+            className="h-9 px-3 text-xs rounded-md border border-input bg-secondary hover:bg-accent cursor-pointer"
+          >
             Clear
           </button>
         )}
-        <span style={{ fontSize: "0.8rem", color: "#888", marginLeft: 4 }}>
+        <span className="text-xs text-muted-foreground ml-1">
           {filteredBills.length} bill{filteredBills.length !== 1 ? "s" : ""}
         </span>
       </div>
 
       {bills.length === 0 && (
-        <div className="loading">No bills yet. Run the simulation to see bills appear.</div>
+        <p className="text-center py-8 text-muted-foreground">No bills yet. Run the simulation to see bills appear.</p>
       )}
       {grouped.map(group => {
         const limit = groupLimits[group.status] ?? GROUP_INITIAL;
         const visible = group.bills.slice(0, limit);
         return (
-          <div key={group.status} className="section">
+          <div key={group.status} className="mb-8">
             <h2>
               {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
             </h2>
@@ -174,102 +169,108 @@ function BillCard({ bill, partyMap }: { bill: Bill; partyMap: Map<string, Party>
   const amendments = bill.amendments ?? [];
 
   return (
-    <div className="card" style={{ marginBottom: "0.75rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <Link to={`/bills/${bill.id}`} style={{ color: "inherit", textDecoration: "none" }}>
-            <strong>{bill.title}</strong>
-          </Link>
-          <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#888" }}>
-            ({bill.category})
-          </span>
-        </div>
-        <span style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          {bill.isGovernmentBill && (
-            <span className="badge badge-govt-bill">Govt. Bill</span>
-          )}
-          {bill.memberInitiative && (
-            <span className="badge" style={{ background: "#6f42c1", color: "white" }}>Member Initiative</span>
-          )}
-          {bill.vetoedByPresident && (
-            <span className="badge badge-presidential-veto">Vetoed by President</span>
-          )}
-          <span className={`badge ${STATUS_BADGE[bill.status] || ""}`}>
-            {STATUS_LABELS[bill.status] ?? bill.status}
-          </span>
-        </span>
-      </div>
-      <div style={{ fontSize: "0.85rem", color: "#555", margin: "0.25rem 0" }}>
-        {bill.description}
-      </div>
-      <div style={{ fontSize: "0.8rem", color: "#888" }}>
-        Proposed by {proposer?.name ?? bill.proposedBy} on day {bill.proposedOnDay}
-      </div>
-
-      {bill.committeeName && (
-        <div style={{ fontSize: "0.8rem", color: "#555", marginTop: "0.25rem" }}>
-          Committee: <strong>{bill.committeeName}</strong>
-          {bill.committeeRecommendation && (
-            <span style={{ marginLeft: "0.5rem" }}>
-              — Recommendation: <span style={{
-                fontWeight: 600,
-                color: bill.committeeRecommendation === "pass" ? "#155724"
-                  : bill.committeeRecommendation === "reject" ? "#721c24"
-                  : "#856404"
-              }}>
-                {bill.committeeRecommendation}
-              </span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {amendments.length > 0 && (
-        <div style={{ marginTop: "0.5rem" }}>
-          <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#444", marginBottom: "0.25rem" }}>
-            Amendments ({amendments.length}):
+    <Card className="mb-3">
+      <CardContent className="p-5">
+        <div className="flex justify-between items-center">
+          <div>
+            <Link to={`/bills/${bill.id}`} className="text-inherit no-underline">
+              <strong>{bill.title}</strong>
+            </Link>
+            <span className="ml-2 text-xs text-muted-foreground">({bill.category})</span>
           </div>
-          {amendments.map(a => (
-            <div key={a.id} style={{ fontSize: "0.8rem", color: "#555", padding: "0.15rem 0", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <span className={`badge ${a.accepted ? "badge-passed" : "badge-rejected"}`} style={{ fontSize: "0.65rem" }}>
-                {a.accepted ? "accepted" : "rejected"}
+          <span className="flex gap-1.5 items-center">
+            {bill.isGovernmentBill && (
+              <Badge variant="outline" className={GOVT_BILL_BADGE}>Govt. Bill</Badge>
+            )}
+            {bill.memberInitiative && (
+              <Badge className={MEMBER_INITIATIVE_BADGE}>Member Initiative</Badge>
+            )}
+            {bill.vetoedByPresident && (
+              <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vetoed by President</Badge>
+            )}
+            <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>
+              {STATUS_LABELS[bill.status] ?? bill.status}
+            </Badge>
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">{bill.description}</p>
+        <p className="text-xs text-muted-foreground">
+          Proposed by {proposer?.name ?? bill.proposedBy} on day {bill.proposedOnDay}
+        </p>
+
+        {bill.committeeName && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Committee: <strong>{bill.committeeName}</strong>
+            {bill.committeeRecommendation && (
+              <span className="ml-2">
+                — Recommendation: <span
+                  className="font-semibold"
+                  style={{
+                    color: bill.committeeRecommendation === "pass" ? "#155724"
+                      : bill.committeeRecommendation === "reject" ? "#721c24"
+                      : "#856404"
+                  }}
+                >
+                  {bill.committeeRecommendation}
+                </span>
               </span>
-              <span>"{a.title}" by {partyMap.get(a.proposedBy)?.name ?? a.proposedBy}</span>
+            )}
+          </p>
+        )}
+
+        {amendments.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-muted-foreground mb-1">
+              Amendments ({amendments.length}):
+            </p>
+            {amendments.map(a => (
+              <div key={a.id} className="text-xs text-muted-foreground py-0.5 flex items-center gap-1.5">
+                <Badge variant="outline" className={cn(
+                  "text-xs px-1.5 py-0",
+                  a.accepted ? STATUS_BADGE.passed : STATUS_BADGE.rejected
+                )}>
+                  {a.accepted ? "accepted" : "rejected"}
+                </Badge>
+                <span>"{a.title}" by {partyMap.get(a.proposedBy)?.name ?? a.proposedBy}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {bill.votes.length > 0 && totalSeats > 0 && (
+          <>
+            <div className="flex h-5 rounded overflow-hidden my-2">
+              {yesSeats > 0 && (
+                <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
+              )}
+              {noSeats > 0 && (
+                <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
+              )}
+              {abstainSeats > 0 && (
+                <div className={VOTE_COLORS.abstain} style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />
+              )}
             </div>
-          ))}
-        </div>
-      )}
-
-      {bill.votes.length > 0 && totalSeats > 0 && (
-        <>
-          <div className="vote-bar">
-            {yesSeats > 0 && (
-              <div className="vote-bar-yes" style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
-            )}
-            {noSeats > 0 && (
-              <div className="vote-bar-no" style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
-            )}
-            {abstainSeats > 0 && (
-              <div className="vote-bar-abstain" style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />
-            )}
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "#888" }}>
-            Yes: {yesSeats} · No: {noSeats} · Abstain: {abstainSeats}
-          </div>
-          <div style={{ marginTop: "0.5rem" }}>
-            {bill.votes.map(v => {
-              const p = partyMap.get(v.partyId);
-              return (
-                <div key={v.partyId} className="vote-detail">
-                  <span className={`vote-dot vote-dot-${v.vote}`} />
-                  <strong>{p?.name ?? v.partyId}</strong>
-                  <span style={{ color: "#666" }}>— {v.reason}</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
+            <p className="text-xs text-muted-foreground">
+              Yes: {yesSeats} · No: {noSeats} · Abstain: {abstainSeats}
+            </p>
+            <div className="mt-2">
+              {bill.votes.map(v => {
+                const p = partyMap.get(v.partyId);
+                return (
+                  <div key={v.partyId} className="flex items-center gap-2 text-sm py-1">
+                    <span className={cn(
+                      "size-2.5 rounded-full shrink-0",
+                      v.vote === "yes" ? VOTE_COLORS.yes : v.vote === "no" ? VOTE_COLORS.no : VOTE_COLORS.abstain
+                    )} />
+                    <strong>{p?.name ?? v.partyId}</strong>
+                    <span className="text-muted-foreground">— {v.reason}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

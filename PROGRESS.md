@@ -1,49 +1,41 @@
-# Progress — UI/UX Overhaul
+# Progress
 
 ## Summary
-- **Status**: completed (6 steps)
-- **Date**: 2026-02-20
+
+- **Status**: completed (4 steps)
+- **Date**: 2026-02-21
 - **Changes**:
-  - Grouped dropdown navigation with mobile hamburger drawer + footer (German labels)
-  - Dashboard redesigned: 2-column grid, sidebar with CTAs, featured Decision/Party of the Month
-  - Flat tagesschau-style cards, pill badges/buttons, uppercase blue headings across all pages
-  - Reusable `ShowMoreButton` component applied to 6 pages (Bills, ConfidenceVotes, Polls, Referendums, SimulationLog, Budget)
-  - Contextual engagement nudges: registration CTAs for non-users, vote/signal action nudges for members
-- **Files changed** (14 total): `main.tsx`, `styles.css`, `ui.tsx`, `Dashboard.tsx`, `Bills.tsx`, `BillDetail.tsx`, `Polls.tsx`, `Referendums.tsx`, `ConfidenceVotes.tsx`, `SimulationLog.tsx`, `Budget.tsx`
-- **No new dependencies** — pure CSS + React restructuring
+  1. Global Typography & Spacing — Inter font, modern headings, widened container
+  2. Shared Color System — `src/lib/colors.ts` with 19 semantic maps, 160+ hex colors replaced
+  3. Dashboard Polish — Left-border accents removed, mood/hero/featured modernized, font sizes normalized
+  4. All Pages Consistency Pass — Remaining hex colors and arbitrary font sizes cleaned across all pages
+
+## Goal
+
+Visual modernization: make the app look modern and polished (beyond the shadcn/ui tech migration which was a 1:1 visual replica).
 
 ## Steps
 
-### Step 1: Research & Inspiration
-- **Status**: done
-- **Result**: Analyzed Politico EU + Tagesschau for design patterns. Documented findings: flat cards, uppercase headings, pill toggles, grouped nav.
+### Step 1: Global Typography & Spacing
 
-### Step 2: Navigation Overhaul
 - **Status**: done
-- **Files**: `main.tsx`, `styles.css`
-- **Result**: 4 dropdown groups (Parlament, Parteien & Wahlen, Mitmachen, Nachrichten) + `MobileNav` drawer + footer with Log/About/Admin.
+- **Files**: `index.html`, `styles.css`, `main.tsx`, `Elections.tsx`
+- **Result**: Inter font via Google Fonts, headings modernized (no uppercase h2, foreground color, tight tracking), container 1280px with more padding.
 
-### Step 3: Dashboard Redesign
+### Step 2: Shared Color System
+
 - **Status**: done
-- **Files**: `Dashboard.tsx`, `styles.css`
-- **Result**: 2-column grid (2fr/1fr). Main: hero, seat bar, economy, events, media. Sidebar: Chancellor, CTAs, sentiment, crises, election, Ask widget. Featured: Decision + Party of the Month.
+- **Files**: New `src/lib/colors.ts`, all 18 page files + `BillDetail.tsx`
+- **Result**: 19 semantic color maps replacing per-page hardcoded hex. Zero `bg-[#...]`/`text-[#...]`/`border-[#...]` remaining.
 
-### Step 4: UI Component Polish
+### Step 3: Dashboard Polish
+
 - **Status**: done
-- **Files**: `styles.css`
-- **Result**: Flat border cards (no shadows), pill badges/buttons, uppercase blue headings, sticky footer layout.
+- **Files**: `Dashboard.tsx`
+- **Result**: Removed left-border accents (party color dots instead), mood badge Tailwind classes, featured section Badge label, 22 font sizes normalized. Zero hex classes.
 
-### Step 5: List Truncation & Load More
+### Step 4: All Pages Consistency Pass
+
 - **Status**: done
-- **Files**: `ui.tsx`, `styles.css`, `Bills.tsx`, `ConfidenceVotes.tsx`, `Polls.tsx`, `Referendums.tsx`, `SimulationLog.tsx`, `Budget.tsx`
-- **Result**: `ShowMoreButton` component + per-page truncation (3–10 initial items). Filter-reset support.
-
-### Step 6: Visitor Engagement UX
-- **Status**: done
-- **Files**: `Bills.tsx`, `BillDetail.tsx`, `Polls.tsx`, `Referendums.tsx`, `styles.css`
-- **Result**: `.nudge-banner` (blue registration CTA) + `.nudge-action` (amber vote/signal nudge) on 4 pages. User-aware via `useUser()`.
-
-## Future Considerations
-- Recharts 2.15.4 is installed — could add approval trend sparklines, economy charts, vote distribution visualizations
-- Mobile nav could gain swipe-to-close gesture
-- Dashboard "Decision/Party of the Month" could become a carousel with weekly rotation
+- **Files**: 12 page files (Elections, Parties, Polls, Interpellations, ConstitutionalCourt, Media, Admin, Bills, Budget, Questions, Referendums, PartyDetail)
+- **Result**: All hex color classes and `text-[0.XXrem]` arbitrary font sizes replaced. CSS output 58.89 KB. Build passes, zero diagnostics.

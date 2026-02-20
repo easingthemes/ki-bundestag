@@ -1,9 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ConstitutionalChallenge, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { ShowMoreButton } from "../components/shared";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
 
 const STATUS_OPTIONS = ["all", "pending", "ruled"] as const;
 const DECISION_OPTIONS = ["all", "struck_down", "upheld"] as const;
+
+const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function ConstitutionalCourt() {
   const [challenges, setChallenges] = useState<ConstitutionalChallenge[]>([]);
@@ -30,25 +37,24 @@ export function ConstitutionalCourt() {
     return true;
   });
   const visibleFiltered = filtered.slice(0, visibleCount);
-  const remaining = filtered.length - visibleCount;
 
   return (
-    <div className="page">
+    <div>
       <h1>Bundesverfassungsgericht</h1>
-      <p className="page-subtitle">Constitutional challenges to passed legislation</p>
+      <p className="text-muted-foreground mb-4">Constitutional challenges to passed legislation</p>
 
-      <div className="filters">
-        <label>
-          Status:{" "}
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+      <div className="flex gap-4 mb-4 flex-wrap items-center">
+        <label className="flex items-center gap-1.5 text-sm">
+          Status:
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={SELECT_CLS}>
             {STATUS_OPTIONS.map(s => (
               <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
           </select>
         </label>
-        <label>
-          Decision:{" "}
-          <select value={decisionFilter} onChange={e => setDecisionFilter(e.target.value)}>
+        <label className="flex items-center gap-1.5 text-sm">
+          Decision:
+          <select value={decisionFilter} onChange={e => setDecisionFilter(e.target.value)} className={SELECT_CLS}>
             {DECISION_OPTIONS.map(d => (
               <option key={d} value={d}>
                 {d === "all" ? "All" : d === "struck_down" ? "Struck Down" : "Upheld"}
@@ -56,13 +62,13 @@ export function ConstitutionalCourt() {
             ))}
           </select>
         </label>
-        <span className="filter-count">{filtered.length} challenge{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs text-muted-foreground">{filtered.length} challenge{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="empty-state">No constitutional challenges match the current filters.</div>
+        <p className="text-center py-8 text-muted-foreground">No constitutional challenges match the current filters.</p>
       ) : (
-        <div className="challenge-list">
+        <div className="flex flex-col gap-3">
           {visibleFiltered.map(c => {
             const filedBy = partyMap.get(c.filedByPartyId);
             const isExpanded = expandedId === c.id;
@@ -70,77 +76,69 @@ export function ConstitutionalCourt() {
             const isUpheld = c.decision === "upheld";
 
             return (
-              <div
+              <Card
                 key={c.id}
-                className={`challenge-card ${isStruckDown ? "challenge-struck-down" : isUpheld ? "challenge-upheld" : "challenge-pending"}`}
+                className="overflow-hidden"
               >
                 <div
-                  className="challenge-header"
+                  className="p-3.5 cursor-pointer bg-card select-none hover:bg-muted/50"
                   onClick={() => setExpandedId(isExpanded ? null : c.id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={e => e.key === "Enter" && setExpandedId(isExpanded ? null : c.id)}
                 >
-                  <div className="challenge-title-row">
-                    <span className={`decision-badge ${isStruckDown ? "badge-struck-down" : isUpheld ? "badge-upheld" : "badge-pending"}`}>
-                      {isStruckDown ? "⚖️ Struck Down" : isUpheld ? "✓ Upheld" : "⏳ Pending"}
-                    </span>
-                    <span className="challenge-bill-title">"{c.billTitle}"</span>
+                  <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+                    <Badge variant="outline" className={cn(
+                      isStruckDown
+                        ? STATUS_BADGE.struck_down
+                        : isUpheld
+                        ? STATUS_BADGE.upheld
+                        : STATUS_BADGE.pending
+                    )}>
+                      {isStruckDown ? "Struck Down" : isUpheld ? "Upheld" : "Pending"}
+                    </Badge>
+                    <span className="text-sm font-semibold">"{c.billTitle}"</span>
                   </div>
-                  <div className="challenge-meta">
-                    <span
-                      className="challenge-party"
-                      style={{ color: filedBy?.color ?? "#888" }}
-                    >
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                    <span className="font-semibold" style={{ color: filedBy?.color ?? "#888" }}>
                       Filed by {filedBy?.name ?? c.filedByPartyId}
                     </span>
-                    <span className="challenge-day">Day {c.dayNumber}</span>
+                    <span>Day {c.dayNumber}</span>
                     {c.ruledOnDay != null && c.ruledOnDay !== c.dayNumber && (
-                      <span className="challenge-ruled">Ruled Day {c.ruledOnDay}</span>
+                      <span>Ruled Day {c.ruledOnDay}</span>
                     )}
-                    <span className="expand-toggle">{isExpanded ? "▲" : "▼"}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="challenge-body">
-                    <div className="challenge-section">
+                  <div className="px-4 pb-4 pt-3.5 bg-muted/50 border-t border-border">
+                    <div className="mb-3 text-sm leading-relaxed">
                       <strong>Constitutional Arguments:</strong>
-                      <p>{c.arguments}</p>
+                      <p className="mt-1">{c.arguments}</p>
                     </div>
                     {c.reasoning && (
-                      <div className="challenge-section">
+                      <div className="mb-3 text-sm leading-relaxed">
                         <strong>Court Reasoning:</strong>
-                        <p className="court-reasoning">{c.reasoning}</p>
+                        <p className="mt-1 italic text-muted-foreground">{c.reasoning}</p>
                       </div>
                     )}
                     {isStruckDown && (
-                      <div className="challenge-section challenge-impact-note">
+                      <div className={ALERT_STYLES.warning}>
                         <strong>Effect:</strong> The law has been nullified. Its economic and sentiment effects have been reversed.
                       </div>
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })}
-          {remaining > 0 && (
-            <div style={{ textAlign: "center", margin: "1rem 0" }}>
-              <button
-                onClick={() => setVisibleCount(c => c + 10)}
-                style={{
-                  padding: "0.5rem 1.5rem",
-                  border: "1px solid #ccc",
-                  borderRadius: 6,
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                }}
-              >
-                Show {Math.min(10, remaining)} more ({remaining} remaining)
-              </button>
-            </div>
-          )}
+          <ShowMoreButton
+            total={filtered.length}
+            visible={Math.min(visibleCount, filtered.length)}
+            increment={10}
+            onShowMore={() => setVisibleCount(c => c + 10)}
+          />
         </div>
       )}
     </div>

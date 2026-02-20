@@ -2,18 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, Bill, Party, ConstitutionalChallenge, BillImpact } from "../api";
 import { useUser } from "../userContext";
-
-const STATUS_BADGE: Record<string, string> = {
-  passed: "badge-passed",
-  rejected: "badge-rejected",
-  debate: "badge-debate",
-  proposed: "badge-proposed",
-  first_reading: "badge-first-reading",
-  committee: "badge-committee",
-  second_reading: "badge-second-reading",
-  third_reading: "badge-third-reading",
-  struck_down: "badge-rejected",
-};
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { STATUS_BADGE, VOTE_COLORS, VOTE_HEX, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
 
 const STATUS_LABELS: Record<string, string> = {
   third_reading: "Third Reading",
@@ -66,10 +58,10 @@ function fmtDelta(orig: number | undefined, cur: number | undefined) {
   if (orig === cur) return fmtImpact(cur);
   const delta = cur - orig;
   const deltaStr = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
-  const color = delta > 0 ? "#28a745" : "#dc3545";
+  const color = delta > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative;
   return (
     <span>
-      <span style={{ color: "#888", textDecoration: "line-through" }}>{fmtImpact(orig)}</span>
+      <span style={{ color: SEMANTIC_HEX.neutral, textDecoration: "line-through" }}>{fmtImpact(orig)}</span>
       {" → "}
       <span>{fmtImpact(cur)}</span>
       <span style={{ fontSize: "0.75rem", color, marginLeft: 4 }}>({deltaStr})</span>
@@ -101,7 +93,7 @@ export function BillDetail() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (!bill || parties.length === 0) return <div className="loading">Loading...</div>;
+  if (!bill || parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
   const proposer = partyMap.get(bill.proposedBy);
@@ -131,16 +123,16 @@ export function BillDetail() {
       </div>
 
       {/* Header */}
-      <div className="card" style={{ borderLeft: `4px solid ${displayColor}`, marginBottom: "1.5rem" }}>
+      <Card className="mb-6" style={{ borderLeft: `4px solid ${displayColor}` }}><CardContent className="p-5">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
           <h1 style={{ margin: 0, fontSize: "1.4rem", flex: 1, minWidth: 0 }}>{bill.title}</h1>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
-            {bill.isGovernmentBill && <span className="badge badge-govt-bill">Govt. Bill</span>}
-            {bill.memberInitiative && <span className="badge" style={{ background: "#6f42c1", color: "white" }}>Member Initiative</span>}
-            {bill.vetoedByPresident && <span className="badge badge-presidential-veto">Vetoed by President</span>}
-            <span className={`badge ${STATUS_BADGE[bill.status] || ""}`}>
+            {bill.isGovernmentBill && <Badge variant="outline" className={GOVT_BILL_BADGE}>Govt. Bill</Badge>}
+            {bill.memberInitiative && <Badge className={MEMBER_INITIATIVE_BADGE}>Member Initiative</Badge>}
+            {bill.vetoedByPresident && <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vetoed by President</Badge>}
+            <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>
               {STATUS_LABELS[bill.status] ?? bill.status}
-            </span>
+            </Badge>
           </div>
         </div>
         <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#666" }}>
@@ -156,43 +148,43 @@ export function BillDetail() {
             </span>
           )}
         </div>
-      </div>
+      </CardContent></Card>
 
       {/* Description */}
-      <div className="section">
+      <div className="mb-6">
         <h2>Description</h2>
-        <div className="card">
+        <Card><CardContent className="p-5">
           <p style={{ fontSize: "0.95rem", color: "#333", lineHeight: 1.6, margin: 0 }}>{bill.description}</p>
-        </div>
+        </CardContent></Card>
       </div>
 
       {/* Member Signals */}
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Member Signals</h2>
           {/* Signal nudge for members who haven't signaled yet */}
           {user && user.partyId && signals && signals.userSignal === null && (
-            <div className="nudge-banner">
+            <div className={ALERT_STYLES.info}>
               This bill is in {STATUS_LABELS[bill.status] ?? bill.status} — signal your position to influence your party's vote.
             </div>
           )}
-          <div className="card">
+          <Card><CardContent className="p-5">
             {signals ? (() => {
               const total = signals.yes + signals.no;
               const yesPct = total > 0 ? Math.round(signals.yes / total * 100) : 0;
               return (
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
-                    <div style={{ flex: 1, background: "#e9ecef", borderRadius: 4, height: 14, overflow: "hidden" }}>
+                    <div style={{ flex: 1, background: "var(--color-muted)", borderRadius: 4, height: 14, overflow: "hidden" }}>
                       {total > 0 && (
-                        <div style={{ width: `${yesPct}%`, height: "100%", background: "#28a745", borderRadius: "4px 0 0 4px" }} />
+                        <div style={{ width: `${yesPct}%`, height: "100%", background: SEMANTIC_HEX.positive, borderRadius: "4px 0 0 4px" }} />
                       )}
                     </div>
                     <div style={{ flexShrink: 0, fontSize: "0.85rem", color: "#555" }}>
-                      <strong style={{ color: "#28a745" }}>{signals.yes} YES</strong>
+                      <strong style={{ color: SEMANTIC_HEX.positive }}>{signals.yes} YES</strong>
                       {" / "}
-                      <strong style={{ color: "#dc3545" }}>{signals.no} NO</strong>
-                      {total > 0 && <span style={{ color: "#888", marginLeft: 4 }}>({yesPct}% YES)</span>}
+                      <strong style={{ color: SEMANTIC_HEX.negative }}>{signals.no} NO</strong>
+                      {total > 0 && <span style={{ color: SEMANTIC_HEX.neutral, marginLeft: 4 }}>({yesPct}% YES)</span>}
                     </div>
                   </div>
                   {user && (
@@ -202,40 +194,40 @@ export function BillDetail() {
                           const s = await api.signalBill(bill.id, "yes");
                           setSignals(s);
                         }}
-                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "yes" ? "#28a745" : "#ddd"}`, background: signals.userSignal === "yes" ? "#d4edda" : "white", color: "#28a745", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-                      >👍 YES</button>
+                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "yes" ? SEMANTIC_HEX.positive : "#ddd"}`, background: signals.userSignal === "yes" ? "var(--color-emerald-50, #ecfdf5)" : "white", color: SEMANTIC_HEX.positive, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                      >YES</button>
                       <button
                         onClick={async () => {
                           const s = await api.signalBill(bill.id, "no");
                           setSignals(s);
                         }}
-                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "no" ? "#dc3545" : "#ddd"}`, background: signals.userSignal === "no" ? "#f8d7da" : "white", color: "#dc3545", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-                      >👎 NO</button>
-                      <span style={{ fontSize: "0.78rem", color: "#888" }}>Your signal is visible to the party AI when it votes.</span>
+                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "no" ? SEMANTIC_HEX.negative : "#ddd"}`, background: signals.userSignal === "no" ? "#f8d7da" : "white", color: SEMANTIC_HEX.negative, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                      >NO</button>
+                      <span style={{ fontSize: "0.78rem", color: SEMANTIC_HEX.neutral }}>Your signal is visible to the party AI when it votes.</span>
                     </div>
                   )}
                   {!user && total === 0 && (
-                    <div style={{ fontSize: "0.85rem", color: "#888" }}>
+                    <div style={{ fontSize: "0.85rem", color: SEMANTIC_HEX.neutral }}>
                       <Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your vote on this bill.
                     </div>
                   )}
                 </div>
               );
             })() : (
-              <div style={{ fontSize: "0.85rem", color: "#888" }}>No signals yet.{" "}
+              <div style={{ fontSize: "0.85rem", color: SEMANTIC_HEX.neutral }}>No signals yet.{" "}
                 {user ? "" : <><Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your opinion.</>}
               </div>
             )}
-          </div>
+          </CardContent></Card>
         </div>
       )}
 
       {/* Legislative Pipeline */}
-      <div className="section">
+      <div className="mb-6">
         <h2>Legislative Pipeline</h2>
-        <div className="card">
+        <Card><CardContent className="p-5">
           {bill.isGovernmentBill && (
-            <div style={{ fontSize: "0.8rem", color: "#856404", marginBottom: "0.75rem", background: "#fff3cd", padding: "4px 8px", borderRadius: 4, display: "inline-block" }}>
+            <div className="text-sm text-amber-700 mb-3 bg-amber-50 px-2 py-1 rounded inline-block">
               Government bill — fast-tracked (1st reading skipped)
             </div>
           )}
@@ -275,14 +267,14 @@ export function BillDetail() {
               );
             })}
           </div>
-        </div>
+        </CardContent></Card>
       </div>
 
       {/* Committee */}
       {bill.committeeName && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Committee Review</h2>
-          <div className="card">
+          <Card><CardContent className="p-5">
             <div style={{ fontWeight: 600 }}>{bill.committeeName}</div>
             {bill.committeeRecommendation && (
               <div style={{ marginTop: "0.25rem", fontSize: "0.9rem" }}>
@@ -297,13 +289,13 @@ export function BillDetail() {
                 </span>
               </div>
             )}
-          </div>
+          </CardContent></Card>
         </div>
       )}
 
       {/* Amendments */}
       {amendments.length > 0 && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Amendments ({amendments.length})</h2>
           {amendments.map(a => {
             const amendProposer = partyMap.get(a.proposedBy);
@@ -313,12 +305,12 @@ export function BillDetail() {
             const aNo = a.votes.filter(v => v.vote === "no").reduce((s, v) => s + (partyMap.get(v.partyId)?.seatCount ?? 0), 0);
 
             return (
-              <div key={a.id} className="card" style={{ marginBottom: "0.75rem", borderLeft: `3px solid ${amendColor}` }}>
+              <Card key={a.id} className="mb-3" style={{ borderLeft: `3px solid ${amendColor}` }}><CardContent className="p-5">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <strong style={{ fontSize: "0.95rem" }}>{a.title}</strong>
-                  <span className={`badge ${a.accepted ? "badge-passed" : "badge-rejected"}`}>
+                  <Badge variant="outline" className={a.accepted ? STATUS_BADGE.passed : STATUS_BADGE.rejected}>
                     {a.accepted ? "Accepted" : "Rejected"}
-                  </span>
+                  </Badge>
                 </div>
                 <div style={{ fontSize: "0.8rem", color: "#888", marginTop: 2 }}>
                   Proposed by{" "}
@@ -329,14 +321,14 @@ export function BillDetail() {
                 <div style={{ fontSize: "0.9rem", color: "#555", marginTop: "0.5rem" }}>{a.description}</div>
                 {a.votes.length > 0 && aTotal > 0 && (
                   <>
-                    <div className="vote-bar" style={{ marginTop: "0.5rem" }}>
-                      {aYes > 0 && <div className="vote-bar-yes" style={{ width: `${(aYes / aTotal) * 100}%` }} />}
-                      {aNo > 0 && <div className="vote-bar-no" style={{ width: `${(aNo / aTotal) * 100}%` }} />}
+                    <div className="flex h-5 rounded overflow-hidden mt-2">
+                      {aYes > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${(aYes / aTotal) * 100}%` }} />}
+                      {aNo > 0 && <div className={VOTE_COLORS.no} style={{ width: `${(aNo / aTotal) * 100}%` }} />}
                     </div>
                     <div style={{ fontSize: "0.75rem", color: "#888" }}>Yes: {aYes} · No: {aNo}</div>
                   </>
                 )}
-              </div>
+              </CardContent></Card>
             );
           })}
         </div>
@@ -344,9 +336,9 @@ export function BillDetail() {
 
       {/* Economic Effects */}
       {hasImpact && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Economic Effects</h2>
-          <div className="card">
+          <Card><CardContent className="p-5">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
               <thead>
                 <tr>
@@ -374,19 +366,19 @@ export function BillDetail() {
                   ))}
               </tbody>
             </table>
-          </div>
+          </CardContent></Card>
         </div>
       )}
 
       {/* Final Vote */}
       {bill.votes.length > 0 && totalSeats > 0 && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Final Vote</h2>
-          <div className="card">
-            <div className="vote-bar">
-              {yesSeats > 0 && <div className="vote-bar-yes" style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />}
-              {noSeats > 0 && <div className="vote-bar-no" style={{ width: `${(noSeats / totalSeats) * 100}%` }} />}
-              {abstainSeats > 0 && <div className="vote-bar-abstain" style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />}
+          <Card><CardContent className="p-5">
+            <div className="flex h-5 rounded overflow-hidden my-2">
+              {yesSeats > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />}
+              {noSeats > 0 && <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />}
+              {abstainSeats > 0 && <div className={VOTE_COLORS.abstain} style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />}
             </div>
             <div style={{ fontSize: "0.75rem", color: "#888", marginBottom: "0.75rem" }}>
               Yes: {yesSeats} · No: {noSeats} · Abstain: {abstainSeats}
@@ -394,8 +386,8 @@ export function BillDetail() {
             {bill.votes.map(v => {
               const p = partyMap.get(v.partyId);
               return (
-                <div key={v.partyId} className="vote-detail">
-                  <span className={`vote-dot vote-dot-${v.vote}`} />
+                <div key={v.partyId} className="flex items-center gap-2 text-sm py-1">
+                  <span className={cn("size-2.5 rounded-full shrink-0", VOTE_COLORS[v.vote as keyof typeof VOTE_COLORS])} />
                   <Link to={`/parties/${v.partyId}`} style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}>
                     {p?.name ?? v.partyId}
                   </Link>
@@ -403,26 +395,26 @@ export function BillDetail() {
                 </div>
               );
             })}
-          </div>
+          </CardContent></Card>
         </div>
       )}
 
       {/* Constitutional Challenge */}
       {challenge && (
-        <div className="section">
+        <div className="mb-6">
           <h2>Constitutional Challenge</h2>
-          <div className={`card ${
-            challenge.decision === "struck_down" ? "challenge-struck-down"
-            : challenge.decision === "upheld" ? "challenge-upheld"
-            : "challenge-pending"
-          }`}>
+          <Card className={cn(
+            challenge.decision === "struck_down" ? "border-red-300 bg-red-50/50"
+            : challenge.decision === "upheld" ? "border-emerald-300 bg-emerald-50/50"
+            : "border-amber-300 bg-amber-50/50"
+          )}><CardContent className="p-5">
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600 }}>
                 Filed by {partyMap.get(challenge.filedByPartyId)?.name ?? challenge.filedByPartyId}
               </span>
-              {challenge.decision === "struck_down" && <span className="badge badge-struck-down">Struck Down</span>}
-              {challenge.decision === "upheld" && <span className="badge badge-upheld">Upheld</span>}
-              {!challenge.decision && <span className="badge badge-pending">Pending</span>}
+              {challenge.decision === "struck_down" && <Badge variant="outline" className={STATUS_BADGE.struck_down}>Struck Down</Badge>}
+              {challenge.decision === "upheld" && <Badge variant="outline" className={STATUS_BADGE.upheld}>Upheld</Badge>}
+              {!challenge.decision && <Badge variant="outline" className={STATUS_BADGE.pending}>Pending</Badge>}
               <span style={{ fontSize: "0.8rem", color: "#888" }}>Day {challenge.dayNumber}</span>
             </div>
             <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
@@ -435,19 +427,19 @@ export function BillDetail() {
                 <p style={{ margin: "0.25rem 0 0", color: "#444", fontStyle: "italic", lineHeight: 1.5 }}>{challenge.reasoning}</p>
               </div>
             )}
-          </div>
+          </CardContent></Card>
         </div>
       )}
 
       {/* Presidential Veto */}
       {bill.vetoedByPresident && (
-        <div className="section">
-          <div className="card" style={{ background: "#fff3cd", borderLeft: "4px solid #ffc107" }}>
+        <div className="mb-6">
+          <Card className="border-amber-300 bg-amber-50"><CardContent className="p-5">
             <strong>Vetoed by the Bundespräsident</strong>
-            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem", color: "#856404" }}>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }} className="text-amber-700">
               The Federal President has refused to sign this bill into law.
             </p>
-          </div>
+          </CardContent></Card>
         </div>
       )}
     </div>
