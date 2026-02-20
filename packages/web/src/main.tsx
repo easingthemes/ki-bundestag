@@ -20,22 +20,55 @@ import { Budget } from "./pages/Budget";
 import { Admin } from "./pages/Admin";
 import { About } from "./pages/About";
 import { BillDetail } from "./pages/BillDetail";
-import { setErrorHandler } from "./api";
+import { api, setErrorHandler, setUserToken, type User } from "./api";
+import { UserContext, loadStoredToken, saveToken, clearToken } from "./userContext";
 import "./styles.css";
 
 function App() {
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const handleError = useCallback((msg: string) => {
     setError(msg);
     setTimeout(() => setError(null), 6000);
   }, []);
 
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    const stored = loadStoredToken();
+    if (stored) {
+      setUserToken(stored);
+      setToken(stored);
+      api.getMe().then(u => setUser(u)).catch(() => {
+        // Token no longer valid — clear it
+        clearToken();
+        setUserToken(null);
+        setToken(null);
+      });
+    }
+  }, []);
+
   useEffect(() => {
     setErrorHandler(handleError);
   }, [handleError]);
 
+  const login = useCallback((newToken: string, newUser: User) => {
+    saveToken(newToken);
+    setUserToken(newToken);
+    setToken(newToken);
+    setUser(newUser);
+  }, []);
+
+  const logout = useCallback(() => {
+    clearToken();
+    setUserToken(null);
+    setToken(null);
+    setUser(null);
+  }, []);
+
   return (
+    <UserContext.Provider value={{ user, token, login, logout }}>
     <BrowserRouter>
       <div className="app">
         <nav className="nav">
@@ -61,6 +94,15 @@ function App() {
             <NavLink to="/log">Log</NavLink>
             <NavLink to="/about">About</NavLink>
             <NavLink to="/admin">Admin</NavLink>
+            <span className="nav-sep" />
+            {user ? (
+              <span style={{ fontSize: "0.8rem", color: "#ccc", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#28a745", display: "inline-block" }} />
+                {user.displayName}
+              </span>
+            ) : (
+              <NavLink to="/parties" style={{ fontSize: "0.8rem", color: "#aaa" }}>Join a Party</NavLink>
+            )}
           </div>
         </nav>
         {error && (
@@ -93,6 +135,7 @@ function App() {
         </main>
       </div>
     </BrowserRouter>
+    </UserContext.Provider>
   );
 }
 

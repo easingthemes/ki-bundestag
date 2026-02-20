@@ -166,9 +166,13 @@ ${thirdReadingBills.map(b => {
   const amStr = amendments.length > 0
     ? `\n    Accepted amendments: ${amendments.map(a => `"${a.title}" by ${a.proposedBy}`).join(", ")}`
     : "";
+  const sig = ctx.memberSignals?.[b.id];
+  const sigStr = sig && (sig.yes + sig.no) > 0
+    ? `\n    Member signals: ${sig.yes} YES / ${sig.no} NO (${Math.round(sig.yes / (sig.yes + sig.no) * 100)}% YES)`
+    : "";
   return `  - [${b.id}] "${b.title}" (${b.category}) proposed by ${b.proposedBy}${rec}
     Description: ${b.description}
-    Impact: ${JSON.stringify(b.impact)}${amStr}`;
+    Impact: ${JSON.stringify(b.impact)}${amStr}${sigStr}`;
 }).join("\n")}\n`;
     } else {
       readingSections += `\nTHIRD READING (awareness only — you cannot vote without a Fraktion):
@@ -242,6 +246,10 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
 ALL PARTIES:
 ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}`).join("\n")}
+
+${ctx.topInternalProposals && ctx.topInternalProposals.length > 0 ? `PARTY MEMBER PROPOSALS (top ideas from your base, by support):
+${ctx.topInternalProposals.map(p => `  - "${p.title}" [${p.category}] score:${p.score > 0 ? "+" : ""}${p.score} (${p.totalVotes} vote${p.totalVotes !== 1 ? "s" : ""})`).join("\n")}
+Consider whether these reflect priorities your members care about.` : ""}
 
 Respond with your actions as JSON.`;
 }

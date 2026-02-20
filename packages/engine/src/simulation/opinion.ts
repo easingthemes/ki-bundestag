@@ -42,6 +42,16 @@ export function applyApprovalDrift(party: Party): number {
   return clamp(Math.round((party.approvalRating + drift) * 10) / 10, 1, 60);
 }
 
+/**
+ * Logarithmic membership bonus: 0 active members → 0, ~10 → +0.026/day, ~100 → +0.05/day
+ * Hard cap: +5 approval points max per day (only reachable with ~1000+ members)
+ */
+export function membershipBonus(activeMembers: number): number {
+  if (activeMembers <= 0) return 0;
+  const bonus = Math.min(5, Math.log10(activeMembers + 1) * 2.5);
+  return Math.round(bonus * 0.01 * 100) / 100; // e.g. 2.6 → 0.026
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }

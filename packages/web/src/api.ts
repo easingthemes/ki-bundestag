@@ -1,14 +1,23 @@
 const BASE = "/api";
 
 let _onError: ((msg: string) => void) | null = null;
+let _userToken: string | null = null;
 
 export function setErrorHandler(handler: (msg: string) => void) {
   _onError = handler;
 }
 
+export function setUserToken(token: string | null) {
+  _userToken = token;
+}
+
+function authHeaders(): Record<string, string> {
+  return _userToken ? { "X-User-Token": _userToken } : {};
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   try {
-    const res = await fetch(`${BASE}${path}`);
+    const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
     if (!res.ok) {
       const msg = `API error: ${res.status} on ${path}`;
       _onError?.(msg);
@@ -28,11 +37,13 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   try {
     const res = await fetch(`${BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const msg = `API error: ${res.status} on POST ${path}`;
+      const text = await res.text();
+      let msg = `API error: ${res.status} on POST ${path}`;
+      try { msg = (JSON.parse(text) as { error?: string }).error ?? msg; } catch { /* ignore */ }
       _onError?.(msg);
       throw new Error(msg);
     }
@@ -46,6 +57,56 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   }
 }
 
+async function deleteJson<T>(path: string): Promise<T> {
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const msg = `API error: ${res.status} on DELETE ${path}`;
+      _onError?.(msg);
+      throw new Error(msg);
+    }
+    return res.json();
+  } catch (err) {
+    if (err instanceof TypeError && err.message.includes("fetch")) {
+      const msg = "Cannot connect to API server. Is it running on port 3001?";
+      _onError?.(msg);
+    }
+    throw err;
+  }
+}
+
+export interface InternalProposal {
+  id: string;
+  partyId: string;
+  proposedBy: string;   // userId or "ai"
+  proposerName: string;
+  title: string;
+  description: string;
+  category: string;
+  rationale: string | null;
+  status: "open" | "reviewing" | "accepted" | "declined" | "expired";
+  voteScore: number;
+  totalVotes: number;
+  createdOnDay: number;
+  reviewByDay: number;
+  reviewedOnDay: number | null;
+  declineReason: string | null;
+  bundestagBillId: string | null;
+  userVote?: 1 | -1 | null;
+}
+
+export interface User {
+  id: string;        // UUID = auth token
+  displayName: string;
+  partyId: string | null;
+  createdAt: number;
+  lastActive: number;
+  switchCooldownUntil: number | null; // sim day
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -56,6 +117,7 @@ export interface Party {
   policyPriorities: Record<string, number>;
   coalitionRole: string;
   recentApprovals: number[];
+  memberCount: number;
 }
 
 export interface BillImpact {
@@ -100,6 +162,8 @@ export interface Bill {
   originalImpact?: BillImpact;
   isGovernmentBill?: boolean;
   vetoedByPresident?: boolean;
+  memberInitiative?: boolean;
+  proposerDisplayName?: string;
   statusChangedOnDay?: number;
 }
 
@@ -481,4 +545,23 @@ export const api = {
   getBudgets: (status?: string) =>
     fetchJson<Budget[]>(`/budgets${status ? `?status=${status}` : ""}`),
   getBudget: (id: string) => fetchJson<Budget>(`/budgets/${id}`),
+
+  // Internal proposals
+  getPartyProposals: (partyId: string, status?: string) =>
+    fetchJson<InternalProposal[]>(`/parties/${partyId}/proposals${status ? `?status=${status}` : ""}`),
+  createProposal: (partyId: string, body: { title: string; description: string; category: string; rationale?: string }) =>
+    postJson<InternalProposal>(`/parties/${partyId}/proposals`, body),
+  getProposal: (id: string) => fetchJson<InternalProposal>(`/proposals/${id}`),
+  voteOnProposal: (id: string, vote: 1 | -1) => postJson<InternalProposal>(`/proposals/${id}/vote`, { vote }),
+  // Member signals on bills
+  getBillSignals: (billId: string) => fetchJson<{ yes: number; no: number; userSignal: "yes" | "no" | null }>(`/bills/${billId}/signal`),
+  signalBill: (billId: string, signal: "yes" | "no") => postJson<{ yes: number; no: number; userSignal: "yes" | "no" | null }>(`/bills/${billId}/signal`, { signal }),
+  retractProposalVote: (id: string) => deleteJson<InternalProposal>(`/proposals/${id}/vote`),
+
+  // User / membership
+  registerUser: (displayName: string, partyId: string) =>
+    postJson<User>("/users/register", { displayName, partyId }),
+  getMe: () => fetchJson<User>("/users/me"),
+  joinParty: (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {}),
+  leaveParty: () => postJson<User>("/users/me/leave", {}),
 };

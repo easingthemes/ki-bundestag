@@ -151,9 +151,9 @@ function Hemicycle({ results, parties }: { results: ElectionResult[]; parties: P
 
     const d = [
       `M ${x1o} ${y1o}`,
-      `A ${outerR} ${outerR} 0 ${largeArc} 0 ${x2o} ${y2o}`,
+      `A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2o} ${y2o}`,
       `L ${x1i} ${y1i}`,
-      `A ${innerR} ${innerR} 0 ${largeArc} 1 ${x2i} ${y2i}`,
+      `A ${innerR} ${innerR} 0 ${largeArc} 0 ${x2i} ${y2i}`,
       `Z`,
     ].join(" ");
 

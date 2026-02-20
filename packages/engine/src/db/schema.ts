@@ -29,6 +29,8 @@ export const bills = sqliteTable("bills", {
   statusChangedOnDay: integer("status_changed_on_day"),
   isGovernmentBill: integer("is_government_bill", { mode: "boolean" }),
   vetoedByPresident: integer("vetoed_by_president", { mode: "boolean" }).default(false),
+  memberInitiative: integer("member_initiative", { mode: "boolean" }).default(false),
+  proposerDisplayName: text("proposer_display_name"),
 });
 
 export const nationalState = sqliteTable("national_state", {
@@ -217,6 +219,50 @@ export const constitutionalChallenges = sqliteTable("constitutional_challenges",
   dayNumber: integer("day_number").notNull(),
   ruledOnDay: integer("ruled_on_day"),
   sentimentImpact: real("sentiment_impact"),
+});
+
+export const internalProposals = sqliteTable("internal_proposals", {
+  id: text("id").primaryKey(),
+  partyId: text("party_id").notNull(),
+  proposedBy: text("proposed_by").notNull(),           // userId or "ai"
+  proposerName: text("proposer_name").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  rationale: text("rationale"),
+  status: text("status").notNull().default("open"),    // open/reviewing/accepted/declined/expired
+  voteScore: integer("vote_score").notNull().default(0),
+  totalVotes: integer("total_votes").notNull().default(0),
+  createdOnDay: integer("created_on_day").notNull(),
+  reviewByDay: integer("review_by_day").notNull(),
+  reviewedOnDay: integer("reviewed_on_day"),
+  declineReason: text("decline_reason"),
+  bundestag_bill_id: text("bundestag_bill_id"),
+});
+
+export const memberSignals = sqliteTable("member_signals", {
+  id: text("id").primaryKey(),
+  billId: text("bill_id").notNull(),
+  userId: text("user_id").notNull(),
+  signal: text("signal").notNull(),    // "yes" | "no"
+  createdAt: integer("created_at").notNull(),
+});
+
+export const internalVotes = sqliteTable("internal_votes", {
+  id: text("id").primaryKey(),
+  proposalId: text("proposal_id").notNull(),
+  userId: text("user_id").notNull(),
+  vote: integer("vote").notNull(),             // +1 or -1
+  createdAt: integer("created_at").notNull(),
+});
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),                         // UUID = auth token
+  displayName: text("display_name").notNull(),
+  partyId: text("party_id"),                           // null = no party
+  createdAt: integer("created_at").notNull(),
+  lastActive: integer("last_active").notNull(),
+  switchCooldownUntil: integer("switch_cooldown_until"), // sim day
 });
 
 export const budgets = sqliteTable("budgets", {

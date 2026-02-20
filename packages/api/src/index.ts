@@ -1,8 +1,9 @@
 import "dotenv/config";
+import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
 import { getDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment } from "@ki-bundestag/engine";
-import { eq, desc, gte, asc, and, inArray } from "drizzle-orm";
+import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
   Party,
   Bill,
@@ -62,7 +63,8 @@ app.get("/api/parties", (_req, res) => {
     histByParty.get(row.partyId)!.push(Number(row.approvalRating));
   }
 
-  const parties = rows.map(r => ({ ...mapParty(r), recentApprovals: histByParty.get(r.id) ?? [] }));
+  const memberCounts = getMemberCounts(db);
+  const parties = rows.map(r => ({ ...mapParty(r, memberCounts.get(r.id) ?? 0), recentApprovals: histByParty.get(r.id) ?? [] }));
   res.json(parties);
 });
 
@@ -107,7 +109,8 @@ app.get("/api/parties/:id", (req, res) => {
     res.status(404).json({ error: "Party not found" });
     return;
   }
-  res.json(mapParty(rows[0]));
+  const memberCounts = getMemberCounts(db);
+  res.json(mapParty(rows[0], memberCounts.get(req.params.id) ?? 0));
 });
 
 // GET /api/parties/:id/history
@@ -186,6 +189,48 @@ app.get("/api/bills/:id", (req, res) => {
     return;
   }
   res.json(mapBill(rows[0]));
+});
+
+// GET /api/bills/:id/signal
+app.get("/api/bills/:id/signal", (req, res) => {
+  const db = getDb();
+  const token = getUserToken(req);
+  const signals = db.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
+  const yes = signals.filter(s => s.signal === "yes").length;
+  const no = signals.filter(s => s.signal === "no").length;
+  const userSignal = token ? (signals.find(s => s.userId === token)?.signal ?? null) : null;
+  res.json({ yes, no, userSignal });
+});
+
+// POST /api/bills/:id/signal (auth)
+app.post("/api/bills/:id/signal", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const db = getDb();
+  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
+  const bill = db.select().from(schema.bills).where(eq(schema.bills.id, req.params.id)).all()[0];
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (!["second_reading", "third_reading"].includes(bill.status)) {
+    res.status(400).json({ error: "Bill is not in second or third reading" }); return;
+  }
+
+  const { signal } = req.body as { signal?: string };
+  if (signal !== "yes" && signal !== "no") { res.status(400).json({ error: "signal must be 'yes' or 'no'" }); return; }
+
+  const existing = db.select().from(schema.memberSignals)
+    .where(and(eq(schema.memberSignals.billId, req.params.id), eq(schema.memberSignals.userId, token)))
+    .all();
+
+  if (existing.length > 0) {
+    db.update(schema.memberSignals).set({ signal, createdAt: Date.now() }).where(eq(schema.memberSignals.id, existing[0].id)).run();
+  } else {
+    db.insert(schema.memberSignals).values({ id: `sig-${randomUUID().slice(0, 8)}`, billId: req.params.id, userId: token, signal, createdAt: Date.now() }).run();
+  }
+
+  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const allSignals = db.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
+  res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
 });
 
 // GET /api/state
@@ -836,7 +881,7 @@ function mapMediaArticle(row: typeof schema.mediaArticles.$inferSelect): MediaAr
   };
 }
 
-function mapParty(row: typeof schema.parties.$inferSelect): Party {
+function mapParty(row: typeof schema.parties.$inferSelect, memberCount = 0): Party {
   return {
     id: row.id,
     name: row.name,
@@ -846,7 +891,20 @@ function mapParty(row: typeof schema.parties.$inferSelect): Party {
     approvalRating: row.approvalRating,
     policyPriorities: row.policyPriorities as unknown as PolicyPriorities,
     coalitionRole: row.coalitionRole as Party["coalitionRole"],
+    memberCount,
   };
+}
+
+function getMemberCounts(db: ReturnType<typeof getDb>): Map<string, number> {
+  const rows = db
+    .select({ partyId: schema.users.partyId, cnt: count() })
+    .from(schema.users)
+    .where(sql`${schema.users.partyId} IS NOT NULL`)
+    .groupBy(schema.users.partyId)
+    .all();
+  const map = new Map<string, number>();
+  for (const r of rows) if (r.partyId) map.set(r.partyId, r.cnt);
+  return map;
 }
 
 function mapBill(row: typeof schema.bills.$inferSelect): Bill {
@@ -868,6 +926,8 @@ function mapBill(row: typeof schema.bills.$inferSelect): Bill {
     statusChangedOnDay: row.statusChangedOnDay ?? undefined,
     isGovernmentBill: row.isGovernmentBill ?? undefined,
     vetoedByPresident: row.vetoedByPresident ?? undefined,
+    memberInitiative: row.memberInitiative ?? undefined,
+    proposerDisplayName: row.proposerDisplayName ?? undefined,
   };
 }
 
@@ -1028,6 +1088,276 @@ app.get("/api/budgets/:id", (req, res) => {
     return;
   }
   res.json(mapBudgetRow(rows[0]));
+});
+
+// ── Internal Proposals endpoints ─────────────────────────────────────────────
+
+function mapProposal(row: typeof schema.internalProposals.$inferSelect, userVote?: 1 | -1 | null) {
+  return {
+    id: row.id,
+    partyId: row.partyId,
+    proposedBy: row.proposedBy,
+    proposerName: row.proposerName,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    rationale: row.rationale,
+    status: row.status,
+    voteScore: row.voteScore,
+    totalVotes: row.totalVotes,
+    createdOnDay: row.createdOnDay,
+    reviewByDay: row.reviewByDay,
+    reviewedOnDay: row.reviewedOnDay,
+    declineReason: row.declineReason,
+    bundestagBillId: row.bundestag_bill_id,
+    userVote: userVote ?? null,
+  };
+}
+
+// GET /api/parties/:id/proposals
+app.get("/api/parties/:id/proposals", (req, res) => {
+  const db = getDb();
+  const token = getUserToken(req);
+  const statusFilter = req.query.status as string | undefined;
+  let rows = db.select().from(schema.internalProposals)
+    .where(eq(schema.internalProposals.partyId, req.params.id))
+    .all();
+  if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
+  rows.sort((a, b) => b.voteScore - a.voteScore || b.createdOnDay - a.createdOnDay);
+
+  // Include userVote if authenticated
+  let userVoteMap: Record<string, 1 | -1> = {};
+  if (token) {
+    const proposalIds = rows.map(r => r.id);
+    if (proposalIds.length > 0) {
+      const votes = db.select().from(schema.internalVotes)
+        .where(and(eq(schema.internalVotes.userId, token), inArray(schema.internalVotes.proposalId, proposalIds)))
+        .all();
+      for (const v of votes) userVoteMap[v.proposalId] = v.vote as 1 | -1;
+    }
+  }
+  res.json(rows.map(r => mapProposal(r, userVoteMap[r.id] ?? null)));
+});
+
+// POST /api/parties/:id/proposals
+app.post("/api/parties/:id/proposals", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const db = getDb();
+  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
+  const user = users[0];
+  if (user.partyId !== req.params.id) { res.status(403).json({ error: "Not a member of this party" }); return; }
+
+  const { title, description, category, rationale } = req.body as Record<string, string>;
+  if (!title?.trim() || title.trim().length > 80) { res.status(400).json({ error: "Title required (max 80 chars)" }); return; }
+  if (!description?.trim() || description.trim().length > 500) { res.status(400).json({ error: "Description required (max 500 chars)" }); return; }
+  if (!category) { res.status(400).json({ error: "Category required" }); return; }
+
+  // Check: one active proposal per member
+  const existing = db.select().from(schema.internalProposals)
+    .where(and(eq(schema.internalProposals.proposedBy, token), eq(schema.internalProposals.partyId, req.params.id)))
+    .all()
+    .filter(r => r.status === "open" || r.status === "reviewing");
+  if (existing.length > 0) { res.status(400).json({ error: "You already have an active proposal" }); return; }
+
+  // Check: max 5 open proposals per party
+  const openCount = db.select().from(schema.internalProposals)
+    .where(and(eq(schema.internalProposals.partyId, req.params.id), eq(schema.internalProposals.status, "open")))
+    .all().length;
+  if (openCount >= 5) { res.status(400).json({ error: "Party already has 5 open proposals" }); return; }
+
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+
+  const id = `iprop-${randomUUID().slice(0, 8)}`;
+  db.insert(schema.internalProposals).values({
+    id,
+    partyId: req.params.id,
+    proposedBy: token,
+    proposerName: user.displayName,
+    title: title.trim(),
+    description: description.trim(),
+    category,
+    rationale: rationale?.trim() || null,
+    status: "open",
+    voteScore: 0,
+    totalVotes: 0,
+    createdOnDay: currentDay,
+    reviewByDay: currentDay + 5,
+  }).run();
+
+  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const row = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
+  res.status(201).json(mapProposal(row));
+});
+
+// GET /api/proposals/:id
+app.get("/api/proposals/:id", (req, res) => {
+  const db = getDb();
+  const token = getUserToken(req);
+  const rows = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all();
+  if (rows.length === 0) { res.status(404).json({ error: "Proposal not found" }); return; }
+  let userVote: 1 | -1 | null = null;
+  if (token) {
+    const vr = db.select().from(schema.internalVotes)
+      .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
+      .all();
+    if (vr.length > 0) userVote = vr[0].vote as 1 | -1;
+  }
+  res.json(mapProposal(rows[0], userVote));
+});
+
+// POST /api/proposals/:id/vote (auth)
+app.post("/api/proposals/:id/vote", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const db = getDb();
+  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
+  const proposal = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  if (!proposal) { res.status(404).json({ error: "Proposal not found" }); return; }
+  if (proposal.status !== "open") { res.status(400).json({ error: "Proposal is not open for voting" }); return; }
+
+  const { vote } = req.body as { vote?: number };
+  if (vote !== 1 && vote !== -1) { res.status(400).json({ error: "vote must be 1 or -1" }); return; }
+
+  const existing = db.select().from(schema.internalVotes)
+    .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
+    .all();
+
+  if (existing.length > 0) {
+    const oldVote = existing[0].vote;
+    if (oldVote === vote) { res.json(mapProposal(proposal, vote as 1 | -1)); return; } // no change
+    // Update existing vote: adjust score by (new - old)
+    db.update(schema.internalVotes).set({ vote, createdAt: Date.now() }).where(eq(schema.internalVotes.id, existing[0].id)).run();
+    db.update(schema.internalProposals).set({
+      voteScore: proposal.voteScore - oldVote + vote,
+    }).where(eq(schema.internalProposals.id, req.params.id)).run();
+  } else {
+    const voteId = `ivote-${randomUUID().slice(0, 8)}`;
+    db.insert(schema.internalVotes).values({ id: voteId, proposalId: req.params.id, userId: token, vote, createdAt: Date.now() }).run();
+    db.update(schema.internalProposals).set({
+      voteScore: proposal.voteScore + vote,
+      totalVotes: proposal.totalVotes + 1,
+    }).where(eq(schema.internalProposals.id, req.params.id)).run();
+  }
+
+  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const updated = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  res.json(mapProposal(updated, vote as 1 | -1));
+});
+
+// DELETE /api/proposals/:id/vote (auth)
+app.delete("/api/proposals/:id/vote", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const db = getDb();
+  const proposal = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  if (!proposal) { res.status(404).json({ error: "Proposal not found" }); return; }
+
+  const existing = db.select().from(schema.internalVotes)
+    .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
+    .all();
+  if (existing.length === 0) { res.json(mapProposal(proposal, null)); return; }
+
+  const oldVote = existing[0].vote;
+  db.delete(schema.internalVotes).where(eq(schema.internalVotes.id, existing[0].id)).run();
+  db.update(schema.internalProposals).set({
+    voteScore: proposal.voteScore - oldVote,
+    totalVotes: Math.max(0, proposal.totalVotes - 1),
+  }).where(eq(schema.internalProposals.id, req.params.id)).run();
+
+  const updated = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  res.json(mapProposal(updated, null));
+});
+
+// ── User / Membership endpoints ──────────────────────────────────────────────
+
+function getUserToken(req: express.Request): string | null {
+  const h = req.headers["x-user-token"];
+  return typeof h === "string" && h.length > 0 ? h : null;
+}
+
+// POST /api/users/register
+app.post("/api/users/register", (req, res) => {
+  const { displayName, partyId } = req.body as { displayName?: string; partyId?: string };
+  if (!displayName || displayName.trim().length < 2 || displayName.trim().length > 30) {
+    res.status(400).json({ error: "displayName must be 2–30 characters" });
+    return;
+  }
+  const db = getDb();
+  if (partyId) {
+    const party = db.select().from(schema.parties).where(eq(schema.parties.id, partyId)).all();
+    if (party.length === 0) { res.status(400).json({ error: "Party not found" }); return; }
+  }
+  const id: string = randomUUID();
+  const now = Date.now();
+  db.insert(schema.users).values({
+    id,
+    displayName: displayName.trim(),
+    partyId: partyId ?? null,
+    createdAt: now,
+    lastActive: now,
+    switchCooldownUntil: null,
+  }).run();
+  res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, createdAt: now, lastActive: now, switchCooldownUntil: null });
+});
+
+// GET /api/users/me
+app.get("/api/users/me", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  const db = getDb();
+  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const u = rows[0];
+  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
+});
+
+// POST /api/users/me/join/:partyId
+app.post("/api/users/me/join/:partyId", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  const db = getDb();
+  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const user = rows[0];
+
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+
+  if (user.switchCooldownUntil != null && currentDay < user.switchCooldownUntil) {
+    res.status(403).json({ error: `Cooldown active until Day ${user.switchCooldownUntil}` });
+    return;
+  }
+  const party = db.select().from(schema.parties).where(eq(schema.parties.id, req.params.partyId)).all();
+  if (party.length === 0) { res.status(404).json({ error: "Party not found" }); return; }
+
+  const cooldown = user.partyId != null ? currentDay + 7 : null;
+  db.update(schema.users)
+    .set({ partyId: req.params.partyId, lastActive: Date.now(), switchCooldownUntil: cooldown })
+    .where(eq(schema.users.id, token))
+    .run();
+  const updated = db.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+});
+
+// POST /api/users/me/leave
+app.post("/api/users/me/leave", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  const db = getDb();
+  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+  db.update(schema.users)
+    .set({ partyId: null, lastActive: Date.now(), switchCooldownUntil: currentDay + 7 })
+    .where(eq(schema.users.id, token))
+    .run();
+  const updated = db.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
 const server = app.listen(PORT, () => {

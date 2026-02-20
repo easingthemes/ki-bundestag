@@ -322,6 +322,50 @@ const TABLE_DDL = `
     economic_effect TEXT,
     revision_attempt INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS internal_proposals (
+    id TEXT PRIMARY KEY,
+    party_id TEXT NOT NULL,
+    proposed_by TEXT NOT NULL,
+    proposer_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    rationale TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    vote_score INTEGER NOT NULL DEFAULT 0,
+    total_votes INTEGER NOT NULL DEFAULT 0,
+    created_on_day INTEGER NOT NULL,
+    review_by_day INTEGER NOT NULL,
+    reviewed_on_day INTEGER,
+    decline_reason TEXT,
+    bundestag_bill_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS member_signals (
+    id TEXT PRIMARY KEY,
+    bill_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    signal TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS internal_votes (
+    id TEXT PRIMARY KEY,
+    proposal_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    vote INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    party_id TEXT,
+    created_at INTEGER NOT NULL,
+    last_active INTEGER NOT NULL,
+    switch_cooldown_until INTEGER
+  );
 `;
 
 /**
@@ -342,6 +386,8 @@ const COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> =
   { table: "bills", column: "status_changed_on_day", sql: "ALTER TABLE bills ADD COLUMN status_changed_on_day INTEGER" },
   { table: "bills", column: "is_government_bill", sql: "ALTER TABLE bills ADD COLUMN is_government_bill INTEGER" },
   { table: "bills", column: "vetoed_by_president", sql: "ALTER TABLE bills ADD COLUMN vetoed_by_president INTEGER NOT NULL DEFAULT 0" },
+  { table: "bills", column: "member_initiative", sql: "ALTER TABLE bills ADD COLUMN member_initiative INTEGER NOT NULL DEFAULT 0" },
+  { table: "bills", column: "proposer_display_name", sql: "ALTER TABLE bills ADD COLUMN proposer_display_name TEXT" },
   { table: "national_state", column: "provisional_budget", sql: "ALTER TABLE national_state ADD COLUMN provisional_budget INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "budget_retry_day", sql: "ALTER TABLE simulation_meta ADD COLUMN budget_retry_day INTEGER" },
   { table: "budgets", column: "revision_attempt", sql: "ALTER TABLE budgets ADD COLUMN revision_attempt INTEGER NOT NULL DEFAULT 0" },
@@ -411,6 +457,10 @@ export function seedDatabase() {
 
   // Drop all tables for a clean start
   sqlite.exec(`
+    DROP TABLE IF EXISTS member_signals;
+    DROP TABLE IF EXISTS internal_votes;
+    DROP TABLE IF EXISTS internal_proposals;
+    DROP TABLE IF EXISTS users;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS constitutional_challenges;
     DROP TABLE IF EXISTS confidence_votes;

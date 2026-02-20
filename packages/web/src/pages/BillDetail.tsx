@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, Bill, Party, ConstitutionalChallenge, BillImpact } from "../api";
+import { useUser } from "../userContext";
 
 const STATUS_BADGE: Record<string, string> = {
   passed: "badge-passed",
@@ -78,13 +79,20 @@ function fmtDelta(orig: number | undefined, cur: number | undefined) {
 
 export function BillDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useUser();
   const [bill, setBill] = useState<Bill | null>(null);
   const [parties, setParties] = useState<Party[]>([]);
   const [challenge, setChallenge] = useState<ConstitutionalChallenge | null>(null);
+  const [signals, setSignals] = useState<{ yes: number; no: number; userSignal: "yes" | "no" | null } | null>(null);
 
   const refresh = useCallback(() => {
     if (!id) return;
-    api.getBill(id).then(setBill).catch(console.error);
+    api.getBill(id).then(b => {
+      setBill(b);
+      if (b.status === "second_reading" || b.status === "third_reading") {
+        api.getBillSignals(id).then(setSignals).catch(console.error);
+      }
+    }).catch(console.error);
     api.getParties().then(setParties).catch(console.error);
     api.getConstitutionalChallenges(undefined, id).then(list => {
       setChallenge(list[0] ?? null);
@@ -128,6 +136,7 @@ export function BillDetail() {
           <h1 style={{ margin: 0, fontSize: "1.4rem", flex: 1, minWidth: 0 }}>{bill.title}</h1>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
             {bill.isGovernmentBill && <span className="badge badge-govt-bill">Govt. Bill</span>}
+            {bill.memberInitiative && <span className="badge" style={{ background: "#6f42c1", color: "white" }}>Member Initiative</span>}
             {bill.vetoedByPresident && <span className="badge badge-presidential-veto">Vetoed by President</span>}
             <span className={`badge ${STATUS_BADGE[bill.status] || ""}`}>
               {STATUS_LABELS[bill.status] ?? bill.status}
@@ -141,6 +150,11 @@ export function BillDetail() {
             {proposer?.name ?? bill.proposedBy}
           </Link>
           {" on Day "}{bill.proposedOnDay}
+          {bill.memberInitiative && bill.proposerDisplayName && (
+            <span style={{ marginLeft: 8, color: "#6f42c1", fontWeight: 500 }}>
+              · Originally proposed by {bill.proposerDisplayName}
+            </span>
+          )}
         </div>
       </div>
 
@@ -151,6 +165,64 @@ export function BillDetail() {
           <p style={{ fontSize: "0.95rem", color: "#333", lineHeight: 1.6, margin: 0 }}>{bill.description}</p>
         </div>
       </div>
+
+      {/* Member Signals */}
+      {(bill.status === "second_reading" || bill.status === "third_reading") && (
+        <div className="section">
+          <h2>Member Signals</h2>
+          <div className="card">
+            {signals ? (() => {
+              const total = signals.yes + signals.no;
+              const yesPct = total > 0 ? Math.round(signals.yes / total * 100) : 0;
+              return (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.75rem" }}>
+                    <div style={{ flex: 1, background: "#e9ecef", borderRadius: 4, height: 14, overflow: "hidden" }}>
+                      {total > 0 && (
+                        <div style={{ width: `${yesPct}%`, height: "100%", background: "#28a745", borderRadius: "4px 0 0 4px" }} />
+                      )}
+                    </div>
+                    <div style={{ flexShrink: 0, fontSize: "0.85rem", color: "#555" }}>
+                      <strong style={{ color: "#28a745" }}>{signals.yes} YES</strong>
+                      {" / "}
+                      <strong style={{ color: "#dc3545" }}>{signals.no} NO</strong>
+                      {total > 0 && <span style={{ color: "#888", marginLeft: 4 }}>({yesPct}% YES)</span>}
+                    </div>
+                  </div>
+                  {user && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <button
+                        onClick={async () => {
+                          const s = await api.signalBill(bill.id, "yes");
+                          setSignals(s);
+                        }}
+                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "yes" ? "#28a745" : "#ddd"}`, background: signals.userSignal === "yes" ? "#d4edda" : "white", color: "#28a745", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                      >👍 YES</button>
+                      <button
+                        onClick={async () => {
+                          const s = await api.signalBill(bill.id, "no");
+                          setSignals(s);
+                        }}
+                        style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "no" ? "#dc3545" : "#ddd"}`, background: signals.userSignal === "no" ? "#f8d7da" : "white", color: "#dc3545", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                      >👎 NO</button>
+                      <span style={{ fontSize: "0.78rem", color: "#888" }}>Your signal is visible to the party AI when it votes.</span>
+                    </div>
+                  )}
+                  {!user && total === 0 && (
+                    <div style={{ fontSize: "0.85rem", color: "#888" }}>
+                      <Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your vote on this bill.
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <div style={{ fontSize: "0.85rem", color: "#888" }}>No signals yet.{" "}
+                {user ? "" : <><Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your opinion.</>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Legislative Pipeline */}
       <div className="section">

@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { api, Party, PartyHistory, Bill, PartyVoteRecord, SimulationEvent, CitizenQuestion, Fraktion, SimulationStatus } from "../api";
+import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal } from "../api";
 import { usePolling } from "../usePolling";
+import { useUser } from "../userContext";
 
 const ROLE_BADGE: Record<string, string> = {
   leader: "badge-leader",
@@ -71,6 +72,7 @@ function ApprovalChart({ history, color, partyId }: { history: PartyHistory[]; c
 
 export function PartyDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user, login } = useUser();
   const [party, setParty] = useState<Party | null>(null);
   const [history, setHistory] = useState<PartyHistory[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -83,6 +85,20 @@ export function PartyDetail() {
   const [questionText, setQuestionText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
+  const [visibleBills, setVisibleBills] = useState(20);
+  const [visibleVotes, setVisibleVotes] = useState(20);
+  const [visibleStatements, setVisibleStatements] = useState(20);
+  const [proposals, setProposals] = useState<InternalProposal[]>([]);
+  const [showProposalForm, setShowProposalForm] = useState(false);
+  const [propTitle, setPropTitle] = useState("");
+  const [propDesc, setPropDesc] = useState("");
+  const [propCategory, setPropCategory] = useState("economy");
+  const [propSubmitting, setPropSubmitting] = useState(false);
+  const [propMsg, setPropMsg] = useState<string | null>(null);
+  const [joinName, setJoinName] = useState("");
+  const [joinStatus, setJoinStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [joinError, setJoinError] = useState("");
+  const [showJoinForm, setShowJoinForm] = useState(false);
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -92,6 +108,7 @@ export function PartyDetail() {
     api.getPartyVotes(id).then(setVotes).catch(console.error);
     api.getPartyStatements(id).then(setStatements).catch(console.error);
     api.getQuestions(id).then(setQuestions).catch(console.error);
+    api.getPartyProposals(id).then(setProposals).catch(console.error);
     api.getParties().then(setAllParties).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getFraktionen().then(all => {
@@ -176,6 +193,93 @@ export function PartyDetail() {
             ))}
           </div>
         </div>
+
+        {/* Membership section */}
+        {(() => {
+          const isMyParty = user?.partyId === id;
+          const handleJoin = async () => {
+            if (joinStatus === "loading") return;
+            setJoinStatus("loading");
+            setJoinError("");
+            try {
+              let result;
+              if (user) {
+                result = await api.joinParty(id!);
+              } else {
+                if (joinName.trim().length < 2) return;
+                result = await api.registerUser(joinName.trim(), id!);
+              }
+              login(result.id, result);
+              setShowJoinForm(false);
+              setJoinStatus("idle");
+              api.getParty(id!).then(setParty).catch(console.error);
+            } catch (err) {
+              setJoinError(err instanceof Error ? err.message : "Failed to join");
+              setJoinStatus("error");
+            }
+          };
+          const handleLeave = async () => {
+            try {
+              const result = await api.leaveParty();
+              login(result.id, result);
+              api.getParty(id!).then(setParty).catch(console.error);
+            } catch { /* ignore */ }
+          };
+
+          return (
+            <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ fontSize: "0.85rem", color: "#666" }}>
+                👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
+                {isMyParty && <span style={{ marginLeft: 8, color: displayColor, fontWeight: 700 }}>✓ You're a member</span>}
+              </span>
+              {isMyParty ? (
+                <button
+                  onClick={handleLeave}
+                  style={{ fontSize: "0.78rem", padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: "white", color: "#888", cursor: "pointer" }}
+                >
+                  Leave Party
+                </button>
+              ) : (
+                <div>
+                  {showJoinForm ? (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {!user && (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={joinName}
+                          onChange={e => setJoinName(e.target.value)}
+                          maxLength={30}
+                          placeholder="Display name"
+                          style={{ padding: "5px 8px", borderRadius: 4, border: "1px solid #ccc", fontSize: "0.83rem", width: 140 }}
+                          onKeyDown={e => e.key === "Enter" && handleJoin()}
+                        />
+                      )}
+                      <button
+                        onClick={handleJoin}
+                        disabled={joinStatus === "loading" || (!user && joinName.trim().length < 2)}
+                        style={{ padding: "5px 12px", borderRadius: 4, border: "none", background: displayColor, color: "white", fontWeight: 700, fontSize: "0.83rem", cursor: "pointer" }}
+                      >
+                        {joinStatus === "loading" ? "Joining…" : `Join ${party.name}`}
+                      </button>
+                      <button onClick={() => setShowJoinForm(false)} style={{ padding: "5px 8px", borderRadius: 4, border: "1px solid #ccc", background: "white", fontSize: "0.83rem", cursor: "pointer" }}>
+                        Cancel
+                      </button>
+                      {joinStatus === "error" && <span style={{ fontSize: "0.78rem", color: "#dc3545" }}>{joinError}</span>}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowJoinForm(true)}
+                      style={{ fontSize: "0.83rem", padding: "5px 14px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Join this Party
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Fraktion */}
@@ -234,7 +338,7 @@ export function PartyDetail() {
                 </tr>
               </thead>
               <tbody>
-                {bills.map(b => (
+                {bills.slice(0, visibleBills).map(b => (
                   <tr key={b.id}>
                     <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee" }}>
                       <Link to={`/bills/${b.id}`} style={{ color: "inherit", textDecoration: "none" }}>{b.title}</Link>
@@ -248,6 +352,16 @@ export function PartyDetail() {
                 ))}
               </tbody>
             </table>
+            {bills.length > visibleBills && (
+              <div style={{ padding: "10px 12px", borderTop: "1px solid #eee" }}>
+                <button
+                  onClick={() => setVisibleBills(v => v + 20)}
+                  style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}
+                >
+                  Load more ({bills.length - visibleBills} remaining)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -269,7 +383,7 @@ export function PartyDetail() {
                 </tr>
               </thead>
               <tbody>
-                {votes.slice(0, 50).map(({ bill, vote }) => (
+                {votes.slice(0, visibleVotes).map(({ bill, vote }) => (
                   <tr key={bill.id}>
                     <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee" }}>
                       <Link to={`/bills/${bill.id}`} style={{ color: "inherit", textDecoration: "none" }}>{bill.title}</Link>
@@ -277,10 +391,7 @@ export function PartyDetail() {
                     </td>
                     <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>{bill.proposedOnDay}</td>
                     <td style={{ padding: "8px 12px", borderBottom: "1px solid #eee", textAlign: "center" }}>
-                      <span style={{
-                        fontWeight: 600,
-                        color: VOTE_COLOR[vote.vote] || "#888",
-                      }}>
+                      <span style={{ fontWeight: 600, color: VOTE_COLOR[vote.vote] || "#888" }}>
                         {vote.vote.toUpperCase()}
                       </span>
                     </td>
@@ -291,6 +402,16 @@ export function PartyDetail() {
                 ))}
               </tbody>
             </table>
+            {votes.length > visibleVotes && (
+              <div style={{ padding: "10px 12px", borderTop: "1px solid #eee" }}>
+                <button
+                  onClick={() => setVisibleVotes(v => v + 20)}
+                  style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}
+                >
+                  Load more ({votes.length - visibleVotes} remaining)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -390,7 +511,7 @@ export function PartyDetail() {
           <div style={{ color: "#888", fontSize: "0.9rem" }}>No statements yet.</div>
         ) : (
           <div>
-            {statements.slice(0, 30).map(s => (
+            {statements.slice(0, visibleStatements).map(s => (
               <div key={s.id} className="card" style={{ marginBottom: 8, borderLeft: `3px solid ${displayColor}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{s.title}</div>
@@ -399,6 +520,173 @@ export function PartyDetail() {
                 <div style={{ fontSize: "0.85rem", color: "#555", marginTop: 4 }}>{s.description}</div>
               </div>
             ))}
+            {statements.length > visibleStatements && (
+              <button
+                onClick={() => setVisibleStatements(v => v + 20)}
+                style={{ fontSize: "0.85rem", color: displayColor, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500, marginTop: 4 }}
+              >
+                Load more ({statements.length - visibleStatements} remaining)
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Member Proposals */}
+      <div className="section">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+          <h2 style={{ margin: 0 }}>Member Proposals ({proposals.length})</h2>
+          {user?.partyId === id && !showProposalForm && (
+            <button
+              onClick={() => setShowProposalForm(true)}
+              style={{ padding: "5px 14px", borderRadius: 4, border: `1px solid ${displayColor}`, background: "white", color: displayColor, fontWeight: 600, fontSize: "0.83rem", cursor: "pointer" }}
+            >
+              + Propose a Bill
+            </button>
+          )}
+        </div>
+
+        {showProposalForm && (
+          <div className="card" style={{ marginBottom: "1rem", borderLeft: `3px solid ${displayColor}` }}>
+            <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>New Member Proposal</div>
+            <input
+              type="text"
+              value={propTitle}
+              onChange={e => setPropTitle(e.target.value)}
+              placeholder="Bill title (10–120 chars)"
+              maxLength={120}
+              style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.88rem", marginBottom: "0.5rem", boxSizing: "border-box" }}
+            />
+            <textarea
+              value={propDesc}
+              onChange={e => setPropDesc(e.target.value)}
+              placeholder="Brief description (20–300 chars)"
+              maxLength={300}
+              rows={3}
+              style={{ width: "100%", padding: "7px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.88rem", marginBottom: "0.5rem", resize: "vertical", boxSizing: "border-box" }}
+            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                value={propCategory}
+                onChange={e => setPropCategory(e.target.value)}
+                style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ddd", fontSize: "0.85rem" }}
+              >
+                {["economy","social","environment","immigration","defense","education","healthcare","infrastructure"].map(c => (
+                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                ))}
+              </select>
+              <button
+                onClick={async () => {
+                  if (propTitle.trim().length < 10 || propDesc.trim().length < 20) return;
+                  setPropSubmitting(true);
+                  setPropMsg(null);
+                  try {
+                    await api.createProposal(id!, { title: propTitle.trim(), description: propDesc.trim(), category: propCategory });
+                    setPropTitle(""); setPropDesc(""); setPropCategory("economy");
+                    setShowProposalForm(false);
+                    setPropMsg("Proposal submitted!");
+                    api.getPartyProposals(id!).then(setProposals).catch(console.error);
+                  } catch (e) {
+                    setPropMsg(e instanceof Error ? e.message : "Failed to submit");
+                  } finally {
+                    setPropSubmitting(false);
+                    setTimeout(() => setPropMsg(null), 4000);
+                  }
+                }}
+                disabled={propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20}
+                style={{ padding: "6px 14px", borderRadius: 4, border: "none", background: displayColor, color: "white", fontWeight: 600, fontSize: "0.83rem", cursor: "pointer", opacity: propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20 ? 0.5 : 1 }}
+              >
+                {propSubmitting ? "Submitting…" : "Submit"}
+              </button>
+              <button
+                onClick={() => { setShowProposalForm(false); setPropTitle(""); setPropDesc(""); }}
+                style={{ padding: "6px 10px", borderRadius: 4, border: "1px solid #ccc", background: "white", fontSize: "0.83rem", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              {propMsg && <span style={{ fontSize: "0.8rem", color: propMsg.includes("Failed") ? "#dc3545" : "#28a745" }}>{propMsg}</span>}
+            </div>
+          </div>
+        )}
+
+        {proposals.length === 0 ? (
+          <div style={{ color: "#888", fontSize: "0.9rem" }}>
+            No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}
+          </div>
+        ) : (
+          <div>
+            {proposals.slice(0, 20).map(p => {
+              const isOpen = p.status === "open";
+              const daysLeft = p.reviewByDay - (simStatus?.currentDay ?? p.createdOnDay);
+              return (
+                <div key={p.id} className="card" style={{ marginBottom: 8, opacity: isOpen ? 1 : 0.75 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: "0.93rem" }}>{p.title}</span>
+                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: "#e8f0fe", color: "#1a1a2e" }}>{p.category}</span>
+                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: p.proposedBy === "ai" ? "#e3d9f5" : "#d4edda", color: p.proposedBy === "ai" ? "#6f42c1" : "#155724" }}>
+                          {p.proposedBy === "ai" ? "AI" : "Member"}
+                        </span>
+                        <span style={{ fontSize: "0.72rem", padding: "1px 6px", borderRadius: 3, background: isOpen ? "#cce5ff" : p.status === "accepted" ? "#d4edda" : "#f8d7da", color: isOpen ? "#004085" : p.status === "accepted" ? "#155724" : "#721c24" }}>
+                          {p.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.84rem", color: "#555" }}>{p.description}</div>
+                      {p.bundestagBillId && (
+                        <div style={{ fontSize: "0.78rem", color: "#28a745", marginTop: 4 }}>
+                          ✓ Submitted to Bundestag
+                        </div>
+                      )}
+                      {p.declineReason && (
+                        <div style={{ fontSize: "0.78rem", color: "#6c757d", marginTop: 4, fontStyle: "italic" }}>
+                          Party: "{p.declineReason}"
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      {isOpen && user?.partyId === id ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <button
+                            onClick={async () => {
+                              const updated = p.userVote === 1
+                                ? await api.retractProposalVote(p.id)
+                                : await api.voteOnProposal(p.id, 1);
+                              setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
+                            }}
+                            title={p.userVote === 1 ? "Retract upvote" : "Upvote"}
+                            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "1.1rem", color: p.userVote === 1 ? "#28a745" : "#aaa", padding: "0 2px" }}
+                          >▲</button>
+                          <span style={{ fontWeight: 700, fontSize: "1rem", minWidth: 28, textAlign: "center", color: p.voteScore >= 0 ? "#28a745" : "#dc3545" }}>
+                            {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              const updated = p.userVote === -1
+                                ? await api.retractProposalVote(p.id)
+                                : await api.voteOnProposal(p.id, -1);
+                              setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
+                            }}
+                            title={p.userVote === -1 ? "Retract downvote" : "Downvote"}
+                            style={{ border: "none", background: "none", cursor: "pointer", fontSize: "1.1rem", color: p.userVote === -1 ? "#dc3545" : "#aaa", padding: "0 2px" }}
+                          >▼</button>
+                        </div>
+                      ) : (
+                        <div style={{ fontWeight: 700, fontSize: "1rem", color: p.voteScore >= 0 ? "#28a745" : "#dc3545" }}>
+                          {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.72rem", color: "#888" }}>{p.totalVotes} vote{p.totalVotes !== 1 ? "s" : ""}</div>
+                      {isOpen && daysLeft >= 0 && (
+                        <div style={{ fontSize: "0.72rem", color: "#888" }}>
+                          {daysLeft === 0 ? "Reviewed today" : `${daysLeft}d left`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

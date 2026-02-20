@@ -102,11 +102,16 @@ export function Dashboard() {
   const [lastElection, setLastElection] = useState<Election | null>(null);
   const [government, setGovernment] = useState<Government | null>(null);
 
-  const refresh = useCallback(() => {
+  // Core sim data — changes every simulation day
+  const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
     api.getParties().then(setParties).catch(console.error);
     api.getEvents(5).then(r => setEvents(r.events)).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
+  }, []);
+
+  // Slowly-changing data — elections, government, crises
+  const refreshSlow = useCallback(() => {
     api.getCrises(true).then(setCrises).catch(console.error);
     api.getActiveElection().then(setElection).catch(console.error);
     api.getGovernment().then(setGovernment).catch(console.error);
@@ -118,8 +123,9 @@ export function Dashboard() {
     }).catch(console.error);
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
-  usePolling(refresh);
+  useEffect(() => { refreshCore(); refreshSlow(); }, [refreshCore, refreshSlow]);
+  usePolling(refreshCore);           // every 5s
+  usePolling(refreshSlow, 60000);    // every 60s
 
   if (!state || !simStatus) return <div className="loading">Loading...</div>;
 
@@ -179,50 +185,176 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Coalition bar */}
-      <div className="section">
-        <h2>Coalition Composition</h2>
-        <div className="coalition-bar">
-          {parties.map(p => (
-            <div
-              key={p.id}
-              className="coalition-segment"
-              style={{
-                width: `${(p.seatCount / totalSeats) * 100}%`,
-                backgroundColor: p.color === "#FFED00" ? "#c4a900" : p.color,
-              }}
-            >
-              {p.seatCount > 60 ? `${p.name} (${p.seatCount})` : p.seatCount}
+      {/* Bundestag composition */}
+      {(() => {
+        const MAJORITY = 368;
+        const coalitionParties = parties.filter(p => state.coalitionParties.includes(p.id) && p.seatCount > 0);
+        const oppositionParties = parties.filter(p => state.oppositionParties.includes(p.id) && p.seatCount > 0);
+        const coalitionSeats = coalitionParties.reduce((s, p) => s + p.seatCount, 0);
+        const oppositionSeats = oppositionParties.reduce((s, p) => s + p.seatCount, 0);
+        const hasMajority = coalitionSeats >= MAJORITY;
+        const majorityPct = (MAJORITY / totalSeats) * 100;
+
+        return (
+          <div className="section">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.75rem" }}>
+              <h2 style={{ margin: 0 }}>Current Bundestag</h2>
+              <span style={{ fontSize: "0.78rem", color: "#888" }}>{totalSeats} seats total · majority at {MAJORITY}</span>
             </div>
-          ))}
-        </div>
-        {state.coalitionCohesion !== null && state.coalitionCohesion !== undefined && (
-          <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ color: "#888" }}>Coalition Cohesion:</span>
-            <div style={{ flex: 1, background: "#eee", borderRadius: 4, height: 6, maxWidth: 120 }}>
+
+            {/* Seat bar */}
+            <div style={{ position: "relative", marginBottom: "0.25rem" }}>
+              {/* Majority marker line */}
               <div style={{
-                width: `${state.coalitionCohesion}%`,
-                height: "100%",
-                borderRadius: 4,
-                background: state.coalitionCohesion >= 90 ? "#28a745"
-                  : state.coalitionCohesion >= 70 ? "#fd7e14"
-                  : "#dc3545",
+                position: "absolute", top: 0, bottom: 0,
+                left: `${majorityPct}%`,
+                width: 2,
+                background: "#333",
+                zIndex: 2,
               }} />
+              <div style={{ display: "flex", height: 32, borderRadius: 4, overflow: "hidden", gap: 3 }}>
+                {/* Coalition */}
+                <div style={{ display: "flex", flex: `0 0 ${(coalitionSeats / totalSeats) * 100}%`, gap: 1 }}>
+                  {coalitionParties.map(p => (
+                    <div
+                      key={p.id}
+                      style={{
+                        flex: p.seatCount,
+                        backgroundColor: p.color === "#FFED00" ? "#c4a900" : p.color,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.7rem", color: "white", fontWeight: 600,
+                        overflow: "hidden", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.seatCount > 50 ? `${p.name} (${p.seatCount})` : p.seatCount > 25 ? p.seatCount : ""}
+                    </div>
+                  ))}
+                </div>
+                {/* Gap between coalition and opposition */}
+                <div style={{ flex: "0 0 3px", background: "#fff" }} />
+                {/* Opposition */}
+                <div style={{ display: "flex", flex: `0 0 ${(oppositionSeats / totalSeats) * 100}%`, gap: 1 }}>
+                  {oppositionParties.map(p => (
+                    <div
+                      key={p.id}
+                      style={{
+                        flex: p.seatCount,
+                        backgroundColor: `${p.color === "#FFED00" ? "#c4a900" : p.color}99`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.7rem", color: "#333", fontWeight: 600,
+                        overflow: "hidden", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.seatCount > 50 ? `${p.name} (${p.seatCount})` : p.seatCount > 25 ? p.seatCount : ""}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <span style={{
-              fontWeight: 600,
-              color: state.coalitionCohesion >= 90 ? "#28a745"
-                : state.coalitionCohesion >= 70 ? "#fd7e14"
-                : "#dc3545",
-            }}>
-              {state.coalitionCohesion}%
-            </span>
-            <span style={{ color: "#aaa", fontSize: "0.78rem" }}>
-              {state.coalitionCohesion >= 90 ? "Stable" : state.coalitionCohesion >= 70 ? "Friction" : "Stressed"}
-            </span>
+
+            {/* Majority label */}
+            <div style={{ position: "relative", height: 16, marginBottom: "0.75rem" }}>
+              <div style={{
+                position: "absolute",
+                left: `${majorityPct}%`,
+                transform: "translateX(-50%)",
+                fontSize: "0.68rem",
+                color: "#555",
+                whiteSpace: "nowrap",
+              }}>
+                ▲ {MAJORITY}
+              </div>
+            </div>
+
+            {/* Coalition / Opposition chips */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              {/* Coalition */}
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#28a745", marginBottom: 6 }}>
+                  Government coalition
+                  <span style={{
+                    marginLeft: 6, fontWeight: 700, fontSize: "0.78rem",
+                    color: hasMajority ? "#28a745" : "#dc3545",
+                  }}>
+                    {coalitionSeats} {hasMajority ? "✓" : "✗"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {coalitionParties.map(p => {
+                    const color = p.color === "#FFED00" ? "#c4a900" : p.color;
+                    return (
+                      <span key={p.id} style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "3px 8px", borderRadius: 4,
+                        border: `2px solid ${color}`, background: `${color}18`,
+                        fontSize: "0.82rem", fontWeight: 600,
+                      }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: color }} />
+                        {p.name}
+                        <span style={{ fontWeight: 400, color: "#555", fontSize: "0.75rem" }}>{p.seatCount}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Opposition */}
+              <div>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#888", marginBottom: 6 }}>
+                  Opposition
+                  <span style={{ marginLeft: 6, fontWeight: 600, fontSize: "0.78rem", color: "#555" }}>
+                    {oppositionSeats}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {oppositionParties.map(p => {
+                    const color = p.color === "#FFED00" ? "#c4a900" : p.color;
+                    return (
+                      <span key={p.id} style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "3px 8px", borderRadius: 4,
+                        border: `1px solid #ccc`, background: "#f8f8f8",
+                        fontSize: "0.82rem", color: "#444",
+                      }}>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: color }} />
+                        {p.name}
+                        <span style={{ color: "#888", fontSize: "0.75rem" }}>{p.seatCount}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Cohesion */}
+            {state.coalitionCohesion != null && (
+              <div style={{ marginTop: "0.75rem", paddingTop: "0.6rem", borderTop: "1px solid #eee", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ color: "#888" }}>Coalition cohesion:</span>
+                <div style={{ flex: 1, background: "#eee", borderRadius: 4, height: 6, maxWidth: 120 }}>
+                  <div style={{
+                    width: `${state.coalitionCohesion}%`,
+                    height: "100%",
+                    borderRadius: 4,
+                    background: state.coalitionCohesion >= 90 ? "#28a745"
+                      : state.coalitionCohesion >= 70 ? "#fd7e14"
+                      : "#dc3545",
+                  }} />
+                </div>
+                <span style={{
+                  fontWeight: 600,
+                  color: state.coalitionCohesion >= 90 ? "#28a745"
+                    : state.coalitionCohesion >= 70 ? "#fd7e14"
+                    : "#dc3545",
+                }}>
+                  {state.coalitionCohesion}%
+                </span>
+                <span style={{ color: "#aaa", fontSize: "0.78rem" }}>
+                  {state.coalitionCohesion >= 90 ? "Stable" : state.coalitionCohesion >= 70 ? "Friction" : "Stressed"}
+                </span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Federal Government */}
       {government && (

@@ -153,6 +153,9 @@ function BillCard({ bill, partyMap }: { bill: Bill; partyMap: Map<string, Party>
           {bill.isGovernmentBill && (
             <span className="badge badge-govt-bill">Govt. Bill</span>
           )}
+          {bill.memberInitiative && (
+            <span className="badge" style={{ background: "#6f42c1", color: "white" }}>Member Initiative</span>
+          )}
           {bill.vetoedByPresident && (
             <span className="badge badge-presidential-veto">Vetoed by President</span>
           )}

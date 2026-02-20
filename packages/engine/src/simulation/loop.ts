@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, count, gte, inArray } from "drizzle-orm";
 import type {
   AgentContext,
   Bill,
@@ -21,7 +21,7 @@ import { runPartyAgent } from "../agent/index.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes, tallyAmendmentVotes, applyAmendmentToBill } from "./voting.js";
 import { assignCommittee, generateRecommendation } from "./committees.js";
-import { applyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
+import { applyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, membershipBonus } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isWeeklyDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
@@ -39,6 +39,7 @@ import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImp
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, shouldPresidentVeto, BUDGET_TOTAL } from "./budget.js";
 import { generateDailySummary } from "./summary.js";
+import { reviewInternalProposals } from "./internal-proposals.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -808,6 +809,38 @@ export async function runDay(): Promise<number> {
     // 6. Run each party agent
     const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
 
+    // Load top internal proposals per party (for agent context)
+    const internalProposalsByParty = new Map<string, Array<{ title: string; category: string; score: number; totalVotes: number }>>();
+    try {
+      const openProps = db.select().from(schema.internalProposals)
+        .where(eq(schema.internalProposals.status, "open"))
+        .all();
+      for (const p of allParties) {
+        const partyProps = openProps
+          .filter(r => r.partyId === p.id)
+          .sort((a, b) => b.voteScore - a.voteScore)
+          .slice(0, 3)
+          .map(r => ({ title: r.title, category: r.category, score: r.voteScore, totalVotes: r.totalVotes }));
+        internalProposalsByParty.set(p.id, partyProps);
+      }
+    } catch { /* table may not exist yet */ }
+
+    // Load member signals for third_reading bills
+    const memberSignalsByBill: Record<string, { yes: number; no: number }> = {};
+    if (thirdReadingBills.length > 0) {
+      try {
+        const billIds = thirdReadingBills.map(b => b.id);
+        const sigs = db.select().from(schema.memberSignals)
+          .where(inArray(schema.memberSignals.billId, billIds))
+          .all();
+        for (const s of sigs) {
+          if (!memberSignalsByBill[s.billId]) memberSignalsByBill[s.billId] = { yes: 0, no: 0 };
+          if (s.signal === "yes") memberSignalsByBill[s.billId].yes++;
+          else memberSignalsByBill[s.billId].no++;
+        }
+      } catch { /* table may not exist yet */ }
+    }
+
     for (const party of allParties) {
       const fraktion = fraktionByParty.get(party.id);
 
@@ -829,6 +862,8 @@ export async function runDay(): Promise<number> {
         hasFraktion: !!fraktion,
         fraktionLeader: fraktion?.leaderName,
         government: activeGov ?? undefined,
+        topInternalProposals: internalProposalsByParty.get(party.id),
+        memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
       };
 
       const actions = await runPartyAgent(ctx, thirdReadingBills, "daily", secondReadingBills);
@@ -857,6 +892,26 @@ export async function runDay(): Promise<number> {
         };
 
         db.insert(schema.bills).values(newBill).run();
+
+        // Mirror AI proposal to internal caucus list
+        try {
+          const party = allParties.find(p => p.id === partyId)!;
+          db.insert(schema.internalProposals).values({
+            id: `iprop-ai-${billId}`,
+            partyId,
+            proposedBy: "ai",
+            proposerName: `${party.name} AI`,
+            title: action.title,
+            description: action.description,
+            category: action.category,
+            rationale: null,
+            status: "open",
+            voteScore: 0,
+            totalVotes: 0,
+            createdOnDay: currentDay,
+            reviewByDay: currentDay + 5,
+          }).run();
+        } catch { /* ignore if table missing */ }
 
         const party = allParties.find(p => p.id === partyId)!;
         addEvent(dayEvents, {
@@ -1436,6 +1491,13 @@ export async function runDay(): Promise<number> {
   // 10b. Answer pending citizen questions
   await answerPendingQuestions(allParties, currentDay);
 
+  // 10c. Review internal party proposals (accept/decline/expire)
+  try {
+    await reviewInternalProposals(currentDay);
+  } catch (err) {
+    console.error("[Loop] Error reviewing internal proposals:", err);
+  }
+
   // 10e. Answer pending interpellations + expire overdue ones
   const govForInterpellations = getActiveGovernment();
   const interpResult = await answerPendingInterpellations(allParties, govForInterpellations, currentDay);
@@ -1477,8 +1539,24 @@ export async function runDay(): Promise<number> {
   }
 
   // 11. Apply approval drift to all parties + sentiment drift
+  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
   for (const party of allParties) {
     party.approvalRating = applyApprovalDrift(party);
+    // Membership bonus: tiny daily reward for engaged party members
+    try {
+      const activeCount = db.select({ cnt: count() }).from(schema.users)
+        .where(and(
+          eq(schema.users.partyId, party.id),
+          gte(schema.users.lastActive, Date.now() - TWO_WEEKS_MS),
+        ))
+        .get()?.cnt ?? 0;
+      if (activeCount > 0) {
+        const bonus = membershipBonus(activeCount);
+        party.approvalRating = Math.max(1, Math.min(60,
+          Math.round((party.approvalRating + bonus) * 10) / 10,
+        ));
+      }
+    } catch { /* table may not exist in old DBs */ }
   }
   nationalState.publicSentiment = applySentimentDrift(nationalState.publicSentiment);
 

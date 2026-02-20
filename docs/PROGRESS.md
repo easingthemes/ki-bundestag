@@ -1,10 +1,10 @@
 # KI Bundestag — Project Progress
 
-> Last updated: 2026-02-18
+> Last updated: 2026-02-19
 
-## Current Status: Phase 4 + Engagement Features — COMPLETE
+## Current Status: Phase 4 + Engagement Features (E.1–E.6) — COMPLETE
 
-All phases complete. Latest additions: mood badge on daily summary, cross-party vote alignment matrix, "Ask a Party" widget on Dashboard, and interactive Coalition Calculator on Elections page. (These correspond to D.1–D.4 in `docs/Future_Improvements.md`.)
+All phases complete. Latest additions: full user membership system with internal party proposals, member voting, AI decision engine, membership influence on approval ratings, and member bill signals. (E.1–E.6 in `docs/Engagement.md`.)
 
 ---
 
@@ -81,6 +81,17 @@ All phases complete. Latest additions: mood badge on daily summary, cross-party 
 | GET /api/crisis-templates | Done | List available crisis templates for injection |
 | POST /api/simulate/inject | Done | Inject crisis, election, economic shock, or budget cycle |
 | GET /api/simulate/injections | Done | List pending/consumed injections |
+| POST /api/users/register | Done | Register with display name + party → UUID token |
+| GET /api/users/me | Done | Auth: returns user profile |
+| POST /api/users/me/join/:partyId | Done | Auth: join/switch party (7-day cooldown) |
+| POST /api/users/me/leave | Done | Auth: leave current party |
+| GET /api/parties/:id/proposals | Done | Internal proposals list; includes userVote when authenticated |
+| POST /api/parties/:id/proposals | Done | Auth + party member: submit internal proposal |
+| GET /api/proposals/:id | Done | Single proposal detail with userVote |
+| POST /api/proposals/:id/vote | Done | Auth: upvote/downvote (upsert) |
+| DELETE /api/proposals/:id/vote | Done | Auth: retract vote |
+| GET /api/bills/:id/signal | Done | Member YES/NO signal counts + userSignal |
+| POST /api/bills/:id/signal | Done | Auth: signal YES or NO on second/third reading bill |
 | Health check | Done | |
 | CORS | Done | |
 
@@ -96,7 +107,7 @@ All phases complete. Latest additions: mood badge on daily summary, cross-party 
 | Parties page: clickable cards with stats & priorities | Done | Links to party detail pages; Fraktion badge + leader name |
 | Parties page: Vote Alignment Matrix | Done | Color-coded table below party grid; green = high agreement, red = low; "—" when <3 shared votes |
 | Party detail page: header, approval chart, bills, votes, statements | Done | SVG sparkline chart; Fraktion section (leader, formed day, status) |
-| Bills page: grouped by status, vote bars | Done | Government bills tagged with "Govt. Bill" badge; vetoed bills show amber "Vetoed by President" badge |
+| Bills page: grouped by status, vote bars | Done | Government bills tagged with "Govt. Bill" badge; vetoed bills show amber "Vetoed by President" badge; member initiatives get purple "Member Initiative" badge |
 | Simulation Log: expandable days | Done | |
 | Elections page: hemicycle, bar chart, result table | Done | SVG hemicycle, comparison with previous election |
 | Elections page: coalition/opposition display | Done | Color-coded government formation |
@@ -114,6 +125,13 @@ All phases complete. Latest additions: mood badge on daily summary, cross-party 
 | Media page: newspaper-style article display | Done | Day groupings, expandable cards, outlet/bias/category badges |
 | Questions page: party/status filters, question/answer cards | Done | Q&A from citizen questions feature |
 | Party detail: question submission form + recent Q&A | Done | Inline form with validation |
+| Party detail: member count + Join/Leave party UI | Done | E.1: zero-friction UUID token auth; 7-day switch cooldown |
+| Party detail: member proposals section | Done | E.2: list with status badges, AI vs Member attribution, days-left countdown |
+| Party detail: proposal vote buttons (▲▼) | Done | E.3: upvote/downvote with highlighted user vote; members only |
+| Party detail: "Propose a Bill" form | Done | E.2: title + description + category; max 1 active proposal per member |
+| Parties page: member count + membership bonus | Done | E.5: "👥 N members · +X.XXX/day" on each party card |
+| Parties page: Join modal | Done | E.1: name input for new users; party switch with cooldown warning |
+| Bill Detail: member signals bar | Done | E.6: YES/NO bar chart; 👍/👎 vote buttons; signal visible to party AI |
 | Referendums page: active voting + past results | Done | Yes/No voting, quorum display, impact summary |
 | Motions page: grouped by status with vote bars | Done | Type badges (Antrag/Entschließung), vote breakdown, proposer info |
 | Anfragen page: interpellation list with filters | Done | Type badges (Kleine/Große Anfrage), status badges, expandable cards with question + minister response |

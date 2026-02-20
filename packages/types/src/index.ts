@@ -18,6 +18,26 @@ export interface Party {
   approvalRating: number;
   policyPriorities: PolicyPriorities;
   coalitionRole: CoalitionRole;
+  memberCount: number;
+}
+
+export interface InternalProposal {
+  id: string;
+  partyId: string;
+  proposedBy: string;      // userId or "ai"
+  proposerName: string;
+  title: string;
+  description: string;
+  category: string;
+  rationale: string | null;
+  status: "open" | "reviewing" | "accepted" | "declined" | "expired";
+  voteScore: number;
+  totalVotes: number;
+  createdOnDay: number;
+  reviewByDay: number;
+  reviewedOnDay: number | null;
+  declineReason: string | null;
+  bundestagseBillId: string | null;
 }
 
 export type BillCategory =
@@ -122,6 +142,8 @@ export interface Bill {
   statusChangedOnDay?: number;
   isGovernmentBill?: boolean;
   vetoedByPresident?: boolean;
+  memberInitiative?: boolean;
+  proposerDisplayName?: string;
 }
 
 export interface EconomyState {
@@ -269,6 +291,8 @@ export interface AgentContext {
   hasFraktion?: boolean;
   fraktionLeader?: string;
   government?: Government;
+  topInternalProposals?: Array<{ title: string; category: string; score: number; totalVotes: number }>;
+  memberSignals?: Record<string, { yes: number; no: number }>;  // keyed by billId
 }
 
 export interface ProposeBillAction {
