@@ -1,0 +1,201 @@
+import type { BillImpact, Crisis, Party, Referendum, SimulationEvent } from "@ki-bundestag/types";
+import { getClient, MODELS } from "../agent/client.js";
+import { getDb, schema } from "../db/index.js";
+import { eq } from "drizzle-orm";
+
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
+/**
+ * Auto-generate a referendum every 30 days based on current political context.
+ */
+export async function maybeGenerateReferendum(
+  currentDay: number,
+  allParties: Party[],
+  activeCrises: Crisis[],
+  recentBillTitles: string[],
+): Promise<void> {
+  // Only generate on days divisible by 30
+  if (currentDay % 30 !== 0 || currentDay === 0) return;
+
+  // Don't generate if there's already an active referendum
+  const db = getDb();
+  const activeRows = db.select().from(schema.referendums).all()
+    .filter((r: any) => r.status === "active");
+  if (activeRows.length > 0) return;
+
+  const client = getClient();
+
+  const context: string[] = [];
+  if (activeCrises.length > 0) {
+    context.push(`Active crises: ${activeCrises.map(c => `${c.name} (${c.severity})`).join(", ")}`);
+  }
+  if (recentBillTitles.length > 0) {
+    context.push(`Recent bills: ${recentBillTitles.slice(0, 5).join(", ")}`);
+  }
+  const partyContext = allParties.map(p =>
+    `${p.name} (${p.coalitionRole}, ${p.approvalRating}% approval)`,
+  ).join(", ");
+  context.push(`Parties: ${partyContext}`);
+
+  try {
+    const response = await client.messages.create({
+      model: MODELS.daily,
+      max_tokens: 512,
+      system: `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
+
+RESPONSE SCHEMA:
+{
+  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
+  "description": "<1-2 sentence context paragraph>",
+  "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
+  "impact": {
+    "budget": <number -2 to 2, optional>,
+    "unemployment": <number -0.5 to 0.5, optional>,
+    "inflation": <number -0.3 to 0.3, optional>,
+    "gdpGrowth": <number -0.3 to 0.3, optional>,
+    "publicSentiment": <number -3 to 3, optional>
+  }
+}
+
+Rules:
+- The referendum should be relevant to the current political context
+- Title should be a yes/no question
+- Impact values represent what happens if the referendum passes
+- Keep it realistic for German politics`,
+      messages: [{
+        role: "user",
+        content: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
+      }],
+    });
+
+    const text = response.content
+      .filter(block => block.type === "text")
+      .map(block => block.text)
+      .join("");
+
+    let jsonStr = text.trim();
+    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) jsonStr = match[1].trim();
+
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed.title || !parsed.description || !parsed.category) {
+      console.error("  [Referendums] Invalid AI response, skipping");
+      return;
+    }
+
+    const referendum: Referendum = {
+      id: `ref-${generateId()}`,
+      title: parsed.title,
+      description: parsed.description,
+      options: ["Yes", "No"],
+      votes: { Yes: 0, No: 0 },
+      createdOnDay: currentDay,
+      closesOnDay: currentDay + 14,
+      status: "active",
+      result: null,
+      impact: parsed.impact || null,
+      category: parsed.category,
+    };
+
+    db.insert(schema.referendums).values({
+      id: referendum.id,
+      title: referendum.title,
+      description: referendum.description,
+      options: referendum.options as any,
+      votes: referendum.votes as any,
+      createdOnDay: referendum.createdOnDay,
+      closesOnDay: referendum.closesOnDay,
+      status: referendum.status,
+      result: null,
+      impact: referendum.impact as any,
+      category: referendum.category,
+    }).run();
+
+    console.log(`  [Referendums] Created: "${referendum.title}" (closes day ${referendum.closesOnDay})`);
+  } catch (error) {
+    console.error("  [Referendums] Error generating referendum:", error);
+  }
+}
+
+/**
+ * Resolve expired referendums: tally votes, apply impact, create events.
+ */
+export function resolveExpiredReferendums(
+  currentDay: number,
+  dayEvents: Array<Omit<SimulationEvent, "id">>,
+): void {
+  const db = getDb();
+  const activeRows = db.select().from(schema.referendums).all()
+    .filter((r: any) => r.status === "active");
+
+  for (const row of activeRows) {
+    if (row.closesOnDay > currentDay) continue;
+
+    const votes = row.votes as unknown as Record<string, number>;
+    const totalVotes = Object.values(votes).reduce((s, v) => s + v, 0);
+
+    let status: "passed" | "rejected" | "expired";
+    let result: string | null = null;
+
+    if (totalVotes < 10) {
+      // Not enough votes — expired
+      status = "expired";
+      console.log(`  [Referendums] Expired (insufficient votes): "${row.title}" (${totalVotes} votes)`);
+    } else {
+      // Majority wins
+      const yesVotes = votes["Yes"] || 0;
+      const noVotes = votes["No"] || 0;
+
+      if (yesVotes > noVotes) {
+        status = "passed";
+        result = "Yes";
+      } else {
+        status = "rejected";
+        result = "No";
+      }
+
+      console.log(`  [Referendums] ${status}: "${row.title}" (Yes: ${yesVotes}, No: ${noVotes})`);
+    }
+
+    db.update(schema.referendums)
+      .set({ status, result })
+      .where(eq(schema.referendums.id, row.id))
+      .run();
+
+    // If passed, apply impact to national state
+    if (status === "passed" && row.impact) {
+      const impact = row.impact as unknown as BillImpact;
+      const stateRows = db.select().from(schema.nationalState).all();
+      if (stateRows.length > 0) {
+        const s = stateRows[0];
+        const updates: Record<string, number> = {};
+        if (impact.budget) updates.budget = Math.round((s.budget + impact.budget) * 10) / 10;
+        if (impact.unemployment) updates.unemployment = Math.max(0, Math.round((s.unemployment + impact.unemployment) * 10) / 10);
+        if (impact.inflation) updates.inflation = Math.max(0, Math.round((s.inflation + impact.inflation) * 10) / 10);
+        if (impact.gdpGrowth) updates.gdpGrowth = Math.round((s.gdpGrowth + impact.gdpGrowth) * 10) / 10;
+        if (impact.publicSentiment) updates.publicSentiment = Math.max(5, Math.min(75, Math.round((s.publicSentiment + impact.publicSentiment) * 10) / 10));
+
+        if (Object.keys(updates).length > 0) {
+          db.update(schema.nationalState)
+            .set(updates)
+            .where(eq(schema.nationalState.id, s.id))
+            .run();
+        }
+      }
+    }
+
+    dayEvents.push({
+      dayNumber: currentDay,
+      type: "day_start", // reuse existing type for referendum events
+      actor: "system",
+      title: `Referendum ${status}: "${row.title}"`,
+      description: status === "expired"
+        ? `The referendum did not receive enough votes (${totalVotes}/10 minimum).`
+        : `Result: ${result} (${votes["Yes"] || 0} Yes, ${votes["No"] || 0} No). ${status === "passed" ? "The measure will be implemented." : "The measure was rejected."}`,
+      data: { referendumId: row.id, status, result, totalVotes },
+    });
+  }
+}
