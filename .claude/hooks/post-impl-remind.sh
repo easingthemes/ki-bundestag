@@ -15,7 +15,7 @@ case "$FILE_PATH" in
   */packages/*)
     cat <<'EOF'
 {
-  "additionalContext": "REMINDER: You modified source code. When the current implementation task is complete, remember to update the relevant documentation: docs/PROGRESS.md (feature status), docs/Current_Architecture.md (schema, API, flow changes), and CLAUDE.md (if simulation flow or key patterns changed). Do NOT update docs mid-task — wait until the feature is fully working."
+  "additionalContext": "REMINDER: You modified source code. When the current implementation task is complete, remember to update the relevant documentation: docs/PROGRESS.md (feature status), docs/Current_Architecture.md (schema, API, flow changes), and .claude/CLAUDE.md (if simulation flow or key patterns changed). Do NOT update docs mid-task — wait until the feature is fully working."
 }
 EOF
     ;;
