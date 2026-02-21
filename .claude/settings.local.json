@@ -35,7 +35,10 @@
       "mcp__chrome-devtools__list_console_messages",
       "Bash(grep:*)",
       "WebFetch(domain:docs.x.ai)",
-      "WebFetch(domain:ai-sdk.dev)"
+      "WebFetch(domain:ai-sdk.dev)",
+      "Bash(ls:*)",
+      "Bash(echo === $tbl DIFFERS ===:*)",
+      "Bash(cd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

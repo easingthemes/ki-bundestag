@@ -1,6 +1,6 @@
 import type { MediaArticle, Party, SimulationEvent } from "@ki-bundestag/types";
 import { desc } from "drizzle-orm";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 
 function generateId(): string {
@@ -139,6 +139,10 @@ Rules:
 
     console.log(`  [Media] Generated ${Math.min(articles.length, 3)} articles`);
   } catch (error) {
-    console.error("  [Media] Error generating articles:", error);
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Media] Skipped (${error.message})`);
+    } else {
+      console.error("  [Media] Error generating articles:", error);
+    }
   }
 }

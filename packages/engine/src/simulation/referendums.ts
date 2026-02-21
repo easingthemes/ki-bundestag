@@ -1,7 +1,8 @@
 import type { BillImpact, Crisis, Party, Referendum, SimulationEvent } from "@ki-bundestag/types";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
+import { TIME_CONFIG } from "./timing.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -16,8 +17,8 @@ export async function maybeGenerateReferendum(
   activeCrises: Crisis[],
   recentBillTitles: string[],
 ): Promise<void> {
-  // Only generate on days divisible by 30
-  if (currentDay % 30 !== 0 || currentDay === 0) return;
+  // Only generate on days divisible by ECONOMY_INTERVAL (30)
+  if (currentDay % TIME_CONFIG.ECONOMY_INTERVAL !== 0 || currentDay === 0) return;
 
   // Don't generate if there's already an active referendum
   const db = getDb();
@@ -106,7 +107,11 @@ Rules:
 
     console.log(`  [Referendums] Created: "${referendum.title}" (closes day ${referendum.closesOnDay})`);
   } catch (error) {
-    console.error("  [Referendums] Error generating referendum:", error);
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Referendums] Skipped (${error.message})`);
+    } else {
+      console.error("  [Referendums] Error generating referendum:", error);
+    }
   }
 }
 

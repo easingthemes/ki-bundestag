@@ -1,5 +1,5 @@
 import type { Crisis, Party, Poll } from "@ki-bundestag/types";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 
@@ -17,7 +17,7 @@ function createPartyPreferencePoll(parties: Party[], currentDay: number): Poll {
     options: parties.map(p => p.name),
     votes: Object.fromEntries(parties.map(p => [p.name, 0])),
     createdOnDay: currentDay,
-    expiresOnDay: currentDay + 7,
+    expiresOnDay: currentDay + 14,
     active: true,
     category: "party_preference",
   };
@@ -78,12 +78,16 @@ Rules:
       options: parsed.options,
       votes: Object.fromEntries(parsed.options.map((o: string) => [o, 0])),
       createdOnDay: currentDay,
-      expiresOnDay: currentDay + 7,
+      expiresOnDay: currentDay + 14,
       active: true,
       category: parsed.category || "general",
     };
   } catch (error) {
-    console.error("  [Polls] Error generating context poll:", error);
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Polls] Skipped (${error.message})`);
+    } else {
+      console.error("  [Polls] Error generating context poll:", error);
+    }
     return null;
   }
 }

@@ -124,6 +124,14 @@ export const SEMANTIC_HEX = {
   info: "#3b82f6",
 } as const;
 
+// ── Timing preset badges ──────────────────────────────────────────────────────
+export const PRESET_BADGE: Record<string, string> = {
+  "ultra-fast": "bg-red-50 text-red-700 border-red-200 hover:bg-red-50",
+  fast: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-50",
+  normal: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50",
+  slow: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50",
+};
+
 // ── Crisis severity badge ─────────────────────────────────────────────────────
 export const SEVERITY_BADGE: Record<string, string> = {
   high: "border-red-400 text-red-600",

@@ -12,7 +12,8 @@ KI Bundestag is an AI-powered simulation of the German parliament. Six political
 npm run seed              # Fresh start: wipe DB, seed 6 parties + initial state (backs up first)
 npm run migrate           # Apply schema changes without clearing data (safe to run repeatedly)
 npm run simulate          # Run simulation days (e.g., npm run simulate 5)
-npm run simulate:auto     # Continuous simulation loop (default 30s interval)
+npm run simulate:auto     # Continuous simulation loop (preset-aware delays)
+npm run migrate:timing    # Add timing preset support to existing DBs
 npm run simulate:visitors # Launch 5 Chrome visitors with random actions (needs dev servers)
 npm run trigger:election  # Force next simulate run to trigger an election (testing)
 npm run dev:api           # Express API on port 3001
@@ -43,16 +44,16 @@ Both `types` and `engine` point `"import"` and `"default"` exports to `./src/ind
 Two SQLite databases in `data/`, both WAL mode with foreign keys enabled:
 
 - **`simulation.db`** — simulation state, accessed via `getDb()` / `getSqlite()`
-  - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`
+  - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`, `event_queue`
   - Override path: `DATABASE_PATH` env var
 - **`users.db`** — user-owned data, accessed via `getUserDb()` / `getUserSqlite()`
-  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`, `question_votes`
+  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`, `question_votes`, `notifications`
   - Override path: `USER_DATABASE_PATH` env var
 - Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory
 - Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM, unified schema object used by both DBs)
 - DDL split in `seed.ts`: `SIM_TABLE_DDL` + `USER_TABLE_DDL`
 - `closeDb()` closes both connections; `npm run seed` backs up both files
-- `national_state` has `provisional_budget` (boolean); `simulation_meta` has `budget_retry_day`; `budgets` has `revision_attempt`
+- `national_state` has `provisional_budget` (boolean); `simulation_meta` has `budget_retry_day`, `timing_preset` (default `"normal"`); `budgets` has `revision_attempt`
 - Use `getSqlite()` / `getUserSqlite()` for raw sqlite3 access — never access drizzle internals
 - One-time migration: `npx tsx scripts/migrate-users-db.ts` (moves user tables from old single-DB layout)
 
@@ -75,11 +76,23 @@ AI calls use the **Vercel AI SDK v6** with per-party and per-role model selectio
 | `negotiation` | anthropic:claude-haiku-4-5-20251001 | `MODEL_NEGOTIATION` | Coalition negotiation rounds (per-party) |
 | `synthesis` | anthropic:claude-sonnet-4-5-20250929 | `MODEL_SYNTHESIS` | Coalition agreement synthesis |
 
-**Unified Client**: [`callAI()`](../packages/engine/src/agent/client.ts) function accepts `{system, prompt, maxTokens, partyId?, roleKey?}` and routes to the appropriate provider + model. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
+**Unified Client**: [`callAI()`](../packages/engine/src/agent/client.ts) function accepts `{system, prompt, maxTokens, partyId?, roleKey?}` and routes to the appropriate provider + model. Per-provider circuit breaker: on API usage limit errors, the provider is marked unavailable and all subsequent calls throw `AIProviderLimitError` immediately (no API hit). `allProvidersLimited()` returns true when all providers are blocked; runner-auto pauses in this case. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
 
 ## Simulation Flow
 
-`npm run simulate` → `runner.ts` → `runDay()` loop in `packages/engine/src/simulation/loop.ts`:
+`npm run simulate` → `runner.ts` → `runDay()` loop in `packages/engine/src/simulation/loop.ts`.
+`npm run simulate:auto` → `runner-auto.ts` → preset-aware loop reading `timing_preset` from `simulation_meta`.
+
+**Timing Presets** (`packages/engine/src/simulation/timing.ts`): 4 speed modes control how fast sim days tick. `TIME_CONFIG` centralizes all cycle intervals (polls every 15d, economy every 30d, budget every 365d, elections every 1461d). Runner applies per-preset delays and night pause (Europe/Berlin timezone). Ultra-fast/fast are watch-only (non-participatory); normal/slow allow user interaction. Feature availability matrix gates 10 feature keys per preset. Night mode: "none" (24/7), "light" (routine only), "pause" (full stop).
+
+| Preset | Delay | Participatory | Night Mode |
+|--------|-------|--------------|------------|
+| ultra-fast | 0 (AI-bound) | No | none |
+| fast | 7 min | No | none |
+| normal | 30/15 min | Yes | light |
+| slow | 1.5 h / pause | Yes | pause |
+
+`runDay()` flow:
 
 1. Increment day, load full state (parties, bills, national economy, recent events)
 2. Apply economic drift (mean-reversion + noise on all 4 indicators)
@@ -108,7 +121,7 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 
 ## Web Pages
 
-- **Dashboard**: 2-column grid layout (main + sidebar). Main: hero summary with mood badge, Bundestag seat bar + coalition/opposition chips, economy 4-stat grid, 3 latest events, 2 media highlights. Sidebar: Chancellor card, engagement CTAs (user-aware), public sentiment gauge, active crises, active election, Ask a Party widget. Full-width "Decision of the Month" + "Party of the Month" featured section. Provisional budget amber banner when Art. 111 GG active
+- **Dashboard**: 2-column grid layout (main + sidebar). Main: hero summary with mood badge, Bundestag seat bar + coalition/opposition chips, economy 4-stat grid, 3 latest events, 2 media highlights. Sidebar: Chancellor card, engagement CTAs (user-aware), public sentiment gauge, active crises, active election, Ask a Party widget. Full-width "Decision of the Month" + "Party of the Month" featured section. Provisional budget amber banner when Art. 111 GG active. Watch-only blue banner when preset is ultra-fast/fast
 - **Parties**: Clickable cards → **Party Detail** (approval chart, bills, votes, statements, question form); Vote Alignment Matrix below party grid (pairwise vote-agreement %, color-coded)
 - **Bills**: Grouped by status with vote breakdowns, "Govt. Bill" badge on government bills, "Vetoed by President" amber badge on vetoed bills
 - **Elections**: Hemicycle, bar chart, result table, negotiation rounds, coalition agreement; Coalition Calculator at bottom (interactive party checkboxes, seat counter, majority indicator, ideological spread)
@@ -125,7 +138,8 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 - **Log**: Expandable day-by-day simulation events
 - **Login**: Nickname-based login/register page at `/login?redirect=<path>`; single input, try login first, offer register if not found; redirects back after success
 - **About**: Project overview and tech stack info
-- **Admin**: Inject events (crisis, snap election, economic shock, invalidate election, trigger budget cycle); AI model config table; simulation actions reference (27 actions, AI vs Algorithmic, expandable detail)
+- **Notifications**: User notification list with type filter pills (All/Morning Summary/Queued/Ready), read/unread indicators, mark-read actions, "Mark all as read" header button
+- **Admin**: Simulation speed preset selector (4 presets with Interactive/Watch-only badges, Apply button); inject events (crisis, snap election, economic shock, invalidate election, trigger budget cycle); AI model config table; simulation actions reference (27 actions, AI vs Algorithmic, expandable detail)
 
 ## Web UI Stack
 

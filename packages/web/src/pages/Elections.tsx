@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ROLE_BADGE, PHASE_BADGE, VOTE_HEX, SEMANTIC_HEX } from "@/lib/colors";
+import { TERM_DURATION, PRESET_LABEL, formatTimeToElection } from "@/lib/timing";
 
 const MAJORITY_THRESHOLD = 368;
 
@@ -322,7 +323,7 @@ export function Elections() {
             <div className="text-sm text-white/80 mt-1.5">
               Next scheduled election: <strong>Day {simStatus.nextElectionDay}</strong>
               {simStatus.nextElectionDay > simStatus.currentDay && (
-                <span className="text-white/65"> — {simStatus.nextElectionDay - simStatus.currentDay} days from now</span>
+                <span className="text-white/65"> — {simStatus.nextElectionDay - simStatus.currentDay} sim days ({formatTimeToElection(simStatus.nextElectionDay - simStatus.currentDay, simStatus.timingPreset)} in {PRESET_LABEL[simStatus.timingPreset]} mode)</span>
               )}
             </div>
           )}
@@ -330,7 +331,7 @@ export function Elections() {
 
         <div className="mt-6 mb-8">
           <p className="text-sm text-muted-foreground mb-3">
-            Initial seating — no election has been simulated yet. Trigger one via Admin or wait until Day 120.
+            Initial seating — no election has been simulated yet. Trigger one via Admin or wait for the scheduled election (4 sim years ≈ {TERM_DURATION[simStatus?.timingPreset ?? "normal"]} real time in {PRESET_LABEL[simStatus?.timingPreset ?? "normal"]} mode).
           </p>
           <div className="grid grid-cols-[auto_1fr] gap-8 items-start max-md:grid-cols-1">
             <div>
@@ -403,7 +404,7 @@ export function Elections() {
         {simStatus && !selected && (
           <div className="text-xs text-white/80 mt-1">
             Next election: Day {simStatus.nextElectionDay}
-            {simStatus.nextElectionDay > simStatus.currentDay && ` (in ${simStatus.nextElectionDay - simStatus.currentDay} days)`}
+            {simStatus.nextElectionDay > simStatus.currentDay && ` (${simStatus.nextElectionDay - simStatus.currentDay} sim days ≈ ${formatTimeToElection(simStatus.nextElectionDay - simStatus.currentDay, simStatus.timingPreset)})`}
           </div>
         )}
       </div>

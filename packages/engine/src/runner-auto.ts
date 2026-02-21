@@ -1,32 +1,79 @@
 import "dotenv/config";
 import { runDay } from "./simulation/index.js";
-import { closeDb } from "./db/index.js";
+import { closeDb, getSqlite } from "./db/index.js";
+import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
+import { allProvidersLimited } from "./agent/client.js";
 
-const INTERVAL_MS = parseInt(process.argv[2] || "30000", 10);
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-async function tick() {
+function readPreset(): TimingPreset {
   try {
-    await runDay();
-  } catch (err) {
-    console.error("Simulation day failed:", err);
+    const row = getSqlite()
+      .prepare("SELECT timing_preset FROM simulation_meta LIMIT 1")
+      .get() as { timing_preset: string } | undefined;
+    return (row?.timing_preset as TimingPreset) ?? "normal";
+  } catch {
+    return "normal";
   }
 }
 
+let running = true;
+
+process.on("SIGINT", () => {
+  console.log("\nStopping auto-simulate...");
+  running = false;
+});
+
 async function main() {
-  console.log(`Auto-simulate: running 1 day every ${INTERVAL_MS / 1000}s (Ctrl+C to stop)`);
+  const preset = readPreset();
+  console.log(`Auto-simulate: preset="${preset}" (Ctrl+C to stop)`);
 
-  // Run first day immediately
-  await tick();
+  while (running) {
+    // Night pause for slow mode: wait until morning
+    if (shouldPauseForNight(preset)) {
+      console.log("  [Runner] Night pause (slow mode) — waiting until 08:00 CET...");
+      while (running && shouldPauseForNight(preset)) {
+        await sleep(60_000); // check every 60s
+      }
+      if (!running) break;
+      console.log("  [Runner] Morning — resuming simulation");
+    }
 
-  // Then loop on interval
-  const timer = setInterval(tick, INTERVAL_MS);
+    try {
+      await runDay();
+    } catch (err) {
+      console.error("Simulation day failed:", err);
+    }
 
-  process.on("SIGINT", () => {
-    console.log("\nStopping auto-simulate...");
-    clearInterval(timer);
-    closeDb();
-    process.exit(0);
-  });
+    if (!running) break;
+
+    // If all AI providers are limited, pause until limits reset
+    if (allProvidersLimited()) {
+      console.log("\n  [Runner] All AI providers have hit usage limits. Pausing simulation.");
+      console.log("  [Runner] Restart the process after limits reset, or press Ctrl+C to stop.\n");
+      while (running && allProvidersLimited()) {
+        await sleep(60_000);
+      }
+      if (!running) break;
+    }
+
+    const delay = getDelayMs(preset);
+    if (delay > 0 && delay !== Infinity) {
+      const delaySec = Math.round(delay / 1000);
+      console.log(`  [Runner] Next day in ${delaySec}s`);
+      // Sleep in 5s chunks so SIGINT is responsive
+      const chunks = Math.ceil(delay / 5000);
+      for (let i = 0; i < chunks && running; i++) {
+        await sleep(Math.min(5000, delay - i * 5000));
+      }
+    }
+    // ultra-fast (delay=0): no wait, loop immediately
+  }
+
+  closeDb();
+  console.log("Auto-simulate stopped.");
 }
 
 main();

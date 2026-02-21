@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { eq, and, lte, gte } from "drizzle-orm";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 
 /**
@@ -116,6 +116,10 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
         }).run();
       }
     } catch (err) {
+      if (err instanceof AIProviderLimitError) {
+        console.warn(`  [InternalProposals] Skipped (${err.message})`);
+        break;
+      }
       console.error(`[InternalProposals] Error reviewing proposal ${top.id}:`, err);
     }
   }

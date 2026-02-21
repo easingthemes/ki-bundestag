@@ -5,7 +5,7 @@ import type {
   Party,
   SimulationEvent,
 } from "@ki-bundestag/types";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAgentResponse } from "../agent/action-parser.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
@@ -134,7 +134,11 @@ export async function runNegotiationRound(
 
       console.log(`  [Negotiation] ${party.name}: position received`);
     } catch (error) {
-      console.error(`  [Negotiation] Error for ${party.name}:`, error);
+      if (error instanceof AIProviderLimitError) {
+        console.warn(`  [Negotiation] ${party.name}: skipped (${error.message})`);
+      } else {
+        console.error(`  [Negotiation] Error for ${party.name}:`, error);
+      }
       rounds.push({
         roundNumber,
         partyId: party.id,
@@ -225,7 +229,11 @@ Determine the coalition agreement. Respond as JSON.`;
     console.log(`  [Negotiation] Synthesis coalition insufficient (${coalitionSeats} seats), falling back`);
     return null;
   } catch (error) {
-    console.error("  [Negotiation] Synthesis error, falling back:", error);
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Negotiation] Synthesis skipped (${error.message})`);
+    } else {
+      console.error("  [Negotiation] Synthesis error, falling back:", error);
+    }
     return null;
   }
 }

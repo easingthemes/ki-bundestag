@@ -163,10 +163,12 @@ const SIM_TABLE_DDL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     current_day INTEGER NOT NULL DEFAULT 0,
     last_run_at TEXT,
-    next_election_day INTEGER NOT NULL DEFAULT 120,
+    next_election_day INTEGER NOT NULL DEFAULT 1461,
     low_sentiment_streak INTEGER NOT NULL DEFAULT 0,
     budget_retry_day INTEGER,
-    daily_summary TEXT
+    daily_summary TEXT,
+    day_started_at TEXT,
+    timing_preset TEXT NOT NULL DEFAULT 'normal'
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -322,6 +324,16 @@ const SIM_TABLE_DDL = `
     economic_effect TEXT,
     revision_attempt INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS event_queue (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    event_data TEXT,
+    scheduled_for_day INTEGER NOT NULL,
+    queued_at TEXT NOT NULL,
+    processed_at TEXT,
+    status TEXT NOT NULL DEFAULT 'queued'
+  );
 `;
 
 /** User table DDL — lives in users.db */
@@ -377,6 +389,18 @@ const USER_TABLE_DDL = `
     vote INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    data TEXT,
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    day_number INTEGER NOT NULL
+  );
 `;
 
 /**
@@ -385,7 +409,8 @@ const USER_TABLE_DDL = `
  */
 const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
   { table: "simulation_events", column: "created_at", sql: "ALTER TABLE simulation_events ADD COLUMN created_at TEXT" },
-  { table: "simulation_meta", column: "next_election_day", sql: "ALTER TABLE simulation_meta ADD COLUMN next_election_day INTEGER NOT NULL DEFAULT 120" },
+  // Note: Old DBs may have 120 here; migrate-timing.ts rescales to 1461
+  { table: "simulation_meta", column: "next_election_day", sql: "ALTER TABLE simulation_meta ADD COLUMN next_election_day INTEGER NOT NULL DEFAULT 1461" },
   { table: "simulation_meta", column: "low_sentiment_streak", sql: "ALTER TABLE simulation_meta ADD COLUMN low_sentiment_streak INTEGER NOT NULL DEFAULT 0" },
   { table: "elections", column: "negotiation_rounds", sql: "ALTER TABLE elections ADD COLUMN negotiation_rounds TEXT" },
   { table: "elections", column: "coalition_agreement", sql: "ALTER TABLE elections ADD COLUMN coalition_agreement TEXT" },
@@ -404,6 +429,7 @@ const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string 
   { table: "budgets", column: "revision_attempt", sql: "ALTER TABLE budgets ADD COLUMN revision_attempt INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "daily_summary", sql: "ALTER TABLE simulation_meta ADD COLUMN daily_summary TEXT" },
   { table: "simulation_meta", column: "day_started_at", sql: "ALTER TABLE simulation_meta ADD COLUMN day_started_at TEXT" },
+  { table: "simulation_meta", column: "timing_preset", sql: "ALTER TABLE simulation_meta ADD COLUMN timing_preset TEXT NOT NULL DEFAULT 'normal'" },
 ];
 
 /** Column migrations for user DB */
@@ -489,6 +515,7 @@ export function seedDatabase() {
 
   // Drop simulation tables for a clean start
   sqlite.exec(`
+    DROP TABLE IF EXISTS event_queue;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS constitutional_challenges;
     DROP TABLE IF EXISTS confidence_votes;
@@ -516,6 +543,7 @@ export function seedDatabase() {
   // User DB: fresh start
   const userSqlite = getUserSqlite();
   userSqlite.exec(`
+    DROP TABLE IF EXISTS notifications;
     DROP TABLE IF EXISTS question_votes;
     DROP TABLE IF EXISTS member_signals;
     DROP TABLE IF EXISTS internal_votes;
@@ -553,8 +581,9 @@ export function seedDatabase() {
   db.insert(schema.simulationMeta).values({
     currentDay: 0,
     lastRunAt: null,
-    nextElectionDay: 120,
+    nextElectionDay: 1461,
     lowSentimentStreak: 0,
+    timingPreset: "normal",
   }).run();
 
   // Insert initial fraktionen for parties with enough seats
