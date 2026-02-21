@@ -104,6 +104,7 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 - **Verfassungsgericht**: Constitutional court challenges to passed bills with status/decision filters, collapsible cards showing arguments + court reasoning
 - **Referendums (Votes)**: AI-generated referendums with user voting, impact on simulation
 - **Log**: Expandable day-by-day simulation events
+- **Login**: Nickname-based login/register page at `/login?redirect=<path>`; single input, try login first, offer register if not found; redirects back after success
 - **About**: Project overview and tech stack info
 - **Admin**: Inject events (crisis, snap election, economic shock, invalidate election, trigger budget cycle); AI model config table; simulation actions reference (27 actions, AI vs Algorithmic, expandable detail)
 

@@ -1,5 +1,15 @@
 # Progress
 
+## Summary
+- **Status**: completed (5 steps)
+- **Date**: 2026-02-21
+- **Changes**:
+  - Unique constraint on `displayName` + `POST /api/users/login` endpoint + 409 on duplicate register
+  - `/login` page with nickname input, two-step login-then-register flow, redirect support
+  - Gold avatar `UserMenu` dropdown in desktop + mobile nav (My Party, My Questions, Logout)
+  - Removed inline name inputs from Parties JoinModal and PartyDetail; redirect to `/login` if unauthenticated
+  - Visitor simulation uses login-first flow, separate party join, correct localStorage key
+
 ## Goal
 
 Replace the invisible UUID-token auth with a simple nickname-based login/register flow — one page, unique nicknames, session persisted in a cookie, user avatar in the nav with a dropdown for user-related pages.
@@ -7,33 +17,26 @@ Replace the invisible UUID-token auth with a simple nickname-based login/registe
 ## Steps
 
 ### Step 1: Unique nickname registration + login API
-
-- **Status**: pending
-- **Description**: Add unique constraint on `displayName` in the users table. Update `POST /api/users/register` to enforce uniqueness. Add `POST /api/users/login` that looks up by nickname and returns the user (or 404 if not found). Return a session token (the existing UUID) in both endpoints.
+- **Status**: done
+- **Files**: `packages/engine/src/db/schema.ts`, `packages/engine/src/db/seed.ts`, `packages/api/src/index.ts`
+- **Result**: Added `.unique()` on displayName, dedup migration, `POST /api/users/login` (404 if not found), register returns 409 on duplicate
 
 ### Step 2: Login/Register page
-
-- **Status**: pending
-- **Description**: Create a single `/login` page with one nickname input. On submit: try login first, if 404 then register. Show inline feedback ("Welcome back" vs "Account created"). On success, store token in a cookie (not just localStorage) and redirect to previous page or home. Redirect unauthenticated users here when they try auth-required actions.
+- **Status**: done
+- **Files**: `packages/web/src/pages/Login.tsx` (new), `packages/web/src/api.ts`, `packages/web/src/userContext.ts`
+- **Result**: `/login?redirect=` page with single nickname input; try login → not found → offer register; cookie backup alongside localStorage
 
 ### Step 3: User avatar + dropdown in navigation
-
-- **Status**: pending
-- **Description**: Add a user avatar (initials-based circle) to the right side of the main nav. Click opens a dropdown with: nickname display, "My Party" link (if member), "My Questions" link, "My Proposals" link, and "Logout". When logged out, show a "Login" link instead.
+- **Status**: done
+- **Files**: `packages/web/src/main.tsx`
+- **Result**: `UserMenu` component (gold initials circle, hover/click dropdown), `MobileLogout`, desktop "Anmelden" link, mobile avatar section; `/login` route added
 
 ### Step 4: Remove redundant nickname prompts
-
-- **Status**: pending
-- **Description**: Update join-party flow, question submission, proposal submission, and any other place that asks for a name to use the logged-in user's nickname automatically. Remove the displayName field from registration-time party joining (party join is now a separate action post-login).
+- **Status**: done
+- **Files**: `packages/web/src/pages/Parties.tsx`, `packages/web/src/pages/PartyDetail.tsx`, `packages/web/src/pages/Dashboard.tsx`
+- **Result**: JoinModal redirects to `/login` via useEffect if no user; PartyDetail join button redirects; Dashboard CTA links to `/login`
 
 ### Step 5: Update visitor simulation script
-
-- **Status**: pending
-- **Description**: Update `scripts/simulate-visitors.ts` to use the new login/register API flow and cookie-based auth instead of raw token + localStorage.
-
-## Notes
-
-- The existing `users` table already has `displayName` — just needs a unique constraint
-- Cookie approach: set `userToken` cookie with `SameSite=Lax`, read it server-side via `cookie-parser` or just keep sending `X-User-Token` header (cookie stores the token, frontend reads it and sends as header — simplest hybrid)
-- "My Questions" / "My Proposals" pages could either be new routes or filtered views of existing pages
-- Avatar: generated from initials (e.g., "HM" for "Hans Müller"), colored by party or hash — no image upload needed
+- **Status**: done
+- **Files**: `scripts/simulate-visitors.ts`
+- **Result**: Login-first flow, register without partyId, separate `POST /users/me/join/:partyId`, fixed localStorage key to `ki-bundestag-token`
