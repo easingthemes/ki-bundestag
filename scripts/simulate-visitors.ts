@@ -12,6 +12,8 @@
  */
 
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { getUserDb, schema } from "@ki-bundestag/engine";
+import { desc, isNotNull } from "drizzle-orm";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -94,12 +96,21 @@ interface VisitorState {
   name: string;
   partyId: string;
   token: string | null;
+  isExisting: boolean;
   context: BrowserContext;
   page: Page;
   votedPolls: Set<string>;
   votedReferendums: Set<string>;
   registered: boolean;
   proposalSubmitted: boolean;
+}
+
+interface ExistingUser {
+  id: string;
+  displayName: string;
+  partyId: string;
+  lastActive: number;
+  createdAt: number;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -117,6 +128,102 @@ function pickN<T>(arr: readonly T[], min: number, max: number): T[] {
 function randomDelay(minMs: number = ACTION_DELAY_MIN, maxMs: number = ACTION_DELAY_MAX): Promise<void> {
   const ms = minMs + Math.floor(Math.random() * (maxMs - minMs));
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function fetchExistingUsers(): ExistingUser[] {
+  const userDb = getUserDb();
+  // Query users with party affiliation, ordered by activity
+  const rows = userDb
+    .select({
+      id: schema.users.id,
+      displayName: schema.users.displayName,
+      partyId: schema.users.partyId,
+      lastActive: schema.users.lastActive,
+      createdAt: schema.users.createdAt,
+    })
+    .from(schema.users)
+    .where(isNotNull(schema.users.partyId))  // Only users with parties
+    .orderBy(desc(schema.users.lastActive))  // Most recent activity first
+    .all();
+  
+  // Filter out null partyIds and cast to proper type
+  return rows.filter((r): r is ExistingUser => r.partyId !== null);
+}
+
+function selectUserMix(visitorCount: number): { name: string; partyId: string; token: string | null; isExisting: boolean }[] {
+  const existing = fetchExistingUsers();
+  const existingCount = Math.ceil(visitorCount * (2/3));
+  
+  const selected: { name: string; partyId: string; token: string | null; isExisting: boolean }[] = [];
+  
+  // Select existing users
+  if (existing.length > 0) {
+    // Mix of most active + recently created
+    const halfPoint = Math.floor(existingCount / 2);
+    const byActivity = existing.slice(0, halfPoint);  // Top half by lastActive
+    const byRecent = [...existing].sort((a, b) => b.createdAt - a.createdAt).slice(0, existingCount - halfPoint);
+    
+    // Deduplicate (a user can appear in both lists)
+    const seen = new Set<string>();
+    const combined = [...byActivity, ...byRecent].filter(u => {
+      if (seen.has(u.id)) return false;
+      seen.add(u.id);
+      return true;
+    });
+    // Shuffle to randomize mix
+    const shuffled = combined.sort(() => Math.random() - 0.5);
+    
+    // Take first existingCount (or all if not enough)
+    const toUse = shuffled.slice(0, Math.min(existingCount, existing.length));
+    
+    for (const user of toUse) {
+      selected.push({
+        name: user.displayName,
+        partyId: user.partyId,
+        token: user.id,  // Existing token
+        isExisting: true,
+      });
+    }
+  }
+  
+  // Fill remaining with new users
+  const stillNeed = visitorCount - selected.length;
+  const shuffledNames = [...GERMAN_NAMES].sort(() => Math.random() - 0.5);
+  
+  for (let i = 0; i < stillNeed; i++) {
+    // Ensure party distribution for large visitor counts
+    let partyId: string;
+    if (visitorCount > 5) {
+      // Balance parties across all selected users
+      const partyCounts = new Map<string, number>();
+      for (const s of selected) {
+        partyCounts.set(s.partyId, (partyCounts.get(s.partyId) || 0) + 1);
+      }
+      // Pick least-used party
+      let minCount = Infinity;
+      let minParty: string = PARTY_IDS[0];
+      for (const p of PARTY_IDS) {
+        const cnt = partyCounts.get(p) || 0;
+        if (cnt < minCount) {
+          minCount = cnt;
+          minParty = p;
+        }
+      }
+      partyId = minParty;
+    } else {
+      // Random for small counts
+      partyId = PARTY_IDS[i % PARTY_IDS.length];
+    }
+    
+    selected.push({
+      name: shuffledNames[i % shuffledNames.length],
+      partyId,
+      token: null,  // Will register as new
+      isExisting: false,
+    });
+  }
+  
+  return selected;
 }
 
 function timestamp(): string {
@@ -162,7 +269,18 @@ async function navigateSafe(page: Page, path: string): Promise<void> {
 async function actionRegister(v: VisitorState): Promise<void> {
   if (v.registered) return;
 
-  // Try login first (in case user already exists)
+  // Existing user - just set token in localStorage
+  if (v.isExisting && v.token) {
+    await v.page.evaluate((token: string) => {
+      localStorage.setItem("ki-bundestag-token", token);
+    }, v.token);
+    log(v, "LOGIN", `Using existing account (${v.name})`);
+    v.registered = true;
+    await navigateSafe(v.page, "/parties");
+    return;
+  }
+
+  // New user - try login first (in case user already exists)
   const loginRes = await apiFetch<{ id: string }>("POST", "/users/login", null, {
     displayName: v.name,
   });
@@ -473,11 +591,11 @@ async function main(): Promise<void> {
     args: ["--window-size=1280,900"],
   });
 
-  // Create 5 visitor contexts
+  // Create 5 visitor contexts with user mix (2/3 existing, 1/3 new)
   const visitors: VisitorState[] = [];
-  const shuffledNames = [...GERMAN_NAMES].sort(() => Math.random() - 0.5);
+  const userMix = selectUserMix(5);
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < userMix.length; i++) {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 900 },
     });
@@ -487,9 +605,10 @@ async function main(): Promise<void> {
 
     visitors.push({
       id: i + 1,
-      name: shuffledNames[i],
-      partyId: PARTY_IDS[i % PARTY_IDS.length],
-      token: null,
+      name: userMix[i].name,
+      partyId: userMix[i].partyId,
+      token: userMix[i].token,
+      isExisting: userMix[i].isExisting,
       context,
       page,
       votedPolls: new Set(),
