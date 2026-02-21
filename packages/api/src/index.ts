@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
-import { getDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
   Party,
@@ -63,7 +63,7 @@ app.get("/api/parties", (_req, res) => {
     histByParty.get(row.partyId)!.push(Number(row.approvalRating));
   }
 
-  const memberCounts = getMemberCounts(db);
+  const memberCounts = getMemberCounts();
   const parties = rows.map(r => ({ ...mapParty(r, memberCounts.get(r.id) ?? 0), recentApprovals: histByParty.get(r.id) ?? [] }));
   res.json(parties);
 });
@@ -109,7 +109,7 @@ app.get("/api/parties/:id", (req, res) => {
     res.status(404).json({ error: "Party not found" });
     return;
   }
-  const memberCounts = getMemberCounts(db);
+  const memberCounts = getMemberCounts();
   res.json(mapParty(rows[0], memberCounts.get(req.params.id) ?? 0));
 });
 
@@ -193,9 +193,9 @@ app.get("/api/bills/:id", (req, res) => {
 
 // GET /api/bills/:id/signal
 app.get("/api/bills/:id/signal", (req, res) => {
-  const db = getDb();
+  const userDb = getUserDb();
   const token = getUserToken(req);
-  const signals = db.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
+  const signals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
   const yes = signals.filter(s => s.signal === "yes").length;
   const no = signals.filter(s => s.signal === "no").length;
   const userSignal = token ? (signals.find(s => s.userId === token)?.signal ?? null) : null;
@@ -206,9 +206,10 @@ app.get("/api/bills/:id/signal", (req, res) => {
 app.post("/api/bills/:id/signal", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const db = getDb();
-  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
+  const db = getDb();
   const bill = db.select().from(schema.bills).where(eq(schema.bills.id, req.params.id)).all()[0];
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
   if (!["second_reading", "third_reading"].includes(bill.status)) {
@@ -218,18 +219,18 @@ app.post("/api/bills/:id/signal", (req, res) => {
   const { signal } = req.body as { signal?: string };
   if (signal !== "yes" && signal !== "no") { res.status(400).json({ error: "signal must be 'yes' or 'no'" }); return; }
 
-  const existing = db.select().from(schema.memberSignals)
+  const existing = userDb.select().from(schema.memberSignals)
     .where(and(eq(schema.memberSignals.billId, req.params.id), eq(schema.memberSignals.userId, token)))
     .all();
 
   if (existing.length > 0) {
-    db.update(schema.memberSignals).set({ signal, createdAt: Date.now() }).where(eq(schema.memberSignals.id, existing[0].id)).run();
+    userDb.update(schema.memberSignals).set({ signal, createdAt: Date.now() }).where(eq(schema.memberSignals.id, existing[0].id)).run();
   } else {
-    db.insert(schema.memberSignals).values({ id: `sig-${randomUUID().slice(0, 8)}`, billId: req.params.id, userId: token, signal, createdAt: Date.now() }).run();
+    userDb.insert(schema.memberSignals).values({ id: `sig-${randomUUID().slice(0, 8)}`, billId: req.params.id, userId: token, signal, createdAt: Date.now() }).run();
   }
 
-  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  const allSignals = db.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
+  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const allSignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
   res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
 });
 
@@ -896,8 +897,9 @@ function mapParty(row: typeof schema.parties.$inferSelect, memberCount = 0): Par
   };
 }
 
-function getMemberCounts(db: ReturnType<typeof getDb>): Map<string, number> {
-  const rows = db
+function getMemberCounts(): Map<string, number> {
+  const userDb = getUserDb();
+  const rows = userDb
     .select({ partyId: schema.users.partyId, cnt: count() })
     .from(schema.users)
     .where(sql`${schema.users.partyId} IS NOT NULL`)
@@ -1117,10 +1119,10 @@ function mapProposal(row: typeof schema.internalProposals.$inferSelect, userVote
 
 // GET /api/parties/:id/proposals
 app.get("/api/parties/:id/proposals", (req, res) => {
-  const db = getDb();
+  const userDb = getUserDb();
   const token = getUserToken(req);
   const statusFilter = req.query.status as string | undefined;
-  let rows = db.select().from(schema.internalProposals)
+  let rows = userDb.select().from(schema.internalProposals)
     .where(eq(schema.internalProposals.partyId, req.params.id))
     .all();
   if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
@@ -1131,7 +1133,7 @@ app.get("/api/parties/:id/proposals", (req, res) => {
   if (token) {
     const proposalIds = rows.map(r => r.id);
     if (proposalIds.length > 0) {
-      const votes = db.select().from(schema.internalVotes)
+      const votes = userDb.select().from(schema.internalVotes)
         .where(and(eq(schema.internalVotes.userId, token), inArray(schema.internalVotes.proposalId, proposalIds)))
         .all();
       for (const v of votes) userVoteMap[v.proposalId] = v.vote as 1 | -1;
@@ -1144,8 +1146,8 @@ app.get("/api/parties/:id/proposals", (req, res) => {
 app.post("/api/parties/:id/proposals", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const db = getDb();
-  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
   const user = users[0];
   if (user.partyId !== req.params.id) { res.status(403).json({ error: "Not a member of this party" }); return; }
@@ -1156,23 +1158,24 @@ app.post("/api/parties/:id/proposals", (req, res) => {
   if (!category) { res.status(400).json({ error: "Category required" }); return; }
 
   // Check: one active proposal per member
-  const existing = db.select().from(schema.internalProposals)
+  const existing = userDb.select().from(schema.internalProposals)
     .where(and(eq(schema.internalProposals.proposedBy, token), eq(schema.internalProposals.partyId, req.params.id)))
     .all()
     .filter(r => r.status === "open" || r.status === "reviewing");
   if (existing.length > 0) { res.status(400).json({ error: "You already have an active proposal" }); return; }
 
   // Check: max 5 open proposals per party
-  const openCount = db.select().from(schema.internalProposals)
+  const openCount = userDb.select().from(schema.internalProposals)
     .where(and(eq(schema.internalProposals.partyId, req.params.id), eq(schema.internalProposals.status, "open")))
     .all().length;
   if (openCount >= 5) { res.status(400).json({ error: "Party already has 5 open proposals" }); return; }
 
+  const db = getDb();
   const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
   const currentDay = metaRow?.day ?? 0;
 
   const id = `iprop-${randomUUID().slice(0, 8)}`;
-  db.insert(schema.internalProposals).values({
+  userDb.insert(schema.internalProposals).values({
     id,
     partyId: req.params.id,
     proposedBy: token,
@@ -1188,20 +1191,20 @@ app.post("/api/parties/:id/proposals", (req, res) => {
     reviewByDay: currentDay + 5,
   }).run();
 
-  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  const row = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
+  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const row = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
   res.status(201).json(mapProposal(row));
 });
 
 // GET /api/proposals/:id
 app.get("/api/proposals/:id", (req, res) => {
-  const db = getDb();
+  const userDb = getUserDb();
   const token = getUserToken(req);
-  const rows = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all();
+  const rows = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all();
   if (rows.length === 0) { res.status(404).json({ error: "Proposal not found" }); return; }
   let userVote: 1 | -1 | null = null;
   if (token) {
-    const vr = db.select().from(schema.internalVotes)
+    const vr = userDb.select().from(schema.internalVotes)
       .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
       .all();
     if (vr.length > 0) userVote = vr[0].vote as 1 | -1;
@@ -1213,17 +1216,17 @@ app.get("/api/proposals/:id", (req, res) => {
 app.post("/api/proposals/:id/vote", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const db = getDb();
-  const users = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
-  const proposal = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  const proposal = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   if (!proposal) { res.status(404).json({ error: "Proposal not found" }); return; }
   if (proposal.status !== "open") { res.status(400).json({ error: "Proposal is not open for voting" }); return; }
 
   const { vote } = req.body as { vote?: number };
   if (vote !== 1 && vote !== -1) { res.status(400).json({ error: "vote must be 1 or -1" }); return; }
 
-  const existing = db.select().from(schema.internalVotes)
+  const existing = userDb.select().from(schema.internalVotes)
     .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
     .all();
 
@@ -1231,21 +1234,21 @@ app.post("/api/proposals/:id/vote", (req, res) => {
     const oldVote = existing[0].vote;
     if (oldVote === vote) { res.json(mapProposal(proposal, vote as 1 | -1)); return; } // no change
     // Update existing vote: adjust score by (new - old)
-    db.update(schema.internalVotes).set({ vote, createdAt: Date.now() }).where(eq(schema.internalVotes.id, existing[0].id)).run();
-    db.update(schema.internalProposals).set({
+    userDb.update(schema.internalVotes).set({ vote, createdAt: Date.now() }).where(eq(schema.internalVotes.id, existing[0].id)).run();
+    userDb.update(schema.internalProposals).set({
       voteScore: proposal.voteScore - oldVote + vote,
     }).where(eq(schema.internalProposals.id, req.params.id)).run();
   } else {
     const voteId = `ivote-${randomUUID().slice(0, 8)}`;
-    db.insert(schema.internalVotes).values({ id: voteId, proposalId: req.params.id, userId: token, vote, createdAt: Date.now() }).run();
-    db.update(schema.internalProposals).set({
+    userDb.insert(schema.internalVotes).values({ id: voteId, proposalId: req.params.id, userId: token, vote, createdAt: Date.now() }).run();
+    userDb.update(schema.internalProposals).set({
       voteScore: proposal.voteScore + vote,
       totalVotes: proposal.totalVotes + 1,
     }).where(eq(schema.internalProposals.id, req.params.id)).run();
   }
 
-  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  const updated = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  const updated = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   res.json(mapProposal(updated, vote as 1 | -1));
 });
 
@@ -1253,23 +1256,23 @@ app.post("/api/proposals/:id/vote", (req, res) => {
 app.delete("/api/proposals/:id/vote", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const db = getDb();
-  const proposal = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  const userDb = getUserDb();
+  const proposal = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   if (!proposal) { res.status(404).json({ error: "Proposal not found" }); return; }
 
-  const existing = db.select().from(schema.internalVotes)
+  const existing = userDb.select().from(schema.internalVotes)
     .where(and(eq(schema.internalVotes.proposalId, req.params.id), eq(schema.internalVotes.userId, token)))
     .all();
   if (existing.length === 0) { res.json(mapProposal(proposal, null)); return; }
 
   const oldVote = existing[0].vote;
-  db.delete(schema.internalVotes).where(eq(schema.internalVotes.id, existing[0].id)).run();
-  db.update(schema.internalProposals).set({
+  userDb.delete(schema.internalVotes).where(eq(schema.internalVotes.id, existing[0].id)).run();
+  userDb.update(schema.internalProposals).set({
     voteScore: proposal.voteScore - oldVote,
     totalVotes: Math.max(0, proposal.totalVotes - 1),
   }).where(eq(schema.internalProposals.id, req.params.id)).run();
 
-  const updated = db.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
+  const updated = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   res.json(mapProposal(updated, null));
 });
 
@@ -1287,11 +1290,11 @@ app.post("/api/users/login", (req, res) => {
     res.status(400).json({ error: "displayName must be at least 2 characters" });
     return;
   }
-  const db = getDb();
-  const rows = db.select().from(schema.users).where(eq(schema.users.displayName, displayName.trim())).all();
+  const userDb = getUserDb();
+  const rows = userDb.select().from(schema.users).where(eq(schema.users.displayName, displayName.trim())).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
-  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
+  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
   res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
 });
 
@@ -1302,15 +1305,16 @@ app.post("/api/users/register", (req, res) => {
     res.status(400).json({ error: "displayName must be 2–30 characters" });
     return;
   }
-  const db = getDb();
   if (partyId) {
+    const db = getDb();
     const party = db.select().from(schema.parties).where(eq(schema.parties.id, partyId)).all();
     if (party.length === 0) { res.status(400).json({ error: "Party not found" }); return; }
   }
+  const userDb = getUserDb();
   const id: string = randomUUID();
   const now = Date.now();
   try {
-    db.insert(schema.users).values({
+    userDb.insert(schema.users).values({
       id,
       displayName: displayName.trim(),
       partyId: partyId ?? null,
@@ -1332,8 +1336,8 @@ app.post("/api/users/register", (req, res) => {
 app.get("/api/users/me", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
-  const db = getDb();
-  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
   res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
@@ -1343,11 +1347,12 @@ app.get("/api/users/me", (req, res) => {
 app.post("/api/users/me/join/:partyId", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
-  const db = getDb();
-  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const user = rows[0];
 
+  const db = getDb();
   const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
   const currentDay = metaRow?.day ?? 0;
 
@@ -1359,11 +1364,11 @@ app.post("/api/users/me/join/:partyId", (req, res) => {
   if (party.length === 0) { res.status(404).json({ error: "Party not found" }); return; }
 
   const cooldown = user.partyId != null ? currentDay + 7 : null;
-  db.update(schema.users)
+  userDb.update(schema.users)
     .set({ partyId: req.params.partyId, lastActive: Date.now(), switchCooldownUntil: cooldown })
     .where(eq(schema.users.id, token))
     .run();
-  const updated = db.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
@@ -1371,16 +1376,17 @@ app.post("/api/users/me/join/:partyId", (req, res) => {
 app.post("/api/users/me/leave", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
-  const db = getDb();
-  const rows = db.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  const userDb = getUserDb();
+  const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const db = getDb();
   const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
   const currentDay = metaRow?.day ?? 0;
-  db.update(schema.users)
+  userDb.update(schema.users)
     .set({ partyId: null, lastActive: Date.now(), switchCooldownUntil: currentDay + 7 })
     .where(eq(schema.users.id, token))
     .run();
-  const updated = db.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 

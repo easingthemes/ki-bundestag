@@ -1,5 +1,5 @@
 import type { Crisis, Party, Poll } from "@ki-bundestag/types";
-import { getClient, MODELS, MAX_TOKENS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 
@@ -32,8 +32,6 @@ async function createContextPoll(
   recentBillTitles: string[],
   currentDay: number,
 ): Promise<Poll | null> {
-  const client = getClient();
-
   const context = [];
   if (activeCrises.length > 0) {
     context.push(`Active crises: ${activeCrises.map(c => `${c.name} (${c.severity})`).join(", ")}`);
@@ -45,9 +43,7 @@ async function createContextPoll(
   if (context.length === 0) return null;
 
   try {
-    const response = await client.messages.create({
-      model: MODELS.daily,
-      max_tokens: 512,
+    const text = await callAI({
       system: `You create opinion poll questions for a German political simulation. Respond with ONLY valid JSON.
 
 RESPONSE SCHEMA:
@@ -61,16 +57,10 @@ Rules:
 - Question should be relevant to the current political context
 - Provide 3 clear, distinct options
 - Keep it concise and politically neutral`,
-      messages: [{
-        role: "user",
-        content: `Current political context:\n${context.join("\n")}\n\nGenerate an opinion poll question.`,
-      }],
+      prompt: `Current political context:\n${context.join("\n")}\n\nGenerate an opinion poll question.`,
+      maxTokens: 512,
+      roleKey: "daily",
     });
-
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
 
     let jsonStr = text.trim();
     const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);

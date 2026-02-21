@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { eq, and, lte, gte } from "drizzle-orm";
-import { getClient, MODELS } from "../agent/client.js";
-import { getDb, schema } from "../db/index.js";
+import { callAI } from "../agent/client.js";
+import { getDb, getUserDb, schema } from "../db/index.js";
 
 /**
  * Review internal party proposals each sim day.
@@ -14,9 +14,10 @@ import { getDb, schema } from "../db/index.js";
  */
 export async function reviewInternalProposals(currentDay: number): Promise<void> {
   const db = getDb();
+  const userDb = getUserDb();
 
   // First: expire proposals past their review day with < 3 votes
-  const overdueOpen = db.select().from(schema.internalProposals)
+  const overdueOpen = userDb.select().from(schema.internalProposals)
     .where(and(
       eq(schema.internalProposals.status, "open"),
       lte(schema.internalProposals.reviewByDay, currentDay),
@@ -25,7 +26,7 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
     .filter(p => p.totalVotes < 3);
 
   for (const p of overdueOpen) {
-    db.update(schema.internalProposals)
+    userDb.update(schema.internalProposals)
       .set({ status: "expired", reviewedOnDay: currentDay })
       .where(eq(schema.internalProposals.id, p.id))
       .run();
@@ -33,10 +34,9 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
 
   // Find all parties that have a ready proposal
   const allParties = db.select().from(schema.parties).all();
-  const client = getClient();
 
   for (const party of allParties) {
-    const readyProposals = db.select().from(schema.internalProposals)
+    const readyProposals = userDb.select().from(schema.internalProposals)
       .where(and(
         eq(schema.internalProposals.partyId, party.id as string),
         eq(schema.internalProposals.status, "open"),
@@ -51,17 +51,12 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
     const top = readyProposals[0];
 
     try {
-      const response = await client.messages.create({
-        model: MODELS.daily,
-        max_tokens: 256,
+      const raw = await callAI({
         system: `You are the party leadership of ${party.name} (ideology: ${party.ideology}). A party member has submitted a bill proposal for your consideration. Decide whether to officially sponsor it. Respond with ONLY valid JSON: {"decision": "accept" | "decline", "reason": "<1 sentence>"}`,
-        messages: [{
-          role: "user",
-          content: `Member proposal: "${top.title}" (${top.category})\n${top.description}\n\nVote score: ${top.voteScore >= 0 ? "+" : ""}${top.voteScore} (${top.totalVotes} votes)\n\nShould ${party.name} sponsor this bill in the Bundestag?`,
-        }],
+        prompt: `Member proposal: "${top.title}" (${top.category})\n${top.description}\n\nVote score: ${top.voteScore >= 0 ? "+" : ""}${top.voteScore} (${top.totalVotes} votes)\n\nShould ${party.name} sponsor this bill in the Bundestag?`,
+        maxTokens: 256,
+        partyId: party.id as string,
       });
-
-      const raw = response.content[0].type === "text" ? response.content[0].text : "";
       let decision: "accept" | "decline" = "decline";
       let reason = "Does not align with current party priorities.";
       try {
@@ -89,7 +84,7 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
           proposerDisplayName: top.proposerName,
         }).run();
 
-        db.update(schema.internalProposals).set({
+        userDb.update(schema.internalProposals).set({
           status: "accepted",
           reviewedOnDay: currentDay,
           bundestag_bill_id: billId,
@@ -105,7 +100,7 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
           actor: party.id as string,
         }).run();
       } else {
-        db.update(schema.internalProposals).set({
+        userDb.update(schema.internalProposals).set({
           status: "declined",
           reviewedOnDay: currentDay,
           declineReason: reason,

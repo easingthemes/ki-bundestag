@@ -1,32 +1,25 @@
 import type { AgentAction, AgentContext, Bill } from "@ki-bundestag/types";
-import { getClient, MODELS, MAX_TOKENS, type ModelKey } from "./client.js";
+import { callAI } from "./client.js";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 
 export async function runPartyAgent(
   ctx: AgentContext,
   votableBills: Bill[],
-  modelKey: ModelKey = "daily",
   secondReadingBills?: Bill[],
 ): Promise<AgentAction[]> {
-  const client = getClient();
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(ctx);
 
-  console.log(`  [Agent] Calling Claude for ${ctx.party.name}...`);
+  console.log(`  [Agent] Calling AI for ${ctx.party.name}...`);
 
   try {
-    const response = await client.messages.create({
-      model: MODELS[modelKey],
-      max_tokens: MAX_TOKENS[modelKey],
+    const text = await callAI({
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      prompt: userPrompt,
+      maxTokens: 2048,
+      partyId: ctx.party.id,
     });
-
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
 
     console.log(`  [Agent] ${ctx.party.name} responded (${text.length} chars)`);
 

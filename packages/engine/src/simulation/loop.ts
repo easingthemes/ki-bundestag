@@ -16,7 +16,7 @@ import type {
   Party,
   SimulationEvent,
 } from "@ki-bundestag/types";
-import { getDb, schema, migrateDatabase } from "../db/index.js";
+import { getDb, getUserDb, schema, migrateDatabase } from "../db/index.js";
 import { runPartyAgent } from "../agent/index.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes, tallyAmendmentVotes, applyAmendmentToBill } from "./voting.js";
@@ -818,7 +818,7 @@ export async function runDay(): Promise<number> {
     // Load top internal proposals per party (for agent context)
     const internalProposalsByParty = new Map<string, Array<{ title: string; category: string; score: number; totalVotes: number }>>();
     try {
-      const openProps = db.select().from(schema.internalProposals)
+      const openProps = getUserDb().select().from(schema.internalProposals)
         .where(eq(schema.internalProposals.status, "open"))
         .all();
       for (const p of allParties) {
@@ -836,7 +836,7 @@ export async function runDay(): Promise<number> {
     if (thirdReadingBills.length > 0) {
       try {
         const billIds = thirdReadingBills.map(b => b.id);
-        const sigs = db.select().from(schema.memberSignals)
+        const sigs = getUserDb().select().from(schema.memberSignals)
           .where(inArray(schema.memberSignals.billId, billIds))
           .all();
         for (const s of sigs) {
@@ -872,7 +872,7 @@ export async function runDay(): Promise<number> {
         memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
       };
 
-      const actions = await runPartyAgent(ctx, thirdReadingBills, "daily", secondReadingBills);
+      const actions = await runPartyAgent(ctx, thirdReadingBills, secondReadingBills);
       partyActions.set(party.id, actions);
     }
 
@@ -1550,7 +1550,7 @@ export async function runDay(): Promise<number> {
     party.approvalRating = applyApprovalDrift(party);
     // Membership bonus: tiny daily reward for engaged party members
     try {
-      const activeCount = db.select({ cnt: count() }).from(schema.users)
+      const activeCount = getUserDb().select({ cnt: count() }).from(schema.users)
         .where(and(
           eq(schema.users.partyId, party.id),
           gte(schema.users.lastActive, Date.now() - TWO_WEEKS_MS),
