@@ -289,6 +289,9 @@ export interface CitizenQuestion {
   respondedOnDay: number | null;
   createdOnDay: number;
   status: "pending" | "answered";
+  voteScore: number;
+  totalVotes: number;
+  userVote?: 1 | -1 | null;
 }
 
 export interface Referendum {
@@ -493,6 +496,10 @@ export const api = {
   getQuestion: (id: string) => fetchJson<CitizenQuestion>(`/questions/${id}`),
   submitQuestion: (question: string, targetPartyId: string) =>
     postJson<CitizenQuestion>("/questions", { question, targetPartyId }),
+  voteOnQuestion: (id: string, vote: 1 | -1) =>
+    postJson<CitizenQuestion>(`/questions/${id}/vote`, { vote }),
+  retractQuestionVote: (id: string) =>
+    deleteJson<CitizenQuestion>(`/questions/${id}/vote`),
   getReferendums: (status?: string) =>
     fetchJson<Referendum[]>(`/referendums${status ? `?status=${status}` : ""}`),
   getReferendum: (id: string) => fetchJson<Referendum>(`/referendums/${id}`),

@@ -417,6 +417,9 @@ export interface CitizenQuestion {
   respondedOnDay: number | null;
   createdOnDay: number;
   status: "pending" | "answered";
+  voteScore: number;
+  totalVotes: number;
+  userVote?: 1 | -1 | null;
 }
 
 export interface Referendum {

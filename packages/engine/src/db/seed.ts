@@ -369,6 +369,14 @@ const USER_TABLE_DDL = `
     signal TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS question_votes (
+    id TEXT PRIMARY KEY,
+    question_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    vote INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
 `;
 
 /**
@@ -508,6 +516,7 @@ export function seedDatabase() {
   // User DB: fresh start
   const userSqlite = getUserSqlite();
   userSqlite.exec(`
+    DROP TABLE IF EXISTS question_votes;
     DROP TABLE IF EXISTS member_signals;
     DROP TABLE IF EXISTS internal_votes;
     DROP TABLE IF EXISTS internal_proposals;
