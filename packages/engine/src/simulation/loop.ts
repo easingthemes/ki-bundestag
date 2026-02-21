@@ -23,8 +23,9 @@ import { tallyVotes, tallyAmendmentVotes, applyAmendmentToBill } from "./voting.
 import { assignCommittee, generateRecommendation } from "./committees.js";
 import { applyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, membershipBonus } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
-import { isWeeklyDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
+import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
+import { TIME_CONFIG } from "./timing.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 import { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
 import { generateDailyMedia, getRecentMedia, mediaSentimentImpact } from "./media.js";
@@ -163,7 +164,7 @@ export async function runDay(): Promise<number> {
     console.log(`  [Injection] Economic shock applied`);
   }
 
-  let nextElectionDay = meta.nextElectionDay ?? 120;
+  let nextElectionDay = meta.nextElectionDay ?? TIME_CONFIG.TERM_DAYS;
   const budgetRetryDay: number | null = (meta as any).budgetRetryDay ?? null;
 
   // 3a2. Handle election invalidation
@@ -456,7 +457,7 @@ export async function runDay(): Promise<number> {
       lowSentimentStreak = 0;
       db.update(schema.simulationMeta)
         .set({
-          nextElectionDay: currentDay + 120,
+          nextElectionDay: currentDay + TIME_CONFIG.TERM_DAYS,
           lowSentimentStreak: 0,
         })
         .where(eq(schema.simulationMeta.id, meta.id))
@@ -1571,7 +1572,7 @@ export async function runDay(): Promise<number> {
   resolveExpiredReferendums(currentDay, dayEvents);
 
   // 11c. Weekly opinion recalculation
-  if (isWeeklyDay(currentDay)) {
+  if (isPollDay(currentDay)) {
     weeklyOpinionRecalc(allParties, allBills, nationalState.publicSentiment, currentDay);
 
     // Generate weekly polls
@@ -1593,7 +1594,7 @@ export async function runDay(): Promise<number> {
 
   // 11c2. Maybe generate referendum (every 30 days)
   const recentBillsForRef = allBills
-    .filter(b => b.proposedOnDay >= currentDay - 30)
+    .filter(b => b.proposedOnDay >= currentDay - TIME_CONFIG.ECONOMY_INTERVAL)
     .map(b => b.title);
   await maybeGenerateReferendum(currentDay, allParties, activeCrises, recentBillsForRef);
 
@@ -1612,9 +1613,9 @@ export async function runDay(): Promise<number> {
     console.log(`  [Cycle] Monthly report — Day ${currentDay}`);
   }
 
-  // 11d. Budget cycle (every 60 days, or user-injected)
+  // 11d. Budget cycle (annual, or user-injected)
   if (isBudgetDay(currentDay) || injections.triggerBudget) {
-    const cycleNumber = Math.floor(currentDay / 60);
+    const cycleNumber = Math.floor(currentDay / TIME_CONFIG.BUDGET_INTERVAL);
     const coalitionParties = allParties.filter(p => nationalState.coalitionParties.includes(p.id));
     const allocations = generateBudgetAllocations(coalitionParties);
     const { votes: budgetVotes, yesSeats, noSeats, passed: budgetPassed } =
@@ -1695,7 +1696,7 @@ export async function runDay(): Promise<number> {
 
     const lastBudget = db.select().from(schema.budgets)
       .orderBy(desc(schema.budgets.proposedOnDay)).limit(1).all()[0];
-    const cycleNumber = lastBudget?.cycleNumber ?? Math.floor(currentDay / 60);
+    const cycleNumber = lastBudget?.cycleNumber ?? Math.floor(currentDay / TIME_CONFIG.BUDGET_INTERVAL);
 
     let economicEffect: Record<string, number> | null = null;
     if (budgetPassed) {

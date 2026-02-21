@@ -3,7 +3,7 @@ export { applyEconomicDrift, applyBillImpact } from "./economy.js";
 export { tallyVotes } from "./voting.js";
 export { updateApproval, updateSentiment, applyApprovalDrift, applySentimentDrift } from "./opinion.js";
 export { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises, getCrisisTemplates, triggerCrisisFromTemplate } from "./crises.js";
-export { isWeeklyDay, isMonthlyDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
+export { isPollDay, isWeeklyDay, isMonthlyDay, isBudgetDay, isSessionDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 export { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
 export { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 export { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
@@ -13,3 +13,7 @@ export { maybeGenerateReferendum, resolveExpiredReferendums } from "./referendum
 export { processInjections } from "./injections.js";
 export { getActiveGovernment, MINISTER_CANDIDATES, MINISTRY_NAMES, formCabinet, dissolveGovernment } from "./government.js";
 export { answerPendingInterpellations, interpellationSentimentImpact } from "./interpellations.js";
+export { TIME_CONFIG, getPresetConfig, isParticipatoryPreset, isFeatureEnabled, isNightTime, getDelayMs, shouldPauseForNight, classifyEvent, shouldQueueEvent } from "./timing.js";
+export type { TimingPreset, NightMode, PresetConfig } from "./timing.js";
+export { queueEvent, getQueuedEvents, drainQueue, createNotification, createNotificationForAll, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, generateMorningSummary } from "./event-queue.js";
+export type { QueuedEvent, Notification } from "./event-queue.js";

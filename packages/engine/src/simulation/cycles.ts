@@ -1,19 +1,27 @@
 import type { Bill, EconomyState, Party } from "@ki-bundestag/types";
+import { TIME_CONFIG } from "./timing.js";
 
-export function isWeeklyDay(day: number): boolean {
-  return day > 0 && day % 7 === 0;
+export function isPollDay(day: number): boolean {
+  return day > 0 && day % TIME_CONFIG.POLL_INTERVAL === 0;
 }
 
+/** @deprecated Use isPollDay instead */
+export const isWeeklyDay = isPollDay;
+
 export function isMonthlyDay(day: number): boolean {
-  return day > 0 && day % 30 === 0;
+  return day > 0 && day % TIME_CONFIG.ECONOMY_INTERVAL === 0;
 }
 
 export function isBudgetDay(day: number): boolean {
-  return day > 0 && day % 60 === 0;
+  return day > 0 && day % TIME_CONFIG.BUDGET_INTERVAL === 0;
+}
+
+export function isSessionDay(day: number): boolean {
+  return day > 0 && day % TIME_CONFIG.SESSION_INTERVAL === 0;
 }
 
 /**
- * Weekly opinion recalculation:
+ * Poll-day opinion recalculation:
  * - Proposers of recently passed bills get +1.0 approval
  * - Opposition bonus if sentiment < 40
  * - Coalition penalty if sentiment < 30
@@ -24,9 +32,9 @@ export function weeklyOpinionRecalc(
   publicSentiment: number,
   currentDay: number,
 ): void {
-  // Bills passed in the last 7 days
+  // Bills passed since last poll day
   const recentPassed = bills.filter(
-    b => b.status === "passed" && b.proposedOnDay >= currentDay - 7,
+    b => b.status === "passed" && b.proposedOnDay >= currentDay - TIME_CONFIG.POLL_INTERVAL,
   );
 
   // Proposers of recently passed bills get approval boost

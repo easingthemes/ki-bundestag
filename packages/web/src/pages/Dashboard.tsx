@@ -123,6 +123,13 @@ export function Dashboard() {
         </Card>
       )}
 
+      {/* Watch-only mode banner */}
+      {simStatus.timingPreset && (simStatus.timingPreset === "ultra-fast" || simStatus.timingPreset === "fast") && (
+        <div className={cn(ALERT_STYLES.info, "font-medium mb-4")}>
+          <strong>Watch-Only Mode</strong> — Simulation running in {simStatus.timingPreset === "ultra-fast" ? "Ultra-Fast" : "Fast"} mode. Switch to Normal or Slow to interact.
+        </div>
+      )}
+
       {/* Provisional budget banner */}
       {state.provisionalBudget && (
         <div className={cn(ALERT_STYLES.warning, "font-medium mb-4")}>

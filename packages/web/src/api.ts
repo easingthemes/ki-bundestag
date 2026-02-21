@@ -240,6 +240,27 @@ export interface Election {
   coalitionAgreement: CoalitionAgreement | null;
 }
 
+export type TimingPreset = "ultra-fast" | "fast" | "normal" | "slow";
+
+export interface PresetInfo {
+  preset: TimingPreset;
+  participatory: boolean;
+  features: Record<string, boolean>;
+  label: string;
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  data: unknown;
+  read: boolean;
+  createdAt: string;
+  dayNumber: number;
+}
+
 export interface SimulationStatus {
   currentDay: number;
   lastRunAt: string | null;
@@ -248,6 +269,7 @@ export interface SimulationStatus {
   budgetRetryDay: number | null;
   provisionalBudget: boolean;
   dailySummary: string | null;
+  timingPreset: TimingPreset;
 }
 
 export interface DaySummary {
@@ -582,4 +604,20 @@ export const api = {
   getMe: () => fetchJson<User>("/users/me"),
   joinParty: (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {}),
   leaveParty: () => postJson<User>("/users/me/leave", {}),
+
+  // Timing preset
+  getPreset: () => fetchJson<PresetInfo>("/simulation/preset"),
+  setPreset: (preset: TimingPreset) => postJson<{ success: boolean; preset: TimingPreset }>("/simulation/preset", { preset }),
+
+  // Notifications
+  getNotifications: (unreadOnly = false, limit?: number) => {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.set("unread", "true");
+    if (limit) params.set("limit", String(limit));
+    const qs = params.toString();
+    return fetchJson<AppNotification[]>(`/notifications${qs ? `?${qs}` : ""}`);
+  },
+  getUnreadCount: () => fetchJson<{ count: number }>("/notifications/unread-count"),
+  markNotificationRead: (id: string) => postJson<{ success: boolean }>(`/notifications/${id}/read`, {}),
+  markAllNotificationsRead: () => postJson<{ marked: number }>("/notifications/read-all", {}),
 };

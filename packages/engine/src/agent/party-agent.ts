@@ -1,5 +1,5 @@
 import type { AgentAction, AgentContext, Bill } from "@ki-bundestag/types";
-import { callAI } from "./client.js";
+import { callAI, AIProviderLimitError } from "./client.js";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 
@@ -38,7 +38,11 @@ export async function runPartyAgent(
     console.log(`  [Agent] ${ctx.party.name}: ${validated.length} valid actions`);
     return validated;
   } catch (error) {
-    console.error(`  [Agent] Error for ${ctx.party.name}:`, error);
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Agent] ${ctx.party.name}: skipped (${error.message})`);
+    } else {
+      console.error(`  [Agent] Error for ${ctx.party.name}:`, error);
+    }
 
     // Fallback: abstain on all votable bills (third reading)
     const fallbackActions: AgentAction[] = votableBills.map(bill => ({

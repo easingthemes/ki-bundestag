@@ -18,7 +18,8 @@
     "simulate:6": "npm run simulate 6",
     "simulate:auto": "tsx packages/engine/src/runner-auto.ts",
     "trigger:election": "tsx packages/engine/src/trigger-election.ts",
-    "simulate:visitors": "tsx scripts/simulate-visitors.ts"
+    "simulate:visitors": "tsx scripts/simulate-visitors.ts",
+    "migrate:timing": "tsx scripts/migrate-timing.ts"
   },
   "devDependencies": {
     "playwright": "^1.58.2",

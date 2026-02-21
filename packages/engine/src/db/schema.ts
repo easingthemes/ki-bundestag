@@ -88,10 +88,11 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   currentDay: integer("current_day").notNull().default(0),
   lastRunAt: text("last_run_at"),
   dayStartedAt: text("day_started_at"),
-  nextElectionDay: integer("next_election_day").notNull().default(120),
+  nextElectionDay: integer("next_election_day").notNull().default(1461),
   lowSentimentStreak: integer("low_sentiment_streak").notNull().default(0),
   budgetRetryDay: integer("budget_retry_day"),
   dailySummary: text("daily_summary"),
+  timingPreset: text("timing_preset").notNull().default("normal"),
 });
 
 export const partyHistory = sqliteTable("party_history", {
@@ -298,4 +299,26 @@ export const polls = sqliteTable("polls", {
   expiresOnDay: integer("expires_on_day"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   category: text("category").notNull().default("general"),
+});
+
+export const eventQueue = sqliteTable("event_queue", {
+  id: text("id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  eventData: text("event_data", { mode: "json" }),
+  scheduledForDay: integer("scheduled_for_day").notNull(),
+  queuedAt: text("queued_at").notNull(),
+  processedAt: text("processed_at"),
+  status: text("status").notNull().default("queued"),  // "queued" | "processed" | "cancelled"
+});
+
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  type: text("type").notNull(),       // "queued_event" | "event_ready" | "participation_window" | "summary"
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  data: text("data", { mode: "json" }),
+  read: integer("read", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+  dayNumber: integer("day_number").notNull(),
 });

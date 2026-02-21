@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { api, CrisisTemplate } from "../api";
+import { Link } from "react-router-dom";
+import { api, CrisisTemplate, type TimingPreset, type SimulationStatus } from "../api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MODEL_TYPE_BADGE } from "@/lib/colors";
+import { MODEL_TYPE_BADGE, PRESET_BADGE } from "@/lib/colors";
 
 // ─── Action reference data ────────────────────────────────────────────────────
 
@@ -382,19 +383,32 @@ const MODEL_CONFIG = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+const PRESET_OPTIONS: { value: TimingPreset; label: string; desc: string; participatory: boolean }[] = [
+  { value: "ultra-fast", label: "Ultra-Fast", desc: "No delay between days", participatory: false },
+  { value: "fast", label: "Fast", desc: "7 min between days", participatory: false },
+  { value: "normal", label: "Normal", desc: "30 min day / 15 min night", participatory: true },
+  { value: "slow", label: "Slow", desc: "1.5 h between days, night pause", participatory: true },
+];
+
 export function Admin() {
   const [crisisTemplates, setCrisisTemplates] = useState<CrisisTemplate[]>([]);
   const [injectMsg, setInjectMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState("all");
-
   const [selectedCrisis, setSelectedCrisis] = useState("");
+  const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<TimingPreset>("normal");
+  const [presetSaving, setPresetSaving] = useState(false);
 
   useEffect(() => {
     api.getCrisisTemplates().then(ts => {
       setCrisisTemplates(ts);
       if (ts.length > 0) setSelectedCrisis(ts[0].id);
+    }).catch(console.error);
+    api.getSimulationStatus().then(s => {
+      setSimStatus(s);
+      setSelectedPreset(s.timingPreset ?? "normal");
     }).catch(console.error);
   }, []);
 
@@ -429,7 +443,80 @@ export function Admin() {
 
   return (
     <div>
-      <h1>Admin</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="mb-0">Admin</h1>
+        <Link to="/admin/costs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI Model Costs &rarr;</Link>
+      </div>
+
+      {/* ── Simulation Speed ─────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2>Simulation Speed</h2>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground mb-4">
+              Controls how fast simulation days progress. Ultra-Fast and Fast are watch-only (no user participation).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {PRESET_OPTIONS.map(opt => (
+                <label
+                  key={opt.value}
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors",
+                    selectedPreset === opt.value ? "border-foreground bg-muted/50" : "border-border hover:bg-muted/30",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="preset"
+                    value={opt.value}
+                    checked={selectedPreset === opt.value}
+                    onChange={() => setSelectedPreset(opt.value)}
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{opt.label}</span>
+                      <Badge variant="outline" className={PRESET_BADGE[opt.value]}>
+                        {opt.participatory ? "Interactive" : "Watch-only"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{opt.desc}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  presetSaving
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : selectedPreset === simStatus?.timingPreset
+                      ? "bg-muted text-muted-foreground cursor-default"
+                      : "bg-foreground text-background hover:bg-foreground/90",
+                )}
+                disabled={presetSaving || selectedPreset === simStatus?.timingPreset}
+                onClick={async () => {
+                  setPresetSaving(true);
+                  try {
+                    await api.setPreset(selectedPreset);
+                    notify("Preset updated to " + selectedPreset, true);
+                    setSimStatus(s => s ? { ...s, timingPreset: selectedPreset } : s);
+                  } catch { notify("Failed to update preset", false); }
+                  setPresetSaving(false);
+                }}
+              >
+                {presetSaving ? "Saving..." : "Apply"}
+              </button>
+              {simStatus?.timingPreset && selectedPreset !== simStatus.timingPreset && (
+                <span className="text-xs text-muted-foreground">
+                  Current: {PRESET_OPTIONS.find(o => o.value === simStatus.timingPreset)?.label ?? simStatus.timingPreset}
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── Inject Events ──────────────────────────────────────────── */}
       <div className="mb-8">
@@ -553,7 +640,7 @@ export function Admin() {
                     <Badge className={MODEL_TYPE_BADGE.Algorithmic}>Algorithmic</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Cancels an active election in progress (announced/campaign phase). Resets nextElectionDay to +120.
+                    Cancels an active election in progress (announced/campaign phase). Resets to next scheduled term (4 years out).
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

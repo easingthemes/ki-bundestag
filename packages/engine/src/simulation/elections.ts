@@ -5,6 +5,7 @@ import type {
   PolicyPriorities,
   SimulationEvent,
 } from "@ki-bundestag/types";
+import { TIME_CONFIG } from "./timing.js";
 
 const TOTAL_SEATS = 735;
 const MAJORITY_SEATS = 368; // > 50%
@@ -38,8 +39,8 @@ export function announceElection(currentDay: number, reason: string): Election {
     id: crypto.randomUUID(),
     triggerReason: reason,
     announcedOnDay: currentDay,
-    campaignStartDay: currentDay + 2,
-    electionDay: currentDay + 5,
+    campaignStartDay: currentDay + TIME_CONFIG.ELECTION_CAMPAIGN_START,
+    electionDay: currentDay + TIME_CONFIG.ELECTION_CAMPAIGN_DAYS,
     status: "announced",
     results: null,
     newCoalition: null,

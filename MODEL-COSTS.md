@@ -1,5 +1,18 @@
 # AI Model Usage & Cost Analysis
 
+## Time Scale
+
+1 sim day ~ 1 week of real parliament. Key cycles:
+
+| Cycle | Sim Days | Real-World Equivalent |
+|-------|----------|----------------------|
+| Weekly | 7 days | ~1 month (polls, approval recalculations) |
+| Monthly | 30 days | ~1 quarter (economic reports, referendums) |
+| Budget | 60 days | ~half a year |
+| **Wahlperiode** | **120 days** | **~1 legislative term (election + full government cycle)** |
+
+Wall clock: ~40–60s per sim day (30s interval + AI latency). A full Wahlperiode takes ~1.5–2 hours.
+
 ## Current Models
 
 | Model | Provider | Price (Input) | Price (Output) | Used For |
@@ -12,14 +25,14 @@
 
 ### Simulation-Driven (Always Happen)
 
-| Action | Model | Max Tokens (Out) | Est. Input Tokens | Calls/Day | Depends on Visitors? |
-|--------|-------|-----------------|-------------------|-----------|---------------------|
-| Party Agent (SPD, CDU, Gruene, FDP, Linke) | Haiku | 2048 | ~3000 | 5 | No |
-| Party Agent (AfD) | Grok-3-mini | 2048 | ~3000 | 1 | No |
-| Daily Summary | Haiku | 320 | ~800 | 1 | No |
-| Media Articles (2-3 per call) | Haiku | 2048 | ~1500 | 0-1 | No |
-| Context Poll | Haiku | 512 | ~600 | 0-1 (weekly) | No |
-| Referendum | Haiku | 512 | ~600 | 0-1 (every 30 days) | No |
+| Action | Model | Max Tokens (Out) | Est. Input Tokens | Calls/Day | Frequency |
+|--------|-------|-----------------|-------------------|-----------|-----------|
+| Party Agent (SPD, CDU, Gruene, FDP, Linke) | Haiku | 2048 | ~3000 | 5 | Always |
+| Party Agent (AfD) | Grok-3-mini | 2048 | ~3000 | 1 | Always |
+| Daily Summary | Haiku | 320 | ~800 | 1 | Always |
+| Media Articles (2-3 per call) | Haiku | 2048 | ~1500 | 0-1 | Always |
+| Context Poll | Haiku | 512 | ~600 | 0-1 | Weekly (7d) |
+| Referendum | Haiku | 512 | ~600 | 0-1 | Monthly (30d) |
 
 ### User/Visitor-Driven (Only If Activity Exists)
 
@@ -29,7 +42,7 @@
 | Interpellation Answer | Haiku/Grok | 300 | ~400 | 0-2 | Agent files interpellation |
 | Proposal Review | Haiku/Grok | 256 | ~400 | 0-6 | Users submit + vote on proposals (need 3 votes) |
 
-### Election-Only (Rare, ~Every 120 Days)
+### Election-Only (~Every 120 Days / 1 Wahlperiode)
 
 | Action | Model | Max Tokens (Out) | Est. Input Tokens | Calls/Round | Total Calls |
 |--------|-------|-----------------|-------------------|-------------|-------------|
@@ -68,76 +81,47 @@
 
 ## Aggregated Estimates
 
-### Per Sim Day / Sim Month
+### Per Sim Day / Sim Month / Wahlperiode
 
-| Scenario | Calls/Day | Cost/Day | Calls/Month (30d) | Cost/Month |
-|----------|-----------|----------|-------------------|------------|
-| Quiet (no visitors, no election) | 8 | $0.047 | 240 | $1.41 |
-| Active (visitors + questions) | 16 | $0.056 | 480 | $1.68 |
-| Election month (1 election) | ~8+19/30 | $0.051 | 259 | $1.52 |
-| Busy month (visitors + election) | ~17 | $0.060 | 499 | $1.79 |
+| Scenario | Calls/Day | Cost/Day | Cost/Month (30d) | Cost/Wahlperiode (120d + 1 election) |
+|----------|-----------|----------|------------------|--------------------------------------|
+| Quiet (no visitors, no election) | 8 | $0.047 | $1.41 | **$5.75** |
+| Active (visitors + questions) | 16 | $0.056 | $1.68 | **$6.83** |
+| Election month (1 election) | ~9 | $0.051 | $1.52 | **$6.23** |
+| Busy month (visitors + election) | ~17 | $0.060 | $1.79 | **$7.31** |
 
-### Per Real Day / Real Month (simulate:auto, 30s interval = ~2880 sim days/real day)
+### Per Real Day / Real Month (simulate:auto, 30s interval + AI latency)
 
-| Scenario | Sim Days/Real Day | Cost/Real Day | Cost/Real Month |
-|----------|-------------------|---------------|-----------------|
-| Auto-sim (quiet) | 2,880 | $135 | $4,050 |
-| Auto-sim (active) | 2,880 | $161 | $4,838 |
-| Manual (5 days/run, 3 runs/day) | 15 | $0.71 | $21.2 |
-| Manual (10 days/run, 1 run/day) | 10 | $0.47 | $14.1 |
+Auto-sim interval is 30s, but AI calls add 5–30s per sim day. Realistic throughput is **~1,400 sim days/real day**, not the theoretical 2,880.
+
+| Scenario | Sim Days/Real Day | Wall Clock/Day | Cost/Real Day | Cost/Real Month |
+|----------|-------------------|----------------|---------------|-----------------|
+| Auto-sim (quiet, realistic) | ~1,400 | ~60s/day | $66 | $1,974 |
+| Auto-sim (active, realistic) | ~1,400 | ~60s/day | $78 | $2,352 |
+| Auto-sim (theoretical max) | 2,880 | 30s/day | $135 | $4,050 |
+| Manual (5 days/run, 3 runs/day) | 15 | — | $0.71 | $21.2 |
+| Manual (10 days/run, 1 run/day) | 10 | — | $0.47 | $14.1 |
 
 ## Alternative Model Comparison
 
-If all calls used a single model instead of the current mix:
+If all calls used a single model instead of the current mix. Per Real Day uses realistic ~1,400 sim days/real day throughput.
 
-### All Haiku (current default for 5/6 parties)
-
-| Metric | Per Sim Day | Per Sim Month | Per Real Day (auto) |
-|--------|-------------|---------------|---------------------|
-| Calls | 8-16 | 240-480 | 23K-46K |
-| Input cost | $0.016 | $0.49 | $47 |
-| Output cost | $0.031 | $0.92 | $88 |
-| **Total** | **$0.047** | **$1.41** | **$135** |
-
-### All Grok-3-mini (cheapest option)
-
-| Metric | Per Sim Day | Per Sim Month | Per Real Day (auto) |
-|--------|-------------|---------------|---------------------|
-| Calls | 8-16 | 240-480 | 23K-46K |
-| Input cost | $0.006 | $0.18 | $17 |
-| Output cost | $0.004 | $0.12 | $11 |
-| **Total** | **$0.010** | **$0.30** | **$29** |
-| **Savings vs current** | **79%** | **79%** | **79%** |
-
-### All Sonnet (premium option)
-
-| Metric | Per Sim Day | Per Sim Month | Per Real Day (auto) |
-|--------|-------------|---------------|---------------------|
-| Calls | 8-16 | 240-480 | 23K-46K |
-| Input cost | $0.061 | $1.83 | $176 |
-| Output cost | $0.116 | $3.47 | $333 |
-| **Total** | **$0.177** | **$5.30** | **$509** |
-| **Extra vs current** | **+276%** | **+276%** | **+276%** |
-
-### GPT-4o-mini (OpenAI alternative)
-
-| Metric | Price In/Out | Per Sim Day | Per Sim Month | Per Real Day (auto) |
-|--------|-------------|-------------|---------------|---------------------|
-| Cost | $0.15 / $0.60 per 1M | $0.008 | $0.23 | $22 |
-| **Savings vs current** | | **83%** | **83%** | **83%** |
-
-### Gemini 2.0 Flash (Google alternative)
-
-| Metric | Price In/Out | Per Sim Day | Per Sim Month | Per Real Day (auto) |
-|--------|-------------|-------------|---------------|---------------------|
-| Cost | $0.10 / $0.40 per 1M | $0.005 | $0.16 | $15 |
-| **Savings vs current** | | **89%** | **89%** | **89%** |
+| Model | Price (In / Out) | Per Sim Day | Per Wahlperiode (120d) | Per Real Day (auto) | vs Current |
+|-------|-----------------|-------------|------------------------|---------------------|------------|
+| **All Haiku** (current default) | $0.80 / $4.00 | $0.047 | **$5.75** | $66 | baseline |
+| All Grok-3-mini (cheapest) | $0.30 / $0.50 | $0.010 | **$1.22** | $14 | **-79%** |
+| All Sonnet (premium) | $3.00 / $15.00 | $0.177 | **$21.42** | $248 | **+276%** |
+| GPT-4o-mini (OpenAI) | $0.15 / $0.60 | $0.008 | **$0.97** | $11 | **-83%** |
+| Gemini 2.0 Flash (Google) | $0.10 / $0.40 | $0.005 | **$0.61** | $7 | **-89%** |
 
 ## Notes
 
+- **Wahlperiode** = 120 sim days = 1 full legislative period. This is the natural unit for total simulation cost.
+- **Wall-clock time per sim day**: 30s interval + 5–30s AI latency = ~40–60s typical. Election negotiation days can take 60–90s.
+- **Realistic auto-sim throughput**: ~1,400 sim days/real day (not 2,880). The 30s interval is the minimum, but AI call latency adds overhead on every tick.
 - **Output tokens are estimates** — actual usage is typically 30-60% of maxTokens
 - **Input token estimates** based on typical prompt sizes observed in code (system + user prompt)
-- **Election frequency**: Default every 120 sim days; snap elections possible from confidence votes or budget failures
+- **Sim day cycles**: polls every 7d, economic reports every 30d, budgets every 60d, elections every 120d (1 Wahlperiode). Snap elections possible from confidence votes or budget failures.
 - **Visitor simulation** (`npm run simulate:visitors`) does NOT trigger additional AI calls — it only performs UI actions (voting, submitting questions, etc.) which the *next* simulation run processes
 - **AfD/Grok savings**: Using grok-3-mini for 1/6 of party calls saves ~$0.005/day (~10% of party agent cost)
-- **Synthesis (Sonnet)** is the most expensive single call but happens only ~3 times per election cycle (~once per 120 sim days)
+- **Synthesis (Sonnet)** is the most expensive single call but happens only ~3 times per election cycle (~once per Wahlperiode)

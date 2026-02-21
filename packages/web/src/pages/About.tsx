@@ -23,19 +23,35 @@ export function About() {
         <CardContent className="p-5 leading-[1.7]">
           <h2>How Time Works</h2>
           <p className="mb-3">
-            The Bundestag operates on <strong>simulation days</strong>. Each simulation day
-            represents roughly <strong>one week</strong> of real parliamentary activity —
-            condensed so that meaningful political developments happen at a pace you can follow.
-            In practice, a new simulation day runs every 30 seconds to a few minutes, depending
-            on configuration. This means:
+            The Bundestag operates on <strong>simulation days</strong>. Key events happen on
+            fixed cycles — polls every 2 weeks, economic reports monthly, budgets annually,
+            elections every 4 years. Each simulation day represents <strong>one real calendar day</strong>,
+            with configurable simulation speed so you can follow at your own pace.
           </p>
           <ul className="my-2 ml-6 list-disc">
-            <li className="mb-1"><strong>7 simulation days</strong> ~ 1 month of political life (weekly opinion polls, approval recalculations)</li>
-            <li className="mb-1"><strong>30 simulation days</strong> ~ 1 quarter (monthly economic reports, possible referendums)</li>
-            <li className="mb-1"><strong>120 simulation days</strong> ~ 1 legislative period (scheduled elections)</li>
+            <li className="mb-1"><strong>Every 15 sim days</strong> (bi-weekly) — opinion polls, approval recalculations</li>
+            <li className="mb-1"><strong>Every 30 sim days</strong> (monthly) — economic reports, possible referendums</li>
+            <li className="mb-1"><strong>Every 365 sim days</strong> (annually) — federal budget cycle</li>
+            <li className="mb-1"><strong>Every 4 sim years = 1 Wahlperiode</strong> — scheduled elections, coalition negotiations, government formation</li>
+          </ul>
+          <p className="mb-3">
+            A <strong>Wahlperiode</strong> (legislative period) of 4 sim years is the fundamental
+            cycle of the simulation: parties govern, propose legislation, face crises, and
+            ultimately face re-election. Everything — budgets, polls, media, confidence votes —
+            plays out within this timeframe.
+          </p>
+          <p className="mb-3">
+            Simulation speed is configurable via timing presets:
+          </p>
+          <ul className="my-2 ml-6 list-disc">
+            <li className="mb-1"><strong>Ultra-Fast</strong> — AI-bound speed, ~24 hours per term (for testing/demos)</li>
+            <li className="mb-1"><strong>Fast</strong> — 7 min per day, ~1 week per term (catch-up viewing)</li>
+            <li className="mb-1"><strong>Normal</strong> — 30 min per day, ~1 month per term (daily check-ins)</li>
+            <li className="mb-1"><strong>Slow</strong> — 1.5 hours per day, ~5 months per term (full participation)</li>
           </ul>
           <p>
-            You might see several weeks of parliamentary drama unfold within a single afternoon.
+            In Normal mode, you can check in once or twice a day and follow the political drama
+            as it unfolds over a month of real time.
           </p>
         </CardContent>
       </Card>
@@ -76,9 +92,9 @@ export function About() {
         <CardContent className="p-5 leading-[1.7]">
           <h2>Elections</h2>
           <p className="mb-3">
-            Elections are held every <strong>120 simulation days</strong> (roughly one legislative
-            period). A snap election can also be triggered if public sentiment stays critically
-            low for 5 consecutive days — a vote of no confidence, in effect.
+            Elections are held every <strong>4 sim years</strong>, matching
+            the real German electoral cycle. A snap election can also be triggered if public 
+            sentiment stays critically low for 5 consecutive days — a vote of no confidence, in effect.
           </p>
           <p className="mb-3">
             The election cycle has distinct phases:

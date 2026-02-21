@@ -2,7 +2,8 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
-import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY } from "@ki-bundestag/engine";
+import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
   Party,
@@ -39,6 +40,44 @@ const PORT = parseInt(process.env.API_PORT || "3001", 10);
 
 app.use(cors());
 app.use(express.json());
+
+// ── Preset cache (10s TTL) ───────────────────────────────────────────────────
+let cachedPreset: { value: TimingPreset; expiresAt: number } | null = null;
+
+function getTimingPreset(): TimingPreset {
+  const now = Date.now();
+  if (cachedPreset && now < cachedPreset.expiresAt) return cachedPreset.value;
+  const db = getDb();
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  const preset = ((meta as any)?.timingPreset ?? "normal") as TimingPreset;
+  cachedPreset = { value: preset, expiresAt: now + 10_000 };
+  return preset;
+}
+
+/**
+ * Guard for participatory endpoints. Returns true (and sends 403) if blocked.
+ */
+function requireParticipatory(_req: express.Request, res: express.Response, feature?: string): boolean {
+  const preset = getTimingPreset();
+  if (!isParticipatoryPreset(preset)) {
+    res.status(403).json({
+      error: "Watch-only mode",
+      preset,
+      message: `Simulation is in ${preset} mode. Switch to Normal or Slow to interact.`,
+    });
+    return true;
+  }
+  if (feature && !isFeatureEnabled(preset, feature)) {
+    res.status(403).json({
+      error: "Feature not available",
+      preset,
+      feature,
+      message: `"${feature}" is not enabled in ${preset} mode.`,
+    });
+    return true;
+  }
+  return false;
+}
 
 // Health check
 app.get("/api/health", (_req, res) => {
@@ -204,6 +243,7 @@ app.get("/api/bills/:id/signal", (req, res) => {
 
 // POST /api/bills/:id/signal (auth)
 app.post("/api/bills/:id/signal", (req, res) => {
+  if (requireParticipatory(req, res, "bill_signals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -309,7 +349,31 @@ app.get("/api/simulation/status", (_req, res) => {
     budgetRetryDay: (meta as any).budgetRetryDay ?? null,
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,
     dailySummary: (meta as any).dailySummary ?? null,
+    timingPreset: (meta as any).timingPreset ?? "normal",
   });
+});
+
+// GET /api/simulation/preset
+app.get("/api/simulation/preset", (_req, res) => {
+  const preset = getTimingPreset();
+  const participatory = isParticipatoryPreset(preset);
+  const features = FEATURE_AVAILABILITY[preset] ?? {};
+  const labels: Record<TimingPreset, string> = { "ultra-fast": "Ultra-Fast", fast: "Fast", normal: "Normal", slow: "Slow" };
+  res.json({ preset, participatory, features, label: labels[preset] });
+});
+
+// POST /api/simulation/preset (admin: change preset)
+app.post("/api/simulation/preset", (req, res) => {
+  const { preset } = req.body as { preset?: string };
+  const valid: TimingPreset[] = ["ultra-fast", "fast", "normal", "slow"];
+  if (!preset || !valid.includes(preset as TimingPreset)) {
+    res.status(400).json({ error: "Invalid preset. Must be one of: ultra-fast, fast, normal, slow" });
+    return;
+  }
+  const db = getDb();
+  db.update(schema.simulationMeta).set({ timingPreset: preset }).run();
+  cachedPreset = null; // invalidate cache
+  res.json({ success: true, preset });
 });
 
 // GET /api/simulation/days
@@ -545,6 +609,7 @@ app.get("/api/polls/:id", (req, res) => {
 
 // POST /api/polls/:id/vote
 app.post("/api/polls/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "vote_polls")) return;
   const db = getDb();
   const rows = db.select().from(schema.polls).where(eq(schema.polls.id, req.params.id)).all();
   if (rows.length === 0) {
@@ -659,6 +724,7 @@ app.get("/api/questions/:id", (req, res) => {
 
 // POST /api/questions
 app.post("/api/questions", (req, res) => {
+  if (requireParticipatory(req, res, "ask_questions")) return;
   const db = getDb();
   const { question, targetPartyId } = req.body;
 
@@ -707,6 +773,7 @@ app.post("/api/questions", (req, res) => {
 
 // POST /api/questions/:id/vote (auth)
 app.post("/api/questions/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "upvote_downvote")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -748,6 +815,7 @@ app.post("/api/questions/:id/vote", (req, res) => {
 
 // DELETE /api/questions/:id/vote (auth)
 app.delete("/api/questions/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "upvote_downvote")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -794,6 +862,7 @@ app.get("/api/referendums/:id", (req, res) => {
 
 // POST /api/referendums/:id/vote
 app.post("/api/referendums/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "vote_referendums")) return;
   const db = getDb();
   const rows = db.select().from(schema.referendums).where(eq(schema.referendums.id, req.params.id)).all();
   if (rows.length === 0) {
@@ -1251,6 +1320,7 @@ app.get("/api/parties/:id/proposals", (req, res) => {
 
 // POST /api/parties/:id/proposals
 app.post("/api/parties/:id/proposals", (req, res) => {
+  if (requireParticipatory(req, res, "internal_proposals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -1321,6 +1391,7 @@ app.get("/api/proposals/:id", (req, res) => {
 
 // POST /api/proposals/:id/vote (auth)
 app.post("/api/proposals/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "internal_proposals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -1361,6 +1432,7 @@ app.post("/api/proposals/:id/vote", (req, res) => {
 
 // DELETE /api/proposals/:id/vote (auth)
 app.delete("/api/proposals/:id/vote", (req, res) => {
+  if (requireParticipatory(req, res, "internal_proposals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
@@ -1495,6 +1567,48 @@ app.post("/api/users/me/leave", (req, res) => {
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+});
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+// GET /api/notifications
+app.get("/api/notifications", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const unreadOnly = req.query.unread === "true";
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+  const notifications = getNotifications(token, { unreadOnly, limit });
+  res.json(notifications);
+});
+
+// GET /api/notifications/unread-count
+app.get("/api/notifications/unread-count", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  res.json({ count: getUnreadCount(token) });
+});
+
+// POST /api/notifications/:id/read
+app.post("/api/notifications/:id/read", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const ok = markNotificationRead(req.params.id, token);
+  if (!ok) { res.status(404).json({ error: "Notification not found" }); return; }
+  res.json({ success: true });
+});
+
+// POST /api/notifications/read-all
+app.post("/api/notifications/read-all", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const count = markAllNotificationsRead(token);
+  res.json({ marked: count });
+});
+
+// GET /api/simulation/queue (admin info: pending queued events)
+app.get("/api/simulation/queue", (_req, res) => {
+  const events = getQueuedEvents();
+  res.json(events);
 });
 
 const server = app.listen(PORT, () => {

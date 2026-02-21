@@ -1,6 +1,6 @@
 import type { Government, Interpellation, Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 2;
@@ -82,6 +82,10 @@ export async function answerPendingInterpellations(
 
       console.log(`  [Interpellations] ${minister.name} answered: "${row.title.substring(0, 50)}..."`);
     } catch (error) {
+      if (error instanceof AIProviderLimitError) {
+        console.warn(`  [Interpellations] Skipped (${error.message})`);
+        break;
+      }
       console.error(`  [Interpellations] Error answering "${row.title}":`, error);
     }
   }

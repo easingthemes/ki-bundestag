@@ -1,0 +1,263 @@
+/**
+ * Timing presets and simulation speed configuration.
+ *
+ * Core principle: 1 sim day = 1 real calendar day.
+ * Elections every 1461 sim days (4 years including leap year).
+ * The only variable is how fast sim days tick in wall-clock time.
+ */
+
+export type TimingPreset = "ultra-fast" | "fast" | "normal" | "slow";
+
+export type NightMode = "none" | "light" | "pause";
+
+export interface PresetConfig {
+  /** Fixed ms per sim day (non-participatory modes) */
+  msPerDay?: number;
+  /** Ms per sim day during daytime (participatory modes) */
+  msPerDayDay?: number;
+  /** Ms per sim day during nighttime, null = paused (participatory modes) */
+  msPerDayNight?: number | null;
+  /** Whether users can interact with the simulation */
+  participatory: boolean;
+  /** Night behavior: none = 24/7, light = routine only, pause = full stop */
+  nightMode: NightMode;
+  /** Display label */
+  label: string;
+  /** Approximate real-time per full term */
+  termRealTime: string;
+}
+
+export const TIME_CONFIG = {
+  // Fixed constants (real-world mapping)
+  TERM_DAYS: 1461,              // 4 years including leap year
+  POLL_INTERVAL: 15,            // bi-weekly polls
+  ECONOMY_INTERVAL: 30,         // monthly economic report
+  BUDGET_INTERVAL: 365,         // annual budget
+  SESSION_INTERVAL: 5,          // ~weekly Plenarsitzung
+
+  // Election campaign timeline (in sim days)
+  ELECTION_CAMPAIGN_START: 7,   // campaign starts N days after announcement
+  ELECTION_CAMPAIGN_DAYS: 21,   // total days from announcement to election
+
+  // Night hours (Europe/Berlin local time)
+  nightStart: 22,               // 10 PM
+  nightEnd: 8,                  // 8 AM
+
+  // Presets
+  presets: {
+    "ultra-fast": {
+      msPerDay: 0,                        // AI-bound, no delay
+      participatory: false,
+      nightMode: "none",
+      label: "Ultra-Fast (Demo)",
+      termRealTime: "~24 hours",
+    },
+    "fast": {
+      msPerDay: 420_000,                  // 7 minutes
+      participatory: false,
+      nightMode: "none",
+      label: "Fast (Weekly)",
+      termRealTime: "1 week",
+    },
+    "normal": {
+      msPerDayDay: 1_800_000,             // 30 min daytime
+      msPerDayNight: 900_000,             // 15 min nighttime
+      participatory: true,
+      nightMode: "light",                 // routine actions only at night
+      label: "Normal (Citizen)",
+      termRealTime: "~30 days",
+    },
+    "slow": {
+      msPerDayDay: 5_400_000,             // 1.5 hours daytime
+      msPerDayNight: null,                // paused at night
+      participatory: true,
+      nightMode: "pause",                 // full pause at night
+      label: "Slow (MdB)",
+      termRealTime: "~5 months",
+    },
+  } satisfies Record<TimingPreset, PresetConfig>,
+} as const;
+
+// Event importance classification for night mode queueing
+export const CRITICAL_EVENTS = [
+  "election_voting",
+  "confidence_vote_filed",
+  "budget_passed",
+  "budget_rejected",
+] as const;
+
+export const IMPORTANT_EVENTS = [
+  "bill_third_reading",
+  "bill_passed",
+  "bill_rejected",
+  "referendum",
+  "crisis_start",
+  "government_dissolved",
+  "government_formed",
+  "constitutional_court_ruled",
+] as const;
+
+export const ROUTINE_EVENTS = [
+  "statement",
+  "poll",
+  "media",
+  "economy_update",
+  "bill_proposed",
+  "bill_first_reading",
+  "bill_second_reading",
+  "bill_committee",
+  "day_start",
+  "weekly_report",
+  "monthly_report",
+] as const;
+
+/**
+ * Feature availability matrix.
+ * Maps preset → feature → enabled.
+ * Includes future MdB features as false for forward-compatibility.
+ */
+export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>> = {
+  "ultra-fast": {
+    vote_polls: false,
+    ask_questions: false,
+    upvote_downvote: false,
+    vote_referendums: false,
+    internal_proposals: false,
+    bill_signals: false,
+    request_to_speak: false,
+    give_speech: false,
+    vote_bills: false,
+    propose_amendments: false,
+  },
+  "fast": {
+    vote_polls: false,
+    ask_questions: false,
+    upvote_downvote: false,
+    vote_referendums: false,
+    internal_proposals: false,
+    bill_signals: false,
+    request_to_speak: false,
+    give_speech: false,
+    vote_bills: false,
+    propose_amendments: false,
+  },
+  "normal": {
+    vote_polls: true,
+    ask_questions: true,
+    upvote_downvote: true,
+    vote_referendums: true,
+    internal_proposals: false,
+    bill_signals: true,
+    request_to_speak: false,
+    give_speech: false,
+    vote_bills: false,
+    propose_amendments: false,
+  },
+  "slow": {
+    vote_polls: true,
+    ask_questions: true,
+    upvote_downvote: true,
+    vote_referendums: true,
+    internal_proposals: true,
+    bill_signals: true,
+    request_to_speak: true,
+    give_speech: true,
+    vote_bills: true,
+    propose_amendments: true,
+  },
+};
+
+// ── Helpers ──
+
+export function getPresetConfig(preset: TimingPreset): PresetConfig {
+  return TIME_CONFIG.presets[preset];
+}
+
+export function isParticipatoryPreset(preset: TimingPreset): boolean {
+  return TIME_CONFIG.presets[preset].participatory;
+}
+
+export function isFeatureEnabled(preset: TimingPreset, feature: string): boolean {
+  return FEATURE_AVAILABILITY[preset]?.[feature] ?? false;
+}
+
+/**
+ * Check if the current wall-clock time is nighttime in Europe/Berlin.
+ */
+export function isNightTime(): boolean {
+  const hour = getBerlinHour();
+  return hour >= TIME_CONFIG.nightEnd ? hour >= TIME_CONFIG.nightStart : hour < TIME_CONFIG.nightEnd;
+}
+
+/**
+ * Get current hour (0-23) in Europe/Berlin timezone.
+ */
+function getBerlinHour(): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hourPart = parts.find(p => p.type === "hour");
+  return parseInt(hourPart?.value ?? "12", 10);
+}
+
+/**
+ * Calculate delay in ms before next sim day, based on preset and time of day.
+ * Returns Infinity for slow mode at night (caller should poll until morning).
+ */
+export function getDelayMs(preset: TimingPreset): number {
+  const config = TIME_CONFIG.presets[preset];
+
+  if (!config.participatory) {
+    // Non-participatory: fixed delay (or 0 for ultra-fast)
+    return config.msPerDay ?? 0;
+  }
+
+  // Participatory mode: day/night aware
+  if (isNightTime()) {
+    if (config.msPerDayNight === null) return Infinity; // pause
+    return config.msPerDayNight ?? 0;
+  }
+
+  return config.msPerDayDay ?? 0;
+}
+
+/**
+ * Whether the runner should fully pause (slow mode at night).
+ */
+export function shouldPauseForNight(preset: TimingPreset): boolean {
+  return preset === "slow" && isNightTime();
+}
+
+/**
+ * Classify an event type by importance level for night mode queueing.
+ */
+export function classifyEvent(eventType: string): "critical" | "important" | "standard" | "routine" {
+  if ((CRITICAL_EVENTS as readonly string[]).includes(eventType)) return "critical";
+  if ((IMPORTANT_EVENTS as readonly string[]).includes(eventType)) return "important";
+  if ((ROUTINE_EVENTS as readonly string[]).includes(eventType)) return "routine";
+  return "standard";
+}
+
+/**
+ * Whether an event should be queued instead of executed (night mode in participatory presets).
+ */
+export function shouldQueueEvent(preset: TimingPreset, eventType: string): boolean {
+  if (!isParticipatoryPreset(preset) || !isNightTime()) return false;
+
+  const config = TIME_CONFIG.presets[preset];
+  const importance = classifyEvent(eventType);
+
+  if (config.nightMode === "pause") {
+    // Slow mode: queue everything at night (runner handles full pause)
+    return true;
+  }
+
+  if (config.nightMode === "light") {
+    // Normal mode: queue critical + important events, run routine + standard
+    return importance === "critical" || importance === "important";
+  }
+
+  return false;
+}

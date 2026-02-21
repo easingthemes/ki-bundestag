@@ -1,6 +1,6 @@
 import type { Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 3;
@@ -68,6 +68,10 @@ export async function answerPendingQuestions(
 
       console.log(`  [Questions] ${party.name} answered: "${q.question.substring(0, 50)}..."`);
     } catch (error) {
+      if (error instanceof AIProviderLimitError) {
+        console.warn(`  [Questions] Skipped (${error.message})`);
+        break;
+      }
       console.error(`  [Questions] Error answering question for ${party.name}:`, error);
     }
   }

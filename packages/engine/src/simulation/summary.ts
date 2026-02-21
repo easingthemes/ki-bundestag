@@ -1,5 +1,5 @@
 import type { Party } from "@ki-bundestag/types";
-import { callAI } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
 
 const SIGNIFICANT = new Set([
   "bill_passed", "bill_rejected", "presidential_veto",
@@ -50,7 +50,10 @@ Respond with ONLY valid JSON in this exact format (no markdown):
     const parsed = JSON.parse(raw) as { narrative: string; mood: string };
     if (typeof parsed.narrative !== "string" || typeof parsed.mood !== "string") return null;
     return parsed;
-  } catch {
+  } catch (error) {
+    if (error instanceof AIProviderLimitError) {
+      console.warn(`  [Summary] Skipped (${error.message})`);
+    }
     return null;
   }
 }

@@ -18,14 +18,16 @@ import { ConfidenceVotes } from "./pages/ConfidenceVotes";
 import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
 import { Admin } from "./pages/Admin";
+import { AdminCosts } from "./pages/AdminCosts";
 import { About } from "./pages/About";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
+import { Notifications } from "./pages/Notifications";
 import { api, setErrorHandler, setUserToken, type User, type SimulationStatus } from "./api";
 import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu } from "lucide-react";
+import { Menu, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import "./styles.css";
 
@@ -342,6 +344,34 @@ function SimStatus() {
   );
 }
 
+/* ── Notification bell ────────────────────────────────────────────── */
+
+function NotificationBell() {
+  const { user } = useUser();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setCount(0); return; }
+    const load = () => api.getUnreadCount().then(r => setCount(r.count)).catch(() => {});
+    load();
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  if (!user) return null;
+
+  return (
+    <Link to="/notifications" className="relative p-1.5 rounded-md text-[#b0b0c0] hover:text-white hover:bg-white/[0.08] transition-colors">
+      <Bell className="w-4 h-4" />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-blue-500 rounded-full leading-none">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 /* ── Error toast ──────────────────────────────────────────────────── */
 
 function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -448,6 +478,7 @@ function App() {
           {/* Sim status + user area (desktop) */}
           <div className="hidden md:flex items-center ml-auto shrink-0 gap-3">
             <SimStatus />
+            <NotificationBell />
             <div className="shrink-0 flex items-center">
               {user ? (
                 <UserMenu user={user} />
@@ -488,8 +519,10 @@ function App() {
             <Route path="/constitutional-court" element={<ConstitutionalCourt />} />
             <Route path="/budget" element={<Budget />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/costs" element={<AdminCosts />} />
             <Route path="/referendums" element={<Referendums />} />
             <Route path="/log" element={<SimulationLog />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/login" element={<Login />} />
             <Route path="/about" element={<About />} />
           </Routes>
