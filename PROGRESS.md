@@ -1,31 +1,30 @@
-# Question Voting
+# Visitor Simulation User Mix
 
 ## Summary
 
 - **Status**: completed (3 steps)
 - **Date**: February 21, 2026
 - **Changes**:
-  - Added `question_votes` table in user DB with `POST/DELETE /api/questions/:id/vote` endpoints
-  - Engine answers top-voted pending questions first (instead of oldest-first)
-  - Questions page split into Pending/Answered sections with upvote/downvote UI
+  - Reviewed current visitor simulation logic (all-new users, hardcoded 5)
+  - Implemented 2/3 existing + 1/3 new user mix with activity-based selection and deduplication
+  - Tested empty DB fallback, existing user reuse, and party affiliation preservation
 
 ## Goal
 
-Add community voting (upvote/downvote) to citizen questions so parties prioritize answering the most popular ones first.
+Update the visitor simulation script (`npm run simulate:visitors`) to use a realistic mix of ~2/3 existing users and ~1/3 new users instead of creating all new users.
 
 ## Completed Steps
 
-### Step 1: Add question_votes table + API endpoints
+### Step 1: Review current visitor simulation logic
 - **Status**: done
-- **Files**: `schema.ts`, `seed.ts`, `types/index.ts`, `web/api.ts`, `api/index.ts`
-- **Result**: Added `questionVotes` table (user DB), `voteScore`/`totalVotes`/`userVote` to `CitizenQuestion` type, `POST/DELETE /api/questions/:id/vote` endpoints, updated `GET /api/questions` with score aggregation + smart sorting
+- **Files**: `scripts/simulate-visitors.ts`
+- **Result**: Documented current implementation — creates 5 new visitors from hardcoded names, no existing user reuse
 
-### Step 2: Sort questions by vote score, answer top-voted first
+### Step 2: Implement user mix logic
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/questions.ts`
-- **Result**: Engine sorts pending questions by vote score (highest first) before answering top 3/day
+- **Files**: `scripts/simulate-visitors.ts`
+- **Result**: Added `fetchExistingUsers()` + `selectUserMix()` with activity-based selection, deduplication, party balancing; existing users skip registration via localStorage token injection
 
-### Step 3: Update Questions web page with vote UI
+### Step 3: Test and validate
 - **Status**: done
-- **Files**: `packages/web/src/pages/Questions.tsx`
-- **Result**: Split into Pending/Answered sections with independent ShowMoreButton; vote buttons for authenticated users; read-only score on answered questions
+- **Result**: Empty DB: 5/5 new users. With existing users: 3-4 reused + 1-2 new. Party affiliation preserved.
