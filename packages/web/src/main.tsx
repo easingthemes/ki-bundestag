@@ -19,9 +19,10 @@ import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
 import { Admin } from "./pages/Admin";
 import { About } from "./pages/About";
+import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { api, setErrorHandler, setUserToken, type User, type SimulationStatus } from "./api";
-import { UserContext, loadStoredToken, saveToken, clearToken } from "./userContext";
+import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Menu } from "lucide-react";
@@ -144,13 +145,23 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileLink to="/log">Protokoll</MobileLink>
           <MobileLink to="/about">&Uuml;ber</MobileLink>
           <MobileLink to="/admin">Admin</MobileLink>
-          {!user && (
+          <Separator className="bg-white/[0.08] mx-5 my-2" />
+          {user ? (
             <>
-              <Separator className="bg-white/[0.08] mx-5 my-2" />
-              <NavLink to="/parties" className="block px-5 py-2.5 text-sm font-semibold text-[#ffd700] hover:text-[#ffe44d]">
-                Partei beitreten
-              </NavLink>
+              <div className="px-5 py-2 flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#ffd700] flex items-center justify-center text-xs font-bold text-[#1a1a2e]">
+                  {user.displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                </div>
+                <span className="text-sm text-white font-medium">{user.displayName}</span>
+              </div>
+              {user.partyId && <MobileLink to={`/parties/${user.partyId}`}>My Party</MobileLink>}
+              <MobileLink to="/questions">My Questions</MobileLink>
+              <MobileLogout />
             </>
+          ) : (
+            <NavLink to="/login" className="block px-5 py-2.5 text-sm font-semibold text-[#ffd700] hover:text-[#ffe44d]">
+              Anmelden
+            </NavLink>
           )}
         </nav>
       </SheetContent>
@@ -178,6 +189,97 @@ function MobileGroupLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-5 pt-3 pb-1.5 text-[0.7rem] font-bold text-[#666] uppercase tracking-[0.08em]">
       {children}
+    </div>
+  );
+}
+
+function MobileLogout() {
+  const { logout } = useUser();
+  return (
+    <button
+      onClick={logout}
+      className="w-full text-left block px-5 py-2.5 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-white/[0.06] bg-transparent border-none cursor-pointer"
+    >
+      Logout
+    </button>
+  );
+}
+
+/* ── User avatar menu ────────────────────────────────────────── */
+
+function UserMenu({ user }: { user: User }) {
+  const { logout } = useUser();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const location = useLocation();
+
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const onEnter = () => { clearTimeout(timeout.current); setOpen(true); };
+  const onLeave = () => { timeout.current = setTimeout(() => setOpen(false), 200); };
+
+  const initials = user.displayName
+    .split(" ")
+    .map(w => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      className="relative"
+      ref={ref}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <button
+        className="w-8 h-8 rounded-full bg-[#ffd700] flex items-center justify-center text-xs font-bold text-[#1a1a2e] cursor-pointer hover:ring-2 hover:ring-[#ffd700]/50 transition-all"
+        onClick={() => setOpen(o => !o)}
+        aria-label="User menu"
+      >
+        {initials}
+      </button>
+      {open && (
+        <div className="absolute top-[calc(100%+6px)] right-0 min-w-[200px] bg-[#1e1e36] border border-white/[0.08] rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1.5 z-[200] animate-in fade-in slide-in-from-top-1.5 duration-150">
+          <div className="px-4 py-2 border-b border-white/[0.08]">
+            <div className="text-sm font-semibold text-white">{user.displayName}</div>
+            {user.partyId && (
+              <div className="text-xs text-[#b0b0c0] mt-0.5">{user.partyId}</div>
+            )}
+          </div>
+          {user.partyId && (
+            <NavLink
+              to={`/parties/${user.partyId}`}
+              className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+            >
+              My Party
+            </NavLink>
+          )}
+          <NavLink
+            to="/questions"
+            className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+          >
+            My Questions
+          </NavLink>
+          <div className="border-t border-white/[0.08] mt-1 pt-1">
+            <button
+              onClick={() => { logout(); setOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] bg-transparent border-none cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -348,16 +450,13 @@ function App() {
             <SimStatus />
             <div className="shrink-0 flex items-center">
               {user ? (
-                <span className="text-xs text-[#ccc] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#28a745] inline-block" />
-                  {user.displayName}
-                </span>
+                <UserMenu user={user} />
               ) : (
                 <NavLink
-                  to="/parties"
+                  to="/login"
                   className="text-xs text-[#b0b0c0] no-underline px-3 py-1.5 border border-white/15 rounded-full whitespace-nowrap transition-all duration-150 hover:text-white hover:border-white/35 hover:bg-white/[0.06]"
                 >
-                  Partei beitreten
+                  Anmelden
                 </NavLink>
               )}
             </div>
@@ -391,6 +490,7 @@ function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/referendums" element={<Referendums />} />
             <Route path="/log" element={<SimulationLog />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </main>

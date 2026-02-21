@@ -360,7 +360,7 @@ const TABLE_DDL = `
 
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
+    display_name TEXT NOT NULL UNIQUE,
     party_id TEXT,
     created_at INTEGER NOT NULL,
     last_active INTEGER NOT NULL,
@@ -393,6 +393,7 @@ const COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> =
   { table: "budgets", column: "revision_attempt", sql: "ALTER TABLE budgets ADD COLUMN revision_attempt INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "daily_summary", sql: "ALTER TABLE simulation_meta ADD COLUMN daily_summary TEXT" },
   { table: "simulation_meta", column: "day_started_at", sql: "ALTER TABLE simulation_meta ADD COLUMN day_started_at TEXT" },
+  { table: "users", column: "display_name_unique", sql: "DELETE FROM users WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY display_name ORDER BY last_active DESC) as rn FROM users) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name ON users(display_name)" },
 ];
 
 /**

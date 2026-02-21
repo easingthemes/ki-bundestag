@@ -162,26 +162,44 @@ async function navigateSafe(page: Page, path: string): Promise<void> {
 async function actionRegister(v: VisitorState): Promise<void> {
   if (v.registered) return;
 
-  const res = await apiFetch<{ id: string }>("POST", "/users/register", null, {
+  // Try login first (in case user already exists)
+  const loginRes = await apiFetch<{ id: string }>("POST", "/users/login", null, {
     displayName: v.name,
-    partyId: v.partyId,
   });
 
-  if (!res.ok) {
-    log(v, "REGISTER", `FAIL - ${JSON.stringify(res.data)}`);
-    return;
+  if (loginRes.ok) {
+    v.token = loginRes.data.id;
+    log(v, "LOGIN", `Logged in as "${v.name}"`);
+  } else {
+    // Register new user (without party)
+    const regRes = await apiFetch<{ id: string }>("POST", "/users/register", null, {
+      displayName: v.name,
+    });
+
+    if (!regRes.ok) {
+      log(v, "REGISTER", `FAIL - ${JSON.stringify(regRes.data)}`);
+      return;
+    }
+    v.token = regRes.data.id;
+    log(v, "REGISTER", `Registered as "${v.name}"`);
   }
 
-  v.token = res.data.id;
+  // Join party separately
+  const joinRes = await apiFetch("POST", `/users/me/join/${v.partyId}`, v.token, {});
+  if (!joinRes.ok) {
+    log(v, "JOIN", `FAIL - ${JSON.stringify(joinRes.data)}`);
+  } else {
+    log(v, "JOIN", `Joined ${v.partyId}`);
+  }
+
   v.registered = true;
 
   // Set token in browser localStorage so UI reflects membership
   await v.page.evaluate((token: string) => {
-    localStorage.setItem("userToken", token);
+    localStorage.setItem("ki-bundestag-token", token);
   }, v.token);
 
   await navigateSafe(v.page, "/parties");
-  log(v, "REGISTER", `Joined ${v.partyId} as "${v.name}"`);
 }
 
 async function actionAskQuestion(v: VisitorState): Promise<void> {

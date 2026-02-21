@@ -1280,6 +1280,21 @@ function getUserToken(req: express.Request): string | null {
   return typeof h === "string" && h.length > 0 ? h : null;
 }
 
+// POST /api/users/login
+app.post("/api/users/login", (req, res) => {
+  const { displayName } = req.body as { displayName?: string };
+  if (!displayName || displayName.trim().length < 2) {
+    res.status(400).json({ error: "displayName must be at least 2 characters" });
+    return;
+  }
+  const db = getDb();
+  const rows = db.select().from(schema.users).where(eq(schema.users.displayName, displayName.trim())).all();
+  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const u = rows[0];
+  db.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
+  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
+});
+
 // POST /api/users/register
 app.post("/api/users/register", (req, res) => {
   const { displayName, partyId } = req.body as { displayName?: string; partyId?: string };
@@ -1294,14 +1309,22 @@ app.post("/api/users/register", (req, res) => {
   }
   const id: string = randomUUID();
   const now = Date.now();
-  db.insert(schema.users).values({
-    id,
-    displayName: displayName.trim(),
-    partyId: partyId ?? null,
-    createdAt: now,
-    lastActive: now,
-    switchCooldownUntil: null,
-  }).run();
+  try {
+    db.insert(schema.users).values({
+      id,
+      displayName: displayName.trim(),
+      partyId: partyId ?? null,
+      createdAt: now,
+      lastActive: now,
+      switchCooldownUntil: null,
+    }).run();
+  } catch (err: any) {
+    if (err.message?.includes("UNIQUE constraint failed")) {
+      res.status(409).json({ error: "Nickname already taken" });
+      return;
+    }
+    throw err;
+  }
   res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, createdAt: now, lastActive: now, switchCooldownUntil: null });
 });
 

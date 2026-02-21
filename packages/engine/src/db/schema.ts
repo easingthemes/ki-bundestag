@@ -259,7 +259,7 @@ export const internalVotes = sqliteTable("internal_votes", {
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),                         // UUID = auth token
-  displayName: text("display_name").notNull(),
+  displayName: text("display_name").notNull().unique(),
   partyId: text("party_id"),                           // null = no party
   createdAt: integer("created_at").notNull(),
   lastActive: integer("last_active").notNull(),

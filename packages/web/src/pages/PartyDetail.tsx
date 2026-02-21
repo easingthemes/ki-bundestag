@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal } from "../api";
 import { usePolling } from "../usePolling";
@@ -90,10 +90,9 @@ export function PartyDetail() {
   const [propCategory, setPropCategory] = useState("economy");
   const [propSubmitting, setPropSubmitting] = useState(false);
   const [propMsg, setPropMsg] = useState<string | null>(null);
-  const [joinName, setJoinName] = useState("");
   const [joinStatus, setJoinStatus] = useState<"idle" | "loading" | "error">("idle");
   const [joinError, setJoinError] = useState("");
-  const [showJoinForm, setShowJoinForm] = useState(false);
+  const joinNavigate = useNavigate();
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -188,19 +187,16 @@ export function PartyDetail() {
           {(() => {
             const isMyParty = user?.partyId === id;
             const handleJoin = async () => {
+              if (!user) {
+                joinNavigate(`/login?redirect=/parties/${id}`);
+                return;
+              }
               if (joinStatus === "loading") return;
               setJoinStatus("loading");
               setJoinError("");
               try {
-                let result;
-                if (user) {
-                  result = await api.joinParty(id!);
-                } else {
-                  if (joinName.trim().length < 2) return;
-                  result = await api.registerUser(joinName.trim(), id!);
-                }
+                const result = await api.joinParty(id!);
                 login(result.id, result);
-                setShowJoinForm(false);
                 setJoinStatus("idle");
                 api.getParty(id!).then(setParty).catch(console.error);
               } catch (err) {
@@ -230,46 +226,16 @@ export function PartyDetail() {
                     Leave Party
                   </button>
                 ) : (
-                  <div>
-                    {showJoinForm ? (
-                      <div className="flex gap-1.5 items-center flex-wrap">
-                        {!user && (
-                          <input
-                            autoFocus
-                            type="text"
-                            value={joinName}
-                            onChange={e => setJoinName(e.target.value)}
-                            maxLength={30}
-                            placeholder="Display name"
-                            className="px-2 py-1 rounded border border-input text-sm w-36"
-                            onKeyDown={e => e.key === "Enter" && handleJoin()}
-                          />
-                        )}
-                        <button
-                          onClick={handleJoin}
-                          disabled={joinStatus === "loading" || (!user && joinName.trim().length < 2)}
-                          className="px-3 py-1 rounded border-none text-white font-bold text-sm cursor-pointer disabled:opacity-50"
-                          style={{ background: displayColor }}
-                        >
-                          {joinStatus === "loading" ? "Joining…" : `Join ${party.name}`}
-                        </button>
-                        <button
-                          onClick={() => setShowJoinForm(false)}
-                          className="px-2 py-1 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
-                        >
-                          Cancel
-                        </button>
-                        {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowJoinForm(true)}
-                        className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
-                        style={{ borderColor: displayColor, color: displayColor }}
-                      >
-                        Join this Party
-                      </button>
-                    )}
+                  <div className="flex gap-1.5 items-center flex-wrap">
+                    <button
+                      onClick={handleJoin}
+                      disabled={joinStatus === "loading"}
+                      className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80 disabled:opacity-50"
+                      style={{ borderColor: displayColor, color: displayColor }}
+                    >
+                      {joinStatus === "loading" ? "Joining…" : "Join this Party"}
+                    </button>
+                    {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
                   </div>
                 )}
               </div>
@@ -602,7 +568,10 @@ export function PartyDetail() {
             <span>No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}</span>
             {user?.partyId !== id && (
               <button
-                onClick={() => { setShowJoinForm(true); document.querySelector(".card")?.scrollIntoView({ behavior: "smooth" }); }}
+                onClick={() => {
+                  if (!user) joinNavigate(`/login?redirect=/parties/${id}`);
+                  else document.querySelector(".card")?.scrollIntoView({ behavior: "smooth" });
+                }}
                 className="text-sm px-3 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
                 style={{ borderColor: displayColor, color: displayColor }}
               >
