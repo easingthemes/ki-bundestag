@@ -1,20 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, CitizenQuestion, Party } from "../api";
 import { usePolling } from "../usePolling";
+import { useUser } from "../userContext";
 import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE } from "@/lib/colors";
+import { STATUS_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Questions() {
+  const { user } = useUser();
   const [questions, setQuestions] = useState<CitizenQuestion[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [filterParty, setFilterParty] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [pendingVisible, setPendingVisible] = useState(10);
+  const [answeredVisible, setAnsweredVisible] = useState(10);
 
   const refresh = useCallback(() => {
     api.getQuestions(filterParty || undefined, filterStatus || undefined)
@@ -24,13 +27,102 @@ export function Questions() {
 
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh, 10000);
-  useEffect(() => { setVisibleCount(10); }, [filterParty, filterStatus]);
+  useEffect(() => { setPendingVisible(10); setAnsweredVisible(10); }, [filterParty, filterStatus]);
 
   const getPartyName = (id: string) => parties.find(p => p.id === id)?.name || id;
   const getPartyColor = (id: string) => {
     const c = parties.find(p => p.id === id)?.color;
     return c === "#FFED00" ? "#c4a900" : c || "#888";
   };
+
+  const pending = questions.filter(q => q.status === "pending");
+  const answered = questions.filter(q => q.status === "answered");
+
+  async function handleVote(q: CitizenQuestion, vote: 1 | -1) {
+    try {
+      const updated = q.userVote === vote
+        ? await api.retractQuestionVote(q.id)
+        : await api.voteOnQuestion(q.id, vote);
+      setQuestions(prev => prev.map(x => x.id === q.id ? updated : x));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function renderVoteControls(q: CitizenQuestion) {
+    if (!user) {
+      return (
+        <div className="flex flex-col items-center shrink-0 mr-3 min-w-10">
+          <span className="font-bold text-base" style={{ color: q.voteScore >= 0 ? SEMANTIC_HEX.positive : q.voteScore < 0 ? SEMANTIC_HEX.negative : "#888" }}>
+            {q.voteScore >= 0 ? "+" : ""}{q.voteScore}
+          </span>
+          <span className="text-xs text-muted-foreground">{q.totalVotes}</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center shrink-0 mr-3 min-w-10">
+        <button
+          onClick={() => handleVote(q, 1)}
+          title={q.userVote === 1 ? "Retract upvote" : "Upvote"}
+          className="border-none bg-transparent cursor-pointer text-lg p-0 leading-none"
+          style={{ color: q.userVote === 1 ? SEMANTIC_HEX.positive : "#aaa" }}
+        >▲</button>
+        <span className="font-bold text-base" style={{ color: q.voteScore > 0 ? SEMANTIC_HEX.positive : q.voteScore < 0 ? SEMANTIC_HEX.negative : "#888" }}>
+          {q.voteScore >= 0 ? "+" : ""}{q.voteScore}
+        </span>
+        <button
+          onClick={() => handleVote(q, -1)}
+          title={q.userVote === -1 ? "Retract downvote" : "Downvote"}
+          className="border-none bg-transparent cursor-pointer text-lg p-0 leading-none"
+          style={{ color: q.userVote === -1 ? SEMANTIC_HEX.negative : "#aaa" }}
+        >▼</button>
+        <span className="text-xs text-muted-foreground">{q.totalVotes}</span>
+      </div>
+    );
+  }
+
+  function renderQuestionCard(q: CitizenQuestion) {
+    return (
+      <Card key={q.id} className="mb-2">
+        <CardContent className="p-4">
+          <div className="flex">
+            {q.status === "pending" && renderVoteControls(q)}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPartyColor(q.targetPartyId) }} />
+                <span className="font-semibold text-sm">{getPartyName(q.targetPartyId)}</span>
+                <Badge variant="outline" className={cn(
+                  q.status === "pending"
+                    ? STATUS_BADGE.pending
+                    : STATUS_BADGE.answered
+                )}>
+                  {q.status}
+                </Badge>
+                {q.status === "answered" && (
+                  <span className="text-xs text-muted-foreground" style={{ color: q.voteScore > 0 ? SEMANTIC_HEX.positive : q.voteScore < 0 ? SEMANTIC_HEX.negative : undefined }}>
+                    {q.voteScore >= 0 ? "+" : ""}{q.voteScore} ({q.totalVotes})
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Day {q.createdOnDay}
+                </span>
+              </div>
+              <p className="text-sm italic mb-1.5">{q.question}</p>
+              {q.response && (
+                <div className="bg-muted rounded p-2 px-3 text-sm leading-relaxed">
+                  <strong>{getPartyName(q.targetPartyId)}:</strong> {q.response}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const showPending = filterStatus !== "answered";
+  const showAnswered = filterStatus !== "pending";
 
   return (
     <div>
@@ -58,38 +150,31 @@ export function Questions() {
         </Card>
       ) : (
         <>
-          {questions.slice(0, visibleCount).map(q => (
-            <Card key={q.id} className="mb-2">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPartyColor(q.targetPartyId) }} />
-                  <span className="font-semibold text-sm">{getPartyName(q.targetPartyId)}</span>
-                  <Badge variant="outline" className={cn(
-                    q.status === "pending"
-                      ? STATUS_BADGE.pending
-                      : STATUS_BADGE.answered
-                  )}>
-                    {q.status}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    Day {q.createdOnDay}
-                  </span>
-                </div>
-                <p className="text-sm italic mb-1.5">{q.question}</p>
-                {q.response && (
-                  <div className="bg-muted rounded p-2 px-3 text-sm leading-relaxed">
-                    <strong>{getPartyName(q.targetPartyId)}:</strong> {q.response}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-          <ShowMoreButton
-            total={questions.length}
-            visible={Math.min(visibleCount, questions.length)}
-            increment={10}
-            onShowMore={() => setVisibleCount(c => c + 10)}
-          />
+          {showPending && pending.length > 0 && (
+            <div className="mb-6">
+              <h2 className="mb-3">Pending ({pending.length})</h2>
+              {pending.slice(0, pendingVisible).map(renderQuestionCard)}
+              <ShowMoreButton
+                total={pending.length}
+                visible={Math.min(pendingVisible, pending.length)}
+                increment={10}
+                onShowMore={() => setPendingVisible(c => c + 10)}
+              />
+            </div>
+          )}
+
+          {showAnswered && answered.length > 0 && (
+            <div>
+              <h2 className="mb-3">Answered ({answered.length})</h2>
+              {answered.slice(0, answeredVisible).map(renderQuestionCard)}
+              <ShowMoreButton
+                total={answered.length}
+                visible={Math.min(answeredVisible, answered.length)}
+                increment={10}
+                onShowMore={() => setAnsweredVisible(c => c + 10)}
+              />
+            </div>
+          )}
         </>
       )}
     </div>

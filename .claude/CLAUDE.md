@@ -46,7 +46,7 @@ Two SQLite databases in `data/`, both WAL mode with foreign keys enabled:
   - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`
   - Override path: `DATABASE_PATH` env var
 - **`users.db`** — user-owned data, accessed via `getUserDb()` / `getUserSqlite()`
-  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`
+  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`, `question_votes`
   - Override path: `USER_DATABASE_PATH` env var
 - Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory
 - Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM, unified schema object used by both DBs)
@@ -116,7 +116,7 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 - **News**: Filterable event timeline with breaking news styling, day separators, pagination
 - **Polls**: Active polls with voting, results bar chart, past polls
 - **Media**: Newspaper-style AI-generated articles from 3 outlets (left/center/right bias), expandable cards
-- **Questions**: Citizen questions to parties with AI-generated responses, party/status filters
+- **Questions**: Citizen questions to parties with AI-generated responses, party/status filters, upvote/downvote on pending questions (top-voted answered first), split Pending/Answered sections
 - **Motions**: Motions (Antrag) and resolutions (Entschließung) with type badges, vote breakdowns
 - **Anfragen**: Interpellations (Kleine/Große Anfrage) with type+status badges, expandable cards showing question + minister response
 - **Vertrauensvoten**: Confidence votes (Vertrauensfrage + Misstrauensvotum) with type/status filters, seat vote bars, outcome text, expandable party breakdown

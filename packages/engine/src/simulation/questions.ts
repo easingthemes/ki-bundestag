@@ -1,7 +1,7 @@
 import type { Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
 import { callAI } from "../agent/client.js";
-import { getDb, schema } from "../db/index.js";
+import { getDb, getUserDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 3;
 const QUESTION_EXPIRY_DAYS = 14;
@@ -29,11 +29,18 @@ export async function answerPendingQuestions(
     }
   }
 
-  // Get pending questions (oldest first, max 3)
+  // Get pending questions sorted by vote score (highest first), then oldest
+  const userDb = getUserDb();
+  const allVotes = userDb.select().from(schema.questionVotes).all();
+  const scoreMap: Record<string, number> = {};
+  for (const v of allVotes) {
+    scoreMap[v.questionId] = (scoreMap[v.questionId] ?? 0) + v.vote;
+  }
+
   const pending = db.select().from(schema.citizenQuestions)
     .where(eq(schema.citizenQuestions.status, "pending"))
     .all()
-    .sort((a, b) => a.createdOnDay - b.createdOnDay)
+    .sort((a, b) => (scoreMap[b.id] ?? 0) - (scoreMap[a.id] ?? 0) || a.createdOnDay - b.createdOnDay)
     .slice(0, MAX_ANSWERS_PER_DAY);
 
   if (pending.length === 0) return;

@@ -600,26 +600,61 @@ app.get("/api/media/:id", (req, res) => {
 // GET /api/questions
 app.get("/api/questions", (req, res) => {
   const db = getDb();
+  const userDb = getUserDb();
   const allRows = db.select().from(schema.citizenQuestions).all();
   const partyFilter = req.query.partyId as string | undefined;
   const statusFilter = req.query.status as string | undefined;
   let rows = allRows;
   if (partyFilter) rows = rows.filter((q: any) => q.targetPartyId === partyFilter);
   if (statusFilter) rows = rows.filter((q: any) => q.status === statusFilter);
-  const questions: CitizenQuestion[] = rows.map(mapQuestion);
-  questions.sort((a, b) => b.createdOnDay - a.createdOnDay);
+
+  // Aggregate vote scores from user DB
+  const allVotes = userDb.select().from(schema.questionVotes).all();
+  const scoreMap: Record<string, { score: number; total: number }> = {};
+  for (const v of allVotes) {
+    if (!scoreMap[v.questionId]) scoreMap[v.questionId] = { score: 0, total: 0 };
+    scoreMap[v.questionId].score += v.vote;
+    scoreMap[v.questionId].total += 1;
+  }
+
+  // Check user vote if authenticated
+  const token = getUserToken(req);
+  const userVoteMap: Record<string, 1 | -1> = {};
+  if (token) {
+    const userVotes = userDb.select().from(schema.questionVotes)
+      .where(eq(schema.questionVotes.userId, token)).all();
+    for (const v of userVotes) userVoteMap[v.questionId] = v.vote as 1 | -1;
+  }
+
+  const questions: CitizenQuestion[] = rows.map(r =>
+    mapQuestion(r, scoreMap[r.id]?.score ?? 0, scoreMap[r.id]?.total ?? 0, userVoteMap[r.id] ?? null),
+  );
+  // Pending: by voteScore desc, then oldest first; Answered: by respondedOnDay desc
+  questions.sort((a, b) => {
+    if (a.status === "pending" && b.status === "pending") {
+      return (b.voteScore - a.voteScore) || (a.createdOnDay - b.createdOnDay);
+    }
+    if (a.status === "pending") return -1;
+    if (b.status === "pending") return 1;
+    return (b.respondedOnDay ?? 0) - (a.respondedOnDay ?? 0);
+  });
   res.json(questions);
 });
 
 // GET /api/questions/:id
 app.get("/api/questions/:id", (req, res) => {
   const db = getDb();
+  const userDb = getUserDb();
   const rows = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, req.params.id)).all();
   if (rows.length === 0) {
     res.status(404).json({ error: "Question not found" });
     return;
   }
-  res.json(mapQuestion(rows[0]));
+  const votes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
+  const score = votes.reduce((s, v) => s + v.vote, 0);
+  const token = getUserToken(req);
+  const uv = token ? votes.find(v => v.userId === token) : undefined;
+  res.json(mapQuestion(rows[0], score, votes.length, uv ? (uv.vote as 1 | -1) : null));
 });
 
 // POST /api/questions
@@ -666,9 +701,73 @@ app.post("/api/questions", (req, res) => {
     status: "pending",
   }).run();
 
-  res.status(201).json(mapQuestion(
-    db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0],
-  ));
+  const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
+  res.status(201).json(mapQuestion(created, 0, 0, null));
+});
+
+// POST /api/questions/:id/vote (auth)
+app.post("/api/questions/:id/vote", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userDb = getUserDb();
+  const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
+
+  const db = getDb();
+  const question = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, req.params.id)).all()[0];
+  if (!question) { res.status(404).json({ error: "Question not found" }); return; }
+
+  const { vote } = req.body as { vote?: number };
+  if (vote !== 1 && vote !== -1) { res.status(400).json({ error: "vote must be 1 or -1" }); return; }
+
+  const existing = userDb.select().from(schema.questionVotes)
+    .where(and(eq(schema.questionVotes.questionId, req.params.id), eq(schema.questionVotes.userId, token)))
+    .all();
+
+  if (existing.length > 0) {
+    if (existing[0].vote === vote) {
+      // No change — return current state
+    } else {
+      userDb.update(schema.questionVotes).set({ vote, createdAt: Date.now() })
+        .where(eq(schema.questionVotes.id, existing[0].id)).run();
+    }
+  } else {
+    const voteId = `qvote-${randomUUID().slice(0, 8)}`;
+    userDb.insert(schema.questionVotes).values({
+      id: voteId, questionId: req.params.id, userId: token, vote, createdAt: Date.now(),
+    }).run();
+  }
+
+  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+
+  // Recompute scores
+  const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
+  const score = allVotes.reduce((s, v) => s + v.vote, 0);
+  res.json(mapQuestion(question, score, allVotes.length, vote as 1 | -1));
+});
+
+// DELETE /api/questions/:id/vote (auth)
+app.delete("/api/questions/:id/vote", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userDb = getUserDb();
+
+  const db = getDb();
+  const question = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, req.params.id)).all()[0];
+  if (!question) { res.status(404).json({ error: "Question not found" }); return; }
+
+  const existing = userDb.select().from(schema.questionVotes)
+    .where(and(eq(schema.questionVotes.questionId, req.params.id), eq(schema.questionVotes.userId, token)))
+    .all();
+
+  if (existing.length > 0) {
+    userDb.delete(schema.questionVotes).where(eq(schema.questionVotes.id, existing[0].id)).run();
+  }
+
+  // Recompute scores
+  const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
+  const score = allVotes.reduce((s, v) => s + v.vote, 0);
+  res.json(mapQuestion(question, score, allVotes.length, null));
 });
 
 // GET /api/referendums
@@ -858,7 +957,12 @@ function mapReferendum(row: typeof schema.referendums.$inferSelect): Referendum 
   };
 }
 
-function mapQuestion(row: typeof schema.citizenQuestions.$inferSelect): CitizenQuestion {
+function mapQuestion(
+  row: typeof schema.citizenQuestions.$inferSelect,
+  voteScore = 0,
+  totalVotes = 0,
+  userVote?: 1 | -1 | null,
+): CitizenQuestion {
   return {
     id: row.id,
     question: row.question,
@@ -867,6 +971,9 @@ function mapQuestion(row: typeof schema.citizenQuestions.$inferSelect): CitizenQ
     respondedOnDay: row.respondedOnDay,
     createdOnDay: row.createdOnDay,
     status: row.status as CitizenQuestion["status"],
+    voteScore,
+    totalVotes,
+    userVote: userVote ?? null,
   };
 }
 
