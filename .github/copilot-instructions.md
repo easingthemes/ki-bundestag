@@ -53,7 +53,12 @@ See [tsconfig.base.json](../tsconfig.base.json) for module config: `Node16` + `.
 
 **Dependency chain**: `types` ← `engine` ← `api`. Web is standalone (no workspace deps, uses local type copies in [packages/web/src/api.ts](../packages/web/src/api.ts)).
 
-**Database**: SQLite at `data/simulation.db`, path resolved via `findMonorepoRoot()` in [packages/engine/src/db/connection.ts](../packages/engine/src/db/connection.ts). Use `getSqlite()` for raw queries — never access drizzle internals.
+**Database**: Two SQLite databases in `data/` (both WAL mode):
+
+- `simulation.db` — Engine state (parties, bills, events, etc.). Access via `getDb()` / `getSqlite()`
+- `users.db` — App-owned data (users, proposals, votes, signals). Access via `getUserDb()` / `getUserSqlite()`
+
+Paths resolved via `findMonorepoRoot()` in [packages/engine/src/db/connection.ts](../packages/engine/src/db/connection.ts). Override: `DATABASE_PATH`, `USER_DATABASE_PATH` env vars.
 
 **Simulation**: Entry point is [packages/engine/src/simulation/loop.ts](../packages/engine/src/simulation/loop.ts) `runDay()` function. 13-step daily loop: economic drift → injections → elections → agent calls → action processing → confidence votes → budget cycle → media → summary.
 
@@ -87,20 +92,32 @@ db.insert(schema.bills).values({ id, title, ... }).run();
 
 ## Model Configuration
 
-Three AI models configurable via env vars in [packages/engine/src/agent/client.ts](../packages/engine/src/agent/client.ts):
+AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (see [packages/engine/src/agent/model-config.ts](../packages/engine/src/agent/model-config.ts)):
 
-- `MODEL_DAILY` (default: claude-haiku-4-5-20251001) — daily party agents
-- `MODEL_NEGOTIATION` (default: claude-haiku-4-5-20251001) — coalition rounds
-- `MODEL_SYNTHESIS` (default: claude-sonnet-4-5-20250929) — coalition agreement synthesis
+**Per-Party Models**:
+
+- SPD, CDU, Grüne, FDP, Linke: `anthropic:claude-haiku-4-5-20251001` ($0.80/$4.00 per 1M tokens)
+- AfD: `xai:grok-3-mini` ($0.30/$0.50 per 1M tokens) — cost savings
+- Override via: `MODEL_PARTY_<ID>` env vars (e.g., `MODEL_PARTY_AFD=xai:grok-3-mini`)
+
+**Per-Role Models**:
+
+- `MODEL_DAILY` (default: anthropic:claude-haiku-4-5-20251001) — system-wide calls
+- `MODEL_NEGOTIATION` (default: anthropic:claude-haiku-4-5-20251001) — coalition rounds
+- `MODEL_SYNTHESIS` (default: anthropic:claude-sonnet-4-5-20250929) — coalition agreement synthesis
+
+Unified client: [`callAI()`](../packages/engine/src/agent/client.ts) routes to appropriate provider. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
 
 ## Database Operations
 
 **Seed vs Migrate**:
 
-- `npm run seed` — **Destructive**: drops all tables, creates fresh DB with parties + govt
-- `npm run migrate` — **Safe**: applies schema changes only ([packages/engine/src/migrate.ts](../packages/engine/src/migrate.ts))
+- `npm run seed` — **Destructive**: drops all tables in both DBs, creates fresh state with parties + govt (backs up both files first)
+- `npm run migrate` — **Safe**: applies schema changes only to both DBs ([packages/engine/src/migrate.ts](../packages/engine/src/migrate.ts))
 
-**Schema**: 20+ tables in [packages/engine/src/db/schema.ts](../packages/engine/src/db/schema.ts). JSON columns use `mode: "json"`, booleans use `mode: "boolean"` (stored as integers).
+**Schema**: 20+ tables split across two DBs in [packages/engine/src/db/schema.ts](../packages/engine/src/db/schema.ts). JSON columns use `mode: "json"`, booleans use `mode: "boolean"` (stored as integers).
+
+**Migration**: One-time migration script available: `npx tsx scripts/migrate-users-db.ts` (moves user tables from old single-DB layout).
 
 ## Testing & Linting
 
@@ -108,7 +125,7 @@ Three AI models configurable via env vars in [packages/engine/src/agent/client.t
 
 ## Environment
 
-Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `API_PORT`, model overrides.
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`, `XAI_API_KEY`. Optional: `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, per-party model overrides (`MODEL_PARTY_<ID>`), role model overrides (`MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`).
 
 ## Key Files to Reference
 
