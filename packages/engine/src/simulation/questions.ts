@@ -1,6 +1,6 @@
 import type { Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
-import { getClient, MODELS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 3;
@@ -38,27 +38,17 @@ export async function answerPendingQuestions(
 
   if (pending.length === 0) return;
 
-  const client = getClient();
-
   for (const q of pending) {
     const party = allParties.find(p => p.id === q.targetPartyId);
     if (!party) continue;
 
     try {
-      const response = await client.messages.create({
-        model: MODELS.daily,
-        max_tokens: 512,
+      const text = await callAI({
         system: `You are the spokesperson for ${party.name}, a ${party.ideology} party in the German Bundestag. Answer the citizen's question in character, reflecting your party's values and positions. Keep your response to 2-3 sentences. Be direct and politically authentic.`,
-        messages: [{
-          role: "user",
-          content: `A citizen asks ${party.name}: "${q.question}"`,
-        }],
+        prompt: `A citizen asks ${party.name}: "${q.question}"`,
+        maxTokens: 512,
+        partyId: party.id,
       });
-
-      const text = response.content
-        .filter(block => block.type === "text")
-        .map(block => block.text)
-        .join("");
 
       db.update(schema.citizenQuestions)
         .set({

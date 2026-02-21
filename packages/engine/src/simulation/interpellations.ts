@@ -1,6 +1,6 @@
 import type { Government, Interpellation, Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
-import { getClient, MODELS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 2;
@@ -46,8 +46,6 @@ export async function answerPendingInterpellations(
 
   if (toAnswer.length === 0) return result;
 
-  const client = getClient();
-
   for (const row of toAnswer) {
     const minister = government.ministers.find(m => m.portfolio === row.targetMinistry);
     if (!minister) continue;
@@ -55,20 +53,12 @@ export async function answerPendingInterpellations(
     const ministerParty = allParties.find(p => p.id === minister.partyId);
 
     try {
-      const response = await client.messages.create({
-        model: MODELS.daily,
-        max_tokens: 300,
+      const text = await callAI({
         system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.`,
-        messages: [{
-          role: "user",
-          content: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
-        }],
+        prompt: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
+        maxTokens: 300,
+        partyId: minister.partyId,
       });
-
-      const text = response.content
-        .filter(block => block.type === "text")
-        .map(block => block.text)
-        .join("");
 
       const impact = row.type === "große" ? 0.3 : 0.1;
 

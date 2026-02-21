@@ -1,5 +1,5 @@
 import type { Party } from "@ki-bundestag/types";
-import { getClient, MODELS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 
 const SIGNIFICANT = new Set([
   "bill_passed", "bill_rejected", "presidential_veto",
@@ -41,14 +41,12 @@ Respond with ONLY valid JSON in this exact format (no markdown):
 {"narrative": "2-3 sentence journalistic summary here.", "mood": "one of: Stable Majority, Coalition Friction, Political Pressure, Crisis Response, Electoral Campaign, Budget Dispute, Government Transition"}`;
 
   try {
-    const response = await getClient().messages.create({
-      model: MODELS.daily,
-      max_tokens: 320,
-      messages: [{ role: "user", content: prompt }],
+    const raw = await callAI({
+      system: "",
+      prompt,
+      maxTokens: 320,
+      roleKey: "daily",
     });
-    const text = response.content[0];
-    if (text.type !== "text") return null;
-    const raw = text.text.trim();
     const parsed = JSON.parse(raw) as { narrative: string; mood: string };
     if (typeof parsed.narrative !== "string" || typeof parsed.mood !== "string") return null;
     return parsed;

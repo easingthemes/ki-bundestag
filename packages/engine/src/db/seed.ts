@@ -1,5 +1,5 @@
 import type { PolicyPriorities, CoalitionRole } from "@ki-bundestag/types";
-import { getDb, getSqlite, schema } from "./connection.js";
+import { getDb, getSqlite, getUserDb, getUserSqlite, getUserDbPath, schema } from "./connection.js";
 import { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../simulation/fraktionen.js";
 import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/government.js";
 
@@ -77,8 +77,8 @@ const PARTIES: PartySeed[] = [
   },
 ];
 
-/** Canonical table DDL. Used by both seed (fresh start) and migrate (upgrade in place). */
-const TABLE_DDL = `
+/** Simulation table DDL — stays in simulation.db */
+const SIM_TABLE_DDL = `
   CREATE TABLE IF NOT EXISTS parties (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -322,6 +322,18 @@ const TABLE_DDL = `
     economic_effect TEXT,
     revision_attempt INTEGER NOT NULL DEFAULT 0
   );
+`;
+
+/** User table DDL — lives in users.db */
+const USER_TABLE_DDL = `
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL UNIQUE,
+    party_id TEXT,
+    created_at INTEGER NOT NULL,
+    last_active INTEGER NOT NULL,
+    switch_cooldown_until INTEGER
+  );
 
   CREATE TABLE IF NOT EXISTS internal_proposals (
     id TEXT PRIMARY KEY,
@@ -342,14 +354,6 @@ const TABLE_DDL = `
     bundestag_bill_id TEXT
   );
 
-  CREATE TABLE IF NOT EXISTS member_signals (
-    id TEXT PRIMARY KEY,
-    bill_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    signal TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS internal_votes (
     id TEXT PRIMARY KEY,
     proposal_id TEXT NOT NULL,
@@ -358,21 +362,20 @@ const TABLE_DDL = `
     created_at INTEGER NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS users (
+  CREATE TABLE IF NOT EXISTS member_signals (
     id TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL UNIQUE,
-    party_id TEXT,
-    created_at INTEGER NOT NULL,
-    last_active INTEGER NOT NULL,
-    switch_cooldown_until INTEGER
+    bill_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    signal TEXT NOT NULL,
+    created_at INTEGER NOT NULL
   );
 `;
 
 /**
- * Column migrations — each entry adds a column to an existing table.
+ * Column migrations for simulation DB — each entry adds a column to an existing table.
  * ALTER TABLE ADD COLUMN is a no-op if the column already exists (we catch the error).
  */
-const COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
+const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
   { table: "simulation_events", column: "created_at", sql: "ALTER TABLE simulation_events ADD COLUMN created_at TEXT" },
   { table: "simulation_meta", column: "next_election_day", sql: "ALTER TABLE simulation_meta ADD COLUMN next_election_day INTEGER NOT NULL DEFAULT 120" },
   { table: "simulation_meta", column: "low_sentiment_streak", sql: "ALTER TABLE simulation_meta ADD COLUMN low_sentiment_streak INTEGER NOT NULL DEFAULT 0" },
@@ -393,6 +396,10 @@ const COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> =
   { table: "budgets", column: "revision_attempt", sql: "ALTER TABLE budgets ADD COLUMN revision_attempt INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "daily_summary", sql: "ALTER TABLE simulation_meta ADD COLUMN daily_summary TEXT" },
   { table: "simulation_meta", column: "day_started_at", sql: "ALTER TABLE simulation_meta ADD COLUMN day_started_at TEXT" },
+];
+
+/** Column migrations for user DB */
+const USER_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
   { table: "users", column: "display_name_unique", sql: "DELETE FROM users WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY display_name ORDER BY last_active DESC) as rn FROM users) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name ON users(display_name)" },
 ];
 
@@ -401,13 +408,14 @@ const COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> =
  * Safe to run repeatedly — creates missing tables, adds missing columns.
  */
 export function migrateDatabase() {
+  // ── Simulation DB ──
   const sqlite = getSqlite();
 
   // Create any missing tables
-  sqlite.exec(TABLE_DDL);
+  sqlite.exec(SIM_TABLE_DDL);
 
   // Add any missing columns to existing tables
-  for (const m of COLUMN_MIGRATIONS) {
+  for (const m of SIM_COLUMN_MIGRATIONS) {
     try {
       sqlite.exec(m.sql);
     } catch (err: any) {
@@ -449,7 +457,21 @@ export function migrateDatabase() {
       }
     }
   } catch {
-    // fraktionen table might not exist yet in TABLE_DDL — that's fine
+    // fraktionen table might not exist yet — that's fine
+  }
+
+  // ── User DB ──
+  const userSqlite = getUserSqlite();
+  userSqlite.exec(USER_TABLE_DDL);
+
+  for (const m of USER_COLUMN_MIGRATIONS) {
+    try {
+      userSqlite.exec(m.sql);
+    } catch (err: any) {
+      if (!err.message?.includes("duplicate column")) {
+        throw err;
+      }
+    }
   }
 }
 
@@ -457,12 +479,8 @@ export function seedDatabase() {
   const sqlite = getSqlite();
   const db = getDb();
 
-  // Drop all tables for a clean start
+  // Drop simulation tables for a clean start
   sqlite.exec(`
-    DROP TABLE IF EXISTS member_signals;
-    DROP TABLE IF EXISTS internal_votes;
-    DROP TABLE IF EXISTS internal_proposals;
-    DROP TABLE IF EXISTS users;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS constitutional_challenges;
     DROP TABLE IF EXISTS confidence_votes;
@@ -484,8 +502,18 @@ export function seedDatabase() {
     DROP TABLE IF EXISTS parties;
   `);
 
-  // Recreate schema
-  sqlite.exec(TABLE_DDL);
+  // Recreate simulation schema
+  sqlite.exec(SIM_TABLE_DDL);
+
+  // User DB: fresh start
+  const userSqlite = getUserSqlite();
+  userSqlite.exec(`
+    DROP TABLE IF EXISTS member_signals;
+    DROP TABLE IF EXISTS internal_votes;
+    DROP TABLE IF EXISTS internal_proposals;
+    DROP TABLE IF EXISTS users;
+  `);
+  userSqlite.exec(USER_TABLE_DDL);
 
   // Insert parties
   for (const party of PARTIES) {

@@ -5,7 +5,7 @@ import type {
   Party,
   SimulationEvent,
 } from "@ki-bundestag/types";
-import { getClient, MODELS, MAX_TOKENS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { parseAgentResponse } from "../agent/action-parser.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
@@ -84,7 +84,6 @@ export async function runNegotiationRound(
   roundNumber: number,
   currentDay: number,
 ): Promise<NegotiationRound[]> {
-  const client = getClient();
   const partiesWithSeats = allParties.filter(p => {
     const result = electionResults.find(r => r.partyId === p.id);
     return result && result.seatsWon > 0;
@@ -97,20 +96,15 @@ export async function runNegotiationRound(
       party, electionResults, allParties, previousRounds, roundNumber,
     );
 
-    console.log(`  [Negotiation] Round ${roundNumber}: Calling Claude for ${party.name}...`);
+    console.log(`  [Negotiation] Round ${roundNumber}: Calling AI for ${party.name}...`);
 
     try {
-      const response = await client.messages.create({
-        model: MODELS.negotiation,
-        max_tokens: MAX_TOKENS.negotiation,
+      const text = await callAI({
         system,
-        messages: [{ role: "user", content: user }],
+        prompt: user,
+        maxTokens: 1024,
+        partyId: party.id,
       });
-
-      const text = response.content
-        .filter(block => block.type === "text")
-        .map(block => block.text)
-        .join("");
 
       const parsed = parseAgentResponse(text);
       const action = parsed.actions.find(a => a.type === "negotiation_position");
@@ -166,8 +160,6 @@ export async function synthesizeAgreement(
   results: ElectionResult[],
   allParties: Party[],
 ): Promise<CoalitionAgreement | null> {
-  const client = getClient();
-
   // Find mutual acceptability: parties that accept each other
   const lastRound = allRounds[allRounds.length - 1];
   const sortedResults = [...results].sort((a, b) => b.seatsWon - a.seatsWon);
@@ -206,17 +198,12 @@ ${allRounds.map((round, i) =>
 Determine the coalition agreement. Respond as JSON.`;
 
   try {
-    const response = await client.messages.create({
-      model: MODELS.synthesis,
-      max_tokens: MAX_TOKENS.synthesis,
+    const text = await callAI({
       system,
-      messages: [{ role: "user", content: user }],
+      prompt: user,
+      maxTokens: 4096,
+      roleKey: "synthesis",
     });
-
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
 
     let jsonStr = text.trim();
     const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);

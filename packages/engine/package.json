@@ -20,8 +20,10 @@
     "simulate:auto": "tsx src/runner-auto.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@ai-sdk/anthropic": "^3.0.46",
+    "@ai-sdk/xai": "^3.0.57",
     "@ki-bundestag/types": "*",
+    "ai": "^6.0.97",
     "better-sqlite3": "^11.8.0",
     "dotenv": "^16.4.0",
     "drizzle-orm": "^0.39.0"

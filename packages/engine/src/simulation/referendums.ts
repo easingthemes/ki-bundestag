@@ -1,5 +1,5 @@
 import type { BillImpact, Crisis, Party, Referendum, SimulationEvent } from "@ki-bundestag/types";
-import { getClient, MODELS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 
@@ -25,8 +25,6 @@ export async function maybeGenerateReferendum(
     .filter((r: any) => r.status === "active");
   if (activeRows.length > 0) return;
 
-  const client = getClient();
-
   const context: string[] = [];
   if (activeCrises.length > 0) {
     context.push(`Active crises: ${activeCrises.map(c => `${c.name} (${c.severity})`).join(", ")}`);
@@ -40,9 +38,7 @@ export async function maybeGenerateReferendum(
   context.push(`Parties: ${partyContext}`);
 
   try {
-    const response = await client.messages.create({
-      model: MODELS.daily,
-      max_tokens: 512,
+    const text = await callAI({
       system: `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
 
 RESPONSE SCHEMA:
@@ -64,16 +60,10 @@ Rules:
 - Title should be a yes/no question
 - Impact values represent what happens if the referendum passes
 - Keep it realistic for German politics`,
-      messages: [{
-        role: "user",
-        content: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
-      }],
+      prompt: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
+      maxTokens: 512,
+      roleKey: "daily",
     });
-
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
 
     let jsonStr = text.trim();
     const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);

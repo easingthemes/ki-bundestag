@@ -66,6 +66,51 @@ export function closeDb() {
     _sqlite = null;
     _db = null;
   }
+  closeUserDb();
+}
+
+// ── User DB (separate file for user-owned tables) ────────────────────────────
+
+let _userDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _userSqlite: Database.Database | null = null;
+
+export function getUserDbPath(): string {
+  if (process.env.USER_DATABASE_PATH) {
+    return path.resolve(process.env.USER_DATABASE_PATH);
+  }
+  return path.join(MONOREPO_ROOT, "data", "users.db");
+}
+
+export function getUserDb() {
+  if (!_userDb) {
+    const dbPath = getUserDbPath();
+    const dir = path.dirname(dbPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    _userSqlite = new Database(dbPath);
+    _userSqlite.pragma("journal_mode = WAL");
+    _userSqlite.pragma("foreign_keys = ON");
+
+    _userDb = drizzle(_userSqlite, { schema });
+  }
+  return _userDb;
+}
+
+export function getUserSqlite(): Database.Database {
+  if (!_userSqlite) {
+    getUserDb(); // initializes both
+  }
+  return _userSqlite!;
+}
+
+export function closeUserDb() {
+  if (_userSqlite) {
+    _userSqlite.close();
+    _userSqlite = null;
+    _userDb = null;
+  }
 }
 
 export { schema };

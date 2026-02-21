@@ -1,6 +1,6 @@
 import type { MediaArticle, Party, SimulationEvent } from "@ki-bundestag/types";
 import { desc } from "drizzle-orm";
-import { getClient, MODELS } from "../agent/client.js";
+import { callAI } from "../agent/client.js";
 import { getDb, schema } from "../db/index.js";
 
 function generateId(): string {
@@ -74,15 +74,11 @@ export async function generateDailyMedia(
   const newsworthy = dayEvents.filter(e => NEWSWORTHY_TYPES.has(e.type));
   if (newsworthy.length === 0) return;
 
-  const client = getClient();
-
   const eventSummaries = newsworthy.map(e => `[${e.type}] ${e.title}: ${e.description}`).join("\n");
   const partyNames = allParties.map(p => `${p.name} (${p.id})`).join(", ");
 
   try {
-    const response = await client.messages.create({
-      model: MODELS.daily,
-      max_tokens: 2048,
+    const text = await callAI({
       system: `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
 
 OUTLETS:
@@ -108,16 +104,10 @@ Rules:
 - Content should reflect the outlet's bias
 - Write in English but use German political terminology where appropriate (Bundestag, Koalition, etc.)
 - Category should match the primary topic`,
-      messages: [{
-        role: "user",
-        content: `Day ${currentDay} in the Bundestag. Parties: ${partyNames}\n\nToday's events:\n${eventSummaries}\n\nWrite 2-3 news articles from different outlets covering today's events.`,
-      }],
+      prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
+      maxTokens: 2048,
+      roleKey: "daily",
     });
-
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.text)
-      .join("");
 
     let jsonStr = text.trim();
     const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);

@@ -40,23 +40,42 @@ Both `types` and `engine` point `"import"` and `"default"` exports to `./src/ind
 
 ## Database
 
-- SQLite at `data/simulation.db`, WAL mode, foreign keys enabled
+Two SQLite databases in `data/`, both WAL mode with foreign keys enabled:
+
+- **`simulation.db`** — simulation state, accessed via `getDb()` / `getSqlite()`
+  - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`
+  - Override path: `DATABASE_PATH` env var
+- **`users.db`** — user-owned data, accessed via `getUserDb()` / `getUserSqlite()`
+  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`
+  - Override path: `USER_DATABASE_PATH` env var
 - Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory
-- Override with `DATABASE_PATH` env var
-- Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM)
-- Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`
+- Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM, unified schema object used by both DBs)
+- DDL split in `seed.ts`: `SIM_TABLE_DDL` + `USER_TABLE_DDL`
+- `closeDb()` closes both connections; `npm run seed` backs up both files
 - `national_state` has `provisional_budget` (boolean); `simulation_meta` has `budget_retry_day`; `budgets` has `revision_attempt`
-- Use `getSqlite()` from connection module for raw sqlite3 access — never access drizzle internals
+- Use `getSqlite()` / `getUserSqlite()` for raw sqlite3 access — never access drizzle internals
+- One-time migration: `npx tsx scripts/migrate-users-db.ts` (moves user tables from old single-DB layout)
 
 ## Model Configuration
 
-Three model keys in `packages/engine/src/agent/client.ts`, each overridable via env var:
+AI calls use the **Vercel AI SDK v6** with per-party and per-role model selection (see `packages/engine/src/agent/model-config.ts`):
 
-| Key | Default | Env Var | Used for |
-|-----|---------|---------|----------|
-| `daily` | claude-haiku-4-5-20251001 | `MODEL_DAILY` | Daily party agent calls |
-| `negotiation` | claude-haiku-4-5-20251001 | `MODEL_NEGOTIATION` | Coalition negotiation rounds |
-| `synthesis` | claude-sonnet-4-5-20250929 | `MODEL_SYNTHESIS` | Coalition agreement synthesis |
+**Per-Party Models** (`PARTY_MODELS`):
+
+- SPD, CDU, Grüne, FDP, Linke: `anthropic:claude-haiku-4-5-20251001` ($0.80/$4.00 per 1M tokens)
+- AfD: `xai:grok-3-mini` ($0.30/$0.50 per 1M tokens) — cost savings
+- Used for: daily party agents, interpellation answers (minister uses their party's model)
+- Override via: `MODEL_PARTY_<ID>` env vars (e.g., `MODEL_PARTY_AFD=xai:grok-3-mini`)
+
+**Per-Role Models** (`ROLE_MODELS`):
+
+| Role Key | Default | Env Var | Used for |
+|----------|---------|---------|----------|
+| `daily` | anthropic:claude-haiku-4-5-20251001 | `MODEL_DAILY` | System-wide calls: media, polls, referendums, daily summaries, citizen Q&A |
+| `negotiation` | anthropic:claude-haiku-4-5-20251001 | `MODEL_NEGOTIATION` | Coalition negotiation rounds (per-party) |
+| `synthesis` | anthropic:claude-sonnet-4-5-20250929 | `MODEL_SYNTHESIS` | Coalition agreement synthesis |
+
+**Unified Client**: [`callAI()`](../packages/engine/src/agent/client.ts) function accepts `{system, prompt, maxTokens, partyId?, roleKey?}` and routes to the appropriate provider + model. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
 
 ## Simulation Flow
 
@@ -132,7 +151,7 @@ The web package uses **Tailwind CSS v4** + **shadcn/ui** for all styling:
 
 ## Environment
 
-Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
 
 ## ESM
 
