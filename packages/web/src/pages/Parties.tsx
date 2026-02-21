@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, type Party, type Fraktion, type AlignmentData } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
@@ -32,20 +32,24 @@ function JoinModal({ party, onClose, onJoined }: {
   onJoined: () => void;
 }) {
   const { user, login } = useUser();
-  const [name, setName] = useState(user?.displayName ?? "");
+  const navigate = useNavigate();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
 
+  // If not logged in, redirect to login
+  useEffect(() => {
+    if (!user) {
+      navigate("/login?redirect=/parties");
+      onClose();
+    }
+  }, [user, navigate, onClose]);
+
+  if (!user) return null;
+
   const handle = async () => {
-    if (name.trim().length < 2) return;
     setStatus("loading");
     try {
-      let result;
-      if (user) {
-        result = await api.joinParty(party.id);
-      } else {
-        result = await api.registerUser(name.trim(), party.id);
-      }
+      const result = await api.joinParty(party.id);
       login(result.id, result);
       onJoined();
       onClose();
@@ -65,29 +69,10 @@ function JoinModal({ party, onClose, onJoined }: {
       <Card className="w-[340px] shadow-lg" onClick={e => e.stopPropagation()}>
         <CardContent className="p-7">
           <h3 className="text-lg font-semibold mb-4">Join {party.name}</h3>
-          {!user && (
-            <>
-              <label className="text-sm text-muted-foreground block mb-1">
-                Display name (public within the party)
-              </label>
-              <input
-                autoFocus
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                maxLength={30}
-                placeholder="Your name"
-                className="w-full px-2.5 py-2 rounded border border-input text-sm"
-                onKeyDown={e => e.key === "Enter" && handle()}
-              />
-            </>
-          )}
-          {user && (
-            <p className="text-sm text-muted-foreground mb-4">
-              You'll join as <strong>{user.displayName}</strong>.
-              {user.partyId && <span className="text-muted-foreground/60"> A 7-day switching cooldown will apply.</span>}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground mb-4">
+            You'll join as <strong>{user.displayName}</strong>.
+            {user.partyId && <span className="text-muted-foreground/60"> A 7-day switching cooldown will apply.</span>}
+          </p>
           {status === "error" && (
             <div className="text-xs text-destructive my-2">{errMsg}</div>
           )}
@@ -100,7 +85,7 @@ function JoinModal({ party, onClose, onJoined }: {
             </button>
             <button
               onClick={handle}
-              disabled={status === "loading" || (!user && name.trim().length < 2)}
+              disabled={status === "loading"}
               className="px-4 py-1.5 rounded border-none text-white font-bold text-sm cursor-pointer disabled:opacity-60"
               style={{ background: displayColor }}
             >

@@ -32,7 +32,8 @@
       "mcp__chrome-devtools__emulate",
       "Bash(kill:*)",
       "Bash(wait)",
-      "mcp__chrome-devtools__list_console_messages"
+      "mcp__chrome-devtools__list_console_messages",
+      "Bash(grep:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

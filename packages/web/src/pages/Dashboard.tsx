@@ -322,9 +322,9 @@ export function Dashboard() {
           {/* Engagement CTAs */}
           <div className="flex flex-col gap-1.5">
             {!user ? (
-              <Link to="/parties" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-bold text-sm text-primary">Join a Party</span>
-                <span className="block text-xs text-muted-foreground">Register and become a member</span>
+              <Link to="/login" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+                <span className="block font-bold text-sm text-primary">Anmelden</span>
+                <span className="block text-xs text-muted-foreground">Log in to participate</span>
               </Link>
             ) : user.partyId ? (
               <Link to={`/parties/${user.partyId}`} className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">

@@ -560,8 +560,18 @@ export const api = {
   retractProposalVote: (id: string) => deleteJson<InternalProposal>(`/proposals/${id}/vote`),
 
   // User / membership
-  registerUser: (displayName: string, partyId: string) =>
-    postJson<User>("/users/register", { displayName, partyId }),
+  registerUser: (displayName: string, partyId?: string) =>
+    postJson<User>("/users/register", partyId ? { displayName, partyId } : { displayName }),
+  loginUser: async (displayName: string): Promise<User | null> => {
+    const res = await fetch(`${BASE}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName }),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("Login failed");
+    return res.json();
+  },
   getMe: () => fetchJson<User>("/users/me"),
   joinParty: (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {}),
   leaveParty: () => postJson<User>("/users/me/leave", {}),

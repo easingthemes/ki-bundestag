@@ -20,15 +20,31 @@ export function useUser(): UserCtx {
 }
 
 const TOKEN_KEY = "ki-bundestag-token";
+const COOKIE_NAME = "ki-bundestag-token";
 
 export function loadStoredToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    const ls = localStorage.getItem(TOKEN_KEY);
+    if (ls) return ls;
+  } catch { /* ignore */ }
+  // Fallback: read from cookie
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]+)`));
+    if (match) return decodeURIComponent(match[1]);
+  } catch { /* ignore */ }
+  return null;
 }
 
 export function saveToken(token: string): void {
   try { localStorage.setItem(TOKEN_KEY, token); } catch { /* ignore */ }
+  try {
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch { /* ignore */ }
 }
 
 export function clearToken(): void {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+  try {
+    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  } catch { /* ignore */ }
 }
