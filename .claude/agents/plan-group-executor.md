@@ -3,6 +3,7 @@ name: plan-group-executor
 description: Executes a single refactoring plan document end-to-end — reads the plan doc, generates Progress.md steps, implements all steps, and runs validation. Invoke with a path to a docs/plans/*.md file.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
+memory: project
 permissionMode: acceptEdits
 skills:
   - plan-from-doc
@@ -42,7 +43,7 @@ Work through every `pending` step in Progress.md in order. For **each step**, ru
 
 - Mark step `in-progress` in Progress.md before starting
 - Implement exactly as the plan doc specifies — follow explicit file paths and target structure
-- Follow project conventions from `.github/copilot-instructions.md`:
+- Follow project conventions from `.claude/CLAUDE.md` and `.claude/rules/`:
   - ESM `.js` extensions on all internal imports in `packages/engine/`
   - kebab-case filenames, camelCase functions, PascalCase types
   - Barrel re-exports to keep existing import paths valid
@@ -96,3 +97,4 @@ If blocked:
 - Never commit without a passing review; never skip the commit after a passing review
 - Keep Progress.md updated in real time — `in-progress` when starting, `done` after commit
 - The compact summary is the only thing that returns to the main conversation — keep it tight
+- Update your agent memory as you discover codepaths, patterns, and conventions that would help future executions

@@ -1,25 +1,12 @@
 #!/bin/bash
-# PostToolUse hook for Edit/Write
-# Reminds agent to update relevant docs after implementation changes
+# SubagentStop hook
+# Reminds agent to update relevant docs after subagent completes implementation
 
-# Read stdin to get tool info
-INPUT=$(cat)
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-
-# Only remind for source code files (not docs, configs, or hook scripts themselves)
-case "$FILE_PATH" in
-  */docs/*|*/.claude/*|*/node_modules/*|*.md|*.json|*.css)
-    exit 0
-    ;;
-  */packages/*)
-    cat <<'EOF'
+cat <<'EOF'
 {
-  "additionalContext": "REMINDER: You modified source code. When the current implementation task is complete, remember to update the relevant documentation: docs/PROGRESS.md (feature status), docs/Current_Architecture.md (schema, API, flow changes), and .claude/CLAUDE.md (if simulation flow or key patterns changed). Do NOT update docs mid-task — wait until the feature is fully working."
+  "hookSpecificOutput": {
+    "hookEventName": "SubagentStop",
+    "additionalContext": "REMINDER: A subagent just finished implementation work. When the current task is complete, consider updating:\n- `.claude/rules/` (domain-specific rules: esm.md, frontend.md, database.md, simulation.md) — if patterns, conventions, or key modules changed\n- `.claude/CLAUDE.md` — ONLY for project-wide changes (new commands, architecture shifts, critical warnings). Keep it concise (~80 lines). Domain details belong in rules/\n- docs/Current_Architecture.md — if schema, API routes, or simulation flow changed\nDo NOT update docs mid-task — wait until the feature is fully working."
+  }
 }
 EOF
-    ;;
-  *)
-    exit 0
-    ;;
-esac

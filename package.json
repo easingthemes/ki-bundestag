@@ -19,7 +19,8 @@
     "simulate:auto": "tsx packages/engine/src/runner-auto.ts",
     "trigger:election": "tsx packages/engine/src/trigger-election.ts",
     "simulate:visitors": "tsx scripts/simulate-visitors.ts",
-    "migrate:timing": "tsx scripts/migrate-timing.ts"
+    "migrate:timing": "tsx scripts/migrate-timing.ts",
+    "kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; echo 'Killed servers on ports 3001 and 5173'"
   },
   "devDependencies": {
     "playwright": "^1.58.2",
