@@ -1,7 +1,7 @@
 ---
 name: plan-commit
 description: Stage all changes and create a concise git commit for a plan step. Uses the current Progress.md step as the commit message source.
-argument-hint: [feat|fix|refactor|chore]
+argument-hint: "[feat|fix|refactor|chore]"
 disable-model-invocation: false
 ---
 
