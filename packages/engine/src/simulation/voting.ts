@@ -178,11 +178,13 @@ export function tallyAmendmentVotes(
  * Saves the original impact before first modification.
  */
 export function applyAmendmentToBill(bill: Bill, amendment: Amendment): void {
+  bill.impact = bill.impact ?? {};
+
   if (!bill.originalImpact) {
     bill.originalImpact = { ...bill.impact };
   }
 
-  const change = amendment.impactChange;
+  const change = amendment.impactChange ?? {};
   if (change.budget != null) bill.impact.budget = (bill.impact.budget ?? 0) + change.budget;
   if (change.unemployment != null) bill.impact.unemployment = (bill.impact.unemployment ?? 0) + change.unemployment;
   if (change.inflation != null) bill.impact.inflation = (bill.impact.inflation ?? 0) + change.inflation;

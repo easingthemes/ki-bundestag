@@ -479,6 +479,7 @@ const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string 
   { table: "simulation_meta", column: "daily_summary", sql: "ALTER TABLE simulation_meta ADD COLUMN daily_summary TEXT" },
   { table: "simulation_meta", column: "day_started_at", sql: "ALTER TABLE simulation_meta ADD COLUMN day_started_at TEXT" },
   { table: "simulation_meta", column: "timing_preset", sql: "ALTER TABLE simulation_meta ADD COLUMN timing_preset TEXT NOT NULL DEFAULT 'normal'" },
+  { table: "simulation_meta", column: "start_date", sql: "ALTER TABLE simulation_meta ADD COLUMN start_date TEXT" },
 ];
 
 /** Column migrations for user DB */
@@ -508,6 +509,11 @@ export function migrateDatabase() {
       }
     }
   }
+
+  // Backfill start_date for existing DBs
+  try {
+    sqlite.prepare("UPDATE simulation_meta SET start_date = ? WHERE start_date IS NULL").run(new Date().toISOString());
+  } catch { /* table may not exist yet */ }
 
   // Migrate existing "debate" bills to "third_reading" for the new multi-stage pipeline
   try {
@@ -705,6 +711,7 @@ export function seedDatabase() {
     nextElectionDay: 1461,
     lowSentimentStreak: 0,
     timingPreset: "normal",
+    startDate: new Date().toISOString(),
   }).run();
 
   // Insert initial fraktionen for parties with enough seats

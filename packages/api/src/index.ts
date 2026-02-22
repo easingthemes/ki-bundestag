@@ -350,6 +350,7 @@ app.get("/api/simulation/status", (_req, res) => {
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,
     dailySummary: (meta as any).dailySummary ?? null,
     timingPreset: (meta as any).timingPreset ?? "normal",
+    startDate: (meta as any).startDate ?? null,
   });
 });
 
@@ -409,6 +410,73 @@ app.get("/api/simulation/days/:dayNumber", (req, res) => {
   const events = db.select().from(schema.simulationEvents).all() as unknown as SimulationEvent[];
   const dayEvents = events.filter(e => e.dayNumber === dayNumber);
   res.json(dayEvents);
+});
+
+// GET /api/calendar — events grouped by day with real calendar dates
+app.get("/api/calendar", (req, res) => {
+  const db = getDb();
+  const metaRows = db.select().from(schema.simulationMeta).all();
+  const meta = metaRows[0];
+  const currentDay = meta?.currentDay ?? 0;
+  const startDateStr = (meta as any)?.startDate as string | null;
+  const startDate = startDateStr ? new Date(startDateStr) : new Date();
+
+  // Event importance tiers (lower = more important)
+  const EVENT_TIER: Record<string, number> = {
+    election_result: 1, government_formed: 1, government_dissolved: 1,
+    crisis_start: 1, constitutional_court_ruled: 1, vertrauensfrage: 1, misstrauensvotum: 1,
+    bill_proposed: 2, bill_third_reading: 2, presidential_veto: 2,
+    budget_proposed: 2, interpellation_filed: 2, election_announced: 2,
+    motion_submitted: 3, statement: 3, amendment_proposed: 3,
+    fraktion_formed: 3, fraktion_dissolved: 3, member_proposal_accepted: 3,
+    crisis_end: 3, negotiation_complete: 3, government_cabinet_formed: 3,
+  };
+  // Tier 4 (routine) events not listed above get tier 99
+
+  const allEvents = db.select().from(schema.simulationEvents).all() as unknown as SimulationEvent[];
+
+  // Optional month filter: ?month=YYYY-MM
+  const monthFilter = req.query.month as string | undefined;
+  let minDay = 0;
+  let maxDay = currentDay;
+  if (monthFilter && /^\d{4}-\d{2}$/.test(monthFilter)) {
+    const [year, month] = monthFilter.split("-").map(Number);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0); // last day of month
+    minDay = Math.max(0, Math.floor((monthStart.getTime() - startDate.getTime()) / 86400000));
+    maxDay = Math.floor((monthEnd.getTime() - startDate.getTime()) / 86400000);
+  }
+
+  // Group events by day
+  const dayMap = new Map<number, SimulationEvent[]>();
+  for (const evt of allEvents) {
+    if (evt.dayNumber < minDay || evt.dayNumber > maxDay) continue;
+    if (!dayMap.has(evt.dayNumber)) dayMap.set(evt.dayNumber, []);
+    dayMap.get(evt.dayNumber)!.push(evt);
+  }
+
+  // Build response: top 3 important events per day + count
+  const days = Array.from(dayMap.entries()).map(([dayNumber, evts]) => {
+    const dateObj = new Date(startDate.getTime() + dayNumber * 86400000);
+    const date = dateObj.toISOString().split("T")[0];
+
+    // Sort by importance tier, then by creation order
+    const sorted = evts
+      .filter(e => (EVENT_TIER[e.type] ?? 99) < 99) // exclude routine
+      .sort((a, b) => (EVENT_TIER[a.type] ?? 99) - (EVENT_TIER[b.type] ?? 99));
+
+    const topEvents = sorted.slice(0, 3).map(e => ({
+      id: e.id, type: e.type, title: e.title, actor: e.actor,
+    }));
+
+    return { dayNumber, date, topEvents, totalCount: sorted.length };
+  }).filter(d => d.totalCount > 0).sort((a, b) => a.dayNumber - b.dayNumber);
+
+  res.json({
+    startDate: startDate.toISOString(),
+    currentDay,
+    days,
+  });
 });
 
 // GET /api/simulation/events
