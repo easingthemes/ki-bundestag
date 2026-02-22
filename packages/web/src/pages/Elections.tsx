@@ -7,12 +7,13 @@ import { cn, fixColor } from "@/lib/utils";
 import { ROLE_BADGE, PHASE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { TERM_DURATION, PRESET_LABEL, formatTimeToElection } from "@/lib/timing";
 import { Hemicycle } from "@/components/Hemicycle";
-
-const MAJORITY_THRESHOLD = 368;
+import { BundesadlerIcon } from "@/components/elections/BundesadlerIcon";
+import { VoteBarChart } from "@/components/elections/VoteBarChart";
+import { CoalitionChips } from "@/components/elections/CoalitionChips";
+import { CoalitionCalculator } from "@/components/elections/CoalitionCalculator";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
-/** Convert election results + parties → SeatGroup[] for the Hemicycle component */
 function resultsToSeats(results: ElectionResult[], parties: Party[]) {
   return results.filter(r => r.seatsWon > 0).map(r => {
     const party = parties.find(p => p.id === r.partyId);
@@ -24,178 +25,6 @@ function partiesToSeats(parties: Party[]) {
   return parties.filter(p => p.seatCount > 0).map(p => ({
     partyId: p.id, count: p.seatCount, color: p.color, name: p.name,
   }));
-}
-
-function ideologicalSpread(selected: Party[]): number | null {
-  if (selected.length < 2) return null;
-  let total = 0, pairs = 0;
-  const keys = ["economy", "social", "environment", "immigration", "spending"] as const;
-  for (let i = 0; i < selected.length; i++) {
-    for (let j = i + 1; j < selected.length; j++) {
-      const dist = keys.reduce((s, k) =>
-        s + Math.abs(((selected[i].policyPriorities as Record<string, number>)[k] ?? 0) - ((selected[j].policyPriorities as Record<string, number>)[k] ?? 0)), 0);
-      total += dist; pairs++;
-    }
-  }
-  return Math.round((total / pairs) * 10) / 10;
-}
-
-function CoalitionCalculator({ parties, currentCoalitionIds }: { parties: Party[]; currentCoalitionIds: string[] }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(currentCoalitionIds));
-
-  const seatedParties = [...parties].filter(p => p.seatCount > 0).sort((a, b) => b.seatCount - a.seatCount);
-  const totalSeats = seatedParties.reduce((s, p) => s + p.seatCount, 0) || 735;
-  const selectedParties = seatedParties.filter(p => selected.has(p.id));
-  const selectedSeats = selectedParties.reduce((s, p) => s + p.seatCount, 0);
-  const hasMajority = selectedSeats >= MAJORITY_THRESHOLD;
-  const spread = ideologicalSpread(selectedParties);
-  const spreadLabel = spread == null ? null : spread <= 1.0 ? "Kompatibel" : spread <= 2.0 ? "Moderat" : "Fragmentiert";
-  const spreadColor = spread == null ? SEMANTIC_HEX.neutral : spread <= 1.0 ? SEMANTIC_HEX.positive : spread <= 2.0 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative;
-
-  const toggle = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  return (
-    <div className="mb-8">
-      <h2 className="section-title">Koalitionsrechner</h2>
-      <Card>
-        <CardContent className="p-5">
-          <div className="flex flex-col gap-1.5">
-            {seatedParties.map(p => {
-              const color = fixColor(p.color);
-              const isSelected = selected.has(p.id);
-              const barWidth = (p.seatCount / totalSeats) * 100;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => toggle(p.id)}
-                  className="flex items-center gap-2.5 cursor-pointer px-2 py-1.5 rounded"
-                  style={{
-                    background: isSelected ? `${color}18` : "transparent",
-                    border: `1px solid ${isSelected ? color : "var(--color-border)"}`,
-                    opacity: isSelected ? 1 : 0.55,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggle(p.id)}
-                    onClick={e => e.stopPropagation()}
-                    className="cursor-pointer size-3.5"
-                  />
-                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span className="font-semibold text-sm min-w-20">{p.name}</span>
-                  <span className="text-sm text-muted-foreground tabular-nums min-w-16">{p.seatCount} Sitze</span>
-                  <div className="flex-1 bg-muted rounded h-2.5 max-w-48">
-                    <div className="h-full rounded" style={{ width: `${barWidth}%`, backgroundColor: color }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-3.5 pt-3 border-t border-border flex gap-5 flex-wrap items-center">
-            <div className="font-bold text-sm">
-              <span style={{ color: hasMajority ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-                {selectedSeats} / {totalSeats} Sitze
-              </span>
-              <span className="ml-2.5 text-sm font-extrabold" style={{ color: hasMajority ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-                {hasMajority ? "MEHRHEIT" : "MINDERHEIT"}
-              </span>
-            </div>
-            {spread != null && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Ideologische Distanz: </span>
-                <span className="font-bold" style={{ color: spreadColor }}>{spread} — {spreadLabel}</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function BundesadlerIcon({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="rgba(255,215,0,0.9)">
-      <path d="M12 2 C10 3 6 4 4 7 L7 8 C5 10 4 12 5 14 L8 13 C9 16 10 18 12 20 C14 18 15 16 16 13 L19 14 C20 12 19 10 17 8 L20 7 C18 4 14 3 12 2Z" />
-    </svg>
-  );
-}
-
-function avatarUrl(name: string, color: string, size = 32): string {
-  const bg = fixColor(color).replace("#", "");
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${size * 2}&bold=true&background=${bg}&color=fff&rounded=true`;
-}
-
-/** Horizontal bar chart — Politico-style */
-function VoteBarChart({ results, parties, previousResults }: {
-  results: ElectionResult[];
-  parties: Party[];
-  previousResults: ElectionResult[] | null;
-}) {
-  const sorted = [...results].filter(r => r.seatsWon > 0).sort((a, b) => b.votesPercent - a.votesPercent);
-  const maxPct = Math.max(...sorted.map(r => r.votesPercent), 1);
-
-  return (
-    <div className="flex flex-col gap-2">
-      {sorted.map(r => {
-        const party = parties.find(p => p.id === r.partyId);
-        const color = fixColor(party?.color || "#999");
-        const prevResult = previousResults?.find(pr => pr.partyId === r.partyId);
-        const barWidth = (r.votesPercent / maxPct) * 100;
-        const prevWidth = prevResult ? (prevResult.votesPercent / maxPct) * 100 : 0;
-        const delta = prevResult ? Math.round((r.votesPercent - prevResult.votesPercent) * 10) / 10 : null;
-
-        return (
-          <div key={r.partyId} className="flex items-center gap-3">
-            <div className="min-w-24 shrink-0 flex items-center gap-2">
-              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-              <span className="text-sm font-medium truncate">{party?.name || r.partyId}</span>
-            </div>
-            <div className="flex-1 relative h-7 bg-muted/50 rounded overflow-hidden">
-              {previousResults && prevResult && (
-                <div
-                  className="absolute top-0 h-full rounded bg-muted-foreground/15"
-                  style={{ width: `${prevWidth}%` }}
-                />
-              )}
-              <div
-                className="absolute top-0 h-full rounded"
-                style={{ width: `${barWidth}%`, backgroundColor: color }}
-              />
-            </div>
-            <div className="min-w-20 shrink-0 text-right">
-              <span className="text-sm font-extrabold tabular-nums">{r.votesPercent}%</span>
-              {delta != null && (
-                <span
-                  className="text-xs ml-1.5 tabular-nums"
-                  style={{ color: delta > 0 ? SEMANTIC_HEX.positive : delta < 0 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral }}
-                >
-                  {delta > 0 ? "+" : ""}{delta}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {previousResults && (
-        <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-2 rounded bg-zinc-500 inline-block" /> Aktuell
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-2 rounded bg-muted-foreground/15 inline-block" /> Vorherig
-          </span>
-        </div>
-      )}
-    </div>
-  );
 }
 
 function formatDelta(n: number): string {
@@ -212,31 +41,9 @@ function formatPctDelta(current: number, previous: number | undefined): string {
   return `${diff}`;
 }
 
-function CoalitionChips({ ids, parties, results, isFull }: { ids: string[]; parties: Party[]; results?: ElectionResult[] | null; isFull?: boolean }) {
-  return (
-    <div className="flex gap-2 mt-2 flex-wrap">
-      {ids.map(id => {
-        const p = parties.find(x => x.id === id);
-        const color = fixColor(p?.color || "#999");
-        const result = results?.find(r => r.partyId === id);
-        return (
-          <div
-            key={id}
-            className={cn("flex items-center gap-1.5 px-3 py-1 rounded", isFull ? "font-semibold text-sm" : "text-sm text-muted-foreground")}
-            style={isFull
-              ? { border: `2px solid ${color}`, background: `${color}18` }
-              : { border: "1px solid var(--color-border)" }
-            }
-          >
-            {isFull && <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />}
-            {p?.name || id}
-            {result && <span className="font-normal text-muted-foreground">({result.seatsWon})</span>}
-            {!result && p && <span className="text-muted-foreground">({p.seatCount})</span>}
-          </div>
-        );
-      })}
-    </div>
-  );
+function avatarUrl(name: string, color: string, size = 32): string {
+  const bg = fixColor(color).replace("#", "");
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${size * 2}&bold=true&background=${bg}&color=fff&rounded=true`;
 }
 
 export function Elections() {

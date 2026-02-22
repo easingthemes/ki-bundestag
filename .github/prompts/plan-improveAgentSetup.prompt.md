@@ -1,6 +1,6 @@
 # Plan: Improve Claude Code & GitHub Copilot Agent Setup
 
-**TL;DR**: Your `.claude/` setup is sophisticated — 12 skills, 1 subagent, 2 hooks, detailed CLAUDE.md — well beyond what most projects have. Your `.github/` Copilot setup is more nascent (1 agent, 1 prompt, 1 instruction file). The plan covers 10 improvements: adopt new features, fix gaps, and leverage cross-compatibility to eliminate duplication.
+**TL;DR**: Both Claude Code and GitHub Copilot in VS Code share the same `.claude/` setup — 12 skills, 2 hooks, CLAUDE.md, plus a growing agent roster. Copilot additionally has 1 dedicated agent and 1 prompt in `.github/`. The two platforms are more aligned than they appear: most `.claude/` config is already read by Copilot. The plan covers 10 improvements: adopt new features, fix remaining gaps, and eliminate the few remaining duplications.
 
 > **Key cross-compatibility insight**: GitHub Copilot in VS Code can read from `.claude/` directories. By default both `.github/` and `.claude/` folders are used, with the option to configure additional sources in VS Code settings. This covers:
 >
@@ -17,7 +17,7 @@
 
 ### Area 1: Adopt New Features
 
-**1. Add `.claude/rules/` for modular, path-specific rules** *(serves both platforms)*
+**1. Add `.claude/rules/` for modular, path-specific rules** _(serves both platforms)_
 Both platforms read `.claude/rules/*.md` files, auto-loaded with optional `paths:` frontmatter for file-glob scoping. CLAUDE.md is a 230-line monolith. Split domain-specific rules out:
 
 - `.claude/rules/esm.md` — ESM import patterns, `.js` extension rules (scoped to `packages/engine/**/*.ts`)
@@ -68,7 +68,7 @@ The `.claude/screenshots/` folder has 16 PNG files and a 3386-line text snapshot
 - Domain-specific rules move to `.claude/rules/` (item #1)
 - The only Copilot-specific config remaining in `.github/` is the Plan agent (`.github/agents/Plan.agent.md`), since agent formats differ between platforms
 
-**8. Activate the `post-impl-remind` hook** *(serves both platforms in VS Code)*
+**8. Activate the `post-impl-remind` hook** _(serves both platforms in VS Code)_
 The hook script exists at `.claude/hooks/post-impl-remind.sh` but is wired to an empty `PostToolUse: []` array — it never runs. Add proper hook config:
 
 ```json
@@ -79,8 +79,6 @@ The hook script exists at `.claude/hooks/post-impl-remind.sh` but is wired to an
   }
 ]
 ```
-
-
 
 **9. Verify skill name resolution**
 The `plan-group-executor` subagent references a skill called `plan-commit`, but the directory is `commit/` (with `name: plan-commit` in frontmatter). Verify Claude Code resolves by `name` not directory. If not, rename the directory to `plan-commit/`.
@@ -97,17 +95,18 @@ The `plan-group-executor` subagent references a skill called `plan-commit`, but 
 ### Cross-Platform Compatibility Matrix
 
 | Config Type                | Single Source Location                   | Claude Code | Copilot (VS Code) | Copilot (remote agent) |
-| -------------------------- | ---------------------------------------- | ------------------- | ------------------------- | ------------------------------------- |
-| Project context            | `.claude/CLAUDE.md`                      | ✅          | ✅                 | ✅                     |
-| Path-scoped rules          | `.claude/rules/*.md`                     | ✅          | ✅                 | ✅                     |
-| Skills                     | `.claude/skills/*/SKILL.md`              | ✅          | ✅                 | ✅                     |
-| Hooks                      | `.claude/hooks/` + `settings.local.json` | ✅          | ✅                 | ❌ (`.github/hooks/`)  |
-| Subagents                  | `.claude/agents/*.md`                    | ✅          | ❌                 | ❌                     |
-| Copilot agents             | `.github/agents/*.agent.md`              | ❌          | ✅                 | ✅                     |
-| Prompts                    | `.github/prompts/*.prompt.md`            | ❌          | ✅                 | ✅                     |
-| Settings (permissions/MCP) | `.claude/settings.local.json`            | ✅          | ❌                 | ❌                     |
+| -------------------------- | ---------------------------------------- | ----------- | ----------------- | ---------------------- |
+| Project context            | `.claude/CLAUDE.md`                      | ✅          | ✅                | ✅                     |
+| Path-scoped rules          | `.claude/rules/*.md`                     | ✅          | ✅                | ✅                     |
+| Skills                     | `.claude/skills/*/SKILL.md`              | ✅          | ✅                | ✅                     |
+| Hooks                      | `.claude/hooks/` + `settings.local.json` | ✅          | ✅                | ❌ (`.github/hooks/`)  |
+| Subagents                  | `.claude/agents/*.md`                    | ✅          | ❌                | ❌                     |
+| Copilot agents             | `.github/agents/*.agent.md`              | ❌          | ✅                | ✅                     |
+| Prompts                    | `.github/prompts/*.prompt.md`            | ❌          | ✅                | ✅                     |
+| Settings (permissions/MCP) | `.claude/settings.local.json`            | ✅          | ❌                | ❌                     |
 
 After implementing items #1 and #7:
+
 - **Claude Code-only**: `.claude/agents/` (subagent format), `.claude/settings.local.json` (permissions/MCP)
 - **Copilot-only**: `.github/agents/Plan.agent.md`, `.github/prompts/`
 - **Shared** (zero duplication): `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, `.claude/hooks/`
@@ -116,18 +115,18 @@ After implementing items #1 and #7:
 
 ### Priority Order
 
-| #   | Item                                                    | Impact                                         | Effort  |
-| --- | ------------------------------------------------------- | ---------------------------------------------- | ------- |
-| 1   | Split CLAUDE.md into `.claude/rules/`                   | **High** — path-scoping, serves both platforms | Medium  |
-| 7   | Delete `copilot-instructions.md` (use CLAUDE.md)        | **High** — eliminates duplication entirely     | Low     |
-| 8   | Activate post-impl-remind hook           | Medium — docs stay current, both platforms     | Low     |
-| 5   | Add `$schema` to settings               | Low — DX improvement                           | Trivial |
-| 2   | Persistent memory on plan-group-executor | Medium — smarter refactoring over time         | Low     |
-| 3   | Add code-reviewer subagent              | Medium — isolates review context               | Low     |
-| 6   | Clean up screenshots                    | Low — prevents accidental context bloat        | Trivial |
-| 4   | Upgrade hook format                     | Low — current format works fine                | Low     |
-| 9   | Verify skill name resolution            | Low — likely already works                     | Trivial |
-| 10  | Verify Plan agent after deletion        | Low — quick check                              | Trivial |
+| #   | Item                                             | Impact                                         | Effort  |
+| --- | ------------------------------------------------ | ---------------------------------------------- | ------- |
+| 1   | Split CLAUDE.md into `.claude/rules/`            | **High** — path-scoping, serves both platforms | Medium  |
+| 7   | Delete `copilot-instructions.md` (use CLAUDE.md) | **High** — eliminates duplication entirely     | Low     |
+| 8   | Activate post-impl-remind hook                   | Medium — docs stay current, both platforms     | Low     |
+| 5   | Add `$schema` to settings                        | Low — DX improvement                           | Trivial |
+| 2   | Persistent memory on plan-group-executor         | Medium — smarter refactoring over time         | Low     |
+| 3   | Add code-reviewer subagent                       | Medium — isolates review context               | Low     |
+| 6   | Clean up screenshots                             | Low — prevents accidental context bloat        | Trivial |
+| 4   | Upgrade hook format                              | Low — current format works fine                | Low     |
+| 9   | Verify skill name resolution                     | Low — likely already works                     | Trivial |
+| 10  | Verify Plan agent after deletion                 | Low — quick check                              | Trivial |
 
 ---
 
