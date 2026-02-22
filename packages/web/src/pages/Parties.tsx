@@ -6,12 +6,8 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FRAKTION_BADGE } from "@/lib/colors";
-import { cn } from "@/lib/utils";
+import { cn, fixColor } from "@/lib/utils";
 import { PartyCard, PartyCardGrid } from "@/components/PartyCard";
-
-function fixColor(c: string): string {
-  return c === "#FFED00" ? "#c4a900" : c;
-}
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) return null;
