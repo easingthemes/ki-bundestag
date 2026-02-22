@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
-import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, getSqlite, getUserSqlite } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
@@ -1542,6 +1542,14 @@ app.post("/api/users/me/join/:partyId", (req, res) => {
   const party = db.select().from(schema.parties).where(eq(schema.parties.id, req.params.partyId)).all();
   if (party.length === 0) { res.status(404).json({ error: "Party not found" }); return; }
 
+  // If switching parties, deactivate seat and expire applications
+  if (user.partyId != null && user.partyId !== req.params.partyId) {
+    deactivateUserSeat(token);
+    userDb.update(schema.mdbApplications)
+      .set({ status: "expired" as const })
+      .where(and(eq(schema.mdbApplications.userId, token), eq(schema.mdbApplications.status, "pending")))
+      .run();
+  }
   const cooldown = user.partyId != null ? currentDay + 7 : null;
   userDb.update(schema.users)
     .set({ partyId: req.params.partyId, lastActive: Date.now(), switchCooldownUntil: cooldown })
@@ -1561,12 +1569,544 @@ app.post("/api/users/me/leave", (req, res) => {
   const db = getDb();
   const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
   const currentDay = metaRow?.day ?? 0;
+  // Deactivate any active Bundestag seat
+  deactivateUserSeat(token);
+  // Expire pending MdB applications
+  userDb.update(schema.mdbApplications)
+    .set({ status: "expired" as const })
+    .where(and(eq(schema.mdbApplications.userId, token), eq(schema.mdbApplications.status, "pending")))
+    .run();
   userDb.update(schema.users)
     .set({ partyId: null, lastActive: Date.now(), switchCooldownUntil: currentDay + 7 })
     .where(eq(schema.users.id, token))
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+});
+
+// ── MdB Seats ────────────────────────────────────────────────────────────────
+
+// POST /api/seats/apply — apply for a Bundestag seat
+app.post("/api/seats/apply", (req, res) => {
+  if (requireParticipatory(req, res, "mdb_apply")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  if (!user.partyId) { res.status(400).json({ error: "You must join a party first" }); return; }
+
+  // Check no active seat
+  const existingSeat = getUserSeat(token);
+  if (existingSeat) { res.status(400).json({ error: "You already have an active seat" }); return; }
+
+  // Check no pending application
+  const pendingApp = userDb.select().from(schema.mdbApplications)
+    .where(and(
+      eq(schema.mdbApplications.userId, token),
+      eq(schema.mdbApplications.status, "pending"),
+    )).all();
+  if (pendingApp.length > 0) { res.status(400).json({ error: "You already have a pending application" }); return; }
+
+  // Check cooldown from rejected application
+  const db = getDb();
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+  const recentRejected = userDb.select().from(schema.mdbApplications)
+    .where(and(
+      eq(schema.mdbApplications.userId, token),
+      eq(schema.mdbApplications.status, "rejected"),
+    )).all()
+    .filter(a => a.cooldownUntilDay != null && currentDay < a.cooldownUntilDay);
+  if (recentRejected.length > 0) {
+    res.status(403).json({ error: `Cooldown active until Day ${recentRejected[0].cooldownUntilDay}` });
+    return;
+  }
+
+  // Check open seats exist for party
+  const openCounts = getOpenSeatCounts();
+  if ((openCounts[user.partyId] ?? 0) === 0) {
+    res.status(400).json({ error: "No open seats available for your party" });
+    return;
+  }
+
+  const { applicationText, policyFocus } = req.body as { applicationText?: string; policyFocus?: string[] };
+  if (!applicationText || applicationText.trim().length < 10 || applicationText.trim().length > 500) {
+    res.status(400).json({ error: "applicationText must be 10–500 characters" });
+    return;
+  }
+
+  const appId = randomUUID();
+  userDb.insert(schema.mdbApplications).values({
+    id: appId,
+    userId: token,
+    partyId: user.partyId,
+    applicationText: applicationText.trim(),
+    policyFocus: policyFocus ?? null,
+    status: "pending",
+    createdOnDay: currentDay,
+  }).run();
+
+  res.json({
+    id: appId,
+    userId: token,
+    partyId: user.partyId,
+    applicationText: applicationText.trim(),
+    policyFocus: policyFocus ?? null,
+    status: "pending",
+    createdOnDay: currentDay,
+  });
+});
+
+// GET /api/seats/my-seat — get user's active seat + application status
+app.get("/api/seats/my-seat", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  const userDb = getUserDb();
+  const applications = userDb.select().from(schema.mdbApplications)
+    .where(eq(schema.mdbApplications.userId, token))
+    .all()
+    .sort((a, b) => b.createdOnDay - a.createdOnDay);
+
+  res.json({ seat, applications });
+});
+
+// GET /api/seats/party/:partyId — all active seats for a party (public roster)
+app.get("/api/seats/party/:partyId", (req, res) => {
+  const seats = getActiveSeats(req.params.partyId);
+
+  // Enrich with user display names
+  const userDb = getUserDb();
+  const enriched = seats.map(seat => {
+    let displayName: string | null = null;
+    if (seat.userId) {
+      const user = userDb.select().from(schema.users)
+        .where(eq(schema.users.id, seat.userId))
+        .all()[0];
+      displayName = user?.displayName ?? null;
+    }
+    return { ...seat, displayName };
+  });
+
+  res.json(enriched);
+});
+
+// GET /api/seats/available — open seat counts per party
+app.get("/api/seats/available", (_req, res) => {
+  const openCounts = getOpenSeatCounts();
+
+  // Also include total active seats per party for context
+  const sqlite = getSqlite();
+  const totalRows = sqlite.prepare(
+    "SELECT party_id, COUNT(*) as total, SUM(CASE WHEN controller = 'human' THEN 1 ELSE 0 END) as human_total FROM bundestag_seats WHERE active = 1 GROUP BY party_id"
+  ).all() as Array<{ party_id: string; total: number; human_total: number }>;
+
+  const result: Record<string, { open: number; humanTotal: number; total: number }> = {};
+  for (const row of totalRows) {
+    result[row.party_id] = {
+      open: openCounts[row.party_id] ?? 0,
+      humanTotal: row.human_total,
+      total: row.total,
+    };
+  }
+
+  res.json(result);
+});
+
+// ── MdB Parliamentary Actions ─────────────────────────────────────────────────
+
+// POST /api/motions/submit — user files a motion
+app.post("/api/motions/submit", (req, res) => {
+  if (requireParticipatory(req, res, "vote_bills")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
+
+  // Check Fraktion
+  const db = getDb();
+  const fraktion = db.select().from(schema.fraktionen)
+    .where(and(eq(schema.fraktionen.partyId, seat.partyId), eq(schema.fraktionen.status, "active")))
+    .all()[0];
+  if (!fraktion) { res.status(403).json({ error: "Your party has no Fraktion — cannot submit motions" }); return; }
+
+  const { motionType, title, description } = req.body as { motionType?: string; title?: string; description?: string };
+  if (!motionType || !["motion", "resolution"].includes(motionType)) {
+    res.status(400).json({ error: "motionType must be 'motion' or 'resolution'" }); return;
+  }
+  if (!title || title.trim().length < 5 || title.trim().length > 100) {
+    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  }
+  if (!description || description.trim().length < 10 || description.trim().length > 300) {
+    res.status(400).json({ error: "description must be 10–300 characters" }); return;
+  }
+
+  // Cooldown: max 1 pending motion at a time per user
+  const sqlite = getSqlite();
+  // Check user-filed motions via pending_injections
+  const recentUserMotion = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_motion' AND json_extract(data, '$.userId') = ?"
+  ).get(token) as { cnt: number };
+  if (recentUserMotion.cnt > 0) {
+    // Count how many were filed in last 7 days (from motions table, attributed to this party by user)
+    // Simpler: just limit to 1 pending at a time
+    const unconsumed = sqlite.prepare(
+      "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_motion' AND consumed = 0 AND json_extract(data, '$.userId') = ?"
+    ).get(token) as { cnt: number };
+    if (unconsumed.cnt > 0) {
+      res.status(429).json({ error: "You already have a pending motion" }); return;
+    }
+  }
+
+  // Get user display name
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+
+  db.insert(schema.pendingInjections).values({
+    id: randomUUID(),
+    type: "mdb_motion",
+    data: {
+      motionType,
+      title: title.trim(),
+      description: description.trim(),
+      partyId: seat.partyId,
+      userId: token,
+      proposerName: user?.displayName ?? "MdB",
+    } as any,
+    consumed: false,
+  }).run();
+
+  res.json({ status: "queued", message: "Motion will be processed on next simulation day" });
+});
+
+// POST /api/interpellations/submit — user files an interpellation
+app.post("/api/interpellations/submit", (req, res) => {
+  if (requireParticipatory(req, res, "vote_bills")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
+
+  const db = getDb();
+  // Must be opposition
+  const party = db.select().from(schema.parties).where(eq(schema.parties.id, seat.partyId)).all()[0];
+  if (!party || (party.coalitionRole as string) !== "opposition") {
+    res.status(403).json({ error: "Only opposition parties can file interpellations" }); return;
+  }
+  // Must have Fraktion
+  const fraktion = db.select().from(schema.fraktionen)
+    .where(and(eq(schema.fraktionen.partyId, seat.partyId), eq(schema.fraktionen.status, "active")))
+    .all()[0];
+  if (!fraktion) { res.status(403).json({ error: "Your party has no Fraktion" }); return; }
+
+  const { interpellationType, title, question, targetMinistry } = req.body as {
+    interpellationType?: string; title?: string; question?: string; targetMinistry?: string;
+  };
+  if (!interpellationType || !["kleine", "große"].includes(interpellationType)) {
+    res.status(400).json({ error: "interpellationType must be 'kleine' or 'große'" }); return;
+  }
+  if (!title || title.trim().length < 5 || title.trim().length > 100) {
+    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  }
+  if (!question || question.trim().length < 10 || question.trim().length > 500) {
+    res.status(400).json({ error: "question must be 10–500 characters" }); return;
+  }
+  const validMinistries = ["finance", "labour", "environment", "interior", "defence", "education", "health", "infrastructure"];
+  if (!targetMinistry || !validMinistries.includes(targetMinistry)) {
+    res.status(400).json({ error: `targetMinistry must be one of: ${validMinistries.join(", ")}` }); return;
+  }
+
+  // Cooldown: 1 pending at a time
+  const sqlite = getSqlite();
+  const unconsumed = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_interpellation' AND consumed = 0 AND json_extract(data, '$.userId') = ?"
+  ).get(token) as { cnt: number };
+  if (unconsumed.cnt > 0) {
+    res.status(429).json({ error: "You already have a pending interpellation" }); return;
+  }
+
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+
+  db.insert(schema.pendingInjections).values({
+    id: randomUUID(),
+    type: "mdb_interpellation",
+    data: {
+      interpellationType,
+      title: title.trim(),
+      question: question.trim(),
+      targetMinistry,
+      partyId: seat.partyId,
+      userId: token,
+      proposerName: user?.displayName ?? "MdB",
+    } as any,
+    consumed: false,
+  }).run();
+
+  res.json({ status: "queued", message: "Interpellation will be processed on next simulation day" });
+});
+
+// POST /api/bills/:id/amendment — user proposes an amendment
+app.post("/api/bills/:id/amendment", (req, res) => {
+  if (requireParticipatory(req, res, "propose_amendments")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
+
+  const db = getDb();
+  const bill = db.select().from(schema.bills).where(eq(schema.bills.id, req.params.id)).all()[0];
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (bill.status !== "second_reading") { res.status(400).json({ error: "Bill is not in second reading" }); return; }
+
+  const { title, description, impactChange } = req.body as {
+    title?: string; description?: string; impactChange?: Record<string, number>;
+  };
+  if (!title || title.trim().length < 5 || title.trim().length > 100) {
+    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  }
+  if (!description || description.trim().length < 10 || description.trim().length > 300) {
+    res.status(400).json({ error: "description must be 10–300 characters" }); return;
+  }
+  if (!impactChange || typeof impactChange !== "object") {
+    res.status(400).json({ error: "impactChange must be an object" }); return;
+  }
+  // Validate impact bounds (±0.3)
+  for (const [key, val] of Object.entries(impactChange)) {
+    if (!["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"].includes(key)) {
+      res.status(400).json({ error: `Invalid impact key: ${key}` }); return;
+    }
+    if (typeof val !== "number" || val < -0.3 || val > 0.3) {
+      res.status(400).json({ error: `${key} must be between -0.3 and 0.3` }); return;
+    }
+  }
+
+  // 1 amendment per user per bill
+  const sqlite = getSqlite();
+  const existingAmend = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_amendment' AND consumed = 0 AND json_extract(data, '$.userId') = ? AND json_extract(data, '$.billId') = ?"
+  ).get(token, req.params.id) as { cnt: number };
+  if (existingAmend.cnt > 0) {
+    res.status(400).json({ error: "You already have a pending amendment for this bill" }); return;
+  }
+  // Check via pending_injections that were already consumed for this bill+user
+  const consumedAmend = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_amendment' AND consumed = 1 AND json_extract(data, '$.userId') = ? AND json_extract(data, '$.billId') = ?"
+  ).get(token, req.params.id) as { cnt: number };
+  if (consumedAmend.cnt > 0) {
+    res.status(400).json({ error: "You have already proposed an amendment for this bill" }); return;
+  }
+
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+
+  db.insert(schema.pendingInjections).values({
+    id: randomUUID(),
+    type: "mdb_amendment",
+    data: {
+      billId: req.params.id,
+      title: title.trim(),
+      description: description.trim(),
+      impactChange,
+      partyId: seat.partyId,
+      userId: token,
+      proposerName: user?.displayName ?? "MdB",
+    } as any,
+    consumed: false,
+  }).run();
+
+  res.json({ status: "queued", message: "Amendment will be processed on next simulation day" });
+});
+
+// ── MdB Speeches ─────────────────────────────────────────────────────────────
+
+// POST /api/bills/:id/speech — submit a speech on a bill
+app.post("/api/bills/:id/speech", (req, res) => {
+  if (requireParticipatory(req, res, "give_speech")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
+
+  const db = getDb();
+  const bill = db.select().from(schema.bills).where(eq(schema.bills.id, req.params.id)).all()[0];
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  const { content, reading } = req.body as { content?: string; reading?: number };
+  if (!content || content.trim().length < 20 || content.trim().length > 500) {
+    res.status(400).json({ error: "content must be 20–500 characters" });
+    return;
+  }
+  if (!reading || ![1, 2, 3].includes(reading)) {
+    res.status(400).json({ error: "reading must be 1, 2, or 3" });
+    return;
+  }
+
+  // Validate bill is in matching reading stage
+  const readingStatusMap: Record<number, string> = { 1: "first_reading", 2: "second_reading", 3: "third_reading" };
+  if (bill.status !== readingStatusMap[reading]) {
+    res.status(400).json({ error: `Bill is in ${bill.status}, not ${readingStatusMap[reading]}` });
+    return;
+  }
+
+  // Check user hasn't already spoken on this bill+reading
+  const userDb = getUserDb();
+  const existing = userDb.select().from(schema.mdbSpeeches)
+    .where(and(
+      eq(schema.mdbSpeeches.billId, req.params.id),
+      eq(schema.mdbSpeeches.userId, token),
+      eq(schema.mdbSpeeches.reading, reading),
+    )).all();
+  if (existing.length > 0) {
+    res.status(400).json({ error: "You have already spoken on this bill in this reading" });
+    return;
+  }
+
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+
+  const speechId = randomUUID();
+  userDb.insert(schema.mdbSpeeches).values({
+    id: speechId,
+    userId: token,
+    billId: req.params.id,
+    reading,
+    content: content.trim(),
+    sentimentImpact: null,
+    dayNumber: currentDay,
+    createdAt: Date.now(),
+  }).run();
+
+  res.json({ id: speechId, billId: req.params.id, reading, content: content.trim(), dayNumber: currentDay });
+});
+
+// GET /api/bills/:id/speeches — all speeches for a bill, grouped by reading
+app.get("/api/bills/:id/speeches", (req, res) => {
+  const userDb = getUserDb();
+  const speeches = userDb.select().from(schema.mdbSpeeches)
+    .where(eq(schema.mdbSpeeches.billId, req.params.id))
+    .all();
+
+  // Enrich with display names
+  const userIds = [...new Set(speeches.map(s => s.userId))];
+  const nameMap = new Map<string, string>();
+  for (const uid of userIds) {
+    const user = userDb.select().from(schema.users).where(eq(schema.users.id, uid)).all()[0];
+    if (user) nameMap.set(uid, user.displayName);
+  }
+
+  const enriched = speeches.map(s => ({
+    ...s,
+    displayName: nameMap.get(s.userId) ?? "Unknown",
+  }));
+
+  // Group by reading
+  const byReading: Record<number, typeof enriched> = {};
+  for (const s of enriched) {
+    if (!byReading[s.reading]) byReading[s.reading] = [];
+    byReading[s.reading].push(s);
+  }
+
+  res.json({ speeches: enriched, byReading });
+});
+
+// ── MdB Voting ───────────────────────────────────────────────────────────────
+
+// POST /api/bills/:id/mdb-vote — cast a direct MdB vote on a third_reading bill
+app.post("/api/bills/:id/mdb-vote", (req, res) => {
+  if (requireParticipatory(req, res, "vote_bills")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+
+  const seat = getUserSeat(token);
+  if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
+
+  const db = getDb();
+  const bill = db.select().from(schema.bills).where(eq(schema.bills.id, req.params.id)).all()[0];
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (bill.status !== "third_reading") { res.status(400).json({ error: "Bill is not in third reading" }); return; }
+
+  const { vote } = req.body as { vote?: string };
+  if (!vote || !["yes", "no", "abstain"].includes(vote)) {
+    res.status(400).json({ error: "vote must be 'yes', 'no', or 'abstain'" });
+    return;
+  }
+
+  const userDb = getUserDb();
+  // Check for existing vote (upsert)
+  const existing = userDb.select().from(schema.mdbVotes)
+    .where(and(eq(schema.mdbVotes.billId, req.params.id), eq(schema.mdbVotes.userId, token)))
+    .all()[0];
+
+  if (existing) {
+    userDb.update(schema.mdbVotes)
+      .set({ vote, createdAt: Date.now() })
+      .where(eq(schema.mdbVotes.id, existing.id))
+      .run();
+  } else {
+    userDb.insert(schema.mdbVotes).values({
+      id: randomUUID(),
+      seatId: seat.id,
+      billId: req.params.id,
+      userId: token,
+      vote,
+      createdAt: Date.now(),
+    }).run();
+  }
+
+  // Return aggregated MdB votes
+  const allVotes = userDb.select().from(schema.mdbVotes)
+    .where(eq(schema.mdbVotes.billId, req.params.id))
+    .all();
+  const summary = { yes: 0, no: 0, abstain: 0, total: allVotes.length };
+  for (const v of allVotes) {
+    if (v.vote === "yes") summary.yes++;
+    else if (v.vote === "no") summary.no++;
+    else summary.abstain++;
+  }
+
+  res.json({ userVote: vote, summary });
+});
+
+// GET /api/bills/:id/mdb-votes — aggregated MdB votes + user's own vote
+app.get("/api/bills/:id/mdb-votes", (req, res) => {
+  const userDb = getUserDb();
+  const allVotes = userDb.select().from(schema.mdbVotes)
+    .where(eq(schema.mdbVotes.billId, req.params.id))
+    .all();
+
+  const summary = { yes: 0, no: 0, abstain: 0, total: allVotes.length };
+  // Also break down by party
+  const byParty: Record<string, { yes: number; no: number; abstain: number }> = {};
+  for (const v of allVotes) {
+    // Get party from the seat
+    const seat = getDb().select().from(schema.bundestagSeats)
+      .where(eq(schema.bundestagSeats.id, v.seatId))
+      .all()[0];
+    const partyId = seat?.partyId ?? "unknown";
+    if (!byParty[partyId]) byParty[partyId] = { yes: 0, no: 0, abstain: 0 };
+
+    if (v.vote === "yes") { summary.yes++; byParty[partyId].yes++; }
+    else if (v.vote === "no") { summary.no++; byParty[partyId].no++; }
+    else { summary.abstain++; byParty[partyId].abstain++; }
+  }
+
+  // User's own vote
+  const token = getUserToken(req);
+  let userVote: string | null = null;
+  if (token) {
+    const own = allVotes.find(v => v.userId === token);
+    userVote = own?.vote ?? null;
+  }
+
+  res.json({ summary, byParty, userVote });
 });
 
 // ── Notifications ────────────────────────────────────────────────────────────

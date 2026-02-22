@@ -170,9 +170,13 @@ ${thirdReadingBills.map(b => {
   const sigStr = sig && (sig.yes + sig.no) > 0
     ? `\n    Member signals: ${sig.yes} YES / ${sig.no} NO (${Math.round(sig.yes / (sig.yes + sig.no) * 100)}% YES)`
     : "";
+  const mdbVotes = ctx.mdbVoteSummary?.[b.id];
+  const mdbStr = mdbVotes && mdbVotes.total > 0
+    ? `\n    MdB votes so far: ${mdbVotes.yes} yes / ${mdbVotes.no} no / ${mdbVotes.abstain} abstain (${mdbVotes.total} MdB seats voted)`
+    : "";
   return `  - [${b.id}] "${b.title}" (${b.category}) proposed by ${b.proposedBy}${rec}
     Description: ${b.description}
-    Impact: ${JSON.stringify(b.impact)}${amStr}${sigStr}`;
+    Impact: ${JSON.stringify(b.impact)}${amStr}${sigStr}${mdbStr}`;
 }).join("\n")}\n`;
     } else {
       readingSections += `\nTHIRD READING (awareness only — you cannot vote without a Fraktion):

@@ -322,3 +322,53 @@ export const notifications = sqliteTable("notifications", {
   createdAt: text("created_at").notNull(),
   dayNumber: integer("day_number").notNull(),
 });
+
+// ── MdB (Bundestag Member) tables ──
+
+export const bundestagSeats = sqliteTable("bundestag_seats", {
+  id: text("id").primaryKey(),
+  seatNumber: integer("seat_number").notNull(),
+  partyId: text("party_id").notNull(),
+  controller: text("controller").notNull(),         // "human" | "ai"
+  userId: text("user_id"),
+  electionId: text("election_id"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  proxyDefault: text("proxy_default").notNull().default("party_line"), // "party_line" | "abstain"
+  disciplineLevel: integer("discipline_level").notNull().default(0),   // 0-3
+  disciplineReason: text("discipline_reason"),
+  allocatedOnDay: integer("allocated_on_day").notNull(),
+});
+
+export const mdbApplications = sqliteTable("mdb_applications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  partyId: text("party_id").notNull(),
+  applicationText: text("application_text").notNull(),
+  policyFocus: text("policy_focus", { mode: "json" }),
+  status: text("status").notNull().default("pending"), // "pending" | "approved" | "rejected" | "expired"
+  aiReasoning: text("ai_reasoning"),
+  priorityScore: real("priority_score"),
+  createdOnDay: integer("created_on_day").notNull(),
+  reviewedOnDay: integer("reviewed_on_day"),
+  cooldownUntilDay: integer("cooldown_until_day"),
+});
+
+export const mdbVotes = sqliteTable("mdb_votes", {
+  id: text("id").primaryKey(),
+  seatId: text("seat_id").notNull(),
+  billId: text("bill_id").notNull(),
+  userId: text("user_id").notNull(),
+  vote: text("vote").notNull(),       // "yes" | "no" | "abstain"
+  createdAt: integer("created_at").notNull(),
+});
+
+export const mdbSpeeches = sqliteTable("mdb_speeches", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  billId: text("bill_id").notNull(),
+  reading: integer("reading").notNull(),
+  content: text("content").notNull(),
+  sentimentImpact: real("sentiment_impact"),
+  dayNumber: integer("day_number").notNull(),
+  createdAt: integer("created_at").notNull(),
+});

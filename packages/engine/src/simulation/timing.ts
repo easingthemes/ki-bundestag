@@ -128,6 +128,7 @@ export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>>
     give_speech: false,
     vote_bills: false,
     propose_amendments: false,
+    mdb_apply: false,
   },
   "fast": {
     vote_polls: false,
@@ -140,6 +141,7 @@ export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>>
     give_speech: false,
     vote_bills: false,
     propose_amendments: false,
+    mdb_apply: false,
   },
   "normal": {
     vote_polls: true,
@@ -152,6 +154,7 @@ export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>>
     give_speech: false,
     vote_bills: false,
     propose_amendments: false,
+    mdb_apply: true,
   },
   "slow": {
     vote_polls: true,
@@ -164,6 +167,7 @@ export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>>
     give_speech: true,
     vote_bills: true,
     propose_amendments: true,
+    mdb_apply: true,
   },
 };
 
@@ -238,6 +242,21 @@ export function classifyEvent(eventType: string): "critical" | "important" | "st
   if ((IMPORTANT_EVENTS as readonly string[]).includes(eventType)) return "important";
   if ((ROUTINE_EVENTS as readonly string[]).includes(eventType)) return "routine";
   return "standard";
+}
+
+/**
+ * Human seat ratio per preset.
+ * ultra-fast/fast = 0 (all AI, watch-only), normal = 30%, slow = 70%.
+ */
+const HUMAN_SEAT_RATIO: Record<TimingPreset, number> = {
+  "ultra-fast": 0,
+  "fast": 0,
+  "normal": 0.3,
+  "slow": 0.7,
+};
+
+export function getHumanSeatRatio(preset: TimingPreset): number {
+  return HUMAN_SEAT_RATIO[preset];
 }
 
 /**

@@ -8,3 +8,5 @@ export { isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getPrese
 export type { TimingPreset, PresetConfig } from "./simulation/timing.js";
 export { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, queueEvent, drainQueue, createNotification, createNotificationForAll, generateMorningSummary } from "./simulation/event-queue.js";
 export type { QueuedEvent, Notification } from "./simulation/event-queue.js";
+export { allocateSeats, resetAllSeats, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, reviewMdbApplications } from "./simulation/seats.js";
+export { getHumanSeatRatio } from "./simulation/timing.js";

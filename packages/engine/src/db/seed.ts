@@ -334,6 +334,20 @@ const SIM_TABLE_DDL = `
     processed_at TEXT,
     status TEXT NOT NULL DEFAULT 'queued'
   );
+
+  CREATE TABLE IF NOT EXISTS bundestag_seats (
+    id TEXT PRIMARY KEY,
+    seat_number INTEGER NOT NULL,
+    party_id TEXT NOT NULL,
+    controller TEXT NOT NULL,
+    user_id TEXT,
+    election_id TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    proxy_default TEXT NOT NULL DEFAULT 'party_line',
+    discipline_level INTEGER NOT NULL DEFAULT 0,
+    discipline_reason TEXT,
+    allocated_on_day INTEGER NOT NULL
+  );
 `;
 
 /** User table DDL — lives in users.db */
@@ -400,6 +414,40 @@ const USER_TABLE_DDL = `
     read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     day_number INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS mdb_applications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    party_id TEXT NOT NULL,
+    application_text TEXT NOT NULL,
+    policy_focus TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    ai_reasoning TEXT,
+    priority_score REAL,
+    created_on_day INTEGER NOT NULL,
+    reviewed_on_day INTEGER,
+    cooldown_until_day INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS mdb_votes (
+    id TEXT PRIMARY KEY,
+    seat_id TEXT NOT NULL,
+    bill_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS mdb_speeches (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    bill_id TEXT NOT NULL,
+    reading INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    sentiment_impact REAL,
+    day_number INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
   );
 `;
 
@@ -515,6 +563,7 @@ export function seedDatabase() {
 
   // Drop simulation tables for a clean start
   sqlite.exec(`
+    DROP TABLE IF EXISTS bundestag_seats;
     DROP TABLE IF EXISTS event_queue;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS constitutional_challenges;
@@ -543,6 +592,9 @@ export function seedDatabase() {
   // User DB: fresh start
   const userSqlite = getUserSqlite();
   userSqlite.exec(`
+    DROP TABLE IF EXISTS mdb_speeches;
+    DROP TABLE IF EXISTS mdb_votes;
+    DROP TABLE IF EXISTS mdb_applications;
     DROP TABLE IF EXISTS notifications;
     DROP TABLE IF EXISTS question_votes;
     DROP TABLE IF EXISTS member_signals;
