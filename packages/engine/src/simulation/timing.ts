@@ -151,7 +151,7 @@ export const FEATURE_AVAILABILITY: Record<TimingPreset, Record<string, boolean>>
     internal_proposals: true,
     bill_signals: true,
     request_to_speak: false,
-    give_speech: false,
+    give_speech: true,
     vote_bills: false,
     propose_amendments: false,
     mdb_apply: true,

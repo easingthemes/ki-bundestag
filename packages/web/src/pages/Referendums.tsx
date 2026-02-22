@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Referendum } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/shared";
+import { ShowMoreButton, UserActionIcon } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +132,7 @@ function ReferendumCard({
     <Card className="mb-2.5">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
+          {referendum.status === "active" && !hasVoted && <UserActionIcon title="Cast your vote" />}
           <Badge variant="outline" className={STATUS_BADGE[referendum.status] || ""}>
             {referendum.status}
           </Badge>

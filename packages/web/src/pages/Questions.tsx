@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api, CitizenQuestion, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
-import { ShowMoreButton } from "../components/shared";
+import { ShowMoreButton, UserActionIcon } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,7 @@ export function Questions() {
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPartyColor(q.targetPartyId) }} />
                 <span className="font-semibold text-sm">{getPartyName(q.targetPartyId)}</span>
+                {user && q.status === "pending" && <UserActionIcon title="Upvote or downvote" />}
                 <Badge variant="outline" className={cn(
                   q.status === "pending"
                     ? STATUS_BADGE.pending

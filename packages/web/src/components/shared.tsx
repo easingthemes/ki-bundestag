@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button as ShadButton } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserRound, Landmark } from "lucide-react";
 
 // ── Button ──────────────────────────────────────────────────────────
 // Maps our app's variant names to shadcn variants + adds loading prop.
@@ -64,6 +64,27 @@ export function SkeletonCard() {
 
 export function SkeletonTitle() {
   return <Skeleton className="h-6 w-3/5" />;
+}
+
+// ── Action Icons ────────────────────────────────────────────────────
+// Small corner icons indicating user can interact with a card.
+
+/** Citizen action available (vote, signal, upvote, propose) */
+export function UserActionIcon({ title = "You can participate" }: { title?: string }) {
+  return (
+    <span title={title} className="text-blue-400 opacity-70">
+      <UserRound className="size-3.5" />
+    </span>
+  );
+}
+
+/** MdB (parliament member) action available (direct vote, speech) */
+export function MdbActionIcon({ title = "MdB action available" }: { title?: string }) {
+  return (
+    <span title={title} className="text-amber-400 opacity-70">
+      <Landmark className="size-3.5" />
+    </span>
+  );
 }
 
 // ── Show More Button ────────────────────────────────────────────────

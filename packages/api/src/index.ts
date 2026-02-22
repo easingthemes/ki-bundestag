@@ -1662,7 +1662,7 @@ app.post("/api/seats/apply", (req, res) => {
 // GET /api/seats/my-seat — get user's active seat + application status
 app.get("/api/seats/my-seat", (req, res) => {
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.json({ seat: null, applications: [] }); return; }
 
   const seat = getUserSeat(token);
   const userDb = getUserDb();

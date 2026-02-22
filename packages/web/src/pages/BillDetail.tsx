@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, Bill, Party, ConstitutionalChallenge, BillImpact, type MdbVoteSummary, type MdbSpeech } from "../api";
+import { api, Bill, Party, ConstitutionalChallenge, BillImpact, type MdbVoteSummary, type MdbSpeech, type BundestagSeat } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +82,11 @@ export function BillDetail() {
   const [speechContent, setSpeechContent] = useState("");
   const [speechSubmitting, setSpeechSubmitting] = useState(false);
   const [speechMsg, setSpeechMsg] = useState<string | null>(null);
+  const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
+
+  useEffect(() => {
+    if (user) api.getMySeat().then(r => setMySeat(r.seat)).catch(() => {});
+  }, [user]);
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -240,7 +245,7 @@ export function BillDetail() {
       {bill.status === "third_reading" && (
         <div className="mb-6">
           <h2>MdB Direct Votes</h2>
-          {user && !mdbVotes?.userVote && (
+          {user && mySeat && !mdbVotes?.userVote && (
             <div className={ALERT_STYLES.info}>
               This bill is in Third Reading — cast your direct vote as an MdB.
             </div>
@@ -271,7 +276,7 @@ export function BillDetail() {
             })() : (
               <div className="text-sm text-muted-foreground mb-3">No MdB votes cast yet.</div>
             )}
-            {user && (
+            {user && mySeat && (
               <div className="flex gap-2 items-center">
                 {(["yes", "no", "abstain"] as const).map(v => (
                   <button
@@ -300,7 +305,7 @@ export function BillDetail() {
                   >{v}</button>
                 ))}
                 <span className="text-xs text-muted-foreground ml-2">
-                  {mdbVotes?.userVote ? `Your vote: ${mdbVotes.userVote.toUpperCase()}` : "Requires an active MdB seat"}
+                  {mdbVotes?.userVote ? `Your vote: ${mdbVotes.userVote.toUpperCase()}` : `Seat #${mySeat.seatNumber}`}
                 </span>
               </div>
             )}
@@ -312,7 +317,7 @@ export function BillDetail() {
       {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
         <div className="mb-6">
           <h2>MdB Speeches ({speeches.length})</h2>
-          {user && (
+          {user && mySeat && (
             <Card className="mb-3"><CardContent className="p-5">
               <div className="font-semibold text-sm mb-2">Submit a Speech</div>
               <textarea
