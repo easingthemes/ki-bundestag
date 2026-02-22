@@ -38,8 +38,9 @@ import { formCabinet, getActiveGovernment, dissolveGovernment, isGovernmentBill 
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
-import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, shouldPresidentVeto, BUDGET_TOTAL } from "./budget.js";
+import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
+import { checkPresidentialVeto } from "./veto.js";
 import { generateDailySummary } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
 import { createNotification, createNotificationForAll } from "./event-queue.js";
@@ -977,24 +978,11 @@ export async function runDay(): Promise<number> {
 
       // 9. Apply passed bill impacts (with presidential veto check)
       if (result.passed) {
-        const { veto, reason } = shouldPresidentVeto(bill);
-        if (veto) {
-          db.update(schema.bills)
-            .set({ status: "rejected", vetoedByPresident: true })
-            .where(eq(schema.bills.id, bill.id))
-            .run();
-          addEvent(dayEvents, {
-            dayNumber: currentDay,
-            type: "presidential_veto",
-            actor: "system",
-            title: `Bundespräsident vetoes "${bill.title}"`,
-            description: reason,
-            data: { billId: bill.id },
-          });
-          const proposer = allParties.find(p => p.id === bill.proposedBy);
-          if (proposer) proposer.approvalRating = Math.round((proposer.approvalRating - 0.5) * 10) / 10;
-          console.log(`  [President] Veto: "${bill.title}"`);
-        } else {
+        const { vetoed, events: vetoEvents } = checkPresidentialVeto(bill, allParties, currentDay);
+        for (const ev of vetoEvents) {
+          addEvent(dayEvents, ev);
+        }
+        if (!vetoed) {
           const impact = bill.impact as BillImpact;
           nationalState.economy = applyBillImpact(nationalState.economy, impact);
           nationalState.publicSentiment = updateSentiment(nationalState.publicSentiment, impact);
