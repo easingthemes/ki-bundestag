@@ -20,7 +20,9 @@
 
 ### Step 3: Consolidate approval drift into `src/simulation/opinion.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/opinion.ts` (updated), `packages/engine/src/simulation/loop.ts` (updated)
+- **Result**: Added `applyDailyApprovalDrift(parties)` to opinion.ts consolidating approval drift + membership bonus loop; loop.ts replaced 18-line block with single call. Removed `count`, `gte`, `applyApprovalDrift`, `membershipBonus` from loop.ts imports. Typecheck passed.
 
 ### Step 4: Consolidate media sentiment into `src/simulation/media.ts`
 
