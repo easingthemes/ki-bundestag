@@ -25,7 +25,7 @@ For each flagged issue:
 
 1. Read the affected file(s)
 2. Apply the minimal fix described or implied by the issue
-3. Follow project conventions (ESM `.js` imports, kebab-case files, no functional changes outside current step scope)
+3. Follow project conventions (see `.claude/rules/` for domain-specific rules)
 4. Do not fix issues by removing/skipping planned functionality — fix them properly
 
 Keep fixes scoped to the issue. Do not refactor unrelated code.

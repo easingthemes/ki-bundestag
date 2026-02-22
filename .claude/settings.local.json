@@ -2,120 +2,26 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(git status:*)",
-      "Bash(git show:*)",
-      "Bash(git blame:*)",
-      "Bash(git branch:*)",
-      "Bash(git stash:*)",
-      "Bash(git remote:*)",
-      "Bash(git fetch:*)",
-      "Bash(git config:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(node --version:*)",
       "Bash(npm:*)",
       "Bash(npx:*)",
-      "Bash(curl:*)",
-      "Bash(python3:*)",
-      "Bash(sqlite3:*)",
-      "Bash(lsof:*)",
-      "Bash(xargs kill:*)",
+      "Bash(node --version:*)",
       "Bash(node -e:*)",
       "Bash(node:*)",
-      "Bash(find:*)",
-      "Bash(cat:*)",
-      "Bash(head:*)",
-      "Bash(tail:*)",
-      "Bash(wc:*)",
-      "Bash(sort:*)",
-      "Bash(uniq:*)",
-      "Bash(awk:*)",
-      "Bash(sed:*)",
-      "Bash(cut:*)",
-      "Bash(tr:*)",
-      "Bash(diff:*)",
-      "Bash(jq:*)",
-      "Bash(pwd:*)",
-      "Bash(which:*)",
-      "Bash(env:*)",
-      "Bash(printenv:*)",
-      "Bash(ps:*)",
-      "Bash(df:*)",
-      "Bash(du:*)",
-      "Bash(date:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(sqlite3:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(touch:*)",
-      "Bash(basename:*)",
-      "Bash(dirname:*)",
-      "Bash(open:*)",
-      "mcp__ide__getDiagnostics",
-      "WebSearch",
-      "WebFetch(domain:www.bundeswahlleiterin.de)",
-      "mcp__chrome-devtools__take_screenshot",
-      "mcp__chrome-devtools__navigate_page",
       "Bash(chmod:*)",
-      "WebFetch(domain:docs.anthropic.com)",
-      "Bash(echo:*)",
-      "mcp__chrome-devtools__list_pages",
-      "WebFetch(domain:www.politico.eu)",
-      "WebFetch(domain:www.tagesschau.de)",
-      "mcp__chrome-devtools__take_snapshot",
-      "mcp__chrome-devtools__evaluate_script",
-      "WebFetch(domain:ui.shadcn.com)",
-      "mcp__chrome-devtools__click",
-      "mcp__chrome-devtools__hover",
-      "mcp__chrome-devtools__emulate",
+      "Bash(open:*)",
       "Bash(kill:*)",
+      "Bash(xargs kill:*)",
       "Bash(wait)",
-      "mcp__chrome-devtools__list_console_messages",
-      "Bash(grep:*)",
-      "WebFetch(domain:docs.x.ai)",
-      "WebFetch(domain:ai-sdk.dev)",
-      "Bash(ls:*)",
-      "Bash(echo === $tbl DIFFERS ===:*)",
       "Bash(cd:*)",
-      "mcp__chrome-devtools__fill",
-      "mcp__chrome-devtools__wait_for",
-      "WebFetch(domain:www.bundestag.de)",
-      "WebFetch(domain:en.wikipedia.org)",
-      "WebFetch(domain:www.timeanddate.com)",
-      "WebFetch(domain:www.highcharts.com)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:codepen.io)"
-    ]
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "chrome-devtools"
-  ],
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "EnterPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/pre-plan-remind.sh",
-            "statusMessage": "Checking architecture docs..."
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/post-impl-remind.sh",
-            "statusMessage": "Checking docs..."
-          }
-        ]
-      }
+      "Bash(claude mcp:*)"
     ]
   }
 }
+

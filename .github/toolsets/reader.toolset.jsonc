@@ -1,0 +1,36 @@
+{
+  // Read-only tools — safe for planning, review, and analysis
+  "reader": {
+    "tools": [
+      "codebase",
+      "changes",
+      "fetch",
+      "findTestFiles",
+      "problems",
+      "search",
+      "usages",
+      "githubRepo"
+    ],
+    "description": "Read-only tools for analysis without modifying code",
+    "icon": "eye"
+  },
+  // Full tools — for implementation and execution
+  "builder": {
+    "tools": [
+      "codebase",
+      "changes",
+      "editFiles",
+      "fetch",
+      "findTestFiles",
+      "problems",
+      "search",
+      "usages",
+      "githubRepo",
+      "execute/runCommand",
+      "execute/getTerminalOutput",
+      "execute/testFailure"
+    ],
+    "description": "Full tool set for implementation with terminal access",
+    "icon": "tools"
+  }
+}

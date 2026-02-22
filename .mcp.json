@@ -1,8 +1,22 @@
 {
   "mcpServers": {
-    "chrome-devtools": {
+    "chrome-devtools-mcp": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "ctx7sk-d5d7aafc-9e42-401c-8b6c-932ab44327d2"
+      ],
+      "env": {}
     }
   }
 }

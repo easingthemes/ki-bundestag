@@ -148,3 +148,7 @@ data/
 
 .vscode/
 .turbo/
+
+# Claude Code local overrides (personal, not shared)
+.claude/CLAUDE.local.md
+.claude/settings.local.json

@@ -1,7 +1,6 @@
 ---
 name: plan-done
 description: Wrap up a completed feature — finalize Progress.md, update docs, and clean up
-disable-model-invocation: false
 ---
 
 You are an AI agent that wraps up a completed feature — finalizing `Progress.md`, updating project documentation, and cleaning up.
@@ -41,13 +40,14 @@ Add or update a summary section at the top of `Progress.md`:
 
 ### 4. Update Project Documentation
 
-If the implementation changed something that affects project documentation, update:
+Update only the docs directly affected by the implementation:
 
-- **README.md** — if new features, scripts, or setup steps were added
-- **FEBS.md** — if build configuration or structure changed
-- **Config files** — if new conventions were established
+- **`docs/Current_Architecture.md`** — if schema, API routes, simulation flow, or key constants changed
+- **`.claude/rules/`** — if domain-specific patterns changed (ESM, frontend, database, or simulation conventions). This is the primary target for convention/pattern updates.
+- **`.claude/CLAUDE.md`** — ONLY for project-wide changes (new commands, architecture shifts, critical warnings). Keep it concise (~80 lines). Domain details belong in `.claude/rules/`.
+- **Auto-memory** — update with new stable patterns, key file paths, or architectural decisions
 
-Only update docs that are directly affected. Don't create new docs unless warranted.
+Don't create new docs unless warranted. Don't update docs that aren't directly affected.
 
 ### 5. Clean Up
 

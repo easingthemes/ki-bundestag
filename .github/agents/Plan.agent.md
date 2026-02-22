@@ -4,7 +4,7 @@ description: Researches and outlines multi-step plans
 argument-hint: Outline the goal or problem to research
 target: vscode
 disable-model-invocation: true
-tools: ['agent', 'search', 'read', 'execute/getTerminalOutput', 'execute/testFailure', 'web', 'github/issue_read', 'github.vscode-pull-request-github/issue_fetch', 'github.vscode-pull-request-github/activePullRequest', 'vscode/askQuestions']
+tools: ['agent', 'search', 'read', 'execute/getTerminalOutput', 'execute/testFailure', 'web/fetch', 'github.vscode-pull-request-github/issue_fetch', 'github.vscode-pull-request-github/activePullRequest', 'vscode/askQuestions']
 agents: []
 handoffs:
   - label: Start Implementation

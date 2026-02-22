@@ -1,6 +1,7 @@
 ---
 name: plan-exe
 description: Execute planned steps from Progress.md — implement code, run validation, update progress. Use 'all' to run all steps automatically.
+argument-hint: [all|stepN|next]
 disable-model-invocation: false
 ---
 
