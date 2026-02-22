@@ -26,7 +26,9 @@
 
 ### Step 4: Consolidate media sentiment into `src/simulation/media.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/media.ts` (updated), `packages/engine/src/simulation/loop.ts` (updated)
+- **Result**: Added `applyMediaSentiment(currentDay, sentiment, stateId)` to media.ts; loop.ts replaced 15-line block with single call. Removed `mediaSentimentImpact` from loop.ts import. Typecheck passed.
 
 ### Step 5: Review remaining inline logic in `loop.ts`
 
