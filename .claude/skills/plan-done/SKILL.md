@@ -1,7 +1,7 @@
 ---
 name: plan-done
 description: Wrap up a completed feature — finalize Progress.md, update docs, and clean up
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 You are an AI agent that wraps up a completed feature — finalizing `Progress.md`, updating project documentation, and cleaning up.
@@ -20,6 +20,7 @@ For each completed step, collapse the Plan/Research detail into a compact `Done`
 
 ```markdown
 ### Step 1: < title >
+
 - **Status**: done
 - **Files**: < files created/modified >
 - **Result**: < one-line summary of what was done >
@@ -31,6 +32,7 @@ Add or update a summary section at the top of `Progress.md`:
 
 ```markdown
 ## Summary
+
 - **Status**: completed (X steps)
 - **Date**: < date >
 - **Changes**:
@@ -40,6 +42,7 @@ Add or update a summary section at the top of `Progress.md`:
 ### 4. Update Project Documentation
 
 If the implementation changed something that affects project documentation, update:
+
 - **README.md** — if new features, scripts, or setup steps were added
 - **FEBS.md** — if build configuration or structure changed
 - **Config files** — if new conventions were established
@@ -62,6 +65,7 @@ Only update docs that are directly affected. Don't create new docs unless warran
 ## Output
 
 After updating, summarize:
+
 - Final state of Progress.md
 - Which project docs were updated
 - Any follow-up items or remaining work

@@ -828,9 +828,15 @@ export async function runDay(): Promise<number> {
       console.log(`  [Pipeline] "${bill.title}" → third_reading`);
     }
 
-    // Collect bills for agent calls
-    const thirdReadingBills = allBills.filter(b => b.status === "third_reading");
-    const secondReadingBills = allBills.filter(b => b.status === "second_reading");
+    // Collect bills for agent calls — fresh DB queries so the validator and prompt
+    // always agree on the exact set of votable bills, even if the in-memory allBills
+    // snapshot is stale from a prior aborted run or mid-step pipeline mutation.
+    const thirdReadingBills = db.select().from(schema.bills)
+      .where(eq(schema.bills.status, "third_reading"))
+      .all() as unknown as Bill[];
+    const secondReadingBills = db.select().from(schema.bills)
+      .where(eq(schema.bills.status, "second_reading"))
+      .all() as unknown as Bill[];
 
     // 5b. Load recent media for agent context
     const recentMedia = getRecentMedia(3);

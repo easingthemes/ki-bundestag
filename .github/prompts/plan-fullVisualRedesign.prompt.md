@@ -1,272 +1,269 @@
 # Plan: Full Visual Redesign — KI Bundestag Web
 
-### TL;DR
+### Direction (updated 2026-02-22)
 
-This is a full redesign — no constraint to preserve the current visual language. The goal is to transform the app from a utilitarian data dashboard into an **editorial news + civic engagement platform** that feels authoritative, modern, and alive. The new design adopts a **dark-mode-first editorial aesthetic** inspired by modern political/news media sites (Politico, The Atlantic, Der Spiegel), using a refined navy + gold + white palette, a stronger typographic hierarchy with a serif display font, a persistent left-sidebar navigation on desktop, a homepage that feels like a live newspaper front page, and a rich component library that goes beyond cards — carousels, stat counters, reading-list teasers, hemicycle widgets, and timeline rivers.
+The redesign is in progress. The implementation settled on a **professional light-mode political media aesthetic** (Tagesschau.de + Politico.eu hybrid) rather than dark-mode-first. This was a deliberate practical choice — the existing Tailwind token system, shadcn/ui components, and Inter font all work well in light mode without the overhead of a full dark-mode token rework.
 
----
+**Active reference sites:**
 
-### I. Aesthetic Direction
-
-**Reference sites:**
-
-- [politico.com](https://www.politico.com) — editorial grid, strong typography, dark nav header, categorized content lanes
-- [spiegel.de](https://www.spiegel.de) — German editorial standard, teaser cards, color-coded sections, serif headlines
-- [bundestag.de](https://www.bundestag.de) — institutional authority, Bundesadler, structured factual layout
-- [pudding.cool](https://pudding.cool) — data-driven storytelling, beautiful scrollytelling layouts
-- [ft.com](https://www.ft.com) — elegant serif + sans hierarchy, pink/salmon accent, financial data tables
-- [ourworldindata.org](https://ourworldindata.org) — clean data viz, readable charts, trust-building design
-- [nytimes.com/section/politics](https://www.nytimes.com/section/politics) — front-page newspaper metaphor, story tiers, bylines
-
-**Core aesthetic decisions:**
-
-| Dimension     | Old                        | New                                              |
-| ------------- | -------------------------- | ------------------------------------------------ |
-| Mode          | Light background (#f5f5f5) | Dark-mode first (can offer toggle)               |
-| Primary bg    | `#f5f5f5`                  | `#0d0d14` (near-black blue-black)                |
-| Card bg       | `#ffffff`                  | `#161625` + glass micro-shimmer border           |
-| Primary       | `#004b91` (flat blue)      | `#3b82f6` (electric blue, more vibrant on dark)  |
-| Accent        | `#ffd700` (raw gold)       | `#f4c542` (warm muted gold, more editorial)      |
-| Danger        | `#dc3545`                  | `#f87171` (softer red on dark)                   |
-| Positive      | `#10b981`                  | `#34d399` (emerald, brighter on dark)            |
-| Nav bg        | `#1a1a2e` (dark navy)      | `#07070f` (pure near-black)                      |
-| Body font     | Inter (sans)               | Inter (keep)                                     |
-| Display font  | Inter (same)               | **DM Serif Display** — serif for H1/H2 headlines |
-| Border radius | 4–12 px                    | 8–16 px (softer, more modern)                    |
-| Shadows       | none                       | Subtle glow shadows on accent elements           |
+- [tagesschau.de](https://www.tagesschau.de) — primary: uppercase section dividers, authoritative clean layout, data-forward cards
+- [politico.eu](https://www.politico.eu) — editorial grid, strong type hierarchy, categorized content lanes
+- [bundestag.de](https://www.bundestag.de) — institutional gravity, structured factual content
+- [ourworldindata.org](https://ourworldindata.org) — clean data viz, sparklines, trust-building charts
+- [ft.com/markets](https://www.ft.com/markets) — stat panels with sparklines, financial data tables
 
 ---
 
-### II. Navigation Redesign
+### I. Current Design State (What's Done)
 
-**Current:** Sticky top bar, hover-grouped dropdowns, mobile sheet.
+#### ✅ Design system (`styles.css`, `index.html`)
 
-**New: Dual-rail navigation**
+- Light-mode tokens: `#f7f8fa` bg, `#ffffff` card, `#003d7a` primary, `#e2e5ea` border
+- `.section-title` — uppercase blue bordered label (Tagesschau style), used across all pages
+- `.stat-value` / `.stat-label` — large tabular stat readouts for dashboard numbers
+- Inter weights 400–800, font-smoothing, heading scale (h1: 1.75rem / h2: 1.15rem / h3: 0.95rem)
 
-**Desktop (1280px+):**
+#### ✅ Navigation (`main.tsx`)
 
-- Persistent **left sidebar** (220px wide, `bg-[#07070f]`, sticky full-height)
-- Top row: Bundesadler SVG logo + "KI Bundestag" wordmark + simulation day badge
-- Navigation sections with iconography (Lucide icons, 18px):
-  - Simulation → Dashboard, Log, Admin
-  - Parlament → Gesetze, Anträge, Anfragen, Vertrauensvoten, Verfassungsgericht, Haushalt
-  - Politik → Parteien, Wahlen, Umfragen, Volksabstimmungen
-  - Öffentlichkeit → Nachrichten, Presse, Bürgerfragen
-  - Ich → Benachrichtigungen, Meine Aktivität, Anmelden
-- Bottom of sidebar: sim status pill (Day N, green pulse dot), cost summary link
-- Active state: gold left border `#f4c542` + slightly lighter bg row
+- Dark `bg-primary` top bar with dropdown groups, SimStatus pill, NotificationBell, UserMenu
+- Dropdown panels: dark `bg-[#0d1b2e]` matching nav (fixed from jarring white mismatch)
+- Mobile: shadcn Sheet drawer, light bg, overflow-safe scrolling
 
-**Mobile (< 1024px):**
+#### ✅ Layout shell (`components/PageShell.tsx`)
 
-- Top bar collapses sidebar into bottom tab bar (5 primary tabs: Home, Parlament, Parteien, Nachrichten, Ich) + hamburger → full overlay drawer
+- Single/two-column layout wrapper with `sidebar` prop (main `1fr` + aside `340px`)
+- `fullWidth` mode, optional `title`/`subtitle` header
 
-Reference: [linear.app](https://linear.app) sidebar style, [vercel.com/dashboard](https://vercel.com/dashboard) nav hierarchy
+#### ✅ Components built
 
----
+| Component                     | File                       | Notes                                                   |
+| ----------------------------- | -------------------------- | ------------------------------------------------------- |
+| `Hemicycle`                   | `components/Hemicycle.tsx` | Dot-based SVG, spectrum-ordered, sm/md/lg sizes, legend |
+| `PartyCard` / `PartyCardGrid` | `components/PartyCard.tsx` | Color block icon, approval bar, compactmode             |
 
-### III. New Component Library
+#### ✅ Pages redesigned
 
-All new components go in `packages/web/src/components/`. Each is a standalone TSX file.
-
-#### Layout Primitives
-
-| Component       | Description                                                             |
-| --------------- | ----------------------------------------------------------------------- |
-| `PageLayout`    | Wraps all pages — sidebar slot + main slot, handles responsive collapse |
-| `PageHeader`    | Serif H1 + subtitle + optional right-side action slot                   |
-| `SectionHeader` | `H2` with decorative gold left-border rule + optional "See all" link    |
-| `TwoColumnGrid` | 2/3 + 1/3 grid for dashboard-style pages                                |
-| `StatCard`      | Large number + label + delta arrow (e.g., "42.3% Zustimmung ↑ 1.2")     |
-
-#### Teaser Components
-
-| Component        | Description                                                                                                             | Reference                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `HeroTeaser`     | Full-width banner: serif headline, mood badge, sim day, CTA button, faint Bundesadler watermark bg                      | [politico.com](https://www.politico.com) above-the-fold banner |
-| `StoryCard`      | Image-free editorial card: category chip + serif headline + 2-line excerpt + timestamp; 3 sizes (hero/standard/compact) | [spiegel.de](https://www.spiegel.de) teaser cards              |
-| `BreakingBanner` | Full-width amber/red urgent strip: icon + message + dismiss. Used for confidence votes, constitutional crises           | [bbc.co.uk/news](https://www.bbc.co.uk/news) breaking news bar |
-| `PartyChip`      | Colored dot + party abbreviation + approval % delta — inline embeddable in any teaser                                   | —                                                              |
-| `EventRow`       | Dense 1-line event: colored left border, icon, event text, day badge — for news feed and log                            | —                                                              |
-
-#### Data Visualization Components
-
-| Component       | Description                                                                                                        | Reference                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `ApprovalGauge` | Semi-circle gauge (SVG), 0–100, color-coded zones, animated on mount                                               | [observablehq.com/@d3/gauge](https://observablehq.com/@d3/gauge) |
-| `SeatBar`       | Horizontal stacked bar — Bundestag seats by party with color + hover tooltip — replaces current simple bar         | —                                                                |
-| `PartySpider`   | Radar/spider chart for party ideology axes (economy/social/environment/etc.)                                       | [ourworldindata.org](https://ourworldindata.org) charts          |
-| `EconomyPanel`  | 4 stat cards in a row, each with a sparkline (tiny 30-day trend line using SVG path)                               | [ft.com markets](https://www.ft.com/markets) data panel          |
-| `VoteRiver`     | Animated flowing vote bar (yes/no/abstain) with party breakdown on hover                                           | —                                                                |
-| `TimelineRiver` | Vertical centered timeline with alternating left/right cards, day markers — for SimulationLog and election history | —                                                                |
-
-#### Interactive / Carousel Components
-
-| Component          | Description                                                                                                               | Reference                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `NewsCarousel`     | Horizontal scroll carousel of `StoryCard`s (snap scrolling, arrow buttons, keyboard nav). Used on Dashboard media section | [spiegel.de](https://www.spiegel.de) front page carousels |
-| `PartyCarousel`    | Horizontal 6-party card strip with approval bars, scrollable on mobile                                                    | —                                                         |
-| `BillPipeline`     | Horizontal Kanban-style pipeline visualization: 5 columns (Proposed → 3rd Reading → Law), bill cards per stage            | [linear.app](https://linear.app) issue board              |
-| `CoalitionBuilder` | Interactive party checkbox grid → seat counter → majority arc — refactor existing into reusable component                 | —                                                         |
-| `HemicycleChart`   | SVG hemicycle (already exists), extract into standalone component with animation on data change                           | —                                                         |
-| `CountUp`          | Animated number counter for stat reveals on scroll                                                                        | —                                                         |
-| `MoodBadge`        | Pill with emoji + label + color per sim mood, used across Dashboard and media                                             | —                                                         |
-| `DayBadge`         | "Tag N" pill with clock icon — standardized across all pages                                                              | —                                                         |
-
-#### Form / Engagement Components
-
-| Component          | Description                                                                                                                              |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `AskPartyWidget`   | Full redesign: party selector with color avatars, textarea with char counter, disabled state when not logged in, inline response display |
-| `PollCard`         | Prominent poll with bar results showing live %, vote button with auth guard                                                              |
-| `ReferendumCard`   | Full-bleed referendum card: question in serif H2, impact preview, Yes/No large buttons                                                   |
-| `NotificationItem` | Notification row with unread dot, type icon, collapsible body                                                                            |
+| Page                   | What changed                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Dashboard              | 2-col `PageShell`, Hemicycle widget, economy stats, media section, coalition/party rail, all widgets preserved |
+| Elections              | Dot hemicycle full-width, horizontal coalition bars, coalition calculator                                      |
+| Parties                | `PartyCard` grid (3-col), vote alignment matrix kept                                                           |
+| PartyDetail            | Color-block party header, section-title throughout                                                             |
+| All 20 remaining pages | `.section-title` headers + German labels applied uniformly                                                     |
 
 ---
 
-### IV. Page-by-Page Redesign Plan
+### II. What Was Dropped (vs. Original Plan)
 
-#### 1. Dashboard (`/`)
+| Item                                    | Reason removed                                                                                     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Dark-mode-first palette                 | Implementation chose light mode — practical, consistent with shadcn defaults                       |
+| Left sidebar navigation                 | Top nav works well with grouped dropdowns; sidebar adds layout complexity for unclear gain         |
+| DM Serif Display + JetBrains Mono fonts | Not implemented; Inter alone is sufficient; serif display would require widespread h1/h2 overrides |
+| Mobile bottom tab bar                   | Mobile Sheet drawer is adequate; bottom tab bar needs a separate layout rework                     |
 
-Replace current 2-col card dump with a **newspaper front page**.
+---
 
-- Full-width `HeroTeaser` at top: today's narrative summary in serif, mood badge, sim day, coalition chip strip
-- `BreakingBanner` shown when: crisis active / confidence vote pending / budget overdue
-- **Section: "Parlament heute"** — `SectionHeader` + 3-col `StoryCard` grid (latest 3 bill events)
-- **Section: "Wirtschaft"** — `EconomyPanel` (4 stats + sparklines)
-- **Section: "Aus der Presse"** — `NewsCarousel` of today's media articles
-- **Section: "Parteien"** — `SeatBar` hemicycle mini + `PartyCarousel` of approval snapshots
-- **Section: "Aktuell im Bundestag"** — `BillPipeline` mini (compact, 5 columns, top 2 bills per stage)
-- Right rail (1/3): Chancellor card, Active crisis card, Top poll, Ask a Party widget, upcoming calendar
-- Remove all skeleton filler — replace with shimmer loading states per section
+### III. Component Library — Still To Build
 
-#### 2. Parties (`/parties`)
+All go in `packages/web/src/components/`.
 
-- Top: `SeatBar` full-width + coalition/opposition breakdown
-- **Party grid**: 3-col cards with gradient header using party color, approval gauge, seat count, recent action summary — replaces flat text cards
-- **Vote Alignment Matrix**: interactive heatmap with hover tooltip — keep but style with proper table design
-- Add: **Ideology Spider comparison** — select 2 parties → overlay radar chart
+#### Data Visualization
 
-#### 3. Bills (`/bills`)
+| Component           | Description                                                                                                                                                                                              | Reference                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `EconomyPanel`      | 4 stat cards side by side, each with a tiny 30-day SVG sparkline (path, no library). Extract from Dashboard inline stat block.                                                                           | [ft.com/markets](https://www.ft.com/markets) |
+| `VoteRiver`         | Stacked vote bar (yes/no/abstain) with per-party breakdown on hover. Animated `transition: width 600ms`. Replaces all current bare `<div className="flex h-5 rounded overflow-hidden">` vote bar clones. | —                                            |
+| `ApprovalSparkline` | Small inline SVG 30-day trend line for party cards and detail pages. Reuses party history data already fetched.                                                                                          | —                                            |
+| `SeatBar`           | Full-width horizontal stacked seat bar with color blocks, party labels below, hover tooltip. Used on Parties page top + Dashboard coalition section.                                                     | —                                            |
 
-- **Kanban columns** (`BillPipeline`) as primary view (toggle: Kanban / List)
-- List view: compact `EventRow` style per bill with status badge, proposer chip, read link
-- Bill Detail: add a **reading stage timeline** at top (5 steps, current highlighted), MdB vote section with `VoteRiver`
+#### Teaser / Feed Components
 
-#### 4. Elections (`/elections`)
+| Component        | Description                                                                                                                                                                                                          | Reference                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `StoryCard`      | Editorial card: `.section-title`-style category chip + bold headline + 2-line excerpt + day badge. Sizes: `hero` (full-width, larger headline) / `standard` / `compact`. Used in Media, News, Dashboard bill events. | [spiegel.de](https://www.spiegel.de) teasers |
+| `BreakingBanner` | Full-width amber/red strip with icon + message + dismiss `×`. Shown when: active crisis / active confidence vote / budget provisional / snap election. Lives in Dashboard above hero.                                | [bbc.co.uk/news](https://www.bbc.co.uk/news) |
+| `EventRow`       | Dense single-line event: colored left border by event type, icon, text, day badge. Replaces ad-hoc list items in NewsFeed and SimulationLog.                                                                         | —                                            |
 
-- Top: live `HemicycleChart` (full width, animated)
-- Coalition negotiation: **chat-log style** — each round as a message thread, party avatars, timestamped
-- `CoalitionBuilder` moved to sidebar of Elections page (always visible)
-- Add: **Seat history chart** — bar chart showing seat shifts across elections
+#### Interactive
 
-#### 5. News Feed (`/news`)
+| Component       | Description                                                                                                                                                              | Reference                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `NewsCarousel`  | CSS snap-scroll horizontal carousel of `StoryCard`s. Arrow buttons + keyboard nav. Used on Dashboard "Aus der Presse" section.                                           | [spiegel.de](https://www.spiegel.de) front page |
+| `BillPipeline`  | Read-only Kanban: 5 columns (Eingereicht → 1. Lesung → Ausschuss → 2./3. Lesung → Gesetz), bill cards per stage. Toggle switch: Kanban / Liste. Primary Bills page view. | [linear.app](https://linear.app)                |
+| `TimelineRiver` | Vertical centered timeline, alternating left/right cards, bold day-separator markers. For SimulationLog and election negotiation history.                                | —                                               |
 
-- Redesign as a **live ticker** split view: breaking ticker strip at top + `TimelineRiver` below
-- Day separators become bold date dividers like a newspaper
-- Filter pills become a horizontal scrollable category strip
+#### Engagement
 
-#### 6. Media (`/media`)
+| Component        | Description                                                                                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PollCard`       | Prominent poll card: question, animated percentage bars (CSS transition), Vote button (auth-gated), result bar with party breakdown. Replaces inline poll rendering in Polls page and Dashboard sidebar. |
+| `ReferendumCard` | Full-bleed card: question headline, impact preview pills, large Yes/No/Abstain buttons.                                                                                                                  |
 
-- **Newspaper broadsheet layout**: 3 outlet columns side by side (outlet badge + bias indicator)
-- Each article is a `StoryCard` — tallest/most recent gets hero treatment
-- Add: outlet bias indicator (left/center/right) as colored badge
+---
 
-#### 7. Budget (`/budget`)
+### IV. Page-by-Page — Still Outstanding
 
-- Top: `StatCard` row — total budget, passed/provisional status, next cycle countdown
-- Ministry allocations: **horizontal bar chart** per ministry with change delta vs prior cycle
+#### Dashboard (`/`)
+
+Currently: 2-col shell, Hemicycle, economy stats, media card list, party cards, sidebar widgets. Good bones.
+
+**Remaining improvements:**
+
+- Add `BreakingBanner` (crisis / confidence vote / provisional budget alert strip)
+- Replace economy inline block → `EconomyPanel` with sparklines
+- Replace media list → `NewsCarousel` of `StoryCard`s
+- Replace bare vote bars everywhere → `VoteRiver`
+- Add `SeatBar` above party carousel section
+
+#### Bills (`/bills`)
+
+**Remaining:**
+
+- Add `BillPipeline` kanban as primary view (toggle: Kanban / Liste)
+- Bill list items → `StoryCard` compact or `EventRow`
+- BillDetail: add 5-step reading stage progress bar at top (Eingereicht → Gesetz, current step highlighted)
+- BillDetail: `VoteRiver` for vote breakdown (replaces bare color div)
+
+#### Elections (`/elections`)
+
+**Remaining:**
+
+- Coalition negotiation rounds → **chat-log layout**: party avatar + round number header + argument text per message, timestamped by day
+- Add seat history bar chart (simple SVG bars, seat delta per election)
+
+#### News Feed (`/news`)
+
+**Remaining:**
+
+- Breaking ticker strip at top (top 3 most recent events, auto-rotating or static)
+- Day separators → bold `section-title`-style date dividers
+- Event items → `EventRow` component
+- Filter pills → horizontal scroll strip (currently static row)
+
+#### Media (`/media`)
+
+**Remaining:**
+
+- 3 outlet columns side by side (Tagesspiegel / Volksstimme / WiWo) with outlet bias badge (left/center/right)
+- Current article → `StoryCard` hero size; archive → `StoryCard` compact
+- Outlet header: colored top border matching existing `OUTLET_STYLE` colors
+
+#### Budget (`/budget`)
+
+**Remaining:**
+
+- Top `StatCard` row: total budget value, passed/provisional status, next cycle countdown
+- Ministry allocations: horizontal bar chart per ministry with delta vs prior cycle
 - Vote section: `VoteRiver` per party
 
-#### 8. Constitutional Court (`/constitutional-court`)
+#### Questions (`/questions`)
 
-- Each challenge: `StoryCard` variant with court-styled serif heading, status badge, collapsible arguments
-- Add: **ruling timeline** showing all decisions chronologically
+**Remaining:**
 
-#### 9. Questions (`/questions`)
+- Split layout: **Pending** (upvote arrows, sorted by votes) | **Answered** (with response excerpt collapsed)
+- Answered items: party color left-border + party avatar initial block
 
-- Split into **two feed columns**: Pending (with upvote arrows) | Answered (with AI response excerpt)
-- Each answered question: party color left-border, avatar, response collapsed by default
+#### Login (`/login`)
 
-#### 10. Login (`/login`)
+**Remaining:**
 
-- Full-page centered layout with Bundesadler watermark
-- Large serif headline: "Willkommen im KI-Bundestag"
-- Single input + CTA, subtle particle/flag animation in background
+- Full-page centered layout with subtle Bundesadler SVG watermark (low-opacity bg element)
+- Single input + CTA only — remove extraneous chrome
 
-#### 11. Admin (`/admin`)
+#### Admin (`/admin`)
 
-- **Dark sidebar sub-navigation** for admin sections
-- Speed preset selector: visual cards with icons (not just text) showing mode description
-- Model config table: styled data table with provider logos
+**Remaining:**
+
+- Speed preset selector: visual tile cards with icons + description (not text-only list)
+- Model config: proper data `<table>` with provider name + model label columns
 
 ---
 
-### V. Typography Scale
+### V. Typography — Remaining Opportunity
 
-New type system using **two fonts**:
+Current state: Inter only, all weights, `section-title` pattern used consistently.
 
-| Role                           | Font             | Weight | Size                      |
-| ------------------------------ | ---------------- | ------ | ------------------------- |
-| H1 display                     | DM Serif Display | 400    | 2.5–3.5rem                |
-| H2 section                     | DM Serif Display | 400    | 1.875rem                  |
-| H3 card                        | Inter            | 600    | 1.125rem                  |
-| Body                           | Inter            | 400    | 0.9375rem                 |
-| Caption/label                  | Inter            | 500    | 0.75rem uppercase tracked |
-| Monospace (day counter, stats) | JetBrains Mono   | 400    | varies                    |
+**Optional next step** (not critical): Add **[DM Serif Display](https://fonts.google.com/specimen/DM+Serif+Display)** exclusively for H1 page titles only — not for section headings. This gives editorial gravitas without widespread disruption. Only 2 lines to add:
 
-Load DM Serif Display + JetBrains Mono via Google Fonts in `packages/web/index.html`. Update `@theme inline` in `packages/web/src/styles.css` with `--font-display` and `--font-mono` tokens.
+```html
+<!-- index.html — add to existing Google Fonts link -->
+family=DM+Serif+Display&
+```
+
+```css
+/* styles.css */
+h1 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 400;
+}
+```
 
 ---
 
 ### VI. Animation & Motion
 
-| Pattern            | Implementation                                              |
-| ------------------ | ----------------------------------------------------------- |
-| Page enter         | `@keyframes fadeInUp` 200ms, opacity 0→1 + translateY 8px→0 |
-| Stat counters      | `CountUp` via `requestAnimationFrame`, 600ms ease-out       |
-| Vote bars          | CSS `transition: width 600ms ease` on mount                 |
-| Approval gauge     | SVG `stroke-dashoffset` animated on mount                   |
-| Carousel           | CSS `scroll-behavior: smooth` + snap points                 |
-| Skeleton → content | Cross-fade via opacity transition                           |
-| Breaking banner    | Slide-down from top, 300ms                                  |
-
-No heavy animation libraries needed — pure CSS + minimal vanilla JS.
+| Pattern            | Implementation                                                    | Status                            |
+| ------------------ | ----------------------------------------------------------------- | --------------------------------- |
+| Vote bars          | CSS `transition: width 600ms ease` on mount                       | ⬜ When `VoteRiver` built         |
+| Approval sparkline | SVG `stroke-dashoffset` on mount                                  | ⬜ When `ApprovalSparkline` built |
+| Carousel           | CSS `scroll-behavior: smooth` + `scroll-snap-type: x mandatory`   | ⬜ When `NewsCarousel` built      |
+| Stat counters      | `requestAnimationFrame` countup on visibility                     | ⬜ Optional polish                |
+| Breaking banner    | `slide-in-from-top` (already available via `tailwindcss-animate`) | ⬜ When `BreakingBanner` built    |
+| Page enter         | `fadeInUp` on `<main>` content — one global CSS rule              | ⬜ Low priority                   |
 
 ---
 
-### VII. Implementation Steps
+### VII. Next Implementation Steps
 
-1. **Install new Google Fonts** — add DM Serif Display + JetBrains Mono to `packages/web/index.html`
-2. **Update design tokens** in `packages/web/src/styles.css` — full dark-mode palette + new font variables + expanded radius/shadow tokens
-3. **Update `packages/web/src/lib/colors.ts`** — remap all semantic hex values to dark-mode equivalents, add new badge classes
-4. **Build `PageLayout` + `PageHeader` + `SectionHeader`** — new layout primitives replacing current `mx-auto max-w-[1280px]` pattern
-5. **Redesign `packages/web/src/main.tsx`** — replace top nav with left sidebar + mobile bottom tabs; extract `SimStatus` + `UserMenu` into sidebar footer
-6. **Build teaser components** — `HeroTeaser`, `StoryCard`, `BreakingBanner`, `EventRow`
-7. **Build data viz components** — `StatCard`, `EconomyPanel` with sparklines, `VoteRiver`, `ApprovalGauge`
-8. **Build carousel + interactive** — `NewsCarousel`, `BillPipeline` kanban, `CoalitionBuilder` refactor
-9. **Redesign Dashboard** — newspaper layout using new components, section by section
-10. **Redesign Parties + PartyDetail** — gradient cards, spider chart, alignment matrix upgrade
-11. **Redesign Bills + BillDetail** — kanban view toggle, reading timeline, vote river
-12. **Redesign Elections** — chat-log coalition rounds, full-width hemicycle
-13. **Redesign remaining pages** — News, Media, Budget, Court, Questions, Login, Admin (in priority order)
-14. **Polish pass** — animations, mobile responsiveness, loading states, error states, empty states
+**Phase A — Shared components (do first, unblocks all pages)**
+
+1. Build `VoteRiver` — replaces every bare vote-bar `<div>` in Bills, BillDetail, Budget, Elections, ConfidenceVotes, Motions
+2. Build `EventRow` — replaces ad-hoc list items in NewsFeed, SimulationLog
+3. Build `StoryCard` (standard + compact) — used by Media, Dashboard, News
+4. Build `SeatBar` — used by Parties top + Dashboard coalition section
+5. Build `EconomyPanel` with sparklines — extract from Dashboard, reuse on Dashboard
+
+**Phase B — High-impact pages**
+
+6. Bills: `BillPipeline` kanban + reading stage progress bar in BillDetail
+7. Media: 3-column outlet layout using `StoryCard`
+8. News Feed: `EventRow` list + day dividers + ticker strip
+9. Dashboard: wire up `BreakingBanner`, `NewsCarousel`, `EconomyPanel`, `SeatBar`
+
+**Phase C — Remaining pages**
+
+10. Elections: chat-log coalition rounds
+11. Budget: `StatCard` row + `VoteRiver`
+12. Questions: split pending/answered layout
+13. Login: centered layout + Bundesadler watermark
+14. Admin: preset tile cards
+
+**Phase D — Polish**
+
+15. H1 serif font (DM Serif Display) — optional, low-risk
+16. Page enter animation (single `@keyframes fadeInUp` rule)
+17. Mobile responsiveness pass on all new components
+18. Empty-state and error-state patterns for all pages
 
 ---
 
-### Design Decisions
+### Design Decisions (current)
 
-- **Dark-mode-first over light**: the subject matter (politics, news, data) suits a dark editorial aesthetic; gold accent reads better on dark than light
-- **Left sidebar over top nav**: 24 pages cannot be organized in a single top bar without crowding; sidebar groups naturally, scales better, and matches modern app conventions
-- **DM Serif Display over Playfair Display**: lower contrast in thin strokes, better legibility at large sizes on dark backgrounds
-- **CSS + SVG over a chart library** (e.g., recharts): existing codebase has no chart library; lightweight SVG sparklines + gauge are achievable without adding 100KB+ dependencies; complex charts (hemicycle) already exist as custom SVG
+- **Light mode confirmed**: shadcn defaults, token system, and Inter all work well; avoids rework of 20+ pages of color logic
+- **Top nav confirmed**: grouped dropdowns handle 24 pages cleanly; sidebar adds layout complexity
+- **No chart library**: SVG sparklines + existing Hemicycle cover all needs; avoid 100KB+ bundle cost
+- **`section-title` as design anchor**: the uppercase blue bordered label is the single strongest visual consistency signal — extend to all new components
+- **`VoteRiver` is highest priority**: bare vote-bar `<div>` clones appear 15+ times across the codebase; a single reusable component eliminates all of them
 
 ---
 
 ### Verification Checklist
 
-- [ ] `npm run typecheck` — no TypeScript regressions
-- [ ] `npm run dev:web` — visually verify each page in browser at 1440px, 1024px, 375px (iPhone)
-- [ ] Dark-mode contrast ratios (WCAG AA minimum 4.5:1) for all text/bg combinations
-- [ ] Sidebar collapse → mobile bottom tab bar at 1023px breakpoint
-- [ ] Carousel keyboard navigation (arrow keys, tab focus)
-- [ ] All `VOTE_COLORS`, `STATUS_BADGE`, `MOOD_BADGE` etc. readable on dark card backgrounds after `colors.ts` update
+- [ ] `npm run typecheck` — no TypeScript regressions after each phase
+- [ ] `npm run dev:web` — visually verify at 1440px, 1024px, 375px after each page
+- [ ] All new components accept `className` prop for overrides
+- [ ] `VoteRiver` / `SeatBar` are accessible (aria-label on color blocks)
+- [ ] `BillPipeline` kanban toggle persists in `localStorage` (user preference)
+- [ ] `NewsCarousel` keyboard-navigable (arrow keys, focus management)
+- [ ] `BreakingBanner` dismiss persists per-day (don't re-show same alert same day)

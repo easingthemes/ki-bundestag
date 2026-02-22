@@ -310,7 +310,7 @@ export function Elections() {
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
             <div className="flex flex-col items-center">
-              <Hemicycle seats={partiesToSeats(parties)} size="md" />
+              <Hemicycle seats={partiesToSeats(parties)} coalitionIds={coalitionIds} size="md" />
               <div className="text-xs text-muted-foreground mt-1">
                 Koalitionsmehrheit: {coalitionSeats} / {totalSeats} Sitze
               </div>
@@ -419,7 +419,7 @@ export function Elections() {
             <h2 className="section-title">Sitzverteilung</h2>
             <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
               <div className="flex flex-col items-center">
-                <Hemicycle seats={resultsToSeats(selected.results, parties)} size="md" />
+                <Hemicycle seats={resultsToSeats(selected.results, parties)} coalitionIds={state?.coalitionParties} size="md" />
               </div>
               <div>
                 <table className="w-full border-collapse text-sm">
@@ -647,7 +647,7 @@ export function Elections() {
                     </div>
                     {selected.results && (
                       <div className="mt-3">
-                        <Hemicycle seats={resultsToSeats(selected.results, parties)} size="sm" />
+                        <Hemicycle seats={resultsToSeats(selected.results, parties)} coalitionIds={state?.coalitionParties} size="sm" />
                       </div>
                     )}
                   </div>

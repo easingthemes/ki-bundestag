@@ -12,6 +12,8 @@
     "@tailwindcss/vite": "^4.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "highcharts": "^12.5.0",
+    "highcharts-react-official": "^3.2.3",
     "lucide-react": "^0.575.0",
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",

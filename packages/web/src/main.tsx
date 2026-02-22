@@ -404,6 +404,22 @@ function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => 
   );
 }
 
+/* ── Scroll to #hash after navigation ──────────────────────────── */
+
+function ScrollToHash() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    // Delay slightly to let the target page render
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash.slice(1));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [pathname, hash]);
+  return null;
+}
+
 /* ── App ──────────────────────────────────────────────────────────── */
 
 function App() {
@@ -450,6 +466,7 @@ function App() {
   return (
     <UserContext.Provider value={{ user, token, login, logout }}>
     <BrowserRouter>
+      <ScrollToHash />
       <div className="min-h-screen flex flex-col">
         {/* ── Top navigation bar ── */}
         <nav className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
