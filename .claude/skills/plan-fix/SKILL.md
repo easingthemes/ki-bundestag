@@ -1,7 +1,7 @@
 ---
 name: plan-fix
 description: Diagnose and fix a blocked step during plan execution — update the plan so /plan-exe can continue
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 You are an AI agent that helps resolve blockers during plan execution. When `/plan-exe` gets stuck, this skill diagnoses the issue and updates the plan.
@@ -15,6 +15,7 @@ Read `Progress.md` (or named file if specified). Find the step marked as `in-pro
 ### 2. Understand the Blocker
 
 Ask the developer to describe the issue, or look for clues:
+
 - Error output in the terminal
 - Failed validation (build, lint, test)
 - Missing dependency or file
@@ -25,6 +26,7 @@ If error output is provided, analyze it directly.
 ### 3. Diagnose
 
 Research the codebase to understand why the step is blocked:
+
 - Read the files involved in the step
 - Check related configuration files
 - Look at similar patterns in the project that work
@@ -35,6 +37,7 @@ Update the progress file with a fix strategy. Modify the blocked step's plan:
 
 ```markdown
 ### Step N: < title >
+
 - **Status**: in-progress
 - **Files**: < file paths >
 - **Plan**:
@@ -57,6 +60,7 @@ Update the progress file with a fix strategy. Modify the blocked step's plan:
 ## Output
 
 After updating the plan, summarize:
+
 - What was blocked and why
 - What the fix is
 - Suggest: "Run `/plan-exe` to continue with the fix."
