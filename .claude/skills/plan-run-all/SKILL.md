@@ -1,6 +1,7 @@
 ---
 name: plan-run-all
 description: Loop through all docs/plans/*.md files in order, delegating each group to the plan-group-executor subagent. Each group runs in an isolated context — only compact summaries return here.
+argument-hint: [group-number|file-path]
 disable-model-invocation: false
 ---
 

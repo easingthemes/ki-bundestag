@@ -6,7 +6,7 @@ model: sonnet
 memory: project
 permissionMode: acceptEdits
 skills:
-  - plan-from-doc
+  - plan-start
   - plan-exe
   - review
   - review-fix
@@ -25,9 +25,9 @@ docs/plans/01-api-refactor.md
 
 ## What you do
 
-### Step 1 — Generate Progress.md (plan-from-doc logic)
+### Step 1 — Generate Progress.md (plan-start logic)
 
-Read the plan document. Generate a fresh `Progress.md` using the plan-from-doc skill rules:
+Read the plan document. Generate a fresh `Progress.md` using the plan-start skill rules:
 
 - Extract the Goal from the TL;DR section
 - Create one numbered step per item in the Steps section

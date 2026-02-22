@@ -1,0 +1,1 @@
+Run `npm run typecheck` from the monorepo root. If there are errors, fix them all. Re-run typecheck to confirm everything passes.

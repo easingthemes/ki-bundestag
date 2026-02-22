@@ -1,0 +1,1 @@
+Read the file or code the user is pointing at. Explain what it does in plain language — purpose, key logic, dependencies, and any non-obvious behavior. Keep it concise.
