@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MODEL_TYPE_BADGE, PRESET_BADGE } from "@/lib/colors";
+import { FilterPills } from "@/components/FilterPills";
 
 // ─── Action reference data ────────────────────────────────────────────────────
 
@@ -728,22 +729,15 @@ export function Admin() {
         <h2 className="section-title">Simulationsaktionen</h2>
 
         {/* Category filter */}
-        <div className="flex gap-1.5 flex-wrap mb-4">
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => setCategoryFilter(c)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors capitalize",
-                categoryFilter === c
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-background text-foreground border-input hover:bg-accent"
-              )}
-            >
-              {c === "all" ? `All (${ACTIONS.length})` : `${c} (${ACTIONS.filter(a => a.category === c).length})`}
-            </button>
-          ))}
-        </div>
+        <FilterPills
+          className="mb-4"
+          options={categories.map(c => ({
+            value: c,
+            label: c === "all" ? `All (${ACTIONS.length})` : `${c} (${ACTIONS.filter(a => a.category === c).length})`,
+          }))}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
 
         <Card>
           <CardContent className="p-0 overflow-hidden">

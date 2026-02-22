@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
+import { FilterPills } from "@/components/FilterPills";
 
 const MINISTRY_LABELS: Record<keyof BudgetAllocations, string> = {
   finance: "Finance",
@@ -74,22 +75,16 @@ export function Budget() {
         Annual budget cycles — every 60 simulation days, the coalition proposes a 300B EUR budget across 8 ministries.
       </p>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {(["all", "passed", "rejected"] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
-              filter === f
-                ? "bg-foreground text-background border-foreground"
-                : "bg-background text-foreground border-input hover:bg-accent"
-            )}
-          >
-            {f === "all" ? `All (${budgets.length})` : f === "passed" ? `Passed (${passedCount})` : `Rejected (${rejectedCount})`}
-          </button>
-        ))}
-      </div>
+      <FilterPills
+        className="mb-6"
+        options={[
+          { value: "all", label: `All (${budgets.length})` },
+          { value: "passed", label: `Passed (${passedCount})` },
+          { value: "rejected", label: `Rejected (${rejectedCount})` },
+        ]}
+        value={filter}
+        onChange={setFilter}
+      />
 
       {filtered.length === 0 && (
         <p className="text-center py-8 text-muted-foreground">

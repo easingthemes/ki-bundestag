@@ -30,4 +30,6 @@ docs/plans/02-web-shared.md
 
 ### Step 4: Create `src/components/FilterPills.tsx`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/web/src/components/FilterPills.tsx`, `packages/web/src/pages/Notifications.tsx`, `packages/web/src/pages/MyActivity.tsx`, `packages/web/src/pages/Budget.tsx`, `packages/web/src/pages/Interpellations.tsx`, `packages/web/src/pages/ConfidenceVotes.tsx`, `packages/web/src/pages/Admin.tsx`
+- **Result**: Created generic FilterPills<T> component with options/value/onChange props. Replaced inline pill filter rows in 6 pages. ConstitutionalCourt skipped (uses select dropdowns, not pills). Typecheck pass.
