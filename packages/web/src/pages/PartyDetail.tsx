@@ -200,6 +200,7 @@ export function PartyDetail() {
           </div>
 
           {/* Membership section */}
+          {/* id anchor: join-party */}
           {(() => {
             const isMyParty = user?.partyId === id;
             const handleJoin = async () => {
@@ -229,7 +230,7 @@ export function PartyDetail() {
             };
 
             return (
-              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
+              <div id="join-party" className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm text-muted-foreground">
                   👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
                   {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>Mitglied</span>}
@@ -290,45 +291,94 @@ export function PartyDetail() {
         const aiSeats = seats.filter(s => s.controller === "ai");
         const partyAvail = availableSeats[id!];
         const openCount = partyAvail?.open ?? 0;
+        const hasSeat = seats.some(s => s.userId === user?.id);
+        const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
+        const rejectedApp = myApplications.find(a => a.status === "rejected" && a.partyId === id);
+        const canApply = isMyParty && !hasSeat && !pendingApp && openCount > 0;
 
         return (
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="section-title m-0">
-                Bundestagsabgeordnete
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  {humanSeats.filter(s => s.userId).length} MdB / {humanSeats.length} human seats / {seats.length} total
-                  {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} open)</span>}
-                </span>
-              </h2>
-              {isMyParty && !seats.some(s => s.userId === user?.id) && (() => {
-                const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
-                if (pendingApp) return (
-                  <Badge variant="outline" className={STATUS_BADGE.pending}>
-                    Application pending (Day {pendingApp.createdOnDay})
-                  </Badge>
-                );
-                if (!showApplyForm && openCount > 0) return (
-                  <button
-                    onClick={() => setShowApplyForm(true)}
-                    className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
-                    style={{ borderColor: displayColor, color: displayColor }}
-                  >
-                    Apply for a Seat
-                  </button>
-                );
-                return null;
-              })()}
-            </div>
+          <div id="mdb-seats" className="mb-8">
+            <h2 className="section-title">
+              Bundestagsabgeordnete
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                {humanSeats.filter(s => s.userId).length}/{humanSeats.length} besetzt · {seats.length} Sitze gesamt
+                {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} frei)</span>}
+              </span>
+            </h2>
 
+            {/* ── Prominent MdB Apply CTA ── */}
+            {canApply && !showApplyForm && (
+              <Card className="mb-4 border-2" style={{ borderColor: `${displayColor}40` }}>
+                <CardContent className="p-5">
+                  <div className="flex flex-col md:flex-row gap-4 md:items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-base mb-1.5" style={{ color: displayColor }}>Werde MdB für {party.name}</div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Als Mitglied des Bundestags nimmst du direkt an der parlamentarischen Arbeit teil.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-3">
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                          <span>Direkte Abstimmung über Gesetze in 3. Lesung</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                          <span>Reden halten in allen Lesungen</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                          <span>Anträge und Entschließungen einbringen</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                          <span>Änderungsanträge in 2. Lesung stellen</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>Voraussetzung: Parteimitglied</span>
+                        <span>·</span>
+                        <span>KI-Bewertung der Bewerbung</span>
+                        <span>·</span>
+                        <span>7 Tage Wartezeit nach Ablehnung</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowApplyForm(true)}
+                      className="shrink-0 px-5 py-2.5 rounded-lg text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{ background: displayColor }}
+                    >
+                      Jetzt bewerben
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Pending application notice */}
+            {pendingApp && (
+              <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800 flex items-center gap-2">
+                <span className="font-semibold">Bewerbung läuft</span>
+                <span className="text-xs text-amber-600">— eingereicht Tag {pendingApp.createdOnDay}, wird demnächst geprüft</span>
+              </div>
+            )}
+
+            {/* Rejected with cooldown notice */}
+            {rejectedApp && rejectedApp.cooldownUntilDay && simStatus && rejectedApp.cooldownUntilDay > simStatus.currentDay && (
+              <div className="mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-sm text-muted-foreground">
+                Letzte Bewerbung abgelehnt — erneute Bewerbung ab Tag {rejectedApp.cooldownUntilDay} möglich
+              </div>
+            )}
+
+            {/* Apply form */}
             {showApplyForm && (
               <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
                 <CardContent className="p-5">
-                  <div className="font-semibold mb-2">Apply for a Bundestag Seat</div>
+                  <div className="font-semibold mb-1">Bewerbung als Bundestagsabgeordnete/r</div>
+                  <p className="text-xs text-muted-foreground mb-3">Begründe, warum du diese Partei vertreten willst. Nenne konkrete politische Ziele — die KI-Fraktionsführung bewertet Substanz und Parteinähe.</p>
                   <textarea
                     value={applyMotivation}
                     onChange={e => setApplyMotivation(e.target.value)}
-                    placeholder="Why do you want to represent this party? (20–500 chars)"
+                    placeholder="Warum willst du diese Partei vertreten? (20–500 Zeichen)"
                     maxLength={500}
                     rows={3}
                     className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
@@ -336,17 +386,18 @@ export function PartyDetail() {
                   <select
                     value={applyFocus}
                     onChange={e => setApplyFocus(e.target.value)}
+                    aria-label="Politischer Schwerpunkt"
                     className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 bg-transparent"
                   >
-                    <option value="">Policy focus (optional)</option>
-                    <option value="economy">Economy</option>
-                    <option value="social">Social</option>
-                    <option value="environment">Environment</option>
-                    <option value="immigration">Immigration</option>
-                    <option value="defense">Defense</option>
-                    <option value="education">Education</option>
-                    <option value="healthcare">Healthcare</option>
-                    <option value="infrastructure">Infrastructure</option>
+                    <option value="">Politischer Schwerpunkt (optional)</option>
+                    <option value="economy">Wirtschaft</option>
+                    <option value="social">Soziales</option>
+                    <option value="environment">Umwelt</option>
+                    <option value="immigration">Migration</option>
+                    <option value="defense">Verteidigung</option>
+                    <option value="education">Bildung</option>
+                    <option value="healthcare">Gesundheit</option>
+                    <option value="infrastructure">Infrastruktur</option>
                   </select>
                   <div className="flex gap-2 items-center flex-wrap">
                     <button
@@ -358,10 +409,10 @@ export function PartyDetail() {
                           await api.applyForSeat(applyMotivation.trim(), applyFocus.trim() || undefined);
                           setApplyMotivation(""); setApplyFocus("");
                           setShowApplyForm(false);
-                          setApplyMsg("Application submitted! You'll be notified of the result.");
+                          setApplyMsg("Bewerbung eingereicht! Du wirst über das Ergebnis benachrichtigt.");
                           refresh();
                         } catch (e) {
-                          setApplyMsg(e instanceof Error ? e.message : "Failed to submit");
+                          setApplyMsg(e instanceof Error ? e.message : "Fehler beim Einreichen");
                         } finally {
                           setApplySubmitting(false);
                           setTimeout(() => setApplyMsg(null), 5000);
@@ -371,30 +422,31 @@ export function PartyDetail() {
                       className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
                       style={{ background: displayColor }}
                     >
-                      {applySubmitting ? "Submitting…" : "Apply"}
+                      {applySubmitting ? "Wird gesendet…" : "Bewerben"}
                     </button>
                     <button
                       onClick={() => { setShowApplyForm(false); setApplyMotivation(""); setApplyFocus(""); }}
                       className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
                     >
-                      Cancel
+                      Abbrechen
                     </button>
-                    {applyMsg && <span className={`text-xs ${applyMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
+                    {applyMsg && <span className={`text-xs ${applyMsg.includes("Fehler") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
                   </div>
                 </CardContent>
               </Card>
             )}
 
+            {/* Seat roster table */}
             <Card>
               <CardContent className="p-0">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th className="text-left px-3 py-2 border-b-2 border-border">Seat</th>
-                      <th className="text-left px-3 py-2 border-b-2 border-border">Member</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Type</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Discipline</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Proxy</th>
+                      <th className="text-left px-3 py-2 border-b-2 border-border">Sitz</th>
+                      <th className="text-left px-3 py-2 border-b-2 border-border">Mitglied</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Typ</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Disziplin</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Stellvertretung</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -405,9 +457,9 @@ export function PartyDetail() {
                           {seat.displayName ? (
                             <span className="font-semibold">{seat.displayName}</span>
                           ) : (
-                            <span className="text-muted-foreground italic">Open</span>
+                            <span className="text-emerald-600 italic">Frei</span>
                           )}
-                          {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">(You)</span>}
+                          {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">(Du)</span>}
                         </td>
                         <td className="px-3 py-2 border-b border-border text-center">
                           <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
@@ -420,14 +472,14 @@ export function PartyDetail() {
                           )}
                         </td>
                         <td className="px-3 py-2 border-b border-border text-center text-xs text-muted-foreground">
-                          {seat.userId ? (seat.proxyDefault === "party_line" ? "Party Line" : "Abstain") : "—"}
+                          {seat.userId ? (seat.proxyDefault === "party_line" ? "Parteilinie" : "Enthaltung") : "—"}
                         </td>
                       </tr>
                     ))}
                     {aiSeats.length > 0 && (
                       <tr>
                         <td className="px-3 py-2 border-b border-border text-muted-foreground" colSpan={5}>
-                          + {aiSeats.length} AI-controlled seat{aiSeats.length !== 1 ? "s" : ""}
+                          + {aiSeats.length} KI-gesteuerte{aiSeats.length !== 1 ? " Sitze" : "r Sitz"}
                         </td>
                       </tr>
                     )}
@@ -655,7 +707,7 @@ export function PartyDetail() {
       </div>
 
       {/* Member Proposals */}
-      <div className="mb-8">
+      <div id="proposals" className="mb-8">
         <div className="flex justify-between items-center mb-3">
           <h2 className="section-title m-0">Mitgliedervorschläge ({proposals.length})</h2>
           {user?.partyId === id && !showProposalForm && (
@@ -837,7 +889,7 @@ export function PartyDetail() {
       </div>
 
       {/* Ask a Question */}
-      <div className="mb-8">
+      <div id="ask-question" className="mb-8">
         <h2 className="section-title">Frage an {party.name}</h2>
         <Card>
           <CardContent className="p-5">

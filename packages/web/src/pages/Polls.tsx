@@ -86,7 +86,7 @@ export function Polls() {
 
       {/* Active polls */}
       {activePolls.length > 0 && (
-        <div className="mb-8">
+        <div id="active-polls" className="mb-8">
           <h2 className="section-title">Aktive Umfragen ({activePolls.length})</h2>
           {activePolls.map(poll => (
             <PollCard

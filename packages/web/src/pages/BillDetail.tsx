@@ -200,7 +200,7 @@ export function BillDetail() {
 
       {/* Member Signals */}
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
-        <div className="mb-6">
+        <div id="member-signals" className="mb-6">
           <h2 className="section-title">Mitglieder-Signale</h2>
           {/* Signal nudge for members who haven't signaled yet */}
           {user && user.partyId && signals && signals.userSignal === null && (
@@ -264,7 +264,7 @@ export function BillDetail() {
 
       {/* MdB Direct Votes */}
       {bill.status === "third_reading" && (
-        <div className="mb-6">
+        <div id="mdb-votes" className="mb-6">
           <h2 className="section-title">MdB-Direktstimmen</h2>
           {user && mySeat && !mdbVotes?.userVote && (
             <div className={ALERT_STYLES.info}>
@@ -336,7 +336,7 @@ export function BillDetail() {
 
       {/* MdB Speeches */}
       {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
-        <div className="mb-6">
+        <div id="speeches" className="mb-6">
           <h2 className="section-title">MdB-Reden ({speeches.length})</h2>
           {user && mySeat && (
             <Card className="mb-3"><CardContent className="p-5">

@@ -589,6 +589,7 @@ export interface MdbApplication {
   createdOnDay: number;
   reviewedOnDay: number | null;
   reviewReason: string | null;
+  cooldownUntilDay: number | null;
 }
 
 export interface MdbSpeech {

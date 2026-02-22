@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import Highcharts from "highcharts";
+import HighchartsReact from "highcharts-react-official";
+import "highcharts/modules/item-series";
 
 interface SeatGroup {
   partyId: string;
@@ -9,139 +12,105 @@ interface SeatGroup {
 
 interface HemicycleProps {
   seats: SeatGroup[];
+  coalitionIds?: string[];
   totalSeats?: number;
   size?: "sm" | "md" | "lg";
   showLegend?: boolean;
   className?: string;
 }
 
-/** Political spectrum order: left → right */
-const SPECTRUM_ORDER = ["linke", "gruene", "spd", "fdp", "cdu", "afd"];
-
-function spectrumIndex(partyId: string): number {
-  const idx = SPECTRUM_ORDER.indexOf(partyId);
-  return idx >= 0 ? idx : 99;
-}
-
 function fixColor(c: string): string {
   return c === "#FFED00" ? "#c4a900" : c;
 }
 
+const MAX_WIDTH = { sm: 440, md: 600, lg: 800 };
+
 /**
- * Dot-based hemicycle parliament visualization.
- * Distributes seats across concentric semicircular rows
- * with parties arranged left-to-right by political spectrum.
+ * Parliament hemicycle using Highcharts item-series.
+ * Ordered from left: coalition parties (by seats desc), then opposition (by seats desc).
  */
-export function Hemicycle({ seats, totalSeats, size = "md", showLegend = true, className }: HemicycleProps) {
-  const sorted = useMemo(() =>
-    [...seats].filter(s => s.count > 0).sort((a, b) => spectrumIndex(a.partyId) - spectrumIndex(b.partyId)),
-    [seats]
-  );
+export function Hemicycle({ seats, coalitionIds = [], totalSeats, size = "md", showLegend = true, className }: HemicycleProps) {
+  const coalitionSet = useMemo(() => new Set(coalitionIds), [coalitionIds]);
+
+  const { sorted, coalition, opposition } = useMemo(() => {
+    const valid = seats.filter(s => s.count > 0);
+    const coal = valid.filter(s => coalitionSet.has(s.partyId)).sort((a, b) => b.count - a.count);
+    const opp = valid.filter(s => !coalitionSet.has(s.partyId)).sort((a, b) => b.count - a.count);
+    return { sorted: [...coal, ...opp], coalition: coal, opposition: opp };
+  }, [seats, coalitionSet]);
 
   const total = totalSeats ?? sorted.reduce((s, g) => s + g.count, 0);
 
-  const dots = useMemo(() => {
-    if (total === 0) return [];
+  const options = useMemo<Highcharts.Options>(() => ({
+    chart: {
+      type: "item",
+      backgroundColor: "transparent",
+      style: { fontFamily: "Inter, sans-serif" },
+    },
+    title: {
+      text: `${total} Sitze`,
+      align: "center",
+      style: { fontSize: "16px", fontWeight: "700" },
+    },
+    credits: { enabled: false },
+    exporting: { enabled: false },
+    legend: { enabled: false },
+    series: [{
+      type: "item",
+      name: "Sitze",
+      keys: ["name", "y", "color", "label"],
+      data: sorted.map(g => [g.name, g.count, fixColor(g.color), g.name]),
+      dataLabels: { enabled: false },
+      center: ["50%", "88%"],
+      size: "170%",
+      startAngle: -100,
+      endAngle: 100,
+    } as unknown as Highcharts.SeriesOptionsType],
+    tooltip: {
+      headerFormat: "",
+      pointFormat: '<span style="color:{point.color}">\u25CF</span> {point.name}: <b>{point.y} Sitze</b>',
+    },
+    responsive: {
+      rules: [{
+        condition: { maxWidth: 600 },
+        chartOptions: {
+          series: [{
+            dataLabels: { distance: -30 },
+          }] as unknown as Highcharts.SeriesOptionsType[],
+        },
+      }],
+    },
+  }), [sorted, total]);
 
-    // Determine number of rows based on total seats
-    const numRows = total <= 100 ? 5 : total <= 300 ? 7 : total <= 500 ? 9 : total <= 800 ? 11 : 13;
-
-    // Radii range (normalized 0-1, will be scaled by viewBox)
-    const innerR = 0.35;
-    const outerR = 0.95;
-    const rowGap = (outerR - innerR) / (numRows - 1);
-
-    // Calculate seats per row proportional to arc length (radius)
-    const rawPerRow = Array.from({ length: numRows }, (_, i) => {
-      const r = innerR + i * rowGap;
-      return Math.PI * r; // arc length proportional
-    });
-    const rawTotal = rawPerRow.reduce((s, v) => s + v, 0);
-    const seatsPerRow = rawPerRow.map(v => Math.round((v / rawTotal) * total));
-
-    // Fix rounding errors
-    const diff = total - seatsPerRow.reduce((s, v) => s + v, 0);
-    if (diff !== 0) {
-      // Adjust the largest row
-      const maxIdx = seatsPerRow.indexOf(Math.max(...seatsPerRow));
-      seatsPerRow[maxIdx] += diff;
-    }
-
-    // Build flat list of party-colored seats
-    const colorList: string[] = [];
-    for (const group of sorted) {
-      for (let i = 0; i < group.count; i++) {
-        colorList.push(fixColor(group.color));
-      }
-    }
-
-    // Distribute dots across rows
-    const result: { x: number; y: number; color: string }[] = [];
-    let seatIdx = 0;
-
-    for (let row = 0; row < numRows; row++) {
-      const r = innerR + row * rowGap;
-      const count = seatsPerRow[row];
-      if (count === 0) continue;
-
-      for (let i = 0; i < count; i++) {
-        // Angle from π (left) to 0 (right)
-        const angle = Math.PI - (i / (count - 1 || 1)) * Math.PI;
-        const x = 0.5 + r * Math.cos(angle);
-        const y = 1.0 - r * Math.sin(angle);
-        const color = seatIdx < colorList.length ? colorList[seatIdx] : "#ccc";
-        result.push({ x, y, color });
-        seatIdx++;
-      }
-    }
-
-    return result;
-  }, [sorted, total]);
-
-  // Size configs
-  const sizeConfig = {
-    sm: { width: 240, dotR: 0.008 },
-    md: { width: 360, dotR: 0.007 },
-    lg: { width: 480, dotR: 0.006 },
-  }[size];
+  if (total === 0) return null;
 
   return (
-    <div className={className}>
-      <svg
-        viewBox="0 0 1 0.58"
-        style={{ width: "100%", maxWidth: sizeConfig.width }}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {dots.map((d, i) => (
-          <circle key={i} cx={d.x} cy={d.y} r={sizeConfig.dotR} fill={d.color} />
-        ))}
-        <text
-          x={0.5}
-          y={0.55}
-          textAnchor="middle"
-          fontSize={0.04}
-          fontWeight="700"
-          fill="#333"
-          fontFamily="Inter, sans-serif"
-        >
-          {total}
-        </text>
-      </svg>
-
+    <div className={className} style={{ width: "100%", maxWidth: MAX_WIDTH[size] }}>
+      <HighchartsReact highcharts={Highcharts} options={options} />
       {showLegend && sorted.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
-          {sorted.map(g => (
-            <div key={g.partyId} className="flex items-center gap-1.5 text-xs">
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: fixColor(g.color) }}
-              />
-              <span className="font-medium text-foreground">{g.name}</span>
-              <span className="text-muted-foreground tabular-nums">{g.count}</span>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-x-6 mt-1 px-2">
+          <LegendColumn label="Koalition" parties={coalition} />
+          <LegendColumn label="Opposition" parties={opposition} />
         </div>
       )}
+    </div>
+  );
+}
+
+function LegendColumn({ label, parties }: { label: string; parties: SeatGroup[] }) {
+  if (parties.length === 0) return null;
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      <div className="space-y-0.5">
+        {parties.map(g => (
+          <div key={g.partyId} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: fixColor(g.color) }} />
+            <span className="font-medium">{g.name}</span>
+            <span className="text-muted-foreground tabular-nums">{g.count}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

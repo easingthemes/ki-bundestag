@@ -1,7 +1,7 @@
 ---
 name: plan-exe
 description: Execute the next planned step from Progress.md — implement code, run validation, update progress
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 You are an AI agent that implements the plan documented in `Progress.md`. You write code, create files, and run commands as specified in the plan.
@@ -30,6 +30,7 @@ For the step in focus:
 
 ```markdown
 ### Step 1: < title >
+
 - **Status**: done
 - **Files**: < files created/modified >
 - **Result**: < one-line summary + validation outcome >
@@ -40,6 +41,7 @@ Replace the Plan section with the compact Result — detailed plan history is in
 ### 4. Offer to Continue
 
 After completing a step, ask the developer:
+
 > "Step N completed. Continue to step N+1: < title >?"
 
 If the developer confirms, proceed to the next step without requiring a new command invocation.
@@ -57,6 +59,7 @@ If the developer confirms, proceed to the next step without requiring a new comm
 ## Output
 
 After completing the step, summarize:
+
 - What was implemented (files created/modified)
 - Validation results
 - Any issues encountered

@@ -44,7 +44,10 @@
       "mcp__chrome-devtools__wait_for",
       "WebFetch(domain:www.bundestag.de)",
       "WebFetch(domain:en.wikipedia.org)",
-      "WebFetch(domain:www.timeanddate.com)"
+      "WebFetch(domain:www.timeanddate.com)",
+      "WebFetch(domain:www.highcharts.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:codepen.io)"
     ]
   },
   "enableAllProjectMcpServers": true,
