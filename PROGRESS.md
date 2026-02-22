@@ -36,11 +36,15 @@ docs/plans/03-web-pages.md
 
 ### Step 5: Extract Admin components
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/components/admin/ActionsReference.tsx`, `InjectForms.tsx`, `ModelConfig.tsx`, `PresetSelector.tsx`
+- **Result**: Extracted ACTIONS data, inject forms, model config table, and preset selector into focused admin components. Typecheck pass.
 
 ### Step 6: Rewrite Admin.tsx shell
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/pages/Admin.tsx`
+- **Result**: Replaced 800-line file with ~60-line shell importing all 4 admin components. Typecheck pass.
 
 ### Step 7: Extract Elections components
 
