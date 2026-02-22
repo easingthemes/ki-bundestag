@@ -1,13 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, Bill, Party, ConstitutionalChallenge, BillImpact, type MdbVoteSummary, type MdbSpeech, type BundestagSeat } from "../api";
+import { api, type Bill, type Party, type ConstitutionalChallenge, type MdbVoteSummary, type MdbSpeech, type BundestagSeat } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, VOTE_COLORS, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES, MDB_BADGE } from "@/lib/colors";
+import { STATUS_BADGE, VOTE_COLORS, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
 import { usePolling } from "../usePolling";
 import { VoteBar } from "@/components/VoteBar";
+import { BillImpactDisplay } from "@/components/bills/BillImpactDisplay";
+import { MdbVoteButtons } from "@/components/bills/MdbVoteButtons";
+import { SpeechDisplay } from "@/components/bills/SpeechDisplay";
+import { SpeechSubmitForm } from "@/components/bills/SpeechSubmitForm";
 
 const STATUS_LABELS: Record<string, string> = {
   third_reading: "Third Reading",
@@ -41,36 +45,6 @@ const STAGE_ORDER: Record<string, number> = {
   struck_down: 5,
 };
 
-const IMPACT_FIELDS: { key: keyof BillImpact; label: string }[] = [
-  { key: "budget", label: "Budget" },
-  { key: "unemployment", label: "Unemployment" },
-  { key: "inflation", label: "Inflation" },
-  { key: "gdpGrowth", label: "GDP Growth" },
-  { key: "publicSentiment", label: "Public Sentiment" },
-];
-
-function fmtImpact(val: number | undefined): string {
-  if (val == null) return "—";
-  const sign = val > 0 ? "+" : "";
-  return `${sign}${val.toFixed(2)}`;
-}
-
-function fmtDelta(orig: number | undefined, cur: number | undefined) {
-  if (orig == null || cur == null) return fmtImpact(cur);
-  if (orig === cur) return fmtImpact(cur);
-  const delta = cur - orig;
-  const deltaStr = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
-  const color = delta > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative;
-  return (
-    <span>
-      <span style={{ color: SEMANTIC_HEX.neutral, textDecoration: "line-through" }}>{fmtImpact(orig)}</span>
-      {" → "}
-      <span>{fmtImpact(cur)}</span>
-      <span style={{ fontSize: "0.75rem", color, marginLeft: 4 }}>({deltaStr})</span>
-    </span>
-  );
-}
-
 export function BillDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
@@ -80,9 +54,7 @@ export function BillDetail() {
   const [signals, setSignals] = useState<{ yes: number; no: number; userSignal: "yes" | "no" | null } | null>(null);
   const [mdbVotes, setMdbVotes] = useState<MdbVoteSummary | null>(null);
   const [speeches, setSpeeches] = useState<MdbSpeech[]>([]);
-  const [speechContent, setSpeechContent] = useState("");
-  const [speechSubmitting, setSpeechSubmitting] = useState(false);
-  const [speechMsg, setSpeechMsg] = useState<string | null>(null);
+  const [mdbError, setMdbError] = useState<string | null>(null);
   const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
 
   useEffect(() => {
@@ -99,7 +71,6 @@ export function BillDetail() {
       if (["third_reading", "passed", "rejected", "struck_down"].includes(b.status)) {
         api.getMdbVotes(id).then(setMdbVotes).catch(() => {});
       }
-      // Load speeches for any reading stage
       if (["first_reading", "second_reading", "third_reading"].includes(b.status)) {
         api.getSpeeches(id).then(r => setSpeeches(r.speeches)).catch(() => {});
       }
@@ -128,10 +99,6 @@ export function BillDetail() {
   const abstainSeats = bill.votes.filter(v => v.vote === "abstain").reduce((s, v) => s + (partyMap.get(v.partyId)?.seatCount ?? 0), 0);
 
   const amendments = bill.amendments ?? [];
-
-  const hasImpact = IMPACT_FIELDS.some(f => bill.impact[f.key] != null);
-  const hasOriginalDiff = bill.originalImpact != null &&
-    IMPACT_FIELDS.some(f => bill.originalImpact![f.key] !== bill.impact[f.key]);
 
   return (
     <div>
@@ -203,7 +170,6 @@ export function BillDetail() {
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
         <div id="member-signals" className="mb-6">
           <h2 className="section-title">Mitglieder-Signale</h2>
-          {/* Signal nudge for members who haven't signaled yet */}
           {user && user.partyId && signals && signals.userSignal === null && (
             <div className={ALERT_STYLES.info}>
               This bill is in {STATUS_LABELS[bill.status] ?? bill.status} — signal your position to influence your party's vote.
@@ -265,140 +231,30 @@ export function BillDetail() {
 
       {/* MdB Direct Votes */}
       {bill.status === "third_reading" && (
-        <div id="mdb-votes" className="mb-6">
-          <h2 className="section-title">MdB-Direktstimmen</h2>
-          {user && mySeat && !mdbVotes?.userVote && (
-            <div className={ALERT_STYLES.info}>
-              This bill is in Third Reading — cast your direct vote as an MdB.
-            </div>
-          )}
-          <Card><CardContent className="p-5">
-            {mdbVotes && mdbVotes.summary.total > 0 ? (() => {
-              const s = mdbVotes.summary;
-              const total = s.total;
-              const yesPct = total > 0 ? Math.round(s.yes / total * 100) : 0;
-              const noPct = total > 0 ? Math.round(s.no / total * 100) : 0;
-              return (
-                <div>
-                  <div className="mb-2">
-                    <VoteBar yes={s.yes} no={s.no} abstain={s.abstain} total={total} />
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    <strong style={{ color: SEMANTIC_HEX.positive }}>{s.yes} Yes</strong>
-                    {" / "}
-                    <strong style={{ color: SEMANTIC_HEX.negative }}>{s.no} No</strong>
-                    {" / "}
-                    <strong style={{ color: SEMANTIC_HEX.warning }}>{s.abstain} Abstain</strong>
-                    <span className="ml-2">({total} total MdB vote{total !== 1 ? "s" : ""})</span>
-                  </div>
-                </div>
-              );
-            })() : (
-              <div className="text-sm text-muted-foreground mb-3">No MdB votes cast yet.</div>
-            )}
-            {user && mySeat && (
-              <div className="flex gap-2 items-center">
-                {(["yes", "no", "abstain"] as const).map(v => (
-                  <button
-                    key={v}
-                    onClick={async () => {
-                      try {
-                        const result = await api.castMdbVote(bill.id, v);
-                        setMdbVotes(prev => prev ? { ...prev, summary: result.summary, userVote: result.userVote } : { summary: result.summary, userVote: result.userVote, byParty: {} });
-                      } catch (e) {
-                        const msg = e instanceof Error ? e.message : "Failed";
-                        setSpeechMsg(msg);
-                        setTimeout(() => setSpeechMsg(null), 3000);
-                      }
-                    }}
-                    style={{
-                      padding: "5px 14px",
-                      borderRadius: 4,
-                      border: `2px solid ${mdbVotes?.userVote === v ? (v === "yes" ? SEMANTIC_HEX.positive : v === "no" ? SEMANTIC_HEX.negative : SEMANTIC_HEX.warning) : "#ddd"}`,
-                      background: mdbVotes?.userVote === v ? (v === "yes" ? "#ecfdf5" : v === "no" ? "#fef2f2" : "#fffbeb") : "white",
-                      color: v === "yes" ? SEMANTIC_HEX.positive : v === "no" ? SEMANTIC_HEX.negative : SEMANTIC_HEX.warning,
-                      fontWeight: 600,
-                      fontSize: "0.85rem",
-                      cursor: "pointer",
-                      textTransform: "uppercase",
-                    }}
-                  >{v}</button>
-                ))}
-                <span className="text-xs text-muted-foreground ml-2">
-                  {mdbVotes?.userVote ? `Your vote: ${mdbVotes.userVote.toUpperCase()}` : `Seat #${mySeat.seatNumber}`}
-                </span>
-              </div>
-            )}
-          </CardContent></Card>
-        </div>
+        <MdbVoteButtons
+          billId={bill.id}
+          userSeat={user ? mySeat : null}
+          mdbVotes={mdbVotes}
+          onVoted={setMdbVotes}
+          onError={msg => { setMdbError(msg); setTimeout(() => setMdbError(null), 3000); }}
+        />
       )}
+      {mdbError && <div className="text-xs text-destructive mb-3">{mdbError}</div>}
 
       {/* MdB Speeches */}
       {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
         <div id="speeches" className="mb-6">
           <h2 className="section-title">MdB-Reden ({speeches.length})</h2>
           {user && mySeat && (
-            <Card className="mb-3"><CardContent className="p-5">
-              <div className="font-semibold text-sm mb-2">Submit a Speech</div>
-              <textarea
-                value={speechContent}
-                onChange={e => setSpeechContent(e.target.value)}
-                placeholder="Your speech (20–500 characters)"
-                maxLength={500}
-                rows={3}
-                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
-              />
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={async () => {
-                    if (speechContent.trim().length < 20) return;
-                    setSpeechSubmitting(true);
-                    setSpeechMsg(null);
-                    try {
-                      const reading = bill.status === "first_reading" ? 1 : bill.status === "second_reading" ? 2 : 3;
-                      await api.submitSpeech(bill.id, reading, speechContent.trim());
-                      setSpeechContent("");
-                      setSpeechMsg("Speech submitted!");
-                      refresh();
-                    } catch (e) {
-                      setSpeechMsg(e instanceof Error ? e.message : "Failed to submit");
-                    } finally {
-                      setSpeechSubmitting(false);
-                      setTimeout(() => setSpeechMsg(null), 4000);
-                    }
-                  }}
-                  disabled={speechSubmitting || speechContent.trim().length < 20}
-                  className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
-                  style={{ background: displayColor }}
-                >
-                  {speechSubmitting ? "Submitting…" : "Submit Speech"}
-                </button>
-                {speechMsg && <span className={`text-xs ${speechMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{speechMsg}</span>}
-              </div>
-            </CardContent></Card>
+            <SpeechSubmitForm
+              billId={bill.id}
+              billStatus={bill.status}
+              displayColor={displayColor}
+              userSeat={mySeat}
+              onSubmitted={refresh}
+            />
           )}
-          {speeches.length > 0 ? (
-            <div>
-              {speeches.map(s => (
-                  <Card key={s.id} className="mb-2">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
-                          <span className="font-semibold text-sm">{s.displayName ?? "MdB"}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          Reading {s.reading} · Day {s.dayNumber}
-                        </span>
-                      </div>
-                      <div className="text-sm text-muted-foreground leading-relaxed">{s.content}</div>
-                    </CardContent>
-                  </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">No speeches submitted yet.</div>
-          )}
+          <SpeechDisplay speeches={speeches} />
         </div>
       )}
 
@@ -500,11 +356,9 @@ export function BillDetail() {
                 </div>
                 <div style={{ fontSize: "0.9rem", color: "#555", marginTop: "0.5rem" }}>{a.description}</div>
                 {a.votes.length > 0 && aTotal > 0 && (
-                  <>
-                    <div className="mt-2">
+                  <div className="mt-2">
                     <VoteBar yes={aYes} no={aNo} abstain={0} total={aTotal} showCounts />
                   </div>
-                  </>
                 )}
               </CardContent></Card>
             );
@@ -513,40 +367,7 @@ export function BillDetail() {
       )}
 
       {/* Economic Effects */}
-      {hasImpact && (
-        <div className="mb-6">
-          <h2 className="section-title">Wirtschaftliche Auswirkungen</h2>
-          <Card><CardContent className="p-5">
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "2px solid #ddd", color: "#666", fontWeight: 600 }}>
-                    Indicator
-                  </th>
-                  <th style={{ textAlign: "right", padding: "6px 8px", borderBottom: "2px solid #ddd", color: "#666", fontWeight: 600 }}>
-                    {hasOriginalDiff ? "Original → Final" : "Impact"}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {IMPACT_FIELDS
-                  .filter(f => bill.impact[f.key] != null || (bill.originalImpact && bill.originalImpact[f.key] != null))
-                  .map(f => (
-                    <tr key={f.key}>
-                      <td style={{ padding: "6px 8px", borderBottom: "1px solid #eee", color: "#444" }}>{f.label}</td>
-                      <td style={{ padding: "6px 8px", borderBottom: "1px solid #eee", textAlign: "right", fontFamily: "monospace" }}>
-                        {hasOriginalDiff
-                          ? fmtDelta(bill.originalImpact?.[f.key], bill.impact[f.key])
-                          : fmtImpact(bill.impact[f.key])
-                        }
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </CardContent></Card>
-        </div>
-      )}
+      <BillImpactDisplay bill={bill} />
 
       {/* Final Vote */}
       {bill.votes.length > 0 && totalSeats > 0 && (
