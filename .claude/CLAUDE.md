@@ -44,10 +44,10 @@ Both `types` and `engine` point `"import"` and `"default"` exports to `./src/ind
 Two SQLite databases in `data/`, both WAL mode with foreign keys enabled:
 
 - **`simulation.db`** — simulation state, accessed via `getDb()` / `getSqlite()`
-  - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`, `event_queue`
+  - Tables: `parties`, `bills`, `national_state`, `simulation_events`, `simulation_meta`, `crises`, `elections`, `party_history`, `polls`, `media_articles`, `citizen_questions`, `referendums`, `pending_injections`, `fraktionen`, `motions`, `government`, `interpellations`, `confidence_votes`, `constitutional_challenges`, `budgets`, `event_queue`, `bundestagSeats`
   - Override path: `DATABASE_PATH` env var
 - **`users.db`** — user-owned data, accessed via `getUserDb()` / `getUserSqlite()`
-  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`, `question_votes`, `notifications`
+  - Tables: `users`, `internal_proposals`, `internal_votes`, `member_signals`, `question_votes`, `notifications`, `mdbApplications`, `mdbVotes`, `mdbSpeeches`
   - Override path: `USER_DATABASE_PATH` env var
 - Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory
 - Schema in `packages/engine/src/db/schema.ts` (Drizzle ORM, unified schema object used by both DBs)
@@ -121,9 +121,9 @@ Agent actions are validated in `action-parser.ts`: max 1 proposal + 1 amendment 
 
 ## Web Pages
 
-- **Dashboard**: 2-column grid layout (main + sidebar). Main: hero summary with mood badge, Bundestag seat bar + coalition/opposition chips, economy 4-stat grid, 3 latest events, 2 media highlights. Sidebar: Chancellor card, engagement CTAs (user-aware), public sentiment gauge, active crises, active election, Ask a Party widget. Full-width "Decision of the Month" + "Party of the Month" featured section. Provisional budget amber banner when Art. 111 GG active. Watch-only blue banner when preset is ultra-fast/fast
-- **Parties**: Clickable cards → **Party Detail** (approval chart, bills, votes, statements, question form); Vote Alignment Matrix below party grid (pairwise vote-agreement %, color-coded)
-- **Bills**: Grouped by status with vote breakdowns, "Govt. Bill" badge on government bills, "Vetoed by President" amber badge on vetoed bills
+- **Dashboard**: 2-column grid layout (main + sidebar). Main: hero summary with mood badge, Bundestag seat bar + coalition/opposition chips, economy 4-stat grid, 3 latest events, 2 media highlights. Sidebar: Chancellor card, MdB Seat card (seat#/discipline/proxy/pending bills) + Apply CTA, engagement CTAs (user-aware), public sentiment gauge, active crises, active election, Ask a Party widget. Full-width "Decision of the Month" + "Party of the Month" featured section. Provisional budget amber banner when Art. 111 GG active. Watch-only blue banner when preset is ultra-fast/fast
+- **Parties**: Clickable cards → **Party Detail** (approval chart, bills, votes, statements, question form, MdB roster table with seat#/name/discipline/proxy, MdB apply form); Vote Alignment Matrix below party grid (pairwise vote-agreement %, color-coded)
+- **Bills**: Grouped by status with vote breakdowns, "Govt. Bill" badge on government bills, "Vetoed by President" amber badge on vetoed bills. **Bill Detail**: MdB direct vote buttons (Yes/No/Abstain for third_reading), MdB speech submission + display per reading stage with MdB badge
 - **Elections**: Hemicycle, bar chart, result table, negotiation rounds, coalition agreement; Coalition Calculator at bottom (interactive party checkboxes, seat counter, majority indicator, ideological spread)
 - **Budget**: Budget cycle cards with ministry allocation bars, seat vote bar, economic effects, party vote breakdown; "Revised" badge on revision attempts; "Retry Day X" note on pending retries
 - **News**: Filterable event timeline with breaking news styling, day separators, pagination
@@ -150,10 +150,11 @@ The web package uses **Tailwind CSS v4** + **shadcn/ui** for all styling:
 - **`@` path alias**: `@/components/ui/card` etc. — configured in both `vite.config.ts` and `tsconfig.json`
 - **`cn()` utility**: `clsx` + `tailwind-merge` from `src/lib/utils.ts` — used for conditional class merging
 - **`src/components/shared.tsx`**: App-level wrappers (Button with variant mapping, SkeletonCard, SkeletonTitle, ShowMoreButton)
+- **`src/components/MdbBadge.tsx`**: `MdbBadge` + `DisciplineBadge` components for MdB seat UI
 - **Party colors**: Stay as inline `style={{ backgroundColor: party.color }}` — dynamic values can't be Tailwind classes
 - **Inter font**: Loaded via Google Fonts in `index.html`
 - **Global headings**: `h1`/`h2`/`h3` styled globally in `styles.css` (foreground color, semibold, tight tracking — no uppercase)
-- **`src/lib/colors.ts`**: Shared semantic color maps (19 exports): `STATUS_BADGE`, `ROLE_BADGE`, `VOTE_COLORS`, `VOTE_HEX`, `MOOD_BADGE`, `ALERT_STYLES`, `PHASE_BADGE`, `SEVERITY_BADGE`, `SEMANTIC_HEX`, etc. All pages import from here — no per-page color maps
+- **`src/lib/colors.ts`**: Shared semantic color maps (22 exports): `STATUS_BADGE`, `ROLE_BADGE`, `VOTE_COLORS`, `VOTE_HEX`, `MOOD_BADGE`, `ALERT_STYLES`, `PHASE_BADGE`, `SEVERITY_BADGE`, `SEMANTIC_HEX`, `MDB_BADGE`, `DISCIPLINE_BADGE`, `DISCIPLINE_LABEL`, etc. All pages import from here — no per-page color maps
 - **Common patterns across pages**:
   - Cards: `<Card><CardContent className="p-5">...</CardContent></Card>`
   - Badges: `<Badge variant="outline" className={STATUS_BADGE[status]}>` (using shared color maps from `colors.ts`)

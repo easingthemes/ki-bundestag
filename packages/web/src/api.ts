@@ -476,6 +476,53 @@ export interface AlignmentData {
   matrix: Record<string, Record<string, number | null>>;
 }
 
+// ── MdB types ─────────────────────────────────────────────────────────────────
+
+export interface BundestagSeat {
+  id: string;
+  seatNumber: number;
+  partyId: string;
+  controller: "human" | "ai";
+  userId: string | null;
+  electionId: string | null;
+  active: boolean;
+  proxyDefault: "party_line" | "abstain";
+  disciplineLevel: number;
+  disciplineReason: string | null;
+  allocatedOnDay: number;
+  displayName?: string | null; // enriched by API
+}
+
+export interface MdbApplication {
+  id: string;
+  userId: string;
+  partyId: string;
+  status: "pending" | "approved" | "rejected";
+  motivation: string;
+  policyFocus: string | null;
+  createdOnDay: number;
+  reviewedOnDay: number | null;
+  reviewReason: string | null;
+}
+
+export interface MdbSpeech {
+  id: string;
+  userId: string;
+  billId: string;
+  reading: number;
+  content: string;
+  sentimentImpact: number | null;
+  dayNumber: number;
+  createdAt: number;
+  displayName?: string;
+}
+
+export interface MdbVoteSummary {
+  summary: { yes: number; no: number; abstain: number; total: number };
+  byParty: Record<string, { yes: number; no: number; abstain: number }>;
+  userVote: string | null;
+}
+
 export const api = {
   getParties: () => fetchJson<Party[]>("/parties"),
   getAlignment: () => fetchJson<AlignmentData>("/parties/alignment"),
@@ -620,4 +667,30 @@ export const api = {
   getUnreadCount: () => fetchJson<{ count: number }>("/notifications/unread-count"),
   markNotificationRead: (id: string) => postJson<{ success: boolean }>(`/notifications/${id}/read`, {}),
   markAllNotificationsRead: () => postJson<{ marked: number }>("/notifications/read-all", {}),
+
+  // MdB Seats
+  getMySeat: () => fetchJson<{ seat: BundestagSeat | null; applications: MdbApplication[] }>("/seats/my-seat"),
+  getPartySeats: (partyId: string) => fetchJson<BundestagSeat[]>(`/seats/party/${partyId}`),
+  getAvailableSeats: () => fetchJson<Record<string, { open: number; humanTotal: number; total: number }>>("/seats/available"),
+  applyForSeat: (motivation: string, policyFocus?: string) =>
+    postJson<{ status: string }>("/seats/apply", { motivation, policyFocus }),
+
+  // MdB Voting
+  castMdbVote: (billId: string, vote: "yes" | "no" | "abstain") =>
+    postJson<{ userVote: string; summary: { yes: number; no: number; abstain: number; total: number } }>(`/bills/${billId}/mdb-vote`, { vote }),
+  getMdbVotes: (billId: string) => fetchJson<MdbVoteSummary>(`/bills/${billId}/mdb-votes`),
+
+  // MdB Speeches
+  submitSpeech: (billId: string, reading: number, content: string) =>
+    postJson<{ status: string }>(`/bills/${billId}/speech`, { reading, content }),
+  getSpeeches: (billId: string) =>
+    fetchJson<{ speeches: MdbSpeech[]; byReading: Record<string, MdbSpeech[]> }>(`/bills/${billId}/speeches`),
+
+  // MdB Parliamentary Actions
+  submitMotion: (body: { motionType: string; title: string; description: string }) =>
+    postJson<{ status: string }>("/motions/submit", body),
+  submitInterpellation: (body: { interpellationType: string; title: string; question: string; targetMinistry: string }) =>
+    postJson<{ status: string }>("/interpellations/submit", body),
+  submitAmendment: (billId: string, body: { title: string; description: string; impactChange?: Record<string, number> }) =>
+    postJson<{ status: string }>(`/bills/${billId}/amendment`, body),
 };

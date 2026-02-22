@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, Bill, Party, ConstitutionalChallenge, BillImpact } from "../api";
+import { api, Bill, Party, ConstitutionalChallenge, BillImpact, type MdbVoteSummary, type MdbSpeech } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, VOTE_COLORS, VOTE_HEX, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { STATUS_BADGE, VOTE_COLORS, VOTE_HEX, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES, MDB_BADGE } from "@/lib/colors";
+import { usePolling } from "../usePolling";
 
 const STATUS_LABELS: Record<string, string> = {
   third_reading: "Third Reading",
@@ -76,6 +77,11 @@ export function BillDetail() {
   const [parties, setParties] = useState<Party[]>([]);
   const [challenge, setChallenge] = useState<ConstitutionalChallenge | null>(null);
   const [signals, setSignals] = useState<{ yes: number; no: number; userSignal: "yes" | "no" | null } | null>(null);
+  const [mdbVotes, setMdbVotes] = useState<MdbVoteSummary | null>(null);
+  const [speeches, setSpeeches] = useState<MdbSpeech[]>([]);
+  const [speechContent, setSpeechContent] = useState("");
+  const [speechSubmitting, setSpeechSubmitting] = useState(false);
+  const [speechMsg, setSpeechMsg] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -83,6 +89,13 @@ export function BillDetail() {
       setBill(b);
       if (b.status === "second_reading" || b.status === "third_reading") {
         api.getBillSignals(id).then(setSignals).catch(console.error);
+      }
+      if (b.status === "third_reading") {
+        api.getMdbVotes(id).then(setMdbVotes).catch(() => {});
+      }
+      // Load speeches for any reading stage
+      if (["first_reading", "second_reading", "third_reading"].includes(b.status)) {
+        api.getSpeeches(id).then(r => setSpeeches(r.speeches)).catch(() => {});
       }
     }).catch(console.error);
     api.getParties().then(setParties).catch(console.error);
@@ -92,6 +105,7 @@ export function BillDetail() {
   }, [id]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  usePolling(refresh);
 
   if (!bill || parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
@@ -219,6 +233,147 @@ export function BillDetail() {
               </div>
             )}
           </CardContent></Card>
+        </div>
+      )}
+
+      {/* MdB Direct Votes */}
+      {bill.status === "third_reading" && (
+        <div className="mb-6">
+          <h2>MdB Direct Votes</h2>
+          {user && !mdbVotes?.userVote && (
+            <div className={ALERT_STYLES.info}>
+              This bill is in Third Reading — cast your direct vote as an MdB.
+            </div>
+          )}
+          <Card><CardContent className="p-5">
+            {mdbVotes && mdbVotes.summary.total > 0 ? (() => {
+              const s = mdbVotes.summary;
+              const total = s.total;
+              const yesPct = total > 0 ? Math.round(s.yes / total * 100) : 0;
+              const noPct = total > 0 ? Math.round(s.no / total * 100) : 0;
+              return (
+                <div>
+                  <div className="flex h-5 rounded overflow-hidden mb-2">
+                    {s.yes > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${yesPct}%` }} />}
+                    {s.no > 0 && <div className={VOTE_COLORS.no} style={{ width: `${noPct}%` }} />}
+                    {s.abstain > 0 && <div className={VOTE_COLORS.abstain} style={{ width: `${100 - yesPct - noPct}%` }} />}
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    <strong style={{ color: SEMANTIC_HEX.positive }}>{s.yes} Yes</strong>
+                    {" / "}
+                    <strong style={{ color: SEMANTIC_HEX.negative }}>{s.no} No</strong>
+                    {" / "}
+                    <strong style={{ color: SEMANTIC_HEX.warning }}>{s.abstain} Abstain</strong>
+                    <span className="ml-2">({total} total MdB vote{total !== 1 ? "s" : ""})</span>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div className="text-sm text-muted-foreground mb-3">No MdB votes cast yet.</div>
+            )}
+            {user && (
+              <div className="flex gap-2 items-center">
+                {(["yes", "no", "abstain"] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={async () => {
+                      try {
+                        const result = await api.castMdbVote(bill.id, v);
+                        setMdbVotes(prev => prev ? { ...prev, summary: result.summary, userVote: result.userVote } : { summary: result.summary, userVote: result.userVote, byParty: {} });
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : "Failed";
+                        setSpeechMsg(msg);
+                        setTimeout(() => setSpeechMsg(null), 3000);
+                      }
+                    }}
+                    style={{
+                      padding: "5px 14px",
+                      borderRadius: 4,
+                      border: `2px solid ${mdbVotes?.userVote === v ? (v === "yes" ? SEMANTIC_HEX.positive : v === "no" ? SEMANTIC_HEX.negative : SEMANTIC_HEX.warning) : "#ddd"}`,
+                      background: mdbVotes?.userVote === v ? (v === "yes" ? "#ecfdf5" : v === "no" ? "#fef2f2" : "#fffbeb") : "white",
+                      color: v === "yes" ? SEMANTIC_HEX.positive : v === "no" ? SEMANTIC_HEX.negative : SEMANTIC_HEX.warning,
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                      textTransform: "uppercase",
+                    }}
+                  >{v}</button>
+                ))}
+                <span className="text-xs text-muted-foreground ml-2">
+                  {mdbVotes?.userVote ? `Your vote: ${mdbVotes.userVote.toUpperCase()}` : "Requires an active MdB seat"}
+                </span>
+              </div>
+            )}
+          </CardContent></Card>
+        </div>
+      )}
+
+      {/* MdB Speeches */}
+      {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
+        <div className="mb-6">
+          <h2>MdB Speeches ({speeches.length})</h2>
+          {user && (
+            <Card className="mb-3"><CardContent className="p-5">
+              <div className="font-semibold text-sm mb-2">Submit a Speech</div>
+              <textarea
+                value={speechContent}
+                onChange={e => setSpeechContent(e.target.value)}
+                placeholder="Your speech (20–500 characters)"
+                maxLength={500}
+                rows={3}
+                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
+              />
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={async () => {
+                    if (speechContent.trim().length < 20) return;
+                    setSpeechSubmitting(true);
+                    setSpeechMsg(null);
+                    try {
+                      const reading = bill.status === "first_reading" ? 1 : bill.status === "second_reading" ? 2 : 3;
+                      await api.submitSpeech(bill.id, reading, speechContent.trim());
+                      setSpeechContent("");
+                      setSpeechMsg("Speech submitted!");
+                      refresh();
+                    } catch (e) {
+                      setSpeechMsg(e instanceof Error ? e.message : "Failed to submit");
+                    } finally {
+                      setSpeechSubmitting(false);
+                      setTimeout(() => setSpeechMsg(null), 4000);
+                    }
+                  }}
+                  disabled={speechSubmitting || speechContent.trim().length < 20}
+                  className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
+                  style={{ background: displayColor }}
+                >
+                  {speechSubmitting ? "Submitting…" : "Submit Speech"}
+                </button>
+                {speechMsg && <span className={`text-xs ${speechMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{speechMsg}</span>}
+              </div>
+            </CardContent></Card>
+          )}
+          {speeches.length > 0 ? (
+            <div>
+              {speeches.map(s => (
+                  <Card key={s.id} className="mb-2">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
+                          <span className="font-semibold text-sm">{s.displayName ?? "MdB"}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Reading {s.reading} · Day {s.dayNumber}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground leading-relaxed">{s.content}</div>
+                    </CardContent>
+                  </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No speeches submitted yet.</div>
+          )}
         </div>
       )}
 
