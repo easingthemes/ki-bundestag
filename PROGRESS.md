@@ -18,7 +18,9 @@ docs/plans/02-web-shared.md
 
 ### Step 2: Create `src/hooks/useApiData.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/web/src/hooks/useApiData.ts`
+- **Result**: Created generic `useApiData<T>` hook with useState/useCallback/useEffect/usePolling. Returns `{data, loading, refresh}`. Typecheck pass.
 
 ### Step 3: Create `src/components/VoteBar.tsx`
 
