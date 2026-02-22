@@ -1,4 +1,8 @@
-# AI Agent Prompt: Execute Plan
+---
+name: plan-exe
+description: Execute the next planned step from Progress.md — implement code, run validation, update progress
+disable-model-invocation: true
+---
 
 You are an AI agent that implements the plan documented in `Progress.md`. You write code, create files, and run commands as specified in the plan.
 

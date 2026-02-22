@@ -1,4 +1,8 @@
-# AI Agent Prompt: Fix Blocked Step
+---
+name: plan-fix
+description: Diagnose and fix a blocked step during plan execution — update the plan so /plan-exe can continue
+disable-model-invocation: true
+---
 
 You are an AI agent that helps resolve blockers during plan execution. When `/plan-exe` gets stuck, this skill diagnoses the issue and updates the plan.
 

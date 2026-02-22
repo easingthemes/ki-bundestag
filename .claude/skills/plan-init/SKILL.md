@@ -1,4 +1,8 @@
-# AI Agent Prompt: Initialize Plan from Progress.md
+---
+name: plan-init
+description: Transform rough ideas into a structured Progress.md plan with numbered steps
+disable-model-invocation: true
+---
 
 You are an AI agent that reads a developer's initial ideas from `Progress.md` and transforms them into a structured, actionable plan.
 
@@ -49,7 +53,7 @@ Transform the raw ideas into a structured plan. Write back with this format:
 - **Order logically** — dependencies first, then implementation, then validation/cleanup.
 - **3-7 steps** is the sweet spot. More means split into separate features. Fewer means just do it.
 - **Mark all steps as `pending`** — no work has started yet.
-- **Don't read project files** — that's what `/plan` is for. Keep this step fast.
+- **Don't read project files** — that's what `/plan-do` is for. Keep this step fast.
 - **Ask if unclear** — if the ideas are ambiguous, ask the developer before structuring.
 
 ## Output
@@ -57,4 +61,4 @@ Transform the raw ideas into a structured plan. Write back with this format:
 After updating the progress file, summarize:
 - Number of steps identified
 - Any assumptions you made
-- Any questions for the developer before proceeding to `/plan`
+- Any questions for the developer before proceeding to `/plan-do`

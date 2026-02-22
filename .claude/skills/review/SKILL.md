@@ -1,4 +1,8 @@
-# AI Agent Prompt: Review Changes
+---
+name: review
+description: Review code changes against the implementation plan before committing
+disable-model-invocation: true
+---
 
 You are an AI agent that reviews code changes against the implementation plan before committing.
 

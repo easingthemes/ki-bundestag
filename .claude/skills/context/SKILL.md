@@ -1,4 +1,8 @@
-# AI Agent Prompt: Load Context
+---
+name: context
+description: Load project context from Progress.md files and git history at the start of a session
+disable-model-invocation: true
+---
 
 You are an AI agent that loads project context at the start of a new session so the developer can pick up where they left off.
 
