@@ -1,41 +1,33 @@
-# Progress
+# Progress: Engine — `loop.ts` Surgery
 
-## Goal
+**Goal**: Extract 4 pieces of inline logic from `loop.ts` into dedicated modules so `loop.ts` becomes a clean orchestrator targeting ~700–900 lines.
 
-Split `packages/web/src/api.ts` (796 lines) into three focused files under `src/api/` — types, client helpers, and endpoint functions — with a barrel `src/api/index.ts` and a shim `src/api.ts` so all existing imports continue to work unchanged.
+**Ref**: docs/plans/05-engine-loop.md
 
-## Ref
+---
 
-docs/plans/04-web-api-split.md
-
-## Steps
-
-### Step 1: Create `src/api/types.ts`
+### Step 1: Create `src/simulation/bill-pipeline.ts`
 
 - **Status**: done
-- **Files**: `packages/web/src/api/types.ts`
-- **Result**: All 35 TypeScript interfaces/types moved from api.ts into types.ts. No imports needed. Typecheck pass.
+- **Files**: `packages/engine/src/simulation/bill-pipeline.ts` (created), `packages/engine/src/simulation/loop.ts` (updated)
+- **Result**: Extracted ~215 lines of bill pipeline logic (stages 1–4) into new module; loop.ts replaced with 4-line delegate. Removed unused `assignCommittee`, `generateRecommendation`, `tallyAmendmentVotes`, `applyAmendmentToBill` imports from loop.ts. Typecheck passed.
 
-### Step 2: Create `src/api/client.ts`
+### Step 2: Create `src/simulation/veto.ts`
 
-- **Status**: done
-- **Files**: `packages/web/src/api/client.ts`
-- **Result**: Moved fetchJson, postJson, deleteJson, added patchJson, moved BASE constant, setErrorHandler, setUserToken, authHeaders. Exported getBase() helper for endpoints.ts. Typecheck pass.
+- **Status**: pending
 
-### Step 3: Create `src/api/endpoints.ts`
+### Step 3: Consolidate approval drift into `src/simulation/opinion.ts`
 
-- **Status**: done
-- **Files**: `packages/web/src/api/endpoints.ts`
-- **Result**: All ~55 typed API call functions moved, grouped by domain with comments. Imports from ./types.js and ./client.js. Legacy `api` object re-exported for backward compatibility. Typecheck pass.
+- **Status**: pending
 
-### Step 4: Create `src/api/index.ts`
+### Step 4: Consolidate media sentiment into `src/simulation/media.ts`
 
-- **Status**: done
-- **Files**: `packages/web/src/api/index.ts`
-- **Result**: Barrel with export * from all three sub-files. Typecheck pass.
+- **Status**: pending
 
-### Step 5: Update `src/api.ts`
+### Step 5: Review remaining inline logic in `loop.ts`
 
-- **Status**: done
-- **Files**: `packages/web/src/api.ts`
-- **Result**: Replaced 796-line file with single re-export shim: `export * from "./api/index.js"`. Zero import changes needed in 49 existing call sites. Typecheck pass.
+- **Status**: pending
+
+### Step 6: Add `.js` extension imports in new files
+
+- **Status**: pending (covered inline in steps 1–4)
