@@ -1,4 +1,6 @@
+import { and, count, eq, gte } from "drizzle-orm";
 import type { BillImpact, Party } from "@ki-bundestag/types";
+import { getUserDb, schema } from "../db/index.js";
 
 const SENTIMENT_MIN = 5;
 const SENTIMENT_MAX = 75;
@@ -50,6 +52,32 @@ export function membershipBonus(activeMembers: number): number {
   if (activeMembers <= 0) return 0;
   const bonus = Math.min(5, Math.log10(activeMembers + 1) * 2.5);
   return Math.round(bonus * 0.01 * 100) / 100; // e.g. 2.6 → 0.026
+}
+
+/**
+ * Apply daily approval drift and membership bonus to all parties.
+ * Mutates each party's approvalRating in place.
+ */
+export function applyDailyApprovalDrift(parties: Party[]): void {
+  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+  for (const party of parties) {
+    party.approvalRating = applyApprovalDrift(party);
+    // Membership bonus: tiny daily reward for engaged party members
+    try {
+      const activeCount = getUserDb().select({ cnt: count() }).from(schema.users)
+        .where(and(
+          eq(schema.users.partyId, party.id),
+          gte(schema.users.lastActive, Date.now() - TWO_WEEKS_MS),
+        ))
+        .get()?.cnt ?? 0;
+      if (activeCount > 0) {
+        const bonus = membershipBonus(activeCount);
+        party.approvalRating = Math.max(1, Math.min(60,
+          Math.round((party.approvalRating + bonus) * 10) / 10,
+        ));
+      }
+    } catch { /* table may not exist in old DBs */ }
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

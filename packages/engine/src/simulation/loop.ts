@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, count, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, ne, inArray } from "drizzle-orm";
 import type {
   AgentContext,
   Bill,
@@ -20,7 +20,7 @@ import { getDb, getUserDb, schema, migrateDatabase } from "../db/index.js";
 import { runPartyAgent } from "../agent/index.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
-import { applyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, membershipBonus } from "./opinion.js";
+import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
@@ -1506,25 +1506,7 @@ export async function runDay(): Promise<number> {
   }
 
   // 11. Apply approval drift to all parties + sentiment drift
-  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
-  for (const party of allParties) {
-    party.approvalRating = applyApprovalDrift(party);
-    // Membership bonus: tiny daily reward for engaged party members
-    try {
-      const activeCount = getUserDb().select({ cnt: count() }).from(schema.users)
-        .where(and(
-          eq(schema.users.partyId, party.id),
-          gte(schema.users.lastActive, Date.now() - TWO_WEEKS_MS),
-        ))
-        .get()?.cnt ?? 0;
-      if (activeCount > 0) {
-        const bonus = membershipBonus(activeCount);
-        party.approvalRating = Math.max(1, Math.min(60,
-          Math.round((party.approvalRating + bonus) * 10) / 10,
-        ));
-      }
-    } catch { /* table may not exist in old DBs */ }
-  }
+  applyDailyApprovalDrift(allParties);
   nationalState.publicSentiment = applySentimentDrift(nationalState.publicSentiment);
 
   // 11b. Resolve expired polls and referendums (daily)
