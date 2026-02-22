@@ -138,3 +138,21 @@ export const SEVERITY_BADGE: Record<string, string> = {
   medium: "border-amber-400 text-amber-600",
   low: "border-cyan-400 text-cyan-600",
 };
+
+// ── MdB badge ─────────────────────────────────────────────────────────────────
+export const MDB_BADGE = "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-50";
+
+// ── Discipline level badges (0-3) ─────────────────────────────────────────────
+export const DISCIPLINE_BADGE: Record<number, string> = {
+  0: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  1: "bg-amber-50 text-amber-700 border-amber-200",
+  2: "bg-orange-50 text-orange-700 border-orange-200",
+  3: "bg-red-50 text-red-700 border-red-200",
+};
+
+export const DISCIPLINE_LABEL: Record<number, string> = {
+  0: "Good",
+  1: "Warning",
+  2: "Restricted",
+  3: "Whipped",
+};

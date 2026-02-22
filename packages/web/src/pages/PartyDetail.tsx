@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal } from "../api";
+import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { ROLE_BADGE, STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { ROLE_BADGE, STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX, DISCIPLINE_BADGE, DISCIPLINE_LABEL, MDB_BADGE } from "@/lib/colors";
 
 
 const PROPOSAL_STATUS: Record<string, string> = {
@@ -93,6 +93,13 @@ export function PartyDetail() {
   const [joinStatus, setJoinStatus] = useState<"idle" | "loading" | "error">("idle");
   const [joinError, setJoinError] = useState("");
   const joinNavigate = useNavigate();
+  const [seats, setSeats] = useState<BundestagSeat[]>([]);
+  const [availableSeats, setAvailableSeats] = useState<Record<string, { open: number; humanTotal: number; total: number }>>({});
+  const [showApplyForm, setShowApplyForm] = useState(false);
+  const [applyMotivation, setApplyMotivation] = useState("");
+  const [applyFocus, setApplyFocus] = useState("");
+  const [applySubmitting, setApplySubmitting] = useState(false);
+  const [applyMsg, setApplyMsg] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -105,6 +112,8 @@ export function PartyDetail() {
     api.getPartyProposals(id).then(setProposals).catch(console.error);
     api.getParties().then(setAllParties).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
+    api.getPartySeats(id).then(setSeats).catch(console.error);
+    api.getAvailableSeats().then(setAvailableSeats).catch(console.error);
     api.getFraktionen().then(all => {
       const active = all.find(f => f.partyId === id && f.status === "active");
       if (active) {
@@ -266,6 +275,146 @@ export function PartyDetail() {
           </Card>
         </div>
       )}
+
+      {/* Bundestag Members (MdB Roster) */}
+      {seats.length > 0 && (() => {
+        const isMyParty = user?.partyId === id;
+        const humanSeats = seats.filter(s => s.controller === "human");
+        const aiSeats = seats.filter(s => s.controller === "ai");
+        const partyAvail = availableSeats[id!];
+        const openCount = partyAvail?.open ?? 0;
+
+        return (
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="m-0">
+                Bundestag Members
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  {humanSeats.filter(s => s.userId).length} MdB / {humanSeats.length} human seats / {seats.length} total
+                  {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} open)</span>}
+                </span>
+              </h2>
+              {isMyParty && !showApplyForm && openCount > 0 && !seats.some(s => s.userId === user?.id) && (
+                <button
+                  onClick={() => setShowApplyForm(true)}
+                  className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
+                  style={{ borderColor: displayColor, color: displayColor }}
+                >
+                  Apply for a Seat
+                </button>
+              )}
+            </div>
+
+            {showApplyForm && (
+              <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
+                <CardContent className="p-5">
+                  <div className="font-semibold mb-2">Apply for a Bundestag Seat</div>
+                  <textarea
+                    value={applyMotivation}
+                    onChange={e => setApplyMotivation(e.target.value)}
+                    placeholder="Why do you want to represent this party? (20–500 chars)"
+                    maxLength={500}
+                    rows={3}
+                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
+                  />
+                  <input
+                    type="text"
+                    value={applyFocus}
+                    onChange={e => setApplyFocus(e.target.value)}
+                    placeholder="Policy focus (optional, e.g. economy, environment)"
+                    maxLength={100}
+                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
+                  />
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <button
+                      onClick={async () => {
+                        if (applyMotivation.trim().length < 20) return;
+                        setApplySubmitting(true);
+                        setApplyMsg(null);
+                        try {
+                          await api.applyForSeat(applyMotivation.trim(), applyFocus.trim() || undefined);
+                          setApplyMotivation(""); setApplyFocus("");
+                          setShowApplyForm(false);
+                          setApplyMsg("Application submitted! You'll be notified of the result.");
+                          refresh();
+                        } catch (e) {
+                          setApplyMsg(e instanceof Error ? e.message : "Failed to submit");
+                        } finally {
+                          setApplySubmitting(false);
+                          setTimeout(() => setApplyMsg(null), 5000);
+                        }
+                      }}
+                      disabled={applySubmitting || applyMotivation.trim().length < 20}
+                      className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
+                      style={{ background: displayColor }}
+                    >
+                      {applySubmitting ? "Submitting…" : "Apply"}
+                    </button>
+                    <button
+                      onClick={() => { setShowApplyForm(false); setApplyMotivation(""); setApplyFocus(""); }}
+                      className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
+                    >
+                      Cancel
+                    </button>
+                    {applyMsg && <span className={`text-xs ${applyMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent className="p-0">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-3 py-2 border-b-2 border-border">Seat</th>
+                      <th className="text-left px-3 py-2 border-b-2 border-border">Member</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Type</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Discipline</th>
+                      <th className="text-center px-3 py-2 border-b-2 border-border">Proxy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {humanSeats.map(seat => (
+                      <tr key={seat.id}>
+                        <td className="px-3 py-2 border-b border-border font-mono text-xs">#{seat.seatNumber}</td>
+                        <td className="px-3 py-2 border-b border-border">
+                          {seat.displayName ? (
+                            <span className="font-semibold">{seat.displayName}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">Open</span>
+                          )}
+                          {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">(You)</span>}
+                        </td>
+                        <td className="px-3 py-2 border-b border-border text-center">
+                          <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
+                        </td>
+                        <td className="px-3 py-2 border-b border-border text-center">
+                          {seat.userId && (
+                            <Badge variant="outline" className={cn("text-xs", DISCIPLINE_BADGE[seat.disciplineLevel] ?? DISCIPLINE_BADGE[0])}>
+                              {DISCIPLINE_LABEL[seat.disciplineLevel] ?? "?"}
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b border-border text-center text-xs text-muted-foreground">
+                          {seat.userId ? (seat.proxyDefault === "party_line" ? "Party Line" : "Abstain") : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                    {aiSeats.length > 0 && (
+                      <tr>
+                        <td className="px-3 py-2 border-b border-border text-muted-foreground" colSpan={5}>
+                          + {aiSeats.length} AI-controlled seat{aiSeats.length !== 1 ? "s" : ""}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Approval chart */}
       {history.length >= 2 && (

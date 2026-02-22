@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, type Bill, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus } from "../api";
+import { api, type Bill, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication } from "../api";
 import { usePolling } from "../usePolling";
 import { Button, SkeletonCard, SkeletonTitle } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, VOTE_COLORS, PHASE_BADGE } from "@/lib/colors";
+import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, VOTE_COLORS, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL } from "@/lib/colors";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Berliner Tagesspiegel": { color: "#1d4ed8", label: "Tagesspiegel" },
@@ -29,6 +29,8 @@ export function Dashboard() {
   const [media, setMedia] = useState<MediaArticle[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
+  const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
 
   const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
@@ -36,6 +38,7 @@ export function Dashboard() {
     api.getEvents(3).then(r => setEvents(r.events)).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getPolls(true).then(setPolls).catch(console.error);
+    api.getMySeat().then(r => { setMySeat(r.seat); setMyApplications(r.applications); }).catch(() => {});
   }, []);
 
   const refreshSlow = useCallback(() => {
@@ -355,6 +358,50 @@ export function Dashboard() {
               <span className="block text-xs text-muted-foreground">Vote on national questions</span>
             </Link>
           </div>
+
+          {/* MdB Seat card */}
+          {mySeat && (() => {
+            const seatParty = parties.find(p => p.id === mySeat.partyId);
+            const seatColor = fixColor(seatParty?.color || "#333");
+            const thirdReadingBills = bills.filter(b => b.status === "third_reading");
+            return (
+              <Card className="py-4" style={{ borderLeft: `3px solid ${seatColor}` }}>
+                <CardContent className="px-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: seatColor }} />
+                    Your MdB Seat
+                  </div>
+                  <div className="font-bold text-base">Seat #{mySeat.seatNumber}</div>
+                  <div className="text-sm text-muted-foreground">{seatParty?.name ?? mySeat.partyId}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs">Discipline:</span>
+                    <Badge variant="outline" className={cn("text-xs", DISCIPLINE_BADGE[mySeat.disciplineLevel] ?? DISCIPLINE_BADGE[0])}>
+                      {DISCIPLINE_LABEL[mySeat.disciplineLevel] ?? "?"}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Proxy: {mySeat.proxyDefault === "party_line" ? "Party Line" : "Abstain"}
+                  </div>
+                  {thirdReadingBills.length > 0 && (
+                    <Link to="/bills?status=third_reading" className="text-xs text-primary mt-2 inline-block no-underline hover:underline">
+                      {thirdReadingBills.length} bill{thirdReadingBills.length !== 1 ? "s" : ""} awaiting your vote →
+                    </Link>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+          {!mySeat && user?.partyId && myApplications.length === 0 && (
+            <Link to={`/parties/${user.partyId}`} className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+              <span className="block font-bold text-sm text-primary">Apply for a Seat</span>
+              <span className="block text-xs text-muted-foreground">Become an MdB and vote directly</span>
+            </Link>
+          )}
+          {!mySeat && myApplications.some(a => a.status === "pending") && (
+            <div className="px-3 py-2 rounded border border-amber-200 bg-amber-50 text-sm text-amber-800">
+              Seat application pending...
+            </div>
+          )}
 
           {/* Public Sentiment */}
           <Card className="py-4">
