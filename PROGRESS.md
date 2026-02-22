@@ -26,12 +26,18 @@
 
 ### Step 4: Create `src/db/schema-sim.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/db/schema-sim.ts` (created)
+- **Result**: Moved all 22 simulation DB table definitions (parties through bundestagSeats) into dedicated file with Drizzle imports. Typecheck passed.
 
 ### Step 5: Create `src/db/schema-user.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/db/schema-user.ts` (created)
+- **Result**: Moved all user DB table definitions (users, internalProposals, memberSignals, internalVotes, questionVotes, referendumVotes, notifications, mdbApplications, mdbVotes, mdbSpeeches, userActions) into dedicated file. Typecheck passed.
 
 ### Step 6: Rewrite `src/db/schema.ts` as re-export barrel
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/db/schema.ts` (rewritten)
+- **Result**: schema.ts now 6 lines: imports both sub-schemas, exports combined schema object, and re-exports all named exports. All existing consumers unchanged. Typecheck passed.
