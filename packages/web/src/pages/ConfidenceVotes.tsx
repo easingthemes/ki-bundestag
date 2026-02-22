@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, CONFIDENCE_TYPE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
+import { FilterPills } from "@/components/FilterPills";
 
 const STATUS_OPTIONS = ["all", "passed", "failed"] as const;
 const TYPE_OPTIONS = ["all", "vertrauensfrage", "misstrauensvotum"] as const;
@@ -47,40 +48,22 @@ export function ConfidenceVotes() {
         Die Opposition benennt einen Ersatzkanzler — Erfolg überträgt die Macht sofort.
       </p>
 
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">Status:</span>
-          {STATUS_OPTIONS.map(opt => (
-            <button
-              key={opt}
-              onClick={() => setStatusFilter(opt)}
-              className={cn(
-                "px-2 py-1 text-xs rounded border cursor-pointer transition-colors",
-                statusFilter === opt
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-background text-foreground border-input hover:bg-accent"
-              )}
-            >
-              {opt === "all" ? "All" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground shrink-0">Status:</span>
+          <FilterPills
+            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt.charAt(0).toUpperCase() + opt.slice(1) }))}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">Type:</span>
-          {TYPE_OPTIONS.map(opt => (
-            <button
-              key={opt}
-              onClick={() => setTypeFilter(opt)}
-              className={cn(
-                "px-2 py-1 text-xs rounded border cursor-pointer transition-colors",
-                typeFilter === opt
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-background text-foreground border-input hover:bg-accent"
-              )}
-            >
-              {opt === "all" ? "All" : opt === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum"}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground shrink-0">Type:</span>
+          <FilterPills
+            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum" }))}
+            value={typeFilter}
+            onChange={setTypeFilter}
+          />
         </div>
       </div>
 

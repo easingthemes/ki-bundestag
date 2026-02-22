@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { NOTIFICATION_TYPE_BADGE } from "@/lib/colors";
 import { ShowMoreButton } from "../components/shared";
+import { FilterPills } from "@/components/FilterPills";
 
 const TYPE_FILTERS = [
   "all", "morning_summary", "event_queued", "event_ready",
@@ -88,20 +89,12 @@ export function Notifications() {
       </div>
 
       {/* Filter pills */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {TYPE_FILTERS.map(t => (
-          <button
-            key={t}
-            onClick={() => { setFilter(t); setVisible(20); }}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
-              filter === t ? "bg-foreground text-background" : "bg-transparent text-muted-foreground hover:bg-muted/50",
-            )}
-          >
-            {TYPE_LABELS[t] ?? t}
-          </button>
-        ))}
-      </div>
+      <FilterPills
+        className="mb-5"
+        options={TYPE_FILTERS.map(t => ({ value: t, label: TYPE_LABELS[t] ?? t }))}
+        value={filter}
+        onChange={t => { setFilter(t); setVisible(20); }}
+      />
 
       {filtered.length === 0 && (
         <p className="text-sm text-muted-foreground">Keine Benachrichtigungen.</p>

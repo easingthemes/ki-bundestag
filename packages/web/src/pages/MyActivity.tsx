@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ShowMoreButton } from "../components/shared";
+import { FilterPills } from "@/components/FilterPills";
 
 const TYPE_ICONS: Record<string, string> = {
   proposal: "\u{1F4DD}",
@@ -74,20 +75,12 @@ export function MyActivity() {
       <p className="text-sm text-muted-foreground mb-4">Alles, was du in der Simulation getan hast.</p>
 
       {/* Filter pills */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {types.map(t => (
-          <button
-            key={t}
-            onClick={() => { setFilter(t); setVisible(20); }}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
-              filter === t ? "bg-foreground text-background" : "bg-transparent text-muted-foreground hover:bg-muted/50",
-            )}
-          >
-            {t === "all" ? "All" : t.replace(/_/g, " ")}
-          </button>
-        ))}
-      </div>
+      <FilterPills
+        className="mb-5"
+        options={types.map(t => ({ value: t, label: t === "all" ? "All" : t.replace(/_/g, " ") }))}
+        value={filter}
+        onChange={t => { setFilter(t); setVisible(20); }}
+      />
 
       {filtered.length === 0 && (
         <p className="text-sm text-muted-foreground">Noch keine Aktivitäten. Fange an mitzumachen!</p>
