@@ -405,6 +405,14 @@ const USER_TABLE_DDL = `
     created_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS referendum_votes (
+    id TEXT PRIMARY KEY,
+    referendum_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    option TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS notifications (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -671,6 +679,7 @@ export function seedDatabase() {
     DROP TABLE IF EXISTS mdb_votes;
     DROP TABLE IF EXISTS mdb_applications;
     DROP TABLE IF EXISTS notifications;
+    DROP TABLE IF EXISTS referendum_votes;
     DROP TABLE IF EXISTS question_votes;
     DROP TABLE IF EXISTS member_signals;
     DROP TABLE IF EXISTS internal_votes;

@@ -267,6 +267,14 @@ export const questionVotes = sqliteTable("question_votes", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const referendumVotes = sqliteTable("referendum_votes", {
+  id: text("id").primaryKey(),
+  referendumId: text("referendum_id").notNull(),
+  userId: text("user_id").notNull(),
+  option: text("option").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),                         // UUID = auth token
   displayName: text("display_name").notNull().unique(),

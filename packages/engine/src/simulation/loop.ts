@@ -1597,9 +1597,9 @@ export async function runDay(): Promise<number> {
     }
   }
 
-  // 10a2. Process MdB speeches
+  // 10a2. Process MdB speeches (AI-evaluated: +0.1 / 0 / -0.1)
   try {
-    const speechSentimentDelta = processDaySpeeches(currentDay);
+    const speechSentimentDelta = await processDaySpeeches(currentDay);
     if (speechSentimentDelta !== 0) {
       nationalState.publicSentiment = Math.max(5, Math.min(75,
         Math.round((nationalState.publicSentiment + speechSentimentDelta) * 10) / 10,

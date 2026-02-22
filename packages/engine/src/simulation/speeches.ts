@@ -1,20 +1,24 @@
 /**
  * MdB speech processing — create simulation events for submitted speeches.
  *
- * V1: All speeches are accepted (1 per reading per user, enforced at API level).
- * Speech slot lottery deferred to v2 if spam becomes an issue.
+ * Each speech is evaluated by AI for relevance and quality:
+ *   +0.1 — substantive, relevant to the bill
+ *    0.0 — generic or off-topic but not harmful
+ *   -0.1 — spam, nonsensical, or disruptive
  */
 
 import { randomUUID } from "node:crypto";
 import { eq, gte } from "drizzle-orm";
 import { getDb, getUserDb, schema } from "../db/index.js";
+import { callAI } from "../agent/client.js";
+import { AIProviderLimitError } from "../agent/client.js";
 
 /**
  * Process speeches submitted since the last sim day.
  * Creates simulation_event of type "mdb_speech" for each speech,
- * applies small sentiment impact (±0.1), and returns total sentiment delta.
+ * applies AI-evaluated sentiment impact (±0.1 or 0), and returns total sentiment delta.
  */
-export function processDaySpeeches(currentDay: number): number {
+export async function processDaySpeeches(currentDay: number): Promise<number> {
   const db = getDb();
   const userDb = getUserDb();
 
@@ -37,25 +41,26 @@ export function processDaySpeeches(currentDay: number): number {
     if (user) userNames.set(uid, user.displayName);
   }
 
-  // Look up bill titles
+  // Look up bill titles and descriptions
   const billIds = [...new Set(speeches.map(s => s.billId))];
-  const billTitles = new Map<string, string>();
+  const billInfo = new Map<string, { title: string; description: string }>();
   for (const bid of billIds) {
     const bill = db.select().from(schema.bills)
       .where(eq(schema.bills.id, bid))
       .get();
-    if (bill) billTitles.set(bid, bill.title);
+    if (bill) billInfo.set(bid, { title: bill.title, description: bill.description ?? "" });
   }
 
   let processed = 0;
   let sentimentDelta = 0;
   for (const speech of speeches) {
     const displayName = userNames.get(speech.userId) ?? "Unknown MdB";
-    const billTitle = billTitles.get(speech.billId) ?? "Unknown Bill";
+    const bill = billInfo.get(speech.billId);
+    const billTitle = bill?.title ?? "Unknown Bill";
     const readingLabel = speech.reading === 1 ? "1st" : speech.reading === 2 ? "2nd" : "3rd";
 
-    // Small sentiment impact: ±0.1 (positive by default — speaking shows engagement)
-    const impact = 0.1;
+    // AI evaluation of speech quality
+    const impact = await evaluateSpeech(speech.content, billTitle, bill?.description ?? "");
     sentimentDelta += impact;
 
     // Mark speech as processed with sentiment impact
@@ -65,6 +70,7 @@ export function processDaySpeeches(currentDay: number): number {
       .run();
 
     // Create simulation event
+    const impactLabel = impact > 0 ? "+0.1" : impact < 0 ? "-0.1" : "0";
     db.insert(schema.simulationEvents).values({
       id: `evt-${randomUUID().slice(0, 8)}`,
       type: "mdb_speech",
@@ -77,6 +83,7 @@ export function processDaySpeeches(currentDay: number): number {
         billId: speech.billId,
         reading: speech.reading,
         sentimentImpact: impact,
+        impactLabel,
       }),
       createdAt: new Date().toISOString(),
     }).run();
@@ -85,8 +92,48 @@ export function processDaySpeeches(currentDay: number): number {
   }
 
   if (processed > 0) {
-    console.log(`  [Speeches] Processed ${processed} MdB speech${processed !== 1 ? "es" : ""}`);
+    console.log(`  [Speeches] Processed ${processed} MdB speech${processed !== 1 ? "es" : ""} (net sentiment: ${sentimentDelta >= 0 ? "+" : ""}${sentimentDelta.toFixed(1)})`);
   }
 
   return sentimentDelta;
+}
+
+/**
+ * AI-evaluate a speech for relevance and quality.
+ * Returns +0.1 (good), 0.0 (neutral/generic), or -0.1 (spam/nonsense).
+ * Falls back to 0.0 on AI errors.
+ */
+async function evaluateSpeech(content: string, billTitle: string, billDescription: string): Promise<number> {
+  try {
+    const raw = await callAI({
+      system: `You are a parliamentary clerk evaluating whether a Bundestag speech is substantive. Respond with ONLY valid JSON: {"rating": "positive" | "neutral" | "negative"}
+
+Rules:
+- "positive": The speech engages meaningfully with the bill's subject matter — argues for/against, raises concerns, proposes perspective, or provides relevant analysis.
+- "neutral": The speech is vaguely on-topic but generic, or too short to add real substance.
+- "negative": The speech is spam, nonsensical, lorem ipsum, copy-pasted filler, completely off-topic, or disruptive gibberish.`,
+      prompt: `Bill: "${billTitle}"${billDescription ? `\nBill description: ${billDescription}` : ""}
+
+Speech text:
+"""
+${content}
+"""
+
+Rate this speech:`,
+      maxTokens: 32,
+      roleKey: "daily",
+    });
+
+    const parsed = JSON.parse(raw) as { rating: string };
+    if (parsed.rating === "positive") return 0.1;
+    if (parsed.rating === "negative") return -0.1;
+    return 0;
+  } catch (err) {
+    if (err instanceof AIProviderLimitError) {
+      console.warn("  [Speeches] AI provider limited, skipping evaluation (neutral fallback)");
+    } else {
+      console.warn("  [Speeches] AI evaluation failed, using neutral fallback:", (err as Error).message);
+    }
+    return 0;
+  }
 }
