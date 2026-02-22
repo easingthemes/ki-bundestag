@@ -1,43 +1,55 @@
-# Progress: Engine — DB Layer Split
+# Progress: Types Package Split
 
-**Goal**: Split oversized `seed.ts` (821L) and `schema.ts` (~400L) into focused files while keeping all imports and runtime behaviour unchanged.
+**Goal**: Split `packages/types/src/index.ts` (623 lines, 60+ types) into 7 domain files under `src/types/`, keeping `index.ts` as a barrel re-export so all consumers see zero changes.
 
-**Ref**: docs/plans/06-engine-db.md
+**Ref**: docs/plans/07-types.md
 
 ---
 
-### Step 1: Create `src/db/seed-data.ts`
+### Step 1: Create `src/types/parties.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/db/seed-data.ts` (created)
-- **Result**: Extracted PARTIES array and INITIAL_NATIONAL_STATE constant as pure data; also exported PartySeed interface. Typecheck passed.
+- **Files**: `packages/types/src/types/parties.ts` (created)
+- **Result**: Moved PolicyPriorities, CoalitionRole, Party interfaces into dedicated file.
 
-### Step 2: Create `src/db/ddl.ts`
-
-- **Status**: done
-- **Files**: `packages/engine/src/db/ddl.ts` (created)
-- **Result**: Moved SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS into dedicated file. No imports needed. Typecheck passed.
-
-### Step 3: Update `src/db/seed.ts` to import from new files
+### Step 2: Create `src/types/economy.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/db/seed.ts` (updated)
-- **Result**: Removed moved constants, added imports from seed-data.js and ddl.js; updated nationalState insert to use INITIAL_NATIONAL_STATE; removed unused PartySeed/CoalitionRole/PolicyPriorities imports. Typecheck passed.
+- **Files**: `packages/types/src/types/economy.ts` (created)
+- **Result**: Moved EconomyState, NationalState, CrisisSeverity, CrisisCategory, Crisis, BudgetAllocations, BudgetVote, Budget; imports BillCategory+BillImpact from bills.js.
 
-### Step 4: Create `src/db/schema-sim.ts`
-
-- **Status**: done
-- **Files**: `packages/engine/src/db/schema-sim.ts` (created)
-- **Result**: Moved all 22 simulation DB table definitions (parties through bundestagSeats) into dedicated file with Drizzle imports. Typecheck passed.
-
-### Step 5: Create `src/db/schema-user.ts`
+### Step 3: Create `src/types/bills.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/db/schema-user.ts` (created)
-- **Result**: Moved all user DB table definitions (users, internalProposals, memberSignals, internalVotes, questionVotes, referendumVotes, notifications, mdbApplications, mdbVotes, mdbSpeeches, userActions) into dedicated file. Typecheck passed.
+- **Files**: `packages/types/src/types/bills.ts` (created)
+- **Result**: Moved BillCategory, BillStatus, CommitteeRecommendation, BillImpact, VoteChoice, BillVote, Amendment, Bill, MotionType, MotionStatus, Motion into dedicated file.
 
-### Step 6: Rewrite `src/db/schema.ts` as re-export barrel
+### Step 4: Create `src/types/elections.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/db/schema.ts` (rewritten)
-- **Result**: schema.ts now 6 lines: imports both sub-schemas, exports combined schema object, and re-exports all named exports. All existing consumers unchanged. Typecheck passed.
+- **Files**: `packages/types/src/types/elections.ts` (created)
+- **Result**: Moved MinistryPortfolio, Minister, Government, Election types, ConfidenceVote, Fraktion; imports BillVote from bills.js.
+
+### Step 5: Create `src/types/parliament.ts`
+
+- **Status**: done
+- **Files**: `packages/types/src/types/parliament.ts` (created)
+- **Result**: Moved Interpellation, ConstitutionalChallenge, Poll, CitizenQuestion, Referendum, MediaArticle, MdB types into dedicated file; imports BillImpact+VoteChoice from bills.js and MinistryPortfolio from elections.js.
+
+### Step 6: Create `src/types/agent.ts`
+
+- **Status**: done
+- **Files**: `packages/types/src/types/agent.ts` (created)
+- **Result**: Moved AgentContext, all action interfaces, AgentAction union, AgentResponse; imports from all sibling type files.
+
+### Step 7: Create `src/types/meta.ts`
+
+- **Status**: done
+- **Files**: `packages/types/src/types/meta.ts` (created); `parties.ts` updated with InternalProposal
+- **Result**: Moved SimulationEventType, SimulationEvent, SimulationMeta, PartyHistoryEntry, PendingInjection into meta.ts; added InternalProposal to parties.ts.
+
+### Step 8: Rewrite `src/index.ts` as barrel re-export
+
+- **Status**: done
+- **Files**: `packages/types/src/index.ts` (rewritten)
+- **Result**: index.ts now 7 lines of re-exports covering all 7 domain files. Typecheck passed across all 4 packages.
