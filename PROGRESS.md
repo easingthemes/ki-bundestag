@@ -48,11 +48,15 @@ docs/plans/03-web-pages.md
 
 ### Step 7: Extract Elections components
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/components/elections/BundesadlerIcon.tsx`, `VoteBarChart.tsx`, `CoalitionChips.tsx`, `CoalitionCalculator.tsx`
+- **Result**: Extracted 4 inline components from Elections.tsx into focused elections components. Typecheck pass.
 
 ### Step 8: Rewrite Elections.tsx shell
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/pages/Elections.tsx`
+- **Result**: Replaced 663-line file with ~250-line shell importing all 4 elections components. Removed local `fixColor` definition (now from lib/utils). Typecheck pass.
 
 ### Step 9: Extract BillDetail components
 
