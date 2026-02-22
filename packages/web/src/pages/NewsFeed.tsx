@@ -146,7 +146,7 @@ export function NewsFeed() {
 
   return (
     <div>
-      <h1>News Feed</h1>
+      <h2 className="section-title">Nachrichtenfeed</h2>
 
       {/* Filter bar */}
       <Card className="mb-6">
@@ -186,7 +186,7 @@ export function NewsFeed() {
               className="px-3 py-1 border border-input rounded-full text-xs font-medium cursor-pointer text-destructive bg-card hover:bg-accent"
               onClick={clearFilters}
             >
-              Clear filters
+              Filter zurücksetzen
             </button>
           )}
         </CardContent>
@@ -194,7 +194,7 @@ export function NewsFeed() {
 
       {/* Event stream */}
       {dayGroups.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground">No events yet. Run the simulation first.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Ereignisse. Starte zuerst die Simulation.</p>
       ) : (
         <div>
           {dayGroups.map(group => {
@@ -284,7 +284,7 @@ export function NewsFeed() {
                 onClick={() => setOffset(events.length)}
                 className="py-2 px-8 rounded border border-input bg-card cursor-pointer text-sm hover:bg-accent"
               >
-                Load more ({total - events.length} remaining)
+                Mehr laden ({total - events.length} verbleibend)
               </button>
             </div>
           )}

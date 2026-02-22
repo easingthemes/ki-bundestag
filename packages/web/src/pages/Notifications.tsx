@@ -50,8 +50,8 @@ export function Notifications() {
   if (!user) {
     return (
       <div>
-        <h1>Notifications</h1>
-        <p className="text-sm text-muted-foreground">Log in to view your notifications.</p>
+        <h2 className="section-title">Benachrichtigungen</h2>
+        <p className="text-sm text-muted-foreground">Melde dich an, um deine Benachrichtigungen zu sehen.</p>
       </div>
     );
   }
@@ -76,13 +76,13 @@ export function Notifications() {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h1 className="mb-0">Notifications</h1>
+        <h2 className="section-title !mb-0">Benachrichtigungen</h2>
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Mark all as read ({unreadCount})
+            Alle als gelesen markieren ({unreadCount})
           </button>
         )}
       </div>
@@ -104,7 +104,7 @@ export function Notifications() {
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-sm text-muted-foreground">No notifications.</p>
+        <p className="text-sm text-muted-foreground">Keine Benachrichtigungen.</p>
       )}
 
       <div className="space-y-3">
@@ -130,7 +130,7 @@ export function Notifications() {
                     onClick={() => markRead(n.id)}
                     className="text-xs text-muted-foreground hover:text-foreground shrink-0 transition-colors"
                   >
-                    Mark read
+                    Gelesen
                   </button>
                 )}
               </div>

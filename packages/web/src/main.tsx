@@ -67,9 +67,9 @@ function NavGroup({ label, children }: NavGroupProps) {
     >
       <button
         className={cn(
-          "flex items-center gap-1 px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-all duration-150",
-          "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
-          open && "text-white bg-white/[0.06]"
+          "flex items-center gap-1 px-2.5 py-1.5 rounded text-[13px] font-medium whitespace-nowrap transition-all duration-150",
+          "text-white/70 hover:text-white hover:bg-white/10",
+          open && "text-white bg-white/10"
         )}
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -84,7 +84,7 @@ function NavGroup({ label, children }: NavGroupProps) {
         </svg>
       </button>
       {open && (
-        <div className="absolute top-[calc(100%+4px)] left-0 min-w-[200px] bg-[#1e1e36] border border-white/[0.08] rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1.5 z-[200] animate-in fade-in slide-in-from-top-1.5 duration-150">
+        <div className="absolute top-[calc(100%+2px)] left-0 min-w-[190px] bg-[#0d1b2e] border border-white/10 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] py-1 z-[200] animate-in fade-in slide-in-from-top-1 duration-100">
           {children}
         </div>
       )}
@@ -98,9 +98,9 @@ function DropdownLink({ to, children }: { to: string; children: React.ReactNode 
     <NavLink
       to={to}
       className={({ isActive }) => cn(
-        "block px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-150",
-        "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
-        isActive && "text-white bg-white/10 border-l-2 border-[#ffd700]"
+        "block px-3 py-1.5 mx-1 rounded text-[13px] font-medium whitespace-nowrap transition-all duration-100",
+        "text-white/70 hover:text-white hover:bg-white/10",
+        isActive && "text-white bg-white/15 font-semibold"
       )}
     >
       {children}
@@ -118,15 +118,15 @@ function MobileNav({ user }: { user: User | null }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="md:hidden ml-auto p-1.5 text-[#b0b0c0] hover:text-white" aria-label="Toggle menu">
+        <button className="md:hidden ml-auto p-1.5 text-white/70 hover:text-white" aria-label="Toggle menu">
           <Menu className="size-5" />
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-[#1a1a2e] border-white/[0.08] w-[280px] p-0">
-        <SheetHeader className="px-5 pt-4 pb-3 border-b border-white/[0.08]">
-          <SheetTitle className="text-white font-bold">Menu</SheetTitle>
+      <SheetContent side="right" className="bg-white border-border w-[280px] p-0">
+        <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
+          <SheetTitle className="text-foreground font-bold">Menu</SheetTitle>
         </SheetHeader>
-        <nav className="py-2">
+        <nav className="py-2 overflow-y-auto max-h-[calc(100vh-80px)]">
           <MobileLink to="/" end>Dashboard</MobileLink>
           <MobileGroupLabel>Parlament</MobileGroupLabel>
           <MobileLink to="/bills">Gesetze</MobileLink>
@@ -145,18 +145,18 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileGroupLabel>Nachrichten</MobileGroupLabel>
           <MobileLink to="/news">Newsticker</MobileLink>
           <MobileLink to="/media">Presse</MobileLink>
-          <Separator className="bg-white/[0.08] mx-5 my-2" />
+          <Separator className="mx-5 my-2" />
           <MobileLink to="/log">Protokoll</MobileLink>
           <MobileLink to="/about">&Uuml;ber</MobileLink>
           <MobileLink to="/admin">Admin</MobileLink>
-          <Separator className="bg-white/[0.08] mx-5 my-2" />
+          <Separator className="mx-5 my-2" />
           {user ? (
             <>
               <div className="px-5 py-2 flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#ffd700] flex items-center justify-center text-xs font-bold text-[#1a1a2e]">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-white">
                   {user.displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
-                <span className="text-sm text-white font-medium">{user.displayName}</span>
+                <span className="text-sm text-foreground font-medium">{user.displayName}</span>
               </div>
               {user.partyId && <MobileLink to={`/parties/${user.partyId}`}>My Party</MobileLink>}
               <MobileLink to="/questions">My Questions</MobileLink>
@@ -164,7 +164,7 @@ function MobileNav({ user }: { user: User | null }) {
               <MobileLogout />
             </>
           ) : (
-            <NavLink to="/login" className="block px-5 py-2.5 text-sm font-semibold text-[#ffd700] hover:text-[#ffe44d]">
+            <NavLink to="/login" className="block px-5 py-2.5 text-sm font-semibold text-primary hover:text-primary/80">
               Anmelden
             </NavLink>
           )}
@@ -180,9 +180,9 @@ function MobileLink({ to, end, children }: { to: string; end?: boolean; children
       to={to}
       end={end}
       className={({ isActive }) => cn(
-        "block px-5 py-2.5 text-sm font-medium transition-all duration-150",
-        "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
-        isActive && "text-white bg-white/[0.06] border-l-2 border-[#ffd700]"
+        "block px-5 py-2 text-sm font-medium transition-all duration-100",
+        "text-foreground/70 hover:text-foreground hover:bg-muted",
+        isActive && "text-primary font-semibold bg-primary/5 border-l-2 border-primary"
       )}
     >
       {children}
@@ -192,7 +192,7 @@ function MobileLink({ to, end, children }: { to: string; end?: boolean; children
 
 function MobileGroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-5 pt-3 pb-1.5 text-[0.7rem] font-bold text-[#666] uppercase tracking-[0.08em]">
+    <div className="px-5 pt-3 pb-1 text-[0.65rem] font-bold text-muted-foreground uppercase tracking-[0.08em]">
       {children}
     </div>
   );
@@ -203,7 +203,7 @@ function MobileLogout() {
   return (
     <button
       onClick={logout}
-      className="w-full text-left block px-5 py-2.5 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-white/[0.06] bg-transparent border-none cursor-pointer"
+      className="w-full text-left block px-5 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent border-none cursor-pointer"
     >
       Logout
     </button>
@@ -252,49 +252,49 @@ function UserMenu({ user }: { user: User }) {
       onMouseLeave={onLeave}
     >
       <button
-        className="w-8 h-8 rounded-full bg-[#ffd700] flex items-center justify-center text-xs font-bold text-[#1a1a2e] cursor-pointer hover:ring-2 hover:ring-[#ffd700]/50 transition-all"
+        className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white cursor-pointer hover:bg-white/30 transition-all"
         onClick={() => setOpen(o => !o)}
         aria-label="User menu"
       >
         {initials}
       </button>
       {open && (
-        <div className="absolute top-[calc(100%+6px)] right-0 min-w-[200px] bg-[#1e1e36] border border-white/[0.08] rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1.5 z-[200] animate-in fade-in slide-in-from-top-1.5 duration-150">
-          <div className="px-4 py-2 border-b border-white/[0.08]">
+        <div className="absolute top-[calc(100%+4px)] right-0 min-w-[200px] bg-[#0d1b2e] border border-white/10 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] py-1 z-[200] animate-in fade-in slide-in-from-top-1 duration-100">
+          <div className="px-3 py-2 border-b border-white/10">
             <div className="text-sm font-semibold text-white flex items-center gap-2">
               {user.displayName}
               {seat && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 leading-none">MdB</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 leading-none">MdB</span>
               )}
             </div>
             {user.partyId && (
-              <div className="text-xs text-[#b0b0c0] mt-0.5">{user.partyId}{seat ? ` · Seat #${seat.seatNumber}` : ""}</div>
+              <div className="text-xs text-white/50 mt-0.5">{user.partyId}{seat ? ` · Seat #${seat.seatNumber}` : ""}</div>
             )}
           </div>
           {user.partyId && (
             <NavLink
               to={`/parties/${user.partyId}`}
-              className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+              className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
             >
               My Party
             </NavLink>
           )}
           <NavLink
             to="/questions"
-            className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+            className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
           >
             My Questions
           </NavLink>
           <NavLink
             to="/my-activity"
-            className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+            className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
           >
             My Activity
           </NavLink>
-          <div className="border-t border-white/[0.08] mt-1 pt-1">
+          <div className="border-t border-white/10 mt-1 pt-1">
             <button
               onClick={() => { logout(); setOpen(false); }}
-              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] bg-transparent border-none cursor-pointer"
+              className="w-full text-left px-3 py-1.5 text-[13px] text-red-400 hover:text-red-300 hover:bg-white/10 bg-transparent border-none cursor-pointer"
             >
               Logout
             </button>
@@ -342,19 +342,19 @@ function SimStatus() {
 
   return (
     <div className="ml-auto shrink-0 flex flex-col items-end gap-0.5 min-w-[80px]">
-      <div className="flex items-center gap-1.5 text-xs text-[#b0b0c0] tabular-nums whitespace-nowrap">
+      <div className="flex items-center gap-1.5 text-xs text-white/70 tabular-nums whitespace-nowrap">
         <span className={cn(
-          "w-[7px] h-[7px] rounded-full shrink-0",
-          running ? "bg-[#28a745] shadow-[0_0_4px_#28a745] animate-pulse" : "bg-[#6c757d]"
+          "w-[6px] h-[6px] rounded-full shrink-0",
+          running ? "bg-emerald-400 shadow-[0_0_4px_#34d399] animate-pulse" : "bg-white/30"
         )} />
         <span>Tag {status.currentDay}</span>
       </div>
-      <div className="w-full h-[3px] bg-white/[0.12] rounded-sm overflow-hidden">
+      <div className="w-full h-[2px] bg-white/15 rounded-sm overflow-hidden">
         <div
           className={cn(
             "h-full rounded-sm",
-            running ? "bg-[#28a745] transition-[width] duration-1000 linear" :
-            pct === 100 ? "bg-[#28a745]" : "bg-transparent"
+            running ? "bg-emerald-400 transition-[width] duration-1000 linear" :
+            pct === 100 ? "bg-emerald-400" : "bg-transparent"
           )}
           style={{ width: `${pct}%` }}
         />
@@ -380,10 +380,10 @@ function NotificationBell() {
   if (!user) return null;
 
   return (
-    <Link to="/notifications" className="relative p-1.5 rounded-md text-[#b0b0c0] hover:text-white hover:bg-white/[0.08] transition-colors">
+    <Link to="/notifications" className="relative p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors">
       <Bell className="w-4 h-4" />
       {count > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-blue-500 rounded-full leading-none">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-red-500 rounded-full leading-none">
           {count > 99 ? "99+" : count}
         </span>
       )}
@@ -396,7 +396,7 @@ function NotificationBell() {
 function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div
-      className="fixed top-[70px] left-1/2 -translate-x-1/2 z-[1000] min-w-[300px] max-w-[500px] bg-[#dc3545] text-white px-5 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer animate-in fade-in slide-in-from-top-2 duration-300"
+      className="fixed top-[56px] left-1/2 -translate-x-1/2 z-[1000] min-w-[280px] max-w-[480px] bg-destructive text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium cursor-pointer animate-in fade-in slide-in-from-top-2 duration-200"
       onClick={onDismiss}
     >
       {message}
@@ -452,21 +452,20 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
         {/* ── Top navigation bar ── */}
-        <nav className="sticky top-0 z-50 bg-[#1a1a2e] text-white px-4 md:px-8 flex items-center h-14 shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
-          <Link to="/" className="font-bold text-[1.15rem] text-white no-underline mr-6 whitespace-nowrap shrink-0 tracking-tight hover:opacity-90">
+        <nav className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
+          <Link to="/" className="font-extrabold text-base text-white no-underline mr-5 whitespace-nowrap shrink-0 tracking-tight hover:opacity-90">
             KI Bundestag
           </Link>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-1 flex-1 overflow-visible">
+          <div className="hidden md:flex items-center gap-0.5 flex-1 overflow-visible">
             <NavLink
               to="/"
               end
               className={({ isActive }) => cn(
-                "relative px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-all duration-150",
-                "text-[#b0b0c0] hover:text-white hover:bg-white/[0.06]",
-                isActive && "text-white bg-white/10 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:bg-[#ffd700] after:scale-x-100",
-                !isActive && "after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:bg-[#ffd700] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-150"
+                "relative px-2.5 py-1.5 rounded text-[13px] font-medium whitespace-nowrap transition-all duration-100",
+                "text-white/70 hover:text-white hover:bg-white/10",
+                isActive && "text-white bg-white/15"
               )}
             >
               Dashboard
@@ -495,7 +494,7 @@ function App() {
           </div>
 
           {/* Sim status + user area (desktop) */}
-          <div className="hidden md:flex items-center ml-auto shrink-0 gap-3">
+          <div className="hidden md:flex items-center ml-auto shrink-0 gap-2.5">
             <SimStatus />
             <NotificationBell />
             <div className="shrink-0 flex items-center">
@@ -504,7 +503,7 @@ function App() {
               ) : (
                 <NavLink
                   to="/login"
-                  className="text-xs text-[#b0b0c0] no-underline px-3 py-1.5 border border-white/15 rounded-full whitespace-nowrap transition-all duration-150 hover:text-white hover:border-white/35 hover:bg-white/[0.06]"
+                  className="text-xs text-white/70 no-underline px-3 py-1 border border-white/20 rounded-full whitespace-nowrap transition-all duration-100 hover:text-white hover:border-white/40 hover:bg-white/10"
                 >
                   Anmelden
                 </NavLink>
@@ -520,7 +519,7 @@ function App() {
         {error && <ErrorToast message={error} onDismiss={() => setError(null)} />}
 
         {/* Main content */}
-        <main className="mx-auto max-w-[1280px] flex-1 px-8 py-10 max-md:px-4 max-md:py-5">
+        <main className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/parties" element={<Parties />} />
@@ -550,14 +549,14 @@ function App() {
         </main>
 
         {/* Footer */}
-        <footer className="bg-[#1a1a2e] text-[#888] mt-8">
-          <div className="max-w-[1280px] mx-auto px-8 py-6 flex justify-between items-center flex-wrap gap-4 max-md:flex-col max-md:text-center">
-            <div className="flex gap-6">
-              <Link to="/log" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">Protokoll</Link>
-              <Link to="/about" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">&Uuml;ber</Link>
-              <Link to="/admin" className="text-[#888] no-underline text-sm hover:text-[#ccc] transition-colors duration-150">Admin</Link>
+        <footer className="border-t border-border bg-card mt-6">
+          <div className="max-w-[1280px] mx-auto px-6 py-4 flex justify-between items-center flex-wrap gap-3 max-md:flex-col max-md:text-center">
+            <div className="flex gap-5">
+              <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Protokoll</Link>
+              <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">&Uuml;ber</Link>
+              <Link to="/admin" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Admin</Link>
             </div>
-            <div className="text-xs text-[#555]">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
+            <div className="text-[11px] text-muted-foreground">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>
         </footer>
       </div>

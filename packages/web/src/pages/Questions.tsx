@@ -127,33 +127,33 @@ export function Questions() {
 
   return (
     <div>
-      <h1>Bürgerfragen</h1>
+      <h2 className="section-title">Bürgerfragen</h2>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         <select value={filterParty} onChange={e => setFilterParty(e.target.value)} className={SELECT_CLS}>
-          <option value="">All parties</option>
+          <option value="">Alle Parteien</option>
           {parties.map(p => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
-          <option value="">All status</option>
-          <option value="pending">Pending</option>
-          <option value="answered">Answered</option>
+          <option value="">Alle Status</option>
+          <option value="pending">Offen</option>
+          <option value="answered">Beantwortet</option>
         </select>
       </div>
 
       {questions.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            No questions yet. Visit a party's page to submit a question.
+            Noch keine Fragen. Besuche eine Parteiseite, um eine Frage zu stellen.
           </CardContent>
         </Card>
       ) : (
         <>
           {showPending && pending.length > 0 && (
             <div className="mb-6">
-              <h2 className="mb-3">Pending ({pending.length})</h2>
+              <h2 className="section-title">Offen ({pending.length})</h2>
               {pending.slice(0, pendingVisible).map(renderQuestionCard)}
               <ShowMoreButton
                 total={pending.length}
@@ -166,7 +166,7 @@ export function Questions() {
 
           {showAnswered && answered.length > 0 && (
             <div>
-              <h2 className="mb-3">Answered ({answered.length})</h2>
+              <h2 className="section-title">Beantwortet ({answered.length})</h2>
               {answered.slice(0, answeredVisible).map(renderQuestionCard)}
               <ShowMoreButton
                 total={answered.length}

@@ -63,21 +63,21 @@ export function Media() {
   const latestDayArticles = dayGroups[0]?.articles ?? [];
   const frontPageMap = new Map(latestDayArticles.map(a => [a.outlet, a]));
 
-  if (loading && articles.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading media...</p>;
+  if (loading && articles.length === 0) return <p className="text-center py-8 text-muted-foreground">Medien laden...</p>;
 
   return (
     <div>
-      <h1>Media</h1>
+      <h2 className="section-title">Medien</h2>
       {articles.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            No articles yet. Run a simulation to generate media coverage.
+            Noch keine Artikel. Starte die Simulation, um Medienberichte zu erzeugen.
           </CardContent>
         </Card>
       ) : (
         <>
           {/* Today's Front Pages */}
-          <h2 className="mb-3">Today's Front Pages</h2>
+          <h2 className="section-title">Titelseiten von heute</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {OUTLET_ORDER.map(outletName => {
               const article = frontPageMap.get(outletName);
@@ -89,7 +89,7 @@ export function Media() {
                   <Card key={outletName} className="opacity-50">
                     <CardContent className="p-4">
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{outletName}</div>
-                      <p className="text-sm text-muted-foreground">No coverage today</p>
+                      <p className="text-sm text-muted-foreground">Keine Berichterstattung heute</p>
                     </CardContent>
                   </Card>
                 );
@@ -121,7 +121,7 @@ export function Media() {
                       </div>
                     )}
                     {!isExpanded && (
-                      <p className="text-xs text-muted-foreground mt-1.5">Click to read full article</p>
+                      <p className="text-xs text-muted-foreground mt-1.5">Klicken für vollständigen Artikel</p>
                     )}
                   </CardContent>
                 </Card>
@@ -129,7 +129,7 @@ export function Media() {
             })}
           </div>
 
-          <h2 className="mb-3">Archive</h2>
+          <h2 className="section-title">Archiv</h2>
           {visible.map(group => (
             <div key={group.day}>
               <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">Day {group.day}</div>
@@ -173,7 +173,7 @@ export function Media() {
                         </div>
                       )}
                       {!isExpanded && (
-                        <p className="text-xs text-muted-foreground mt-1.5">Click to read full article</p>
+                        <p className="text-xs text-muted-foreground mt-1.5">Klicken für vollständigen Artikel</p>
                       )}
                     </CardContent>
                   </Card>
@@ -186,7 +186,7 @@ export function Media() {
               onClick={() => setLimit(l => l + 50)}
               className="block mx-auto my-6 py-3 px-8 border border-input rounded-md bg-card cursor-pointer text-sm hover:bg-accent"
             >
-              Load more
+              Mehr laden
             </button>
           )}
         </>

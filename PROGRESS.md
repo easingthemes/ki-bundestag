@@ -1,55 +1,43 @@
 # Progress
 
 ## Summary
-- **Status**: completed (6 steps)
+
+- **Status**: completed (5 steps)
 - **Date**: 2026-02-22
-- **Goal**: Harden AI engine output quality and reliability — consistent JSON parsing, schema validation with typed fallbacks, tighter prompts, token-budgeted context, transient-error retry, and standardized degradation — without changing core behavior patterns.
 - **Changes**:
-  - Step 1: Audited all 13 callAI sites — cataloged parsers, validators, and fallback gaps
-  - Step 2: Created shared `parseAIJson()` utility; migrated 9 JSON call sites from ad-hoc parsing
-  - Step 3: Added priority-based token-budgeted context trimming + tightened prompt constraints
-  - Step 4: Added transient-error retry (2 retries, 2s+5s backoff) + TTL-based circuit breaker reset
-  - Step 5: Changed `callAI` return to `AICallResult {text, model, provider}`; added `logAICall()` observability to all 13 sites
-  - Step 6: Verified with `npm run simulate 5`; fixed summary empty-system-prompt bug; reconciled docs
+  - Step 1: Design system tokens, nav/footer restyle, `.section-title`/`.stat-value`/`.stat-label` utility classes, `PageShell` 2-column layout wrapper
+  - Step 2: Dot-based `Hemicycle` SVG component, `PartyCard`/`PartyCardGrid` tagesschau-style party cards
+  - Step 3: Dashboard complete rewrite — 2-column grid, hero+hemicycle+economy+events+media, sidebar with Chancellor/parties/sentiment/MdB/crises
+  - Step 4: Elections (dot hemicycle, horizontal bars), Parties (PartyCard grid), PartyDetail (color block header, section-titles)
+  - Step 5: All 20 remaining pages — section-title headers + German labels throughout
+
+## Goal
+
+Complete UI redesign inspired by Politico.eu and Tagesschau.de — rich, data-driven, multi-column dashboard with professional political media aesthetics. Replace all existing page layouts.
 
 ## Steps
 
-### Step 1: Audit AI surface and failure points
+### Step 1: Design system + layout shell
 - **Status**: done
-- **Files**: (read-only)
-- **Result**: Cataloged 13 callAI sites — 11 JSON, 2 free text. Found 4 ad-hoc parsers, 5 bare JSON.parse, 1 worst-offender (summary: no code-fence strip).
+- **Files**: `styles.css`, `main.tsx`, `index.html`, new `components/PageShell.tsx`
+- **Result**: Theme tokens, nav/footer restyle, utility classes, PageShell wrapper. Build pass.
 
----
-
-### Step 2: Shared JSON parser + per-feature schema validation
+### Step 2: Hemicycle dots + party stat cards
 - **Status**: done
-- **Files**: `ai-json.ts` (NEW), `action-parser.ts`, `media.ts`, `polls.ts`, `referendums.ts`, `summary.ts`, `negotiations.ts`, `internal-proposals.ts`, `seats.ts`, `discipline.ts`, `speeches.ts`
-- **Result**: Created `extractJson` + `safeParseJson` + `parseAIJson` in `ai-json.ts`; migrated 9 JSON sites with typed validators. Sanitizers (`stripLeadingPlus`, `stripTrailingCommas`) moved from action-parser.
+- **Files**: new `components/Hemicycle.tsx`, new `components/PartyCard.tsx`
+- **Result**: Dot-based hemicycle SVG, PartyCard with colored icon block + stats. Build pass.
 
----
-
-### Step 3: Prompt quality + token-budgeted context
+### Step 3: Dashboard page redesign
 - **Status**: done
-- **Files**: `prompt.ts`, `negotiations.ts`, `summary.ts`
-- **Result**: Added `CONTEXT_TOKEN_BUDGET=3000` with 3-tier priority trimming in `buildUserPrompt()`. Added "no code fences / no leading + / no trailing commas" rules to system prompts. Tightened negotiation + summary prompts.
+- **Files**: `packages/web/src/pages/Dashboard.tsx`
+- **Result**: Complete rewrite with 2-column grid layout, all widgets preserved. Build pass.
 
----
-
-### Step 4: Transient error retry + provider-limit TTL
+### Step 4: Elections + Parties pages
 - **Status**: done
-- **Files**: `client.ts`
-- **Result**: `detectLimitError()` classifies hard vs transient (429/network) errors. Retry loop: 2 retries with [2s, 5s] delays. Circuit breaker entries store `resetAt` timestamp; auto-expire on next check. `allProvidersLimited()` checks TTL.
+- **Files**: `Elections.tsx`, `Parties.tsx`, `PartyDetail.tsx`
+- **Result**: Dot hemicycle, horizontal bars, PartyCard grid, color block headers. Build pass.
 
----
-
-### Step 5: Standardized fallback semantics + console observability
+### Step 5: All remaining pages
 - **Status**: done
-- **Files**: `ai-json.ts`, `client.ts`, `index.ts` (agent+engine), `party-agent.ts`, `negotiations.ts`, `media.ts`, `polls.ts`, `referendums.ts`, `summary.ts`, `internal-proposals.ts`, `seats.ts`, `discipline.ts`, `speeches.ts`, `questions.ts`, `interpellations.ts`
-- **Result**: `callAI` returns `AICallResult {text, model, provider}`. All 13 sites wrapped with `Date.now()` timing + `logAICall()` emitting `[AI] <task> | <provider>/<model> | <ms>ms | OK|PARSE_FAIL|VALIDATION_FAIL`. Fallback policies documented in `ai-json.ts`.
-
----
-
-### Step 6: Verify and reconcile docs
-- **Status**: done
-- **Files**: `summary.ts`, `docs/Current_Architecture.md`
-- **Result**: Typecheck 6/6 pass. 5-day simulation verified all log lines. Fixed summary bug (`system: ""` rejected by Anthropic API → minimal system prompt). Architecture doc already reconciled with all changes.
+- **Files**: All 20 remaining page files in `packages/web/src/pages/`
+- **Result**: Section-title pattern + German labels applied to all pages. Build pass.

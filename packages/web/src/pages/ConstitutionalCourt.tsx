@@ -40,8 +40,8 @@ export function ConstitutionalCourt() {
 
   return (
     <div>
-      <h1>Bundesverfassungsgericht</h1>
-      <p className="text-muted-foreground mb-4">Constitutional challenges to passed legislation</p>
+      <h2 className="section-title">Bundesverfassungsgericht</h2>
+      <p className="text-muted-foreground mb-4">Verfassungsbeschwerden gegen verabschiedete Gesetze</p>
 
       <div className="flex gap-4 mb-4 flex-wrap items-center">
         <label className="flex items-center gap-1.5 text-sm">
@@ -66,7 +66,7 @@ export function ConstitutionalCourt() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground">No constitutional challenges match the current filters.</p>
+        <p className="text-center py-8 text-muted-foreground">Keine Verfassungsbeschwerden entsprechen den aktuellen Filtern.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {visibleFiltered.map(c => {

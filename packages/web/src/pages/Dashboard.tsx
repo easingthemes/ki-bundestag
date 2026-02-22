@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData, type ImpactData, type CatchupData } from "../api";
 import { CalendarWidget } from "../components/CalendarWidget";
 import { UpcomingCalendar } from "../components/UpcomingCalendar";
+import { Hemicycle } from "../components/Hemicycle";
 import { usePolling } from "../usePolling";
 import { Button, SkeletonCard, SkeletonTitle } from "../components/shared";
 import { useUser } from "../userContext";
@@ -18,6 +19,8 @@ const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
 };
 
 function fixColor(c: string) { return c === "#FFED00" ? "#c4a900" : c; }
+
+/* ── Onboarding Overlay ───────────────────────────────────────────── */
 
 function OnboardingOverlay() {
   const { user } = useUser();
@@ -58,25 +61,16 @@ function OnboardingOverlay() {
         <p className="text-sm text-muted-foreground mb-4">{current.desc}</p>
         <div className="flex items-center gap-2">
           {step > 0 && (
-            <button
-              onClick={() => setStep(s => s - 1)}
-              className="px-3 py-2 text-sm rounded border border-input hover:bg-accent cursor-pointer"
-            >
+            <button onClick={() => setStep(s => s - 1)} className="px-3 py-2 text-sm rounded border border-input hover:bg-accent cursor-pointer">
               Back
             </button>
           )}
           {step < steps.length - 1 ? (
-            <button
-              onClick={() => setStep(s => s + 1)}
-              className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90"
-            >
+            <button onClick={() => setStep(s => s + 1)} className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90">
               Next
             </button>
           ) : (
-            <button
-              onClick={dismiss}
-              className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90"
-            >
+            <button onClick={dismiss} className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90">
               Get Started
             </button>
           )}
@@ -86,7 +80,6 @@ function OnboardingOverlay() {
             </a>
           )}
         </div>
-        {/* Progress dots */}
         <div className="flex justify-center gap-1.5 mt-4">
           {steps.map((_, i) => (
             <div key={i} className={cn("w-2 h-2 rounded-full", i === step ? "bg-foreground" : i < step ? "bg-foreground/40" : "bg-muted")} />
@@ -97,10 +90,10 @@ function OnboardingOverlay() {
   );
 }
 
-/* ── A5: Quick Actions Bar ─────────────────────────────────────────── */
-function QuickActionsBar({ user, parties, mySeat, bills, polls }: {
+/* ── Quick Actions Bar ────────────────────────────────────────────── */
+
+function QuickActionsBar({ user, mySeat, bills, polls }: {
   user: { id: string; partyId: string | null } | null;
-  parties: Party[];
   mySeat: BundestagSeat | null;
   bills: Bill[];
   polls: Poll[];
@@ -125,24 +118,22 @@ function QuickActionsBar({ user, parties, mySeat, bills, polls }: {
     }
   }
 
-  if (polls.length > 0) {
-    actions.push({ label: "Vote on Polls", to: "/polls" });
-  }
+  if (polls.length > 0) actions.push({ label: "Vote on Polls", to: "/polls" });
   actions.push({ label: "Referendums", to: "/referendums" });
 
   if (actions.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap gap-2 mb-5">
       {actions.map(a => (
         <Link
           key={a.label}
           to={a.to}
           className={cn(
-            "px-4 py-2 rounded-full text-sm font-medium no-underline transition-colors",
+            "px-3.5 py-1.5 rounded-full text-xs font-medium no-underline transition-colors",
             a.primary
-              ? "bg-foreground text-background hover:opacity-90"
-              : "border border-input bg-card text-foreground hover:bg-accent"
+              ? "bg-primary text-white hover:bg-primary/90"
+              : "border border-border bg-card text-foreground hover:bg-muted"
           )}
         >
           {a.label}
@@ -152,7 +143,8 @@ function QuickActionsBar({ user, parties, mySeat, bills, polls }: {
   );
 }
 
-/* ── A6: My Impact Card ───────────────────────────────────────────── */
+/* ── My Impact Card ───────────────────────────────────────────────── */
+
 function MyImpactCard() {
   const { user } = useUser();
   const [impact, setImpact] = useState<ImpactData | null>(null);
@@ -168,14 +160,14 @@ function MyImpactCard() {
   if (!hasData) return null;
 
   return (
-    <Card className="py-4">
-      <CardContent className="px-4">
+    <Card>
+      <CardContent className="p-4">
         <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Your Impact</div>
         {impact.signalAccuracy.total > 0 && (
           <div className="mb-2">
             <div className="text-sm">
               <span className="font-semibold">{impact.signalAccuracy.matched}/{impact.signalAccuracy.total}</span>
-              <span className="text-muted-foreground ml-1">signals matched outcome</span>
+              <span className="text-muted-foreground ml-1">signals matched</span>
             </div>
             <div className="flex h-1.5 rounded overflow-hidden mt-1 bg-muted">
               <div className="h-full rounded bg-emerald-500" style={{ width: `${impact.signalAccuracy.pct}%` }} />
@@ -213,7 +205,8 @@ function MyImpactCard() {
   );
 }
 
-/* ── A7: Catchup Card ─────────────────────────────────────────────── */
+/* ── Catchup Card ─────────────────────────────────────────────────── */
+
 function CatchupCard() {
   const { user } = useUser();
   const [catchup, setCatchup] = useState<CatchupData | null>(null);
@@ -230,7 +223,7 @@ function CatchupCard() {
   if (!hasContent) return null;
 
   return (
-    <Card className="mb-6 border-l-4 border-l-blue-500">
+    <Card className="mb-5 border-l-4 border-l-blue-500">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div>
@@ -249,9 +242,7 @@ function CatchupCard() {
             </div>
           )}
           {catchup.billsRejected.length > 0 && (
-            <div>
-              <span className="font-medium text-destructive">{catchup.billsRejected.length} bill{catchup.billsRejected.length !== 1 ? "s" : ""} rejected</span>
-            </div>
+            <div><span className="font-medium text-destructive">{catchup.billsRejected.length} bill{catchup.billsRejected.length !== 1 ? "s" : ""} rejected</span></div>
           )}
           {catchup.crisesStarted.length > 0 && (
             <div>
@@ -262,9 +253,7 @@ function CatchupCard() {
             </div>
           )}
           {catchup.crisesEnded.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              {catchup.crisesEnded.length} cris{catchup.crisesEnded.length !== 1 ? "es" : "is"} resolved
-            </div>
+            <div className="text-xs text-muted-foreground">{catchup.crisesEnded.length} cris{catchup.crisesEnded.length !== 1 ? "es" : "is"} resolved</div>
           )}
           {catchup.partyApprovalDelta != null && catchup.partyApprovalDelta !== 0 && (
             <div className="text-xs">
@@ -274,9 +263,7 @@ function CatchupCard() {
             </div>
           )}
           {catchup.proposalOutcomes.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              {catchup.proposalOutcomes.length} of your proposal{catchup.proposalOutcomes.length !== 1 ? "s" : ""} reviewed
-            </div>
+            <div className="text-xs text-muted-foreground">{catchup.proposalOutcomes.length} of your proposal{catchup.proposalOutcomes.length !== 1 ? "s" : ""} reviewed</div>
           )}
         </div>
       </CardContent>
@@ -284,7 +271,8 @@ function CatchupCard() {
   );
 }
 
-/* ── A9: Live Event Ticker ────────────────────────────────────────── */
+/* ── Live Event Ticker ────────────────────────────────────────────── */
+
 function LiveEventTicker({ simStatus }: { simStatus: SimulationStatus }) {
   const [toasts, setToasts] = useState<SimulationEvent[]>([]);
   const lastEventId = useRef<string | null>(null);
@@ -313,7 +301,6 @@ function LiveEventTicker({ simStatus }: { simStatus: SimulationStatus }) {
     return () => clearInterval(id);
   }, [isRunning]);
 
-  // Auto-dismiss after 8s
   useEffect(() => {
     if (toasts.length === 0) return;
     const id = setTimeout(() => setToasts(prev => prev.slice(0, -1)), 8000);
@@ -325,27 +312,23 @@ function LiveEventTicker({ simStatus }: { simStatus: SimulationStatus }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
       {toasts.map(ev => (
-        <div
-          key={ev.id}
-          className="bg-card border border-border rounded-lg shadow-lg px-4 py-3 animate-in slide-in-from-right-3 fade-in duration-300"
-        >
+        <div key={ev.id} className="bg-card border border-border rounded-lg shadow-lg px-4 py-3 animate-in slide-in-from-right-3 fade-in duration-300">
           <div className="flex justify-between items-start gap-2">
             <div>
               <div className="text-xs text-muted-foreground">Day {ev.dayNumber} · {ev.type.replace(/_/g, " ")}</div>
               <div className="font-semibold text-sm mt-0.5">{ev.title}</div>
             </div>
-            <button
-              onClick={() => setToasts(prev => prev.filter(t => t.id !== ev.id))}
-              className="text-xs text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer shrink-0"
-            >
-              ×
-            </button>
+            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== ev.id))} className="text-xs text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer shrink-0">×</button>
           </div>
         </div>
       ))}
     </div>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   DASHBOARD
+   ══════════════════════════════════════════════════════════════════════ */
 
 export function Dashboard() {
   const { user } = useUser();
@@ -369,7 +352,7 @@ export function Dashboard() {
   const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
     api.getParties().then(setParties).catch(console.error);
-    api.getEvents(3).then(r => setEvents(r.events)).catch(console.error);
+    api.getEvents(5).then(r => setEvents(r.events)).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getPolls(true).then(setPolls).catch(console.error);
     api.getMySeat().then(r => { setMySeat(r.seat); setMyApplications(r.applications); }).catch(() => {});
@@ -387,12 +370,10 @@ export function Dashboard() {
   usePolling(refreshCore);
   usePolling(refreshSlow, 60000);
 
-  // Calendar fetch — separate so month navigation doesn't re-fetch everything
   useEffect(() => {
     api.getCalendar(calendarMonth).then(setCalendar).catch(console.error);
   }, [calendarMonth]);
 
-  // Upcoming calendar fetch
   useEffect(() => {
     api.getUpcomingCalendar().then(setUpcomingCalendar).catch(console.error);
   }, []);
@@ -401,9 +382,7 @@ export function Dashboard() {
     return (
       <div>
         <SkeletonTitle />
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <SkeletonCard /><SkeletonCard />
-        </div>
+        <div className="grid grid-cols-2 gap-4 mb-8"><SkeletonCard /><SkeletonCard /></div>
         <SkeletonCard />
       </div>
     );
@@ -411,17 +390,11 @@ export function Dashboard() {
 
   const totalSeats = parties.reduce((s, p) => s + p.seatCount, 0);
   const sentimentColor = state.publicSentiment > 60 ? SEMANTIC_HEX.positive : state.publicSentiment > 40 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative;
-  const MAJORITY = 368;
   const coalitionPartyList = parties.filter(p => state.coalitionParties.includes(p.id) && p.seatCount > 0);
   const oppositionPartyList = parties.filter(p => state.oppositionParties.includes(p.id) && p.seatCount > 0);
   const coalitionSeats = coalitionPartyList.reduce((s, p) => s + p.seatCount, 0);
-  const oppositionSeats = oppositionPartyList.reduce((s, p) => s + p.seatCount, 0);
-  const hasMajority = coalitionSeats >= MAJORITY;
-  const majorityPct = totalSeats > 0 ? (MAJORITY / totalSeats) * 100 : 50;
 
-  const recentBills = bills.filter(b =>
-    b.votes.length > 0 && b.proposedOnDay >= simStatus.currentDay - 30
-  );
+  const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= simStatus.currentDay - 30);
   const decisionOfMonth = recentBills.length > 0
     ? recentBills.reduce((best, b) => {
         const total = b.votes.reduce((s, v) => s + (parties.find(pp => pp.id === v.partyId)?.seatCount ?? 0), 0);
@@ -432,10 +405,7 @@ export function Dashboard() {
 
   const politicianOfMonth = parties
     .filter(p => p.seatCount > 0 && p.recentApprovals && p.recentApprovals.length >= 2)
-    .map(p => ({
-      party: p,
-      delta: p.recentApprovals[p.recentApprovals.length - 1] - p.recentApprovals[0],
-    }))
+    .map(p => ({ party: p, delta: p.recentApprovals[p.recentApprovals.length - 1] - p.recentApprovals[0] }))
     .sort((a, b) => b.delta - a.delta)[0] ?? null;
 
   const latestMedia = [...media].sort((a, b) => b.dayNumber - a.dayNumber).slice(0, 2);
@@ -451,298 +421,281 @@ export function Dashboard() {
   }
   const moodBadgeCls = mood ? (MOOD_BADGE[mood] ?? null) : null;
 
+  // Parties sorted by approval for sidebar ranking
+  const partiesByApproval = [...parties].filter(p => p.seatCount > 0).sort((a, b) => b.approvalRating - a.approvalRating);
+  const maxApproval = partiesByApproval[0]?.approvalRating ?? 50;
+
+  // Hemicycle seat data
+  const hemicycleSeats = parties
+    .filter(p => p.seatCount > 0)
+    .map(p => ({ partyId: p.id, count: p.seatCount, color: p.color, name: p.name }));
+
   return (
     <div>
       <OnboardingOverlay />
-      <h1>Dashboard — Day {simStatus.currentDay}</h1>
 
-      {/* Hero summary */}
+      {/* ── Header row ── */}
+      <div className="flex items-baseline justify-between mb-1">
+        <h1 className="!mb-0">Tag {simStatus.currentDay}</h1>
+        {mood && moodBadgeCls && (
+          <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", moodBadgeCls)}>{mood}</span>
+        )}
+      </div>
+
+      {/* Hero narrative */}
       {narrative && (
-        <Card className="bg-muted/50 mb-6 py-4">
-          <CardContent className="px-5">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">
-              Today in the Bundestag
-              {mood && moodBadgeCls && (
-                <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", moodBadgeCls)}>{mood}</span>
-              )}
-            </div>
-            <p className="text-sm leading-relaxed">{narrative}</p>
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-5 max-w-3xl">{narrative}</p>
       )}
 
-      {/* Watch-only mode banner */}
+      {/* Banners */}
       {simStatus.timingPreset && (simStatus.timingPreset === "ultra-fast" || simStatus.timingPreset === "fast") && (
-        <div className={cn(ALERT_STYLES.info, "font-medium mb-4")}>
-          <strong>Watch-Only Mode</strong> — Simulation running in {simStatus.timingPreset === "ultra-fast" ? "Ultra-Fast" : "Fast"} mode. Switch to Normal or Slow to interact.
+        <div className={cn(ALERT_STYLES.info, "font-medium mb-4 text-sm")}>
+          <strong>Watch-Only Mode</strong> — Simulation running in {simStatus.timingPreset === "ultra-fast" ? "Ultra-Fast" : "Fast"} mode.
         </div>
       )}
-
-      {/* Provisional budget banner */}
       {state.provisionalBudget && (
-        <div className={cn(ALERT_STYLES.warning, "font-medium mb-4")}>
-          <strong>Provisional Budget Active</strong> — operating under Art. 111 GG.
-          {simStatus.budgetRetryDay != null && (
-            <span className="ml-1.5">Revised vote on Day {simStatus.budgetRetryDay}.</span>
-          )}
+        <div className={cn(ALERT_STYLES.warning, "font-medium mb-4 text-sm")}>
+          <strong>Provisional Budget Active</strong> — Art. 111 GG.
+          {simStatus.budgetRetryDay != null && <span className="ml-1">Revised vote Day {simStatus.budgetRetryDay}.</span>}
         </div>
       )}
 
-      {/* Quick actions */}
-      <QuickActionsBar user={user} parties={parties} mySeat={mySeat} bills={bills} polls={polls} />
-
-      {/* Catchup card */}
+      <QuickActionsBar user={user} mySeat={mySeat} bills={bills} polls={polls} />
       <CatchupCard />
 
-      {/* === 2-column grid === */}
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+      {/* ═══ 2-COLUMN GRID ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
 
-        {/* ── Main column ── */}
-        <div className="min-w-0">
+        {/* ── MAIN COLUMN ── */}
+        <div className="min-w-0 space-y-6">
 
-          {/* Bundestag composition */}
-          <div className="mb-8">
-            <div className="flex justify-between items-baseline mb-3">
-              <h2 className="!mb-0">Bundestag</h2>
-              <span className="text-xs text-muted-foreground">{totalSeats} seats · majority {MAJORITY}</span>
-            </div>
-
-            {/* Seat bar */}
-            <div className="relative mb-1">
-              <div className="absolute top-0 bottom-0 w-0.5 bg-foreground z-[2]" style={{ left: `${majorityPct}%` }} />
-              <div className="flex h-7 rounded overflow-hidden gap-0.5">
-                <div className="flex" style={{ flex: `0 0 ${(coalitionSeats / totalSeats) * 100}%`, gap: 1 }}>
-                  {coalitionPartyList.map(p => (
-                    <div key={p.id} className="flex items-center justify-center text-xs text-white font-semibold overflow-hidden whitespace-nowrap" style={{ flex: p.seatCount, backgroundColor: fixColor(p.color) }}>
-                      {p.seatCount > 50 ? `${p.name} ${p.seatCount}` : p.seatCount > 25 ? p.seatCount : ""}
+          {/* Bundestag Composition — Hemicycle + coalition info */}
+          <section>
+            <div className="section-title">Bundestag</div>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex flex-col md:flex-row gap-5 items-start">
+                  {/* Hemicycle */}
+                  <div className="flex-1 min-w-0">
+                    <Hemicycle seats={hemicycleSeats} totalSeats={totalSeats} size="md" />
+                  </div>
+                  {/* Coalition / Opposition info */}
+                  <div className="md:w-52 shrink-0 space-y-3">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 mb-1">
+                        Koalition
+                        <span className={cn("ml-1.5", coalitionSeats >= 368 ? "text-emerald-600" : "text-destructive")}>
+                          {coalitionSeats} Sitze {coalitionSeats >= 368 ? "✓" : "✗"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {coalitionPartyList.map(p => (
+                          <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ background: `${fixColor(p.color)}15`, color: fixColor(p.color) }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
+                            {p.name} {p.seatCount}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
-                <div className="flex-none w-0.5 bg-white" />
-                <div className="flex" style={{ flex: `0 0 ${(oppositionSeats / totalSeats) * 100}%`, gap: 1 }}>
-                  {oppositionPartyList.map(p => (
-                    <div key={p.id} className="flex items-center justify-center text-xs text-foreground font-semibold overflow-hidden whitespace-nowrap" style={{ flex: p.seatCount, backgroundColor: `${fixColor(p.color)}99` }}>
-                      {p.seatCount > 50 ? `${p.name} ${p.seatCount}` : p.seatCount > 25 ? p.seatCount : ""}
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Opposition</div>
+                      <div className="flex flex-wrap gap-1">
+                        {oppositionPartyList.map(p => (
+                          <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground/70">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
+                            {p.name} {p.seatCount}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                    {state.coalitionCohesion != null && (
+                      <div className="pt-2 border-t border-border">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Kohäsion</span>
+                          <span className="font-bold" style={{ color: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative }}>
+                            {state.coalitionCohesion}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded bg-muted overflow-hidden">
+                          <div className="h-full rounded" style={{
+                            width: `${state.coalitionCohesion}%`,
+                            background: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative,
+                          }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="relative h-3.5 mb-2">
-              <div className="absolute text-xs text-muted-foreground whitespace-nowrap -translate-x-1/2" style={{ left: `${majorityPct}%` }}>
-                ▲ {MAJORITY}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          </section>
 
-            {/* Coalition / Opposition chips */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-emerald-600 mb-1">
-                  Coalition
-                  <span className={cn("ml-1 font-bold text-xs", hasMajority ? "text-emerald-600" : "text-destructive")}>
-                    {coalitionSeats} {hasMajority ? "✓" : "✗"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-[3px]">
-                  {coalitionPartyList.map(p => (
-                    <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium border" style={{ borderColor: fixColor(p.color), background: `${fixColor(p.color)}18` }}>
-                      <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ backgroundColor: fixColor(p.color) }} />
-                      {p.name} <span className="text-xs opacity-60">{p.seatCount}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground mb-1">
-                  Opposition <span className="ml-1 font-semibold text-xs text-muted-foreground">{oppositionSeats}</span>
-                </div>
-                <div className="flex flex-wrap gap-[3px]">
-                  {oppositionPartyList.map(p => (
-                    <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium border border-border bg-muted/50 text-foreground">
-                      <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ backgroundColor: fixColor(p.color) }} />
-                      {p.name} <span className="text-xs opacity-60">{p.seatCount}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {state.coalitionCohesion != null && (
-              <div className="mt-2.5 pt-2 border-t border-border text-sm flex items-center gap-2">
-                <span className="text-muted-foreground">Cohesion:</span>
-                <div className="flex-1 bg-muted rounded h-[5px] max-w-[100px]">
-                  <div className="h-full rounded" style={{
-                    width: `${state.coalitionCohesion}%`,
-                    background: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative,
-                  }} />
-                </div>
-                <span className="font-semibold" style={{ color: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative }}>
-                  {state.coalitionCohesion}%
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Economy */}
-          <div className="mb-8">
-            <h2>Economy</h2>
+          {/* Economy Stats */}
+          <section>
+            <div className="section-title">Wirtschaft</div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { v: `${state.economy.gdpGrowth}%`, l: "GDP Growth", c: state.economy.gdpGrowth >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative },
-                { v: `${state.economy.unemployment}%`, l: "Unemployment", c: state.economy.unemployment > 8 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral },
-                { v: `${state.economy.inflation}%`, l: "Inflation", c: state.economy.inflation > 3 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral },
-                { v: `${state.economy.budget}B`, l: "Budget (EUR)", c: SEMANTIC_HEX.neutral },
+                { v: state.economy.gdpGrowth, l: "BIP-Wachstum", fmt: (n: number) => `${n >= 0 ? "+" : ""}${n}%`, c: state.economy.gdpGrowth >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative },
+                { v: state.economy.unemployment, l: "Arbeitslosigkeit", fmt: (n: number) => `${n}%`, c: state.economy.unemployment > 8 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral },
+                { v: state.economy.inflation, l: "Inflation", fmt: (n: number) => `${n}%`, c: state.economy.inflation > 3 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral },
+                { v: state.economy.budget, l: "Haushalt (Mrd.)", fmt: (n: number) => `${n}`, c: SEMANTIC_HEX.neutral },
               ].map(s => (
-                <Card key={s.l} className="py-4">
-                  <CardContent className="px-4">
-                    <div className="text-2xl font-bold" style={{ color: s.c }}>{s.v}</div>
-                    <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground mt-1">{s.l}</div>
+                <Card key={s.l}>
+                  <CardContent className="p-4">
+                    <div className="stat-value" style={{ color: s.c }}>{s.fmt(s.v)}</div>
+                    <div className="stat-label">{s.l}</div>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </div>
+          </section>
 
           {/* Latest Events */}
-          <div className="mb-8">
-            <div className="flex justify-between items-baseline">
-              <h2 className="!mb-0">Latest Events</h2>
-              <Link to="/news" className="text-xs text-primary">View all →</Link>
+          <section>
+            <div className="flex justify-between items-baseline mb-3">
+              <div className="section-title !mb-0 !pb-0 !border-b-0">Aktuelle Ereignisse</div>
+              <Link to="/news" className="text-xs font-medium text-primary hover:underline">Alle →</Link>
             </div>
-            <Card className="mt-2 py-0">
-              <CardContent className="px-4 py-0 divide-y divide-border">
-                {events.length === 0 ? (
-                  <div className="py-4 text-sm text-muted-foreground">No events yet.</div>
-                ) : events.map(ev => (
-                  <div key={ev.id} className="py-3">
-                    <div className="text-xs uppercase text-muted-foreground tracking-wide">#{ev.dayNumber} · {ev.type.replace(/_/g, " ")}</div>
-                    <div className="font-semibold mt-0.5">{ev.title}</div>
-                    <div className="text-sm text-muted-foreground mt-0.5">{ev.description}</div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+            <div className="space-y-2">
+              {events.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4">No events yet.</div>
+              ) : events.map(ev => (
+                <Card key={ev.id}>
+                  <CardContent className="p-3.5">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm leading-snug">{ev.title}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ev.description}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[10px] font-medium text-muted-foreground">Tag {ev.dayNumber}</div>
+                        <div className="text-[10px] text-muted-foreground/60">{ev.type.replace(/_/g, " ")}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
 
           {/* Media Highlights */}
           {latestMedia.length > 0 && (
-            <div className="mb-8">
-              <div className="flex justify-between items-baseline">
-                <h2 className="!mb-0">Media Highlights</h2>
-                <Link to="/media" className="text-xs text-primary">All articles →</Link>
+            <section>
+              <div className="flex justify-between items-baseline mb-3">
+                <div className="section-title !mb-0 !pb-0 !border-b-0">Presse</div>
+                <Link to="/media" className="text-xs font-medium text-primary hover:underline">Alle Artikel →</Link>
               </div>
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {latestMedia.map(a => {
                   const outlet = OUTLET_STYLE[a.outlet] ?? { color: "#555", label: a.outlet };
                   return (
-                    <Card key={a.id} className="py-3">
-                      <CardContent className="px-4">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: outlet.color }}>
-                            <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: outlet.color }} />
-                            {outlet.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">Day {a.dayNumber}</span>
+                    <Card key={a.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: outlet.color }} />
+                          <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: outlet.color }}>{outlet.label}</span>
+                          <span className="text-[11px] text-muted-foreground ml-auto">Tag {a.dayNumber}</span>
                         </div>
                         <div className="font-semibold text-sm leading-snug">{a.headline}</div>
-                        <div className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                          {a.summary.length > 140 ? a.summary.slice(0, 140) + "..." : a.summary}
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{a.summary}</div>
                       </CardContent>
                     </Card>
                   );
                 })}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Calendar */}
           {(calendar || upcomingCalendar) && (
-            <div className="mb-8">
-              <div className="flex justify-between items-baseline mb-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="!mb-0">Kalender</h2>
-                  <div className="flex gap-1 ml-2">
-                    <button
-                      onClick={() => setCalendarView("upcoming")}
-                      className={cn(
-                        "px-2.5 py-0.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
-                        calendarView === "upcoming" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-foreground/30",
-                      )}
-                    >Termine</button>
-                    <button
-                      onClick={() => setCalendarView("past")}
-                      className={cn(
-                        "px-2.5 py-0.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
-                        calendarView === "past" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-foreground/30",
-                      )}
-                    >Vergangene</button>
+            <section>
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="section-title !mb-0 !pb-0 !border-b-0">Kalender</div>
+                  <div className="flex gap-1">
+                    {(["upcoming", "past"] as const).map(v => (
+                      <button key={v} onClick={() => setCalendarView(v)} className={cn(
+                        "px-2.5 py-0.5 text-[11px] font-medium rounded-full border cursor-pointer transition-colors",
+                        calendarView === v ? "bg-primary text-white border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/30",
+                      )}>
+                        {v === "upcoming" ? "Termine" : "Vergangene"}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <Link to="/log" className="text-xs text-primary">Alle Tage →</Link>
+                <Link to="/log" className="text-xs font-medium text-primary hover:underline">Alle Tage →</Link>
               </div>
-              {calendarView === "upcoming" && upcomingCalendar && (
-                <UpcomingCalendar data={upcomingCalendar} />
-              )}
-              {calendarView === "past" && calendar && (
-                <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />
-              )}
-            </div>
+              {calendarView === "upcoming" && upcomingCalendar && <UpcomingCalendar data={upcomingCalendar} />}
+              {calendarView === "past" && calendar && <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />}
+            </section>
           )}
         </div>
 
-        {/* ── Sidebar ── */}
-        <div className="flex flex-col gap-3">
+        {/* ── SIDEBAR ── */}
+        <div className="flex flex-col gap-4">
 
           {/* Chancellor card */}
           {government && (() => {
             const cp = parties.find(p => p.id === government.chancellorPartyId);
             return (
-              <Card className="py-4">
-                <CardContent className="px-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: fixColor(cp?.color || "#333") }} />
-                    Bundeskanzler/in
-                  </div>
-                  <div className="font-bold text-base">{government.chancellorName}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {cp?.name ?? government.chancellorPartyId}
-                    <span className="text-xs text-muted-foreground ml-1.5">since Day {government.formedOnDay}</span>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Bundeskanzler/in</div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: fixColor(cp?.color || "#333") }}>
+                      {government.chancellorName.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm">{government.chancellorName}</div>
+                      <div className="text-xs text-muted-foreground">{cp?.name ?? government.chancellorPartyId} · Tag {government.formedOnDay}</div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             );
           })()}
 
-          {/* Engagement CTAs */}
-          <div className="flex flex-col gap-1.5">
-            {!user ? (
-              <Link to="/login" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-bold text-sm text-primary">Anmelden</span>
-                <span className="block text-xs text-muted-foreground">Log in to participate</span>
-              </Link>
-            ) : user.partyId ? (
-              <Link to={`/parties/${user.partyId}`} className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-bold text-sm text-primary">Your Party</span>
-                <span className="block text-xs text-muted-foreground">{parties.find(p => p.id === user.partyId)?.name ?? user.partyId}</span>
-              </Link>
-            ) : (
-              <Link to="/parties" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-bold text-sm text-primary">Join a Party</span>
-                <span className="block text-xs text-muted-foreground">Pick a party to participate</span>
-              </Link>
-            )}
-            {polls.length > 0 && (
-              <Link to="/polls" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-bold text-sm text-primary">Vote on Polls</span>
-                <span className="block text-xs text-muted-foreground">{polls.length} active poll{polls.length !== 1 ? "s" : ""}</span>
-              </Link>
-            )}
-            <Link to="/referendums" className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-              <span className="block font-bold text-sm text-primary">Referendums</span>
-              <span className="block text-xs text-muted-foreground">Vote on national questions</span>
-            </Link>
-          </div>
+          {/* Party Approval Ranking */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Zustimmung</div>
+                <Link to="/parties" className="text-[11px] font-medium text-primary hover:underline">Alle →</Link>
+              </div>
+              <div className="space-y-2">
+                {partiesByApproval.map(p => {
+                  const color = fixColor(p.color);
+                  const barW = maxApproval > 0 ? (p.approvalRating / maxApproval) * 100 : 0;
+                  return (
+                    <Link key={p.id} to={`/parties/${p.id}`} className="flex items-center gap-2 no-underline group">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="text-xs font-medium text-foreground group-hover:text-primary w-14 truncate">{p.name}</span>
+                      <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
+                        <div className="h-full rounded transition-all duration-300" style={{ width: `${barW}%`, backgroundColor: color }} />
+                      </div>
+                      <span className="text-xs font-bold tabular-nums w-10 text-right" style={{ color }}>{p.approvalRating.toFixed(1)}%</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Public Sentiment */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Öffentliche Stimmung</div>
+              <div className="flex items-center gap-3">
+                <div className="stat-value text-2xl" style={{ color: sentimentColor }}>{state.publicSentiment}</div>
+                <div className="flex-1">
+                  <div className="h-2 rounded bg-muted overflow-hidden">
+                    <div className="h-full rounded" style={{ width: `${state.publicSentiment}%`, backgroundColor: sentimentColor }} />
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5 text-right">/100</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* MdB Seat card */}
           {mySeat && (() => {
@@ -750,26 +703,19 @@ export function Dashboard() {
             const seatColor = fixColor(seatParty?.color || "#333");
             const thirdReadingBills = bills.filter(b => b.status === "third_reading");
             return (
-              <Card className="py-4" style={{ borderLeft: `3px solid ${seatColor}` }}>
-                <CardContent className="px-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                    <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: seatColor }} />
-                    Your MdB Seat
-                  </div>
-                  <div className="font-bold text-base">Seat #{mySeat.seatNumber}</div>
-                  <div className="text-sm text-muted-foreground">{seatParty?.name ?? mySeat.partyId}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs">Discipline:</span>
-                    <Badge variant="outline" className={cn("text-xs", DISCIPLINE_BADGE[mySeat.disciplineLevel] ?? DISCIPLINE_BADGE[0])}>
+              <Card style={{ borderLeft: `3px solid ${seatColor}` }}>
+                <CardContent className="p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Ihr MdB-Sitz</div>
+                  <div className="font-bold text-sm">Sitz #{mySeat.seatNumber} · {seatParty?.name ?? mySeat.partyId}</div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-xs text-muted-foreground">Disziplin:</span>
+                    <Badge variant="outline" className={cn("text-[10px]", DISCIPLINE_BADGE[mySeat.disciplineLevel] ?? DISCIPLINE_BADGE[0])}>
                       {DISCIPLINE_LABEL[mySeat.disciplineLevel] ?? "?"}
                     </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Proxy: {mySeat.proxyDefault === "party_line" ? "Party Line" : "Abstain"}
-                  </div>
                   {thirdReadingBills.length > 0 && (
-                    <Link to="/bills?status=third_reading" className="text-xs text-primary mt-2 inline-block no-underline hover:underline">
-                      {thirdReadingBills.length} bill{thirdReadingBills.length !== 1 ? "s" : ""} awaiting your vote →
+                    <Link to="/bills?status=third_reading" className="text-xs text-primary mt-2 inline-block no-underline hover:underline font-medium">
+                      {thirdReadingBills.length} Gesetz{thirdReadingBills.length !== 1 ? "e" : ""} warten →
                     </Link>
                   )}
                 </CardContent>
@@ -777,47 +723,27 @@ export function Dashboard() {
             );
           })()}
           {!mySeat && user?.partyId && myApplications.length === 0 && (
-            <Link to={`/parties/${user.partyId}`} className="block px-3 py-2 rounded border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-              <span className="block font-bold text-sm text-primary">Apply for a Seat</span>
-              <span className="block text-xs text-muted-foreground">Become an MdB and vote directly</span>
+            <Link to={`/parties/${user.partyId}`} className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+              <span className="block font-semibold text-xs text-primary">MdB-Sitz beantragen</span>
+              <span className="block text-[11px] text-muted-foreground">Direkt abstimmen und Reden halten</span>
             </Link>
           )}
           {!mySeat && myApplications.some(a => a.status === "pending") && (
-            <div className="px-3 py-2 rounded border border-amber-200 bg-amber-50 text-sm text-amber-800">
-              Seat application pending...
-            </div>
+            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800">Bewerbung läuft...</div>
           )}
-
-          {/* Public Sentiment */}
-          <Card className="py-4">
-            <CardContent className="px-4">
-              <div className="text-xs font-bold uppercase tracking-[0.05em] text-muted-foreground mb-1.5">Public Sentiment</div>
-              <div className="flex items-center gap-2">
-                <div className="font-bold text-lg" style={{ color: sentimentColor }}>{state.publicSentiment}</div>
-                <div className="flex-1 bg-muted rounded h-1.5">
-                  <div className="h-full rounded" style={{ width: `${state.publicSentiment}%`, backgroundColor: sentimentColor }} />
-                </div>
-                <span className="text-xs text-muted-foreground">/100</span>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Active Crises */}
           {crises.length > 0 && (
-            <Card className="py-4">
-              <CardContent className="px-4">
-                <div className="text-xs font-bold uppercase tracking-[0.05em] text-destructive mb-1.5">Active Crises</div>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-destructive mb-2">Aktive Krisen</div>
                 {crises.map(c => (
-                  <div key={c.id} className="mb-1.5">
+                  <div key={c.id} className="mb-2 last:mb-0">
                     <div className="flex justify-between items-center">
-                      <span className="font-semibold text-sm">{c.name}</span>
-                      <Badge variant="outline" className={cn(
-                        "text-xs",
-                        c.severity === "high" && "border-destructive text-destructive",
-                        SEVERITY_BADGE[c.severity],
-                      )}>{c.severity}</Badge>
+                      <span className="font-semibold text-xs">{c.name}</span>
+                      <Badge variant="outline" className={cn("text-[10px]", SEVERITY_BADGE[c.severity])}>{c.severity}</Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground">{c.category} · Day {c.startDay}–{c.endDay}</div>
+                    <div className="text-[11px] text-muted-foreground">{c.category} · Tag {c.startDay}–{c.endDay}</div>
                   </div>
                 ))}
               </CardContent>
@@ -826,36 +752,51 @@ export function Dashboard() {
 
           {/* Active Election */}
           {election && (
-            <Card className="py-4">
-              <CardContent className="px-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-blue-600 mb-1">Election</div>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-blue-600 mb-2">Wahl</div>
                 <div className="flex justify-between items-center mb-1">
-                  <Badge variant="outline" className={cn(
-                    "text-xs",
-                    PHASE_BADGE[election.status],
-                  )}>{election.status}</Badge>
-                  <span className="text-sm">Day {election.electionDay}</span>
+                  <Badge variant="outline" className={cn("text-[10px]", PHASE_BADGE[election.status])}>{election.status}</Badge>
+                  <span className="text-xs text-muted-foreground">Tag {election.electionDay}</span>
                 </div>
-                <div className="text-sm text-muted-foreground">{election.triggerReason}</div>
+                <div className="text-xs text-muted-foreground">{election.triggerReason}</div>
                 {election.electionDay - simStatus.currentDay > 0 && (
-                  <div className="mt-1 font-semibold text-sm">{election.electionDay - simStatus.currentDay} days until vote</div>
+                  <div className="mt-1.5 font-bold text-sm">{election.electionDay - simStatus.currentDay} Tage bis zur Wahl</div>
                 )}
-                <Link to="/elections" className="text-xs text-primary mt-1 inline-block">Details →</Link>
+                <Link to="/elections" className="text-xs text-primary mt-1.5 inline-block font-medium hover:underline">Details →</Link>
               </CardContent>
             </Card>
           )}
 
+          {/* Engagement CTAs */}
+          <div className="space-y-1.5">
+            {!user ? (
+              <Link to="/login" className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+                <span className="block font-semibold text-xs text-primary">Anmelden</span>
+                <span className="block text-[11px] text-muted-foreground">Log in to participate</span>
+              </Link>
+            ) : user.partyId ? (
+              <Link to={`/parties/${user.partyId}`} className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+                <span className="block font-semibold text-xs text-primary">Ihre Partei</span>
+                <span className="block text-[11px] text-muted-foreground">{parties.find(p => p.id === user.partyId)?.name ?? user.partyId}</span>
+              </Link>
+            ) : (
+              <Link to="/parties" className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
+                <span className="block font-semibold text-xs text-primary">Partei beitreten</span>
+                <span className="block text-[11px] text-muted-foreground">Wählen Sie eine Partei</span>
+              </Link>
+            )}
+          </div>
+
           {/* Ask a Party widget */}
-          {parties.length > 0 && (
-            <AskPartyWidget parties={parties} coalitionParties={state.coalitionParties} />
-          )}
+          {parties.length > 0 && <AskPartyWidget parties={parties} coalitionParties={state.coalitionParties} />}
 
           {/* My Impact card */}
           <MyImpactCard />
         </div>
       </div>
 
-      {/* === Featured section (full width) === */}
+      {/* ═══ FEATURED (full width) ═══ */}
       {(decisionOfMonth || politicianOfMonth) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
           {decisionOfMonth && (() => {
@@ -864,25 +805,23 @@ export function Dashboard() {
             const noSeats = decisionOfMonth.votes.filter(v => v.vote === "no").reduce((s, v) => s + (parties.find(p => p.id === v.partyId)?.seatCount ?? 0), 0);
             const total = yesSeats + noSeats;
             return (
-              <Card className="py-4">
-                <CardContent className="px-4">
-                  <Badge variant="secondary" className="text-xs mb-2">Decision of the Month</Badge>
-                  <Link to={`/bills/${decisionOfMonth.id}`} className="font-bold text-base text-foreground no-underline hover:underline">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Entscheidung des Monats</div>
+                  <Link to={`/bills/${decisionOfMonth.id}`} className="font-bold text-sm text-foreground no-underline hover:underline leading-snug">
                     {decisionOfMonth.title}
                   </Link>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {decisionOfMonth.category} · by {proposer?.name ?? decisionOfMonth.proposedBy}
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {decisionOfMonth.category} · {proposer?.name ?? decisionOfMonth.proposedBy}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant={decisionOfMonth.status === "passed" ? "default" : "destructive"} className={cn(
-                      decisionOfMonth.status === "passed" && "bg-emerald-600",
-                    )}>{decisionOfMonth.status}</Badge>
-                    {total > 0 && (
-                      <span className="text-xs text-muted-foreground">Yes {yesSeats} · No {noSeats}</span>
-                    )}
+                    <Badge variant={decisionOfMonth.status === "passed" ? "default" : "destructive"} className={cn("text-[10px]", decisionOfMonth.status === "passed" && "bg-emerald-600")}>
+                      {decisionOfMonth.status}
+                    </Badge>
+                    {total > 0 && <span className="text-[11px] text-muted-foreground">Ja {yesSeats} · Nein {noSeats}</span>}
                   </div>
                   {total > 0 && (
-                    <div className="flex h-1.5 rounded overflow-hidden mt-1.5">
+                    <div className="flex h-1.5 rounded overflow-hidden mt-2">
                       <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / total) * 100}%` }} />
                       <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / total) * 100}%` }} />
                     </div>
@@ -892,19 +831,17 @@ export function Dashboard() {
             );
           })()}
           {politicianOfMonth && (
-            <Card className="py-4">
-              <CardContent className="px-4">
-                <Badge variant="secondary" className="text-xs mb-2">Party of the Month</Badge>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Partei des Monats</div>
                 <Link to={`/parties/${politicianOfMonth.party.id}`} className="flex items-center gap-2 no-underline text-foreground">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fixColor(politicianOfMonth.party.color) }} />
-                  <span className="font-bold text-base">{politicianOfMonth.party.name}</span>
+                  <span className="font-bold text-sm">{politicianOfMonth.party.name}</span>
                 </Link>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Current approval: {politicianOfMonth.party.approvalRating.toFixed(1)}%
-                </div>
-                <div className="mt-1.5 font-bold text-lg" style={{ color: politicianOfMonth.delta > 0 ? SEMANTIC_HEX.positive : politicianOfMonth.delta < 0 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral }}>
+                <div className="text-xs text-muted-foreground mt-1">Aktuelle Zustimmung: {politicianOfMonth.party.approvalRating.toFixed(1)}%</div>
+                <div className="mt-1.5 font-extrabold text-lg" style={{ color: politicianOfMonth.delta > 0 ? SEMANTIC_HEX.positive : politicianOfMonth.delta < 0 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral }}>
                   {politicianOfMonth.delta > 0 ? "+" : ""}{politicianOfMonth.delta.toFixed(1)}
-                  <span className="font-normal text-xs text-muted-foreground ml-1">approval change (recent)</span>
+                  <span className="font-normal text-[11px] text-muted-foreground ml-1.5">Veränderung</span>
                 </div>
               </CardContent>
             </Card>
@@ -912,13 +849,13 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Live event ticker */}
       <LiveEventTicker simStatus={simStatus} />
     </div>
   );
 }
 
 /* ── Ask a Party widget ── */
+
 function AskPartyWidget({ parties, coalitionParties }: { parties: Party[]; coalitionParties: string[] }) {
   const seatedParties = parties.filter(p => p.seatCount > 0);
   const defaultPartyId = coalitionParties[0] || (seatedParties[0]?.id ?? "");
@@ -943,16 +880,16 @@ function AskPartyWidget({ parties, coalitionParties }: { parties: Party[]; coali
   };
 
   return (
-    <Card className="py-4">
-      <CardContent className="px-4">
+    <Card>
+      <CardContent className="p-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="font-bold text-sm">Ask a Party</span>
-          <Link to="/questions" className="text-xs text-primary">Questions →</Link>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Frage stellen</span>
+          <Link to="/questions" className="text-[11px] font-medium text-primary hover:underline">Alle →</Link>
         </div>
         <select
           value={selectedPartyId}
           onChange={e => setSelectedPartyId(e.target.value)}
-          className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] mb-1.5"
+          className="border-input h-8 w-full rounded-md border bg-transparent px-2.5 text-xs shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] mb-1.5"
           aria-label="Select party"
         >
           {seatedParties.map(p => (
@@ -962,27 +899,21 @@ function AskPartyWidget({ parties, coalitionParties }: { parties: Party[]; coali
         <div className="flex gap-1.5">
           <input
             type="text"
-            placeholder="5–140 chars"
+            placeholder="5–140 Zeichen"
             value={questionText}
             onChange={e => setQuestionText(e.target.value)}
             maxLength={140}
-            className="border-input h-9 flex-1 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            className="border-input h-8 flex-1 rounded-md border bg-transparent px-2.5 text-xs shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
           />
-          <Button
-            onClick={handleSubmit}
-            disabled={submitStatus === "submitting" || questionText.length < 5}
-            loading={submitStatus === "submitting"}
-            size="sm"
-            variant="primary"
-          >
-            Ask
+          <Button onClick={handleSubmit} disabled={submitStatus === "submitting" || questionText.length < 5} loading={submitStatus === "submitting"} size="sm" variant="primary">
+            Fragen
           </Button>
         </div>
         {submitStatus === "success" && (
-          <div className="mt-1.5 px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-700 text-sm">Submitted! Check Questions page.</div>
+          <div className="mt-1.5 px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">Eingereicht!</div>
         )}
         {submitStatus === "error" && (
-          <div className="mt-1.5 px-2.5 py-1.5 rounded bg-red-50 text-red-700 text-sm">{errorMsg}</div>
+          <div className="mt-1.5 px-2.5 py-1 rounded bg-red-50 text-red-700 text-xs">{errorMsg}</div>
         )}
       </CardContent>
     </Card>

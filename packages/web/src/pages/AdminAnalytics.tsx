@@ -34,7 +34,7 @@ export function AdminAnalytics() {
     api.getAnalytics().then(setData).catch(console.error);
   }, []);
 
-  if (!data) return <p className="text-center py-8 text-muted-foreground">Loading analytics...</p>;
+  if (!data) return <p className="text-center py-8 text-muted-foreground">Analytik laden...</p>;
 
   const maxActionCount = Math.max(...data.actionBreakdown.map(a => a.count), 1);
   const maxDailyCount = Math.max(...data.dailyActions.map(d => d.count), 1);
@@ -44,7 +44,7 @@ export function AdminAnalytics() {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h1 className="mb-0">Analytics</h1>
+        <h2 className="section-title !mb-0">Analytik</h2>
         <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Back to Admin</Link>
       </div>
 
@@ -69,7 +69,7 @@ export function AdminAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Action Breakdown */}
         <div>
-          <h2>Action Breakdown</h2>
+          <h2 className="section-title">Aktionsübersicht</h2>
           <Card>
             <CardContent className="p-5">
               {data.actionBreakdown.length === 0 ? (
@@ -101,7 +101,7 @@ export function AdminAnalytics() {
 
         {/* User Funnel */}
         <div>
-          <h2>User Funnel</h2>
+          <h2 className="section-title">Nutzer-Funnel</h2>
           <Card>
             <CardContent className="p-5">
               <div className="space-y-3">
@@ -141,7 +141,7 @@ export function AdminAnalytics() {
 
       {/* ── Daily Activity Chart ───────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Daily Activity (Last 30 Days)</h2>
+        <h2 className="section-title">Tägliche Aktivität (letzte 30 Tage)</h2>
         <Card>
           <CardContent className="p-5">
             {data.dailyActions.length === 0 ? (
@@ -177,7 +177,7 @@ export function AdminAnalytics() {
 
       {/* ── Top Users ──────────────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Top Users</h2>
+        <h2 className="section-title">Top-Nutzer</h2>
         <Card>
           <CardContent className="p-5">
             {data.topUsers.length === 0 ? (

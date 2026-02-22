@@ -27,7 +27,7 @@ export function Interpellations() {
   usePolling(refresh);
   useEffect(() => { setVisibleCount(10); }, [statusFilter, typeFilter]);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -40,10 +40,10 @@ export function Interpellations() {
 
   return (
     <div>
-      <h1>Anfragen (Interpellations)</h1>
+      <h2 className="section-title">Anfragen</h2>
       <p className="text-muted-foreground mb-4">
-        Opposition parties formally question government ministers. Kleine Anfrage = written question.
-        Große Anfrage = major inquiry with plenary debate.
+        Oppositionsparteien befragen formell Regierungsminister. Kleine Anfrage = schriftliche Frage.
+        Große Anfrage = umfassende Befragung mit Plenardebatte.
       </p>
 
       <div className="flex gap-4 mb-4 flex-wrap">
@@ -84,7 +84,7 @@ export function Interpellations() {
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">No interpellations yet. Run the simulation to see opposition parties question the government.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Anfragen. Starte die Simulation, um parlamentarische Anfragen zu sehen.</p>
       )}
 
       {visibleFiltered.map(interp => (
