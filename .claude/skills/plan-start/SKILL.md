@@ -1,7 +1,7 @@
 ---
 name: plan-start
 description: Create a structured Progress.md — from scratch, rough ideas, or an existing plan document
-argument-hint: [from <file-path>]
+argument-hint: "[from <file-path>]"
 disable-model-invocation: true
 ---
 

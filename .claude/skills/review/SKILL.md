@@ -1,7 +1,7 @@
 ---
 name: review
 description: Review code changes against the implementation plan before committing
-argument-hint: [progress-file]
+argument-hint: "[progress-file]"
 disable-model-invocation: true
 ---
 
