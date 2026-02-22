@@ -1,6 +1,7 @@
 import type { MediaArticle, Party, SimulationEvent } from "@ki-bundestag/types";
 import { desc } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { safeParseJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 
 function generateId(): string {
@@ -77,8 +78,9 @@ export async function generateDailyMedia(
   const eventSummaries = newsworthy.map(e => `[${e.type}] ${e.title}: ${e.description}`).join("\n");
   const partyNames = allParties.map(p => `${p.name} (${p.id})`).join(", ");
 
+  const t0 = Date.now();
   try {
-    const text = await callAI({
+    const { text, model, provider } = await callAI({
       system: `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
 
 OUTLETS:
@@ -109,40 +111,43 @@ Rules:
       roleKey: "daily",
     });
 
-    let jsonStr = text.trim();
-    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) jsonStr = match[1].trim();
+    const articles = safeParseJson<unknown[]>(text);
 
-    const articles = JSON.parse(jsonStr);
-
-    if (!Array.isArray(articles) || articles.length === 0) return;
+    if (!Array.isArray(articles) || articles.length === 0) {
+      logAICall({ task: "media", model, provider, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
+      return;
+    }
 
     const db = getDb();
+    let inserted = 0;
 
     for (const article of articles.slice(0, 3)) {
-      if (!article.headline || !article.summary || !article.content || !article.outlet) continue;
+      const a = article as Record<string, unknown>;
+      if (!a.headline || !a.summary || !a.content || !a.outlet) continue;
 
-      const outlet = OUTLETS.find(o => o.name === article.outlet);
+      const outlet = OUTLETS.find(o => o.name === a.outlet);
       const bias = outlet?.bias ?? "center";
 
       db.insert(schema.mediaArticles).values({
         id: `media-${generateId()}`,
-        headline: article.headline,
-        summary: article.summary,
-        content: article.content,
-        outlet: article.outlet,
+        headline: a.headline as string,
+        summary: a.summary as string,
+        content: a.content as string,
+        outlet: a.outlet as string,
         bias,
-        category: article.category || "policy",
+        category: (a.category as string) || "policy",
         dayNumber: currentDay,
       }).run();
+      inserted++;
     }
 
-    console.log(`  [Media] Generated ${Math.min(articles.length, 3)} articles`);
+    logAICall({ task: "media", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: inserted > 0 });
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
       console.warn(`  [Media] Skipped (${error.message})`);
     } else {
       console.error("  [Media] Error generating articles:", error);
     }
+    logAICall({ task: "media", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
   }
 }

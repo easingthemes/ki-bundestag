@@ -1,8 +1,14 @@
 import type { BillImpact, Crisis, Party, Referendum, SimulationEvent } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { TIME_CONFIG } from "./timing.js";
+
+const VALID_CATEGORIES = [
+  "economy", "social", "environment", "immigration",
+  "defense", "education", "healthcare", "infrastructure",
+];
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -38,8 +44,9 @@ export async function maybeGenerateReferendum(
   ).join(", ");
   context.push(`Parties: ${partyContext}`);
 
+  const t0 = Date.now();
   try {
-    const text = await callAI({
+    const { text, model, provider } = await callAI({
       system: `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
 
 RESPONSE SCHEMA:
@@ -66,14 +73,26 @@ Rules:
       roleKey: "daily",
     });
 
-    let jsonStr = text.trim();
-    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) jsonStr = match[1].trim();
+    const parsed = parseAIJson<{ title: string; description: string; category: string; impact: BillImpact | null }>(
+      text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (typeof o.title !== "string" || typeof o.description !== "string") return null;
+        const category = typeof o.category === "string" && VALID_CATEGORIES.includes(o.category)
+          ? o.category
+          : "economy";
+        return {
+          title: o.title,
+          description: o.description,
+          category,
+          impact: (o.impact && typeof o.impact === "object") ? o.impact as BillImpact : null,
+        };
+      },
+      "Referendums",
+    );
 
-    const parsed = JSON.parse(jsonStr);
-
-    if (!parsed.title || !parsed.description || !parsed.category) {
-      console.error("  [Referendums] Invalid AI response, skipping");
+    if (!parsed) {
+      logAICall({ task: "referendums", model, provider, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
       return;
     }
 
@@ -105,13 +124,14 @@ Rules:
       category: referendum.category,
     }).run();
 
-    console.log(`  [Referendums] Created: "${referendum.title}" (closes day ${referendum.closesOnDay})`);
+    logAICall({ task: "referendums", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
       console.warn(`  [Referendums] Skipped (${error.message})`);
     } else {
       console.error("  [Referendums] Error generating referendum:", error);
     }
+    logAICall({ task: "referendums", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
   }
 }
 

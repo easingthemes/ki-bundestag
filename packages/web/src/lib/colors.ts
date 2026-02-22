@@ -156,3 +156,21 @@ export const DISCIPLINE_LABEL: Record<number, string> = {
   2: "Restricted",
   3: "Whipped",
 };
+
+// ── Notification type badges ─────────────────────────────────────────────────
+export const NOTIFICATION_TYPE_BADGE: Record<string, string> = {
+  morning_summary: "bg-blue-50 text-blue-700 border-blue-200",
+  event_queued: "bg-amber-50 text-amber-700 border-amber-200",
+  event_ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  proposal_accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  proposal_declined: "bg-red-50 text-red-700 border-red-200",
+  proposal_expired: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  question_answered: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  bill_outcome: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  mdb_vote_needed: "bg-orange-50 text-orange-700 border-orange-200",
+  election_started: "bg-purple-50 text-purple-700 border-purple-200",
+  election_result: "bg-purple-50 text-purple-700 border-purple-200",
+  crisis_alert: "bg-red-50 text-red-700 border-red-200",
+  budget_outcome: "bg-amber-50 text-amber-700 border-amber-200",
+  government_formed: "bg-sky-50 text-sky-700 border-sky-200",
+};

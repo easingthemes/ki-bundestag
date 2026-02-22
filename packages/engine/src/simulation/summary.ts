@@ -1,5 +1,11 @@
 import type { Party } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
+
+const VALID_MOODS = [
+  "Stable Majority", "Coalition Friction", "Political Pressure",
+  "Crisis Response", "Electoral Campaign", "Budget Dispute", "Government Transition",
+];
 
 const SIGNIFICANT = new Set([
   "bill_passed", "bill_rejected", "presidential_veto",
@@ -37,23 +43,38 @@ ${eventLines}
 
 Write a concise journalistic summary of today's most politically significant developments. Focus on coalition dynamics, major bills, crises, elections, surprises.
 
-Respond with ONLY valid JSON in this exact format (no markdown):
-{"narrative": "2-3 sentence journalistic summary here.", "mood": "one of: Stable Majority, Coalition Friction, Political Pressure, Crisis Response, Electoral Campaign, Budget Dispute, Government Transition"}`;
+Respond with ONLY valid JSON (no markdown code fences):
+{"narrative": "<2-3 sentence journalistic summary>", "mood": "<one of: Stable Majority, Coalition Friction, Political Pressure, Crisis Response, Electoral Campaign, Budget Dispute, Government Transition>"}
 
+The mood field MUST be exactly one of the 7 values listed above.`;
+
+  const t0 = Date.now();
   try {
-    const raw = await callAI({
-      system: "",
+    const { text, model, provider } = await callAI({
+      system: "You are a concise German political journalist. Respond with ONLY valid JSON.",
       prompt,
       maxTokens: 320,
       roleKey: "daily",
     });
-    const parsed = JSON.parse(raw) as { narrative: string; mood: string };
-    if (typeof parsed.narrative !== "string" || typeof parsed.mood !== "string") return null;
-    return parsed;
+    const result = parseAIJson<{ narrative: string; mood: string }>(
+      text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (typeof o.narrative !== "string" || typeof o.mood !== "string") return null;
+        const mood = VALID_MOODS.includes(o.mood) ? o.mood : VALID_MOODS[0];
+        return { narrative: o.narrative, mood };
+      },
+      "Summary",
+    );
+    logAICall({ task: "summary", model, provider, latencyMs: Date.now() - t0, parseOk: result !== null, validationOk: result !== null, fallback: result ? undefined : "skip" });
+    return result;
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
       console.warn(`  [Summary] Skipped (${error.message})`);
+    } else {
+      console.warn(`  [Summary] Error: ${(error as Error).message?.slice(0, 200)}`);
     }
+    logAICall({ task: "summary", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
     return null;
   }
 }

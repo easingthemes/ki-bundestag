@@ -19,10 +19,12 @@ import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
 import { Admin } from "./pages/Admin";
 import { AdminCosts } from "./pages/AdminCosts";
+import { AdminAnalytics } from "./pages/AdminAnalytics";
 import { About } from "./pages/About";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
+import { MyActivity } from "./pages/MyActivity";
 import { api, setErrorHandler, setUserToken, type User, type SimulationStatus, type BundestagSeat } from "./api";
 import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -158,6 +160,7 @@ function MobileNav({ user }: { user: User | null }) {
               </div>
               {user.partyId && <MobileLink to={`/parties/${user.partyId}`}>My Party</MobileLink>}
               <MobileLink to="/questions">My Questions</MobileLink>
+              <MobileLink to="/my-activity">My Activity</MobileLink>
               <MobileLogout />
             </>
           ) : (
@@ -281,6 +284,12 @@ function UserMenu({ user }: { user: User }) {
             className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
           >
             My Questions
+          </NavLink>
+          <NavLink
+            to="/my-activity"
+            className="block px-4 py-2 text-sm text-[#b0b0c0] hover:text-white hover:bg-white/[0.06] no-underline"
+          >
+            My Activity
           </NavLink>
           <div className="border-t border-white/[0.08] mt-1 pt-1">
             <button
@@ -530,9 +539,11 @@ function App() {
             <Route path="/budget" element={<Budget />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/costs" element={<AdminCosts />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/referendums" element={<Referendums />} />
             <Route path="/log" element={<SimulationLog />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/my-activity" element={<MyActivity />} />
             <Route path="/login" element={<Login />} />
             <Route path="/about" element={<About />} />
           </Routes>

@@ -17,6 +17,7 @@ This supports parallel workstreams — each feature can have its own progress fi
 ### 2. Understand the Initial Ideas
 
 Read all content. The developer may have written:
+
 - A rough description of what they want to build or change
 - Bullet points with ideas or requirements
 - A list of components, features, or areas to work on
@@ -30,19 +31,23 @@ Transform the raw ideas into a structured plan. Write back with this format:
 # Progress
 
 ## Goal
+
 < One-sentence summary of what this work achieves >
 
 ## Steps
 
 ### Step 1: < short title >
+
 - **Status**: pending
 - **Description**: < what needs to happen, 2-3 sentences max >
 
 ### Step 2: < short title >
+
 - **Status**: pending
 - **Description**: < what needs to happen >
 
 ## Notes
+
 < open questions, assumptions, constraints >
 ```
 
@@ -59,6 +64,7 @@ Transform the raw ideas into a structured plan. Write back with this format:
 ## Output
 
 After updating the progress file, summarize:
+
 - Number of steps identified
 - Any assumptions you made
 - Any questions for the developer before proceeding to `/plan-do`

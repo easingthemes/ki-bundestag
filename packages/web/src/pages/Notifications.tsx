@@ -5,15 +5,32 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE } from "@/lib/colors";
+import { NOTIFICATION_TYPE_BADGE } from "@/lib/colors";
 import { ShowMoreButton } from "../components/shared";
 
-const TYPE_FILTERS = ["all", "morning_summary", "event_queued", "event_ready"] as const;
+const TYPE_FILTERS = [
+  "all", "morning_summary", "event_queued", "event_ready",
+  "proposal_accepted", "proposal_declined", "proposal_expired",
+  "question_answered", "bill_outcome", "mdb_vote_needed",
+  "election_started", "election_result", "crisis_alert",
+  "budget_outcome", "government_formed",
+] as const;
 const TYPE_LABELS: Record<string, string> = {
   all: "All",
   morning_summary: "Morning Summary",
   event_queued: "Queued",
   event_ready: "Ready",
+  proposal_accepted: "Proposal Accepted",
+  proposal_declined: "Proposal Declined",
+  proposal_expired: "Proposal Expired",
+  question_answered: "Question Answered",
+  bill_outcome: "Bill Outcome",
+  mdb_vote_needed: "Vote Needed",
+  election_started: "Election",
+  election_result: "Election Result",
+  crisis_alert: "Crisis",
+  budget_outcome: "Budget",
+  government_formed: "Government",
 };
 
 export function Notifications() {
@@ -99,7 +116,7 @@ export function Notifications() {
                   <div className="flex items-center gap-2 mb-1">
                     {!n.read && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />}
                     <span className="font-medium text-sm">{n.title}</span>
-                    <Badge variant="outline" className={STATUS_BADGE[n.type] ?? "bg-zinc-100 text-zinc-600 border-zinc-200"}>
+                    <Badge variant="outline" className={NOTIFICATION_TYPE_BADGE[n.type] ?? "bg-zinc-100 text-zinc-600 border-zinc-200"}>
                       {TYPE_LABELS[n.type] ?? n.type}
                     </Badge>
                   </div>

@@ -1,4 +1,7 @@
-How the Bundestag Works
+# How the Bundestag Works
+
+> **Doc Status**: Active reference (domain model)
+> **Use for**: Parliamentary process rules and action semantics
 
 1. Core Constitutional Framework
 

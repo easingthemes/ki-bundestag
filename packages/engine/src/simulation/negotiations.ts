@@ -7,6 +7,7 @@ import type {
 } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAgentResponse } from "../agent/action-parser.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
 
@@ -28,11 +29,12 @@ export function buildNegotiationPrompt(
 You must negotiate in character, reflecting your party's ideology and priorities.
 
 RULES:
-1. Respond with ONLY valid JSON. No other text.
+1. Respond with ONLY valid JSON. No other text. Do NOT wrap in markdown code fences.
 2. You must provide exactly one action of type "negotiation_position".
 3. Be strategic: consider which partners are ideologically compatible.
 4. Consider previous rounds when making concessions.
 5. A coalition needs 368+ seats (majority of 735).
+6. acceptablePartners must only contain valid party IDs from the list provided.
 
 RESPONSE SCHEMA:
 {
@@ -96,18 +98,28 @@ export async function runNegotiationRound(
       party, electionResults, allParties, previousRounds, roundNumber,
     );
 
-    console.log(`  [Negotiation] Round ${roundNumber}: Calling AI for ${party.name}...`);
+    const t0 = Date.now();
 
     try {
-      const text = await callAI({
+      const { text, model, provider } = await callAI({
         system,
         prompt: user,
         maxTokens: 1024,
         partyId: party.id,
       });
 
-      const parsed = parseAgentResponse(text);
-      const action = parsed.actions.find(a => a.type === "negotiation_position");
+      let parseOk = true;
+      let validationOk = true;
+      let fallback: string | undefined;
+
+      let parsed;
+      try {
+        parsed = parseAgentResponse(text);
+      } catch {
+        parseOk = false;
+      }
+
+      const action = parsed?.actions.find(a => a.type === "negotiation_position");
 
       if (action && action.type === "negotiation_position") {
         rounds.push({
@@ -120,7 +132,8 @@ export async function runNegotiationRound(
           ),
         });
       } else {
-        // Fallback
+        validationOk = false;
+        fallback = "open-to-all";
         rounds.push({
           roundNumber,
           partyId: party.id,
@@ -132,13 +145,14 @@ export async function runNegotiationRound(
         });
       }
 
-      console.log(`  [Negotiation] ${party.name}: position received`);
+      logAICall({ task: `negotiation:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk, validationOk, fallback });
     } catch (error) {
       if (error instanceof AIProviderLimitError) {
         console.warn(`  [Negotiation] ${party.name}: skipped (${error.message})`);
       } else {
         console.error(`  [Negotiation] Error for ${party.name}:`, error);
       }
+      logAICall({ task: `negotiation:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "open-to-all" });
       rounds.push({
         roundNumber,
         partyId: party.id,
@@ -172,10 +186,11 @@ export async function synthesizeAgreement(
 Analyze the negotiation rounds and determine the most viable coalition.
 
 RULES:
-1. Respond with ONLY valid JSON.
+1. Respond with ONLY valid JSON. Do NOT wrap in markdown code fences.
 2. A coalition needs 368+ seats (majority of 735).
 3. Prefer coalitions where parties mutually accept each other.
 4. Consider ideological compatibility and concessions made.
+5. All party IDs in the response must match the IDs from ELECTION RESULTS.
 
 RESPONSE SCHEMA:
 {
@@ -201,19 +216,35 @@ ${allRounds.map((round, i) =>
 
 Determine the coalition agreement. Respond as JSON.`;
 
+  const t0 = Date.now();
   try {
-    const text = await callAI({
+    const { text, model, provider } = await callAI({
       system,
       prompt: user,
       maxTokens: 4096,
       roleKey: "synthesis",
     });
 
-    let jsonStr = text.trim();
-    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) jsonStr = match[1].trim();
+    const parsed = parseAIJson<CoalitionAgreement>(
+      text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (!Array.isArray(o.parties) || !o.parties.every((p: unknown) => typeof p === "string")) return null;
+        if (typeof o.summary !== "string") return null;
+        return {
+          parties: o.parties as string[],
+          keyPolicies: Array.isArray(o.keyPolicies) ? (o.keyPolicies as string[]) : [],
+          summary: o.summary,
+          concessions: (o.concessions && typeof o.concessions === "object") ? o.concessions as Record<string, string> : {},
+        };
+      },
+      "Negotiation:Synthesis",
+    );
 
-    const parsed = JSON.parse(jsonStr) as CoalitionAgreement;
+    if (!parsed) {
+      logAICall({ task: "synthesis", model, provider, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "algorithmic" });
+      return null;
+    }
 
     // Validate: coalition must have 368+ seats
     const coalitionSeats = parsed.parties.reduce((sum, id) => {
@@ -222,11 +253,11 @@ Determine the coalition agreement. Respond as JSON.`;
     }, 0);
 
     if (coalitionSeats >= 368 && parsed.parties.length >= 2) {
-      console.log(`  [Negotiation] Synthesis produced coalition: ${parsed.parties.join(", ")} (${coalitionSeats} seats)`);
+      logAICall({ task: "synthesis", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
       return parsed;
     }
 
-    console.log(`  [Negotiation] Synthesis coalition insufficient (${coalitionSeats} seats), falling back`);
+    logAICall({ task: "synthesis", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: false, fallback: "algorithmic" });
     return null;
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
@@ -234,6 +265,7 @@ Determine the coalition agreement. Respond as JSON.`;
     } else {
       console.error("  [Negotiation] Synthesis error, falling back:", error);
     }
+    logAICall({ task: "synthesis", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "algorithmic" });
     return null;
   }
 }

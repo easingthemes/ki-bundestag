@@ -240,6 +240,33 @@ function mapNotification(row: typeof schema.notifications.$inferSelect): Notific
   };
 }
 
+// ── User Action Logging (analytics) ──
+
+/**
+ * Log a user action for analytics tracking.
+ */
+export function logUserAction(
+  userId: string,
+  actionType: string,
+  simDay: number,
+  entityId?: string,
+  entityType?: string,
+  metadata?: unknown,
+): void {
+  const userDb = getUserDb();
+  const id = `ua-${generateId()}`;
+  userDb.insert(schema.userActions).values({
+    id,
+    userId,
+    actionType,
+    entityId: entityId ?? null,
+    entityType: entityType ?? null,
+    metadata: metadata as any ?? null,
+    simDay,
+    createdAt: new Date().toISOString(),
+  }).run();
+}
+
 /**
  * Generate a morning summary from overnight queued events.
  */

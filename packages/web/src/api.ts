@@ -513,6 +513,55 @@ export interface AlignmentData {
   matrix: Record<string, Record<string, number | null>>;
 }
 
+export interface ActivityItem {
+  type: string;
+  title: string;
+  description: string;
+  dayNumber: number;
+  createdAt: string;
+  entityId?: string;
+  entityType?: string;
+  outcome?: string;
+}
+
+// ── Analytics types ───────────────────────────────────────────────────────────
+
+export interface AnalyticsData {
+  totalUsers: number;
+  totalActions: number;
+  dau: number;
+  wau: number;
+  actionBreakdown: { actionType: string; count: number }[];
+  topUsers: { userId: string; displayName: string; actionCount: number }[];
+  funnel: {
+    registered: number;
+    joinedParty: number;
+    firstAction: number;
+    appliedMdb: number;
+    gotSeat: number;
+  };
+  dailyActions: { date: string; count: number }[];
+}
+
+// ── Impact & Catchup types ────────────────────────────────────────────────────
+
+export interface ImpactData {
+  signalAccuracy: { matched: number; total: number; pct: number };
+  proposalOutcomes: { title: string; status: string; billId: string | null }[];
+  mdbVoteStats: { total: number; withMajority: number };
+  partyStats: { partyId: string; partyName: string; memberCount: number; approvalPerDay: number } | null;
+}
+
+export interface CatchupData {
+  daysMissed: number;
+  billsPassed: { id: string; title: string; status: string }[];
+  billsRejected: { id: string; title: string; status: string }[];
+  crisesStarted: { id: string; name: string; severity: string }[];
+  crisesEnded: { id: string; name: string }[];
+  partyApprovalDelta: number | null;
+  proposalOutcomes: { title: string; status: string }[];
+}
+
 // ── MdB types ─────────────────────────────────────────────────────────────────
 
 export interface BundestagSeat {
@@ -688,6 +737,7 @@ export const api = {
     return res.json();
   },
   getMe: () => fetchJson<User>("/users/me"),
+  getMyActivity: () => fetchJson<{ items: ActivityItem[] }>("/users/me/activity"),
   joinParty: (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {}),
   leaveParty: () => postJson<User>("/users/me/leave", {}),
 
@@ -732,4 +782,14 @@ export const api = {
     postJson<{ status: string }>("/interpellations/submit", body),
   submitAmendment: (billId: string, body: { title: string; description: string; impactChange?: Record<string, number> }) =>
     postJson<{ status: string }>(`/bills/${billId}/amendment`, body),
+
+  // Analytics
+  getAnalytics: () => fetchJson<AnalyticsData>("/admin/analytics"),
+
+  // Impact & Catchup
+  getMyImpact: () => fetchJson<ImpactData>("/users/me/impact"),
+  getMyCatchup: () => fetchJson<CatchupData>("/users/me/catchup"),
+
+  // Live event ticker
+  getLatestEvents: (since?: string) => fetchJson<SimulationEvent[]>(`/simulation/events/latest${since ? `?since=${since}` : ""}`),
 };

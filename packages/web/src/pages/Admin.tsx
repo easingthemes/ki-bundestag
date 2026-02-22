@@ -445,7 +445,10 @@ export function Admin() {
     <div>
       <div className="flex items-center justify-between mb-2">
         <h1 className="mb-0">Admin</h1>
-        <Link to="/admin/costs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI Model Costs &rarr;</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Analytics &rarr;</Link>
+          <Link to="/admin/costs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI Model Costs &rarr;</Link>
+        </div>
       </div>
 
       {/* ── Simulation Speed ─────────────────────────────────────────── */}

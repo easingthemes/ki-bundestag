@@ -10,8 +10,8 @@
 import { randomUUID } from "node:crypto";
 import { eq, gte } from "drizzle-orm";
 import { getDb, getUserDb, schema } from "../db/index.js";
-import { callAI } from "../agent/client.js";
-import { AIProviderLimitError } from "../agent/client.js";
+import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 
 /**
  * Process speeches submitted since the last sim day.
@@ -104,8 +104,9 @@ export async function processDaySpeeches(currentDay: number): Promise<number> {
  * Falls back to 0.0 on AI errors.
  */
 async function evaluateSpeech(content: string, billTitle: string, billDescription: string): Promise<number> {
+  const t0 = Date.now();
   try {
-    const raw = await callAI({
+    const { text: raw, model, provider } = await callAI({
       system: `You are a parliamentary clerk evaluating whether a Bundestag speech is substantive. Respond with ONLY valid JSON: {"rating": "positive" | "neutral" | "negative"}
 
 Rules:
@@ -124,9 +125,18 @@ Rate this speech:`,
       roleKey: "daily",
     });
 
-    const parsed = JSON.parse(raw) as { rating: string };
-    if (parsed.rating === "positive") return 0.1;
-    if (parsed.rating === "negative") return -0.1;
+    const parsed = parseAIJson<{ rating: string }>(
+      raw,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (typeof o.rating !== "string") return null;
+        return { rating: o.rating };
+      },
+      "Speeches",
+    );
+    logAICall({ task: "speech-eval", model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "neutral" });
+    if (parsed?.rating === "positive") return 0.1;
+    if (parsed?.rating === "negative") return -0.1;
     return 0;
   } catch (err) {
     if (err instanceof AIProviderLimitError) {
@@ -134,6 +144,7 @@ Rate this speech:`,
     } else {
       console.warn("  [Speeches] AI evaluation failed, using neutral fallback:", (err as Error).message);
     }
+    logAICall({ task: "speech-eval", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "neutral" });
     return 0;
   }
 }

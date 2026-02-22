@@ -1,7 +1,9 @@
 import type { Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { logAICall } from "../agent/ai-json.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
+import { createNotification } from "./event-queue.js";
 
 const MAX_ANSWERS_PER_DAY = 3;
 const QUESTION_EXPIRY_DAYS = 14;
@@ -49,8 +51,9 @@ export async function answerPendingQuestions(
     const party = allParties.find(p => p.id === q.targetPartyId);
     if (!party) continue;
 
+    const t0 = Date.now();
     try {
-      const text = await callAI({
+      const { text, model, provider } = await callAI({
         system: `You are the spokesperson for ${party.name}, a ${party.ideology} party in the German Bundestag. Answer the citizen's question in character, reflecting your party's values and positions. Keep your response to 2-3 sentences. Be direct and politically authentic.`,
         prompt: `A citizen asks ${party.name}: "${q.question}"`,
         maxTokens: 512,
@@ -66,13 +69,30 @@ export async function answerPendingQuestions(
         .where(eq(schema.citizenQuestions.id, q.id))
         .run();
 
-      console.log(`  [Questions] ${party.name} answered: "${q.question.substring(0, 50)}..."`);
+      // Notify question submitter
+      const questionUserId = (q as any).userId as string | null;
+      if (questionUserId) {
+        try {
+          createNotification(
+            questionUserId,
+            "question_answered",
+            `${party.name} answered your question`,
+            `Your question "${q.question.substring(0, 80)}..." was answered by ${party.name}.`,
+            { questionId: q.id, partyId: party.id },
+            currentDay,
+          );
+        } catch {}
+      }
+
+      logAICall({ task: `question:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
     } catch (error) {
       if (error instanceof AIProviderLimitError) {
         console.warn(`  [Questions] Skipped (${error.message})`);
-        break;
+      } else {
+        console.error(`  [Questions] Error answering question for ${party.name}:`, error);
       }
-      console.error(`  [Questions] Error answering question for ${party.name}:`, error);
+      logAICall({ task: `question:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
+      if (error instanceof AIProviderLimitError) break;
     }
   }
 }

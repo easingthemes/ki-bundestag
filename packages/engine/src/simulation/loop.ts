@@ -42,6 +42,7 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, shouldPresidentVeto, BUDGET_TOTAL } from "./budget.js";
 import { generateDailySummary } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
+import { createNotification, createNotificationForAll } from "./event-queue.js";
 import { resetAllSeats, allocateSeats, reviewMdbApplications } from "./seats.js";
 import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
@@ -317,6 +318,8 @@ export async function runDay(): Promise<number> {
       data: { crisisId: newCrisis.id, severity: newCrisis.severity, category: newCrisis.category, endDay: newCrisis.endDay },
     });
 
+    try { createNotificationForAll("crisis_alert", `Crisis: ${newCrisis.name}`, `${newCrisis.description} (Severity: ${newCrisis.severity})`, { crisisId: newCrisis.id, severity: newCrisis.severity }, currentDay); } catch {}
+
     console.log(`  [Crisis] Started: ${newCrisis.name} (${newCrisis.severity}, until day ${newCrisis.endDay})`);
   }
 
@@ -374,6 +377,8 @@ export async function runDay(): Promise<number> {
         description: `A federal election has been called. Campaign begins Day ${newElection.campaignStartDay}, Election Day ${newElection.electionDay}.`,
         data: { electionId: newElection.id, reason: trigger.reason },
       });
+
+      try { createNotificationForAll("election_started", "Election announced!", `A federal election has been called. Election Day: ${newElection.electionDay}.`, { electionId: newElection.id }, currentDay); } catch {}
 
       console.log(`  [Election] Announced: ${trigger.reason} (election day: ${newElection.electionDay})`);
     }
@@ -507,6 +512,8 @@ export async function runDay(): Promise<number> {
         data: { electionId: activeElection.id, coalition, opposition },
       });
 
+      try { createNotificationForAll("government_formed", "New government formed", `Coalition: ${coalitionNames}`, { coalition, opposition }, currentDay); } catch {}
+
       // Form cabinet (Chancellor + Ministers)
       const cabinet = formCabinet(coalition, allParties, activeElection.id, currentDay);
       const ministerList = cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ");
@@ -597,6 +604,8 @@ export async function runDay(): Promise<number> {
         description: resultsStr,
         data: { electionId: activeElection.id, results },
       });
+
+      try { createNotificationForAll("election_result", "Election results are in!", resultsStr, { electionId: activeElection.id }, currentDay); } catch {}
 
       console.log(`  [Election] Results: ${resultsStr}`);
       console.log(`  [Election] Entering negotiation phase...`);
@@ -797,6 +806,25 @@ export async function runDay(): Promise<number> {
         description: `The bill enters final reading and vote.${amendments.filter(a => a.accepted).length > 0 ? ` ${amendments.filter(a => a.accepted).length} amendment(s) were incorporated.` : ""}`,
         data: { billId: bill.id, acceptedAmendments: amendments.filter(a => a.accepted).length },
       });
+
+      // Notify MdB seat holders: vote needed
+      try {
+        const mdbSeats = getUserDb().select().from(schema.bundestagSeats)
+          .where(and(eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "human")))
+          .all()
+          .filter(s => s.userId);
+        for (const seat of mdbSeats) {
+          createNotification(
+            seat.userId!,
+            "mdb_vote_needed",
+            `Vote needed: "${bill.title}"`,
+            `"${bill.title}" has entered Third Reading. Cast your MdB vote before the day ends.`,
+            { billId: bill.id },
+            currentDay,
+          );
+        }
+      } catch {}
+
       console.log(`  [Pipeline] "${bill.title}" → third_reading`);
     }
 
@@ -1130,6 +1158,23 @@ export async function runDay(): Promise<number> {
         description: `Yes: ${result.yesSeats} seats, No: ${result.noSeats} seats, Abstain: ${result.abstainSeats} seats`,
         data: { billId: bill.id, ...result },
       });
+
+      // Notify users who signaled on this bill
+      try {
+        const signals = getUserDb().select().from(schema.memberSignals)
+          .where(eq(schema.memberSignals.billId, bill.id))
+          .all();
+        for (const sig of signals) {
+          createNotification(
+            sig.userId,
+            "bill_outcome",
+            `Bill ${result.passed ? "passed" : "rejected"}: "${bill.title}"`,
+            `You signaled ${sig.signal.toUpperCase()} — the bill was ${result.passed ? "PASSED" : "REJECTED"} (Yes: ${result.yesSeats}, No: ${result.noSeats}).`,
+            { billId: bill.id, passed: result.passed, yesSeats: result.yesSeats, noSeats: result.noSeats },
+            currentDay,
+          );
+        }
+      } catch {}
 
       console.log(`  [Vote] "${bill.title}": ${newStatus} (Yes: ${result.yesSeats}, No: ${result.noSeats})`);
 
@@ -1814,6 +1859,8 @@ export async function runDay(): Promise<number> {
       description: `${budgetPassed ? "Approved" : "Rejected"} by parliament. Yes: ${yesSeats} seats, No: ${noSeats} seats.`,
       data: { budgetId, cycleNumber, yesSeats, noSeats },
     });
+
+    try { createNotificationForAll("budget_outcome", `Budget ${budgetPassed ? "passed" : "rejected"}`, `Budget Cycle ${cycleNumber}: ${budgetPassed ? "Approved" : "Rejected"} (${yesSeats} vs ${noSeats}).`, { budgetPassed, cycleNumber }, currentDay); } catch {}
 
     console.log(`  [Budget] Cycle ${cycleNumber}: ${budgetPassed ? "PASSED" : "REJECTED"} (${yesSeats} vs ${noSeats})`);
   }
