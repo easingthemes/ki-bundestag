@@ -40,6 +40,7 @@
       "Bash(echo === $tbl DIFFERS ===:*)",
       "Bash(cd:*)",
       "Bash(git add:*)",
+      "Bash(git commit:*)",
       "mcp__chrome-devtools__fill",
       "mcp__chrome-devtools__wait_for",
       "WebFetch(domain:www.bundestag.de)",

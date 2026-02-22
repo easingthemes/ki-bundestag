@@ -176,3 +176,5 @@ All packages use `"type": "module"`. Internal imports within engine use `.js` ex
 ## MCP
 
 Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+
+When using `chrome-devtools` MCP to take screenshots, always save to `docs/screenshots/<name>.png` — never to `.claude/screenshots/`.

@@ -51,10 +51,9 @@ Your current hooks use the Claude Code format (`settings.local.json` → `hooks.
 Add `"$schema": "https://json.schemastore.org/claude-code-settings.json"` to `.claude/settings.local.json` for autocomplete and validation in VS Code.
 
 **6. Clean up screenshots folder**
-The `.claude/screenshots/` folder has 16 PNG files and a 3386-line text snapshot. These consume context when agents explore the directory. Either:
+The `.claude/screenshots/` folder accumulates PNG files from `chrome-devtools-mcp`. They consume context when agents explore the directory. The `take_screenshot` tool accepts a `filePath` parameter — there's no server-level path config.
 
-- Move to a `docs/screenshots/` folder outside `.claude/`
-- Or add them to a `.claudeignore` / permission deny rule to prevent accidental context pollution
+Fix: add `.claude/screenshots/` to `.claudeignore` (done) and instruct Claude via CLAUDE.md to always save to `docs/screenshots/` instead (done). Move existing files manually if needed.
 
 ---
 
