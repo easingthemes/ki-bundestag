@@ -14,7 +14,9 @@
 
 ### Step 2: Create `src/simulation/veto.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/veto.ts` (created), `packages/engine/src/simulation/loop.ts` (updated)
+- **Result**: Extracted presidential veto logic (~20 lines) into new module; loop.ts replaced with 5-line delegate. Removed `shouldPresidentVeto` from budget.js import in loop.ts. Typecheck passed.
 
 ### Step 3: Consolidate approval drift into `src/simulation/opinion.ts`
 
