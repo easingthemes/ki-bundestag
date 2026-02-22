@@ -59,8 +59,8 @@ export function MyActivity() {
   if (!user) {
     return (
       <div>
-        <h1>My Activity</h1>
-        <p className="text-sm text-muted-foreground">Log in to view your activity.</p>
+        <h2 className="section-title">Meine Aktivitäten</h2>
+        <p className="text-sm text-muted-foreground">Melde dich an, um deine Aktivitäten zu sehen.</p>
       </div>
     );
   }
@@ -70,8 +70,8 @@ export function MyActivity() {
 
   return (
     <div>
-      <h1>My Activity</h1>
-      <p className="text-sm text-muted-foreground mb-4">Everything you've done in the simulation.</p>
+      <h2 className="section-title">Meine Aktivitäten</h2>
+      <p className="text-sm text-muted-foreground mb-4">Alles, was du in der Simulation getan hast.</p>
 
       {/* Filter pills */}
       <div className="flex flex-wrap gap-2 mb-5">
@@ -90,7 +90,7 @@ export function MyActivity() {
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-sm text-muted-foreground">No activity yet. Start participating!</p>
+        <p className="text-sm text-muted-foreground">Noch keine Aktivitäten. Fange an mitzumachen!</p>
       )}
 
       <div className="space-y-3">

@@ -5,7 +5,7 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, VOTE_COLORS, VOTE_HEX, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES, MDB_BADGE } from "@/lib/colors";
+import { STATUS_BADGE, VOTE_COLORS, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES, MDB_BADGE } from "@/lib/colors";
 import { usePolling } from "../usePolling";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -112,7 +112,7 @@ export function BillDetail() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (!bill || parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (!bill || parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
   const proposer = partyMap.get(bill.proposedBy);
@@ -137,7 +137,7 @@ export function BillDetail() {
       {/* Back link */}
       <div style={{ marginBottom: "1.5rem" }}>
         <Link to="/bills" style={{ fontSize: "0.85rem", color: "#666", textDecoration: "none" }}>
-          &larr; All bills
+          &larr; Alle Gesetze
         </Link>
       </div>
 
@@ -192,7 +192,7 @@ export function BillDetail() {
 
       {/* Description */}
       <div className="mb-6">
-        <h2>Description</h2>
+        <h2 className="section-title">Beschreibung</h2>
         <Card><CardContent className="p-5">
           <p style={{ fontSize: "0.95rem", color: "#333", lineHeight: 1.6, margin: 0 }}>{bill.description}</p>
         </CardContent></Card>
@@ -201,7 +201,7 @@ export function BillDetail() {
       {/* Member Signals */}
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
         <div className="mb-6">
-          <h2>Member Signals</h2>
+          <h2 className="section-title">Mitglieder-Signale</h2>
           {/* Signal nudge for members who haven't signaled yet */}
           {user && user.partyId && signals && signals.userSignal === null && (
             <div className={ALERT_STYLES.info}>
@@ -265,7 +265,7 @@ export function BillDetail() {
       {/* MdB Direct Votes */}
       {bill.status === "third_reading" && (
         <div className="mb-6">
-          <h2>MdB Direct Votes</h2>
+          <h2 className="section-title">MdB-Direktstimmen</h2>
           {user && mySeat && !mdbVotes?.userVote && (
             <div className={ALERT_STYLES.info}>
               This bill is in Third Reading — cast your direct vote as an MdB.
@@ -337,7 +337,7 @@ export function BillDetail() {
       {/* MdB Speeches */}
       {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
         <div className="mb-6">
-          <h2>MdB Speeches ({speeches.length})</h2>
+          <h2 className="section-title">MdB-Reden ({speeches.length})</h2>
           {user && mySeat && (
             <Card className="mb-3"><CardContent className="p-5">
               <div className="font-semibold text-sm mb-2">Submit a Speech</div>
@@ -405,7 +405,7 @@ export function BillDetail() {
 
       {/* Legislative Pipeline */}
       <div className="mb-6">
-        <h2>Legislative Pipeline</h2>
+        <h2 className="section-title">Gesetzgebungsverfahren</h2>
         <Card><CardContent className="p-5">
           {bill.isGovernmentBill && (
             <div className="text-sm text-amber-700 mb-3 bg-amber-50 px-2 py-1 rounded inline-block">
@@ -454,7 +454,7 @@ export function BillDetail() {
       {/* Committee */}
       {bill.committeeName && (
         <div className="mb-6">
-          <h2>Committee Review</h2>
+          <h2 className="section-title">Ausschussprüfung</h2>
           <Card><CardContent className="p-5">
             <div style={{ fontWeight: 600 }}>{bill.committeeName}</div>
             {bill.committeeRecommendation && (
@@ -477,7 +477,7 @@ export function BillDetail() {
       {/* Amendments */}
       {amendments.length > 0 && (
         <div className="mb-6">
-          <h2>Amendments ({amendments.length})</h2>
+          <h2 className="section-title">Änderungsanträge ({amendments.length})</h2>
           {amendments.map(a => {
             const amendProposer = partyMap.get(a.proposedBy);
             const amendColor = amendProposer?.color === "#FFED00" ? "#c4a900" : (amendProposer?.color ?? "#888");
@@ -518,7 +518,7 @@ export function BillDetail() {
       {/* Economic Effects */}
       {hasImpact && (
         <div className="mb-6">
-          <h2>Economic Effects</h2>
+          <h2 className="section-title">Wirtschaftliche Auswirkungen</h2>
           <Card><CardContent className="p-5">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
               <thead>
@@ -554,7 +554,7 @@ export function BillDetail() {
       {/* Final Vote */}
       {bill.votes.length > 0 && totalSeats > 0 && (
         <div className="mb-6">
-          <h2>Final Vote</h2>
+          <h2 className="section-title">Schlussabstimmung</h2>
           <Card><CardContent className="p-5">
             <div className="flex h-5 rounded overflow-hidden my-2">
               {yesSeats > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />}
@@ -583,7 +583,7 @@ export function BillDetail() {
       {/* Constitutional Challenge */}
       {challenge && (
         <div className="mb-6">
-          <h2>Constitutional Challenge</h2>
+          <h2 className="section-title">Verfassungsbeschwerde</h2>
           <Card className={cn(
             challenge.decision === "struck_down" ? "border-red-300 bg-red-50/50"
             : challenge.decision === "upheld" ? "border-emerald-300 bg-emerald-50/50"

@@ -22,13 +22,13 @@ export function Login() {
             <div className="w-14 h-14 rounded-full bg-[#ffd700] flex items-center justify-center text-xl font-bold text-[#1a1a2e] mx-auto mb-4">
               {user.displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
             </div>
-            <h2 className="text-lg font-semibold mb-1">Welcome, {user.displayName}</h2>
-            <p className="text-sm text-muted-foreground mb-4">You're already logged in.</p>
+            <h2 className="text-lg font-semibold mb-1">Willkommen, {user.displayName}</h2>
+            <p className="text-sm text-muted-foreground mb-4">Du bist bereits angemeldet.</p>
             <Link
               to="/"
               className="inline-block px-4 py-2 rounded bg-[#1a1a2e] text-white text-sm font-medium no-underline hover:opacity-90"
             >
-              Go to Dashboard
+              Zum Dashboard
             </Link>
           </CardContent>
         </Card>
@@ -50,7 +50,7 @@ export function Login() {
         setStatus("not_found");
       }
     } catch {
-      setErrMsg("Login failed. Please try again.");
+      setErrMsg("Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
       setStatus("error");
     }
   };
@@ -68,7 +68,7 @@ export function Login() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       if (msg.includes("already taken") || msg.includes("Nickname")) {
-        setErrMsg("Nickname already taken. Try logging in instead.");
+        setErrMsg("Nickname bereits vergeben. Versuche dich stattdessen anzumelden.");
       } else {
         setErrMsg(msg);
       }
@@ -82,7 +82,7 @@ export function Login() {
         <CardContent className="p-8">
           <h2 className="text-xl font-semibold mb-1 text-center">Anmelden</h2>
           <p className="text-sm text-muted-foreground text-center mb-6">
-            Log in with your nickname or create a new account.
+            Mit Nickname anmelden oder neues Konto erstellen.
           </p>
 
           <label className="text-sm font-medium block mb-1.5">Nickname</label>
@@ -104,8 +104,8 @@ export function Login() {
 
           {status === "not_found" && (
             <div className="mb-4 px-3 py-2.5 rounded bg-amber-50 border border-amber-200 text-sm">
-              <span className="font-medium text-amber-800">No account found for "{name.trim()}".</span>
-              <span className="text-amber-700 block mt-0.5">Create a new account with this nickname?</span>
+              <span className="font-medium text-amber-800">Kein Konto gefunden für "{name.trim()}".</span>
+              <span className="text-amber-700 block mt-0.5">Neues Konto mit diesem Nickname erstellen?</span>
             </div>
           )}
 
@@ -129,7 +129,7 @@ export function Login() {
                   onClick={() => { setStatus("idle"); setName(""); }}
                   className="w-full px-4 py-2 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
                 >
-                  Try a different name
+                  Anderen Namen versuchen
                 </button>
               </>
             ) : (

@@ -27,7 +27,7 @@ export function ConfidenceVotes() {
   usePolling(refresh);
   useEffect(() => { setVisibleCount(5); }, [statusFilter, typeFilter]);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -39,11 +39,11 @@ export function ConfidenceVotes() {
 
   return (
     <div>
-      <h1>Vertrauensvoten</h1>
+      <h2 className="section-title">Vertrauensvoten</h2>
       <p className="text-muted-foreground mb-4">
-        Parliamentary confidence mechanisms. <strong>Vertrauensfrage</strong>: the Chancellor requests
-        confidence — failure triggers a snap election. <strong>Konstruktives Misstrauensvotum</strong>:
-        opposition names a replacement Chancellor — success transfers power immediately.
+        Parlamentarische Vertrauensmechanismen. <strong>Vertrauensfrage</strong>: Der Kanzler stellt
+        die Vertrauensfrage — Scheitern löst Neuwahlen aus. <strong>Konstruktives Misstrauensvotum</strong>:
+        Die Opposition benennt einen Ersatzkanzler — Erfolg überträgt die Macht sofort.
       </p>
 
       <div className="flex gap-4 mb-4 flex-wrap">
@@ -85,7 +85,7 @@ export function ConfidenceVotes() {
 
       {filtered.length === 0 && (
         <p className="text-center py-8 text-muted-foreground">
-          No confidence votes yet. The coalition leader can call a Vertrauensfrage; opposition parties can file a Misstrauensvotum.
+          Noch keine Vertrauensvoten. Der Koalitionsführer kann eine Vertrauensfrage stellen; Oppositionsparteien können ein Misstrauensvotum einreichen.
         </p>
       )}
 

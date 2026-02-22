@@ -68,7 +68,7 @@ export function Budget() {
 
   return (
     <div>
-      <h1>Bundeshaushalt</h1>
+      <h2 className="section-title">Bundeshaushalt</h2>
       <p className="text-sm text-muted-foreground mb-6">
         Annual budget cycles — every 60 simulation days, the coalition proposes a 300B EUR budget across 8 ministries.
       </p>

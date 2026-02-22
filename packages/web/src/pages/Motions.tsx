@@ -22,7 +22,7 @@ export function Motions() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -35,14 +35,14 @@ export function Motions() {
 
   return (
     <div>
-      <h1>Motions & Resolutions</h1>
+      <h2 className="section-title">Anträge & Entschließungen</h2>
       {motions.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">No motions yet. Run the simulation to see motions appear.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Anträge. Starte die Simulation, um Anträge zu sehen.</p>
       )}
       {grouped.map(group => (
         <div key={group.status} className="mb-8">
-          <h2>
-            {group.status === "passed" ? "Passed" : "Rejected"} ({motions.filter(m => m.status === group.status).length})
+          <h2 className="section-title">
+            {group.status === "passed" ? "Angenommen" : "Abgelehnt"} ({motions.filter(m => m.status === group.status).length})
           </h2>
           {group.motions.map(motion => (
             <MotionCard key={motion.id} motion={motion} partyMap={partyMap} />

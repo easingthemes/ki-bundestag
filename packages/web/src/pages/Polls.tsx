@@ -64,7 +64,7 @@ export function Polls() {
 
   return (
     <div>
-      <h1>Public Opinion Polls</h1>
+      <h2 className="section-title">Meinungsumfragen</h2>
 
       {/* Registration prompt */}
       {!user && activePolls.length > 0 && (
@@ -81,13 +81,13 @@ export function Polls() {
       )}
 
       {activePolls.length === 0 && closedPolls.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">No polls yet. Run the simulation until day 7 for the first polls.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Umfragen. Starte die Simulation bis Tag 7 für die ersten Umfragen.</p>
       )}
 
       {/* Active polls */}
       {activePolls.length > 0 && (
         <div className="mb-8">
-          <h2>Active Polls ({activePolls.length})</h2>
+          <h2 className="section-title">Aktive Umfragen ({activePolls.length})</h2>
           {activePolls.map(poll => (
             <PollCard
               key={poll.id}
@@ -107,7 +107,7 @@ export function Polls() {
             onClick={() => setShowClosed(!showClosed)}
             className="bg-transparent border-none cursor-pointer text-base font-semibold text-muted-foreground p-0"
           >
-            {showClosed ? "▾" : "▸"} Past Polls ({closedPolls.length})
+            {showClosed ? "▾" : "▸"} Vergangene Umfragen ({closedPolls.length})
           </button>
           {showClosed && (
             <div className="mt-3">

@@ -42,7 +42,7 @@ export function Referendums() {
 
   return (
     <div>
-      <h1>Referendums</h1>
+      <h2 className="section-title">Volksabstimmungen</h2>
 
       {/* Registration prompt */}
       {!user && active.length > 0 && (
@@ -70,7 +70,7 @@ export function Referendums() {
 
       {active.length > 0 && (
         <div className="mb-8">
-          <h2>Active Referendums</h2>
+          <h2 className="section-title">Aktive Abstimmungen</h2>
           {active.map(ref => (
             <ReferendumCard
               key={ref.id}
@@ -83,7 +83,7 @@ export function Referendums() {
 
       {past.length > 0 && (
         <div className="mb-8">
-          <h2>Past Referendums</h2>
+          <h2 className="section-title">Vergangene Abstimmungen</h2>
           {past.slice(0, pastVisible).map(ref => (
             <ReferendumCard
               key={ref.id}
@@ -103,7 +103,7 @@ export function Referendums() {
       {referendums.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            No referendums yet. They are generated automatically every 30 simulation days.
+            Noch keine Volksabstimmungen. Sie werden automatisch alle 30 Simulationstage generiert.
           </CardContent>
         </Card>
       )}

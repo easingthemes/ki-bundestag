@@ -444,7 +444,7 @@ export function Admin() {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h1 className="mb-0">Admin</h1>
+        <h2 className="section-title !mb-0">Admin</h2>
         <div className="flex items-center gap-4">
           <Link to="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Analytics &rarr;</Link>
           <Link to="/admin/costs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">AI Model Costs &rarr;</Link>
@@ -453,7 +453,7 @@ export function Admin() {
 
       {/* ── Simulation Speed ─────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Simulation Speed</h2>
+        <h2 className="section-title">Simulationsgeschwindigkeit</h2>
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground mb-4">
@@ -523,7 +523,7 @@ export function Admin() {
 
       {/* ── Inject Events ──────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Inject Events</h2>
+        <h2 className="section-title">Ereignisse einspeisen</h2>
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground mb-4">
@@ -662,7 +662,7 @@ export function Admin() {
 
       {/* ── AI Model Configuration ─────────────────────────────────── */}
       <div className="mb-8">
-        <h2>AI Model Configuration</h2>
+        <h2 className="section-title">KI-Modell-Konfiguration</h2>
         <Card>
           <CardContent className="p-0 overflow-hidden">
             <table className="w-full border-collapse text-sm">
@@ -725,7 +725,7 @@ export function Admin() {
 
       {/* ── Simulation Actions Reference ───────────────────────────── */}
       <div className="mb-8">
-        <h2>Simulation Actions</h2>
+        <h2 className="section-title">Simulationsaktionen</h2>
 
         {/* Category filter */}
         <div className="flex gap-1.5 flex-wrap mb-4">

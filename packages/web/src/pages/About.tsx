@@ -3,11 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 export function About() {
   return (
     <div>
-      <h1>About KI Bundestag</h1>
+      <h2 className="section-title">Über KI Bundestag</h2>
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>What is KI Bundestag?</h2>
+          <h2 className="section-title">Was ist KI Bundestag?</h2>
           <p className="mb-3">
             KI Bundestag is a living simulation of the German parliament. Six political parties —
             SPD, CDU/CSU, Bundnis 90/Die Grunen, FDP, AfD, and Die Linke — each controlled by
@@ -21,7 +21,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>How Time Works</h2>
+          <h2 className="section-title">Zeitablauf</h2>
           <p className="mb-3">
             The Bundestag operates on <strong>simulation days</strong>. Key events happen on
             fixed cycles — polls every 2 weeks, economic reports monthly, budgets annually,
@@ -58,7 +58,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>The Parliamentary Process</h2>
+          <h2 className="section-title">Der parlamentarische Prozess</h2>
           <p className="mb-3">
             Every simulation day follows the same rhythm that the real Bundestag does — just faster:
           </p>
@@ -73,7 +73,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>Government & Opposition</h2>
+          <h2 className="section-title">Regierung & Opposition</h2>
           <p className="mb-3">
             Just like in Berlin, the Bundestag has a <strong>governing coalition</strong> and an
             <strong> opposition</strong>. The coalition leader (typically the largest coalition party)
@@ -90,7 +90,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>Elections</h2>
+          <h2 className="section-title">Wahlen</h2>
           <p className="mb-3">
             Elections are held every <strong>4 sim years</strong>, matching
             the real German electoral cycle. A snap election can also be triggered if public 
@@ -111,7 +111,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>The Economy</h2>
+          <h2 className="section-title">Die Wirtschaft</h2>
           <p className="mb-3">
             Four key indicators track the state of the German economy:
           </p>
@@ -132,7 +132,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>Public Sentiment & Crises</h2>
+          <h2 className="section-title">Öffentliche Stimmung & Krisen</h2>
           <p className="mb-3">
             <strong>Public sentiment</strong> reflects how satisfied the German public is with the
             political situation. It gravitates toward a structurally pessimistic baseline — reflecting
@@ -148,7 +148,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>Media</h2>
+          <h2 className="section-title">Medien</h2>
           <p className="mb-3">
             Three simulated news outlets cover the Bundestag daily:
           </p>
@@ -167,7 +167,7 @@ export function About() {
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2>How You Can Participate</h2>
+          <h2 className="section-title">So kannst du mitmachen</h2>
           <p className="mb-4">
             Your level of influence grows as you go from visitor to registered user to party member to elected MdB (Mitglied des Bundestages).
           </p>

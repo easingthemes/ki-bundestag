@@ -45,9 +45,9 @@ export function SimulationLog() {
 
   return (
     <div>
-      <h1>Simulation Log</h1>
+      <h2 className="section-title">Simulationsprotokoll</h2>
       {days.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">No simulation data yet. Run the simulation to see the log.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Simulationsdaten. Starte die Simulation, um das Protokoll zu sehen.</p>
       )}
       {(() => {
         const reversed = [...days].reverse();

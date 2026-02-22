@@ -160,8 +160,8 @@ export function AdminCosts() {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h1>AI Model Costs</h1>
-        <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Back to Admin</Link>
+        <h2 className="section-title !mb-0">KI-Modell-Kosten</h2>
+        <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Zurück zu Admin</Link>
       </div>
 
       {/* ── Time Scale Reference ─────────────────────────────────── */}
@@ -178,7 +178,7 @@ export function AdminCosts() {
 
       {/* ── Current Models ────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Current Models</h2>
+        <h2 className="section-title">Aktuelle Modelle</h2>
         <Card>
           <CardContent className="p-5 overflow-x-auto">
             <table className="w-full border-collapse">
@@ -210,7 +210,7 @@ export function AdminCosts() {
 
       {/* ── AI Calls Per Simulation Day ───────────────────────────── */}
       <div className="mb-8">
-        <h2>AI Calls Per Simulation Day</h2>
+        <h2 className="section-title">KI-Aufrufe pro Simulationstag</h2>
 
         {/* Simulation-driven */}
         <h3 className="mt-4">Simulation-Driven (Always Happen)</h3>
@@ -308,7 +308,7 @@ export function AdminCosts() {
 
       {/* ── Cost Estimates ────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Cost Estimates</h2>
+        <h2 className="section-title">Kostenschätzungen</h2>
 
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           {/* Quiet day */}
@@ -343,7 +343,7 @@ export function AdminCosts() {
 
       {/* ── Aggregated Estimates ──────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Aggregated Estimates</h2>
+        <h2 className="section-title">Gesamtschätzungen</h2>
 
         <h3>Per Sim Day / Sim Month / Wahlperiode</h3>
         <Card className="mb-4">
@@ -407,7 +407,7 @@ export function AdminCosts() {
 
       {/* ── Alternative Model Comparison ──────────────────────────── */}
       <div className="mb-8">
-        <h2>Alternative Model Comparison</h2>
+        <h2 className="section-title">Modellvergleich (Alternativen)</h2>
         <Card>
           <CardContent className="p-5 overflow-x-auto">
             <table className="w-full border-collapse">
@@ -440,7 +440,7 @@ export function AdminCosts() {
 
       {/* ── Notes ─────────────────────────────────────────────────── */}
       <div className="mb-8">
-        <h2>Notes</h2>
+        <h2 className="section-title">Hinweise</h2>
         <Card>
           <CardContent className="p-5">
             <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-4">

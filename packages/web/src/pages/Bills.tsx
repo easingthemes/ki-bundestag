@@ -55,7 +55,7 @@ export function Bills() {
   // Reset per-group limits when filters change
   useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -78,7 +78,7 @@ export function Bills() {
 
   return (
     <div>
-      <h1>Bills</h1>
+      <h2 className="section-title">Gesetzentwürfe</h2>
 
       {/* Registration prompt */}
       {!user && signalReadyCount > 0 && (
@@ -97,21 +97,21 @@ export function Bills() {
       <div className="flex gap-2 flex-wrap mb-4 items-center">
         <input
           type="text"
-          placeholder="Search bills..."
+          placeholder="Gesetze suchen..."
           value={filterSearch}
           onChange={e => setFilterSearch(e.target.value)}
           className={cn(SELECT_CLS, "min-w-40")}
         />
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className={SELECT_CLS}>
-          <option value="">All categories</option>
+          <option value="">Alle Kategorien</option>
           {BILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filterParty} onChange={e => setFilterParty(e.target.value)} className={SELECT_CLS}>
-          <option value="">All parties</option>
+          <option value="">Alle Parteien</option>
           {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
-          <option value="">All statuses</option>
+          <option value="">Alle Status</option>
           {STATUS_ORDER.map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
         </select>
         {hasFilters && (
@@ -119,7 +119,7 @@ export function Bills() {
             onClick={() => { setFilterCategory(""); setFilterParty(""); setFilterSearch(""); setFilterStatus(""); }}
             className="h-9 px-3 text-xs rounded-md border border-input bg-secondary hover:bg-accent cursor-pointer"
           >
-            Clear
+            Zurücksetzen
           </button>
         )}
         <span className="text-xs text-muted-foreground ml-1">
@@ -128,14 +128,14 @@ export function Bills() {
       </div>
 
       {bills.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">No bills yet. Run the simulation to see bills appear.</p>
+        <p className="text-center py-8 text-muted-foreground">Noch keine Gesetzentwürfe. Starte die Simulation, um Gesetze zu sehen.</p>
       )}
       {grouped.map(group => {
         const limit = groupLimits[group.status] ?? GROUP_INITIAL;
         const visible = group.bills.slice(0, limit);
         return (
           <div key={group.status} className="mb-8">
-            <h2>
+            <h2 className="section-title">
               {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
             </h2>
             {visible.map(bill => (
