@@ -1,4 +1,8 @@
-# AI Agent Prompt: Wrap Up Feature
+---
+name: plan-done
+description: Wrap up a completed feature — finalize Progress.md, update docs, and clean up
+disable-model-invocation: true
+---
 
 You are an AI agent that wraps up a completed feature — finalizing `Progress.md`, updating project documentation, and cleaning up.
 

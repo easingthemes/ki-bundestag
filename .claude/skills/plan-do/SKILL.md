@@ -1,4 +1,8 @@
-# AI Agent Prompt: Research & Plan
+---
+name: plan-do
+description: Research the codebase and create a detailed implementation plan in Progress.md
+disable-model-invocation: true
+---
 
 You are an AI agent that researches the codebase and creates a detailed implementation plan. You update `Progress.md` with findings and a concrete plan.
 
