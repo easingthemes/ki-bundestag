@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -234,6 +235,7 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
                 return `${d.getDate()}. ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()} — Tag ${selectedDay.dayNumber}`;
               })()}
             </DialogTitle>
+            <DialogDescription className="sr-only">Events for this simulation day</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {loadingEvents ? (

@@ -26,6 +26,7 @@ import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
 import { TIME_CONFIG } from "./timing.js";
+import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 import { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
 import { generateDailyMedia, getRecentMedia, mediaSentimentImpact } from "./media.js";
@@ -70,7 +71,16 @@ export async function runDay(): Promise<number> {
   if (!meta) throw new Error("No simulation meta found. Run seed first.");
 
   const currentDay = meta.currentDay + 1;
-  console.log(`\n=== DAY ${currentDay} ===`);
+  const startDateStr = (meta as any).startDate as string | null;
+  const startDate: Date | undefined = startDateStr ? new Date(startDateStr) : undefined;
+
+  if (startDate) {
+    const calDate = dayToDate(currentDay, startDate);
+    const weekdays = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    console.log(`\n=== DAY ${currentDay} — ${calDate.toISOString().split("T")[0]} (${weekdays[calDate.getDay()]}) ===`);
+  } else {
+    console.log(`\n=== DAY ${currentDay} ===`);
+  }
 
   // Write currentDay + dayStartedAt immediately so the API reflects the new day in real time
   db.update(schema.simulationMeta)
@@ -275,7 +285,7 @@ export async function runDay(): Promise<number> {
   activeCrises = activeCrises.filter(c => !c.resolved);
 
   // Maybe trigger new crisis
-  const monthly = isMonthlyDay(currentDay);
+  const monthly = isMonthlyDay(currentDay, startDate);
   const newCrisis = maybeTriggerCrisis(currentDay, activeCrises, monthly);
   if (newCrisis) {
     db.insert(schema.crises).values({
@@ -339,7 +349,7 @@ export async function runDay(): Promise<number> {
       ? { trigger: true, reason: "User-injected snap election" }
       : shouldTriggerElection(currentDay, nextElectionDay, lowSentimentStreak, null);
     if (trigger.trigger) {
-      const newElection = announceElection(currentDay, trigger.reason);
+      const newElection = announceElection(currentDay, trigger.reason, startDate);
       activeElection = newElection;
 
       db.insert(schema.elections).values({
@@ -458,11 +468,13 @@ export async function runDay(): Promise<number> {
       nationalState.coalitionParties = coalition;
       nationalState.oppositionParties = opposition;
 
-      // Reset streak and schedule next election
+      // Reset streak and schedule next election (snap to Sunday if calendar-aware)
       lowSentimentStreak = 0;
+      let nextElDay = currentDay + TIME_CONFIG.TERM_DAYS;
+      if (startDate) nextElDay = snapToNextSunday(nextElDay, startDate);
       db.update(schema.simulationMeta)
         .set({
-          nextElectionDay: currentDay + TIME_CONFIG.TERM_DAYS,
+          nextElectionDay: nextElDay,
           lowSentimentStreak: 0,
         })
         .where(eq(schema.simulationMeta.id, meta.id))
@@ -1690,7 +1702,7 @@ export async function runDay(): Promise<number> {
   resolveExpiredReferendums(currentDay, dayEvents);
 
   // 11c. Weekly opinion recalculation
-  if (isPollDay(currentDay)) {
+  if (isPollDay(currentDay, startDate)) {
     weeklyOpinionRecalc(allParties, allBills, nationalState.publicSentiment, currentDay);
 
     // Generate weekly polls
@@ -1732,7 +1744,7 @@ export async function runDay(): Promise<number> {
   }
 
   // 11d. Budget cycle (annual, or user-injected)
-  if (isBudgetDay(currentDay) || injections.triggerBudget) {
+  if (isBudgetDay(currentDay, startDate) || injections.triggerBudget) {
     const cycleNumber = Math.floor(currentDay / TIME_CONFIG.BUDGET_INTERVAL);
     const coalitionParties = allParties.filter(p => nationalState.coalitionParties.includes(p.id));
     const allocations = generateBudgetAllocations(coalitionParties);
@@ -1751,9 +1763,10 @@ export async function runDay(): Promise<number> {
         .set({ budgetRetryDay: null } as any)
         .where(eq(schema.simulationMeta.id, meta.id)).run();
     } else {
-      // First rejection: provisional budget + schedule retry
+      // First rejection: provisional budget + schedule retry (snap to workday)
       nationalState.provisionalBudget = true;
-      const retryDay = currentDay + 7;
+      let retryDay = currentDay + 7;
+      if (startDate) retryDay = snapToNextWorkday(retryDay, startDate);
       db.update(schema.simulationMeta)
         .set({ budgetRetryDay: retryDay } as any)
         .where(eq(schema.simulationMeta.id, meta.id)).run();

@@ -6,6 +6,7 @@ import type {
   SimulationEvent,
 } from "@ki-bundestag/types";
 import { TIME_CONFIG } from "./timing.js";
+import { snapToNextSunday } from "./calendar.js";
 
 const TOTAL_SEATS = 735;
 const MAJORITY_SEATS = 368; // > 50%
@@ -34,13 +35,18 @@ export function shouldTriggerElection(
   return { trigger: false, reason: "" };
 }
 
-export function announceElection(currentDay: number, reason: string): Election {
+export function announceElection(currentDay: number, reason: string, startDate?: Date): Election {
+  let electionDay = currentDay + TIME_CONFIG.ELECTION_CAMPAIGN_DAYS;
+  // German elections must be on a Sunday
+  if (startDate) {
+    electionDay = snapToNextSunday(electionDay, startDate);
+  }
   return {
     id: crypto.randomUUID(),
     triggerReason: reason,
     announcedOnDay: currentDay,
     campaignStartDay: currentDay + TIME_CONFIG.ELECTION_CAMPAIGN_START,
-    electionDay: currentDay + TIME_CONFIG.ELECTION_CAMPAIGN_DAYS,
+    electionDay,
     status: "announced",
     results: null,
     newCoalition: null,

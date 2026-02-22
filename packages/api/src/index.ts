@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
-import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, getSqlite, getUserSqlite } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, getSqlite, getUserSqlite, dayToDate, isRealisticSessionDay, getHolidaysInRange, isPollDay, isMonthlyDay, isBudgetDay, snapToNextSunday } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
@@ -477,6 +477,116 @@ app.get("/api/calendar", (req, res) => {
     currentDay,
     days,
   });
+});
+
+// GET /api/calendar/upcoming — future scheduled events computed from cycle math + DB state
+app.get("/api/calendar/upcoming", (_req, res) => {
+  const db = getDb();
+  const metaRows = db.select().from(schema.simulationMeta).all();
+  const meta = metaRows[0];
+  const currentDay = meta?.currentDay ?? 0;
+  const startDateStr = (meta as any)?.startDate as string | null;
+  const startDate = startDateStr ? new Date(startDateStr) : new Date();
+  const calendarAware = !!startDateStr;
+  const nextElectionDay = (meta as any)?.nextElectionDay as number | null;
+  const budgetRetryDay = (meta as any)?.budgetRetryDay as number | null;
+
+  interface UpcomingEvent {
+    dayNumber: number;
+    date: string;
+    category: string;
+    label: string;
+    detail?: string;
+    link?: string;
+  }
+
+  const events: UpcomingEvent[] = [];
+  const fmtDate = (d: number) => dayToDate(d, startDate).toISOString().split("T")[0];
+
+  // Election timeline events (always show, even beyond 90d)
+  if (nextElectionDay && nextElectionDay > currentDay) {
+    // Snap election day display to Sunday when calendar-aware
+    const elDay = calendarAware ? snapToNextSunday(nextElectionDay, startDate) : nextElectionDay;
+    const announcementDay = elDay - 21;
+    const campaignDay = elDay - 14;
+    if (announcementDay > currentDay) {
+      events.push({ dayNumber: announcementDay, date: fmtDate(announcementDay), category: "election_announcement", label: "Wahlankündigung", link: "/elections" });
+    }
+    if (campaignDay > currentDay) {
+      events.push({ dayNumber: campaignDay, date: fmtDate(campaignDay), category: "election_campaign", label: "Wahlkampf beginnt", link: "/elections" });
+    }
+    events.push({ dayNumber: elDay, date: fmtDate(elDay), category: "election_voting", label: "Wahltag", link: "/elections" });
+  }
+
+  // Budget retry day
+  if (budgetRetryDay && budgetRetryDay > currentDay) {
+    events.push({ dayNumber: budgetRetryDay, date: fmtDate(budgetRetryDay), category: "budget_retry", label: "Haushalts-Nachverhandlung", link: "/budget" });
+  }
+
+  // Cycle-based events: loop currentDay+1 to currentDay+90
+  const horizon = currentDay + 90;
+  const cycleStartDate = calendarAware ? startDate : undefined;
+  for (let d = currentDay + 1; d <= horizon; d++) {
+    if (isBudgetDay(d, cycleStartDate)) {
+      events.push({ dayNumber: d, date: fmtDate(d), category: "budget_cycle", label: "Haushaltszyklus", link: "/budget" });
+    }
+    if (isPollDay(d, cycleStartDate)) {
+      events.push({ dayNumber: d, date: fmtDate(d), category: "poll_day", label: "Umfrage", link: "/polls" });
+    }
+    if (isMonthlyDay(d, cycleStartDate)) {
+      events.push({ dayNumber: d, date: fmtDate(d), category: "economy_report", label: "Wirtschaftsbericht" });
+    }
+    // Session days: realistic (Wed–Fri, no holidays/recess) when calendar-aware
+    if (calendarAware) {
+      if (isRealisticSessionDay(d, startDate)) {
+        events.push({ dayNumber: d, date: fmtDate(d), category: "session_day", label: "Plenarsitzung" });
+      }
+    } else {
+      if (d % 5 === 0) {
+        events.push({ dayNumber: d, date: fmtDate(d), category: "session_day", label: "Plenarsitzung" });
+      }
+    }
+  }
+
+  // Public holidays in range (calendar-aware only)
+  if (calendarAware) {
+    const holidays = getHolidaysInRange(currentDay + 1, horizon, startDate);
+    for (const { day, holiday } of holidays) {
+      events.push({ dayNumber: day, date: fmtDate(day), category: "public_holiday", label: holiday.nameDE });
+    }
+  }
+
+  // Active polls with expiry dates
+  const activePolls = db.select().from(schema.polls).all() as any[];
+  for (const poll of activePolls) {
+    if (poll.active && poll.expiresOnDay && poll.expiresOnDay > currentDay) {
+      events.push({ dayNumber: poll.expiresOnDay, date: fmtDate(poll.expiresOnDay), category: "poll_expiry", label: "Umfrage endet", detail: poll.question, link: "/polls" });
+    }
+  }
+
+  // Active referendums with closing dates
+  const activeRefs = db.select().from(schema.referendums).all() as any[];
+  for (const ref of activeRefs) {
+    if (ref.status === "active" && ref.closesOnDay > currentDay) {
+      events.push({ dayNumber: ref.closesOnDay, date: fmtDate(ref.closesOnDay), category: "referendum_expiry", label: "Volksentscheid endet", detail: ref.title, link: "/votes" });
+    }
+  }
+
+  // Pending interpellations with deadlines (dayNumber + 14)
+  const pendingInterps = db.select().from(schema.interpellations).all() as any[];
+  for (const interp of pendingInterps) {
+    if (interp.status === "pending") {
+      const deadline = interp.dayNumber + 14;
+      if (deadline > currentDay) {
+        events.push({ dayNumber: deadline, date: fmtDate(deadline), category: "interpellation_deadline", label: "Anfrage-Frist", detail: interp.title, link: "/interpellations" });
+      }
+    }
+  }
+
+  // Sort by day number
+  events.sort((a, b) => a.dayNumber - b.dayNumber);
+
+  res.json({ startDate: startDate.toISOString(), currentDay, events });
 });
 
 // GET /api/simulation/events

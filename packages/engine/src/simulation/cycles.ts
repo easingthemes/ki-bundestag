@@ -1,22 +1,38 @@
 import type { Bill, EconomyState, Party } from "@ki-bundestag/types";
 import { TIME_CONFIG } from "./timing.js";
+import { snapToNextWorkday, isRealisticSessionDay } from "./calendar.js";
 
-export function isPollDay(day: number): boolean {
-  return day > 0 && day % TIME_CONFIG.POLL_INTERVAL === 0;
+/**
+ * Calendar-aware cycle check: a modulo hit is snapped forward to the
+ * next workday. The day matches if it equals the snapped target.
+ * When `startDate` is omitted, falls back to pure modulo (legacy).
+ */
+function calendarCycleHit(day: number, interval: number, startDate?: Date): boolean {
+  if (day <= 0) return false;
+  if (!startDate) return day % interval === 0;
+  // Find the latest modulo-hit at or before `day`
+  const cycleHit = Math.floor(day / interval) * interval;
+  if (cycleHit <= 0) return false;
+  return snapToNextWorkday(cycleHit, startDate) === day;
+}
+
+export function isPollDay(day: number, startDate?: Date): boolean {
+  return calendarCycleHit(day, TIME_CONFIG.POLL_INTERVAL, startDate);
 }
 
 /** @deprecated Use isPollDay instead */
 export const isWeeklyDay = isPollDay;
 
-export function isMonthlyDay(day: number): boolean {
-  return day > 0 && day % TIME_CONFIG.ECONOMY_INTERVAL === 0;
+export function isMonthlyDay(day: number, startDate?: Date): boolean {
+  return calendarCycleHit(day, TIME_CONFIG.ECONOMY_INTERVAL, startDate);
 }
 
-export function isBudgetDay(day: number): boolean {
-  return day > 0 && day % TIME_CONFIG.BUDGET_INTERVAL === 0;
+export function isBudgetDay(day: number, startDate?: Date): boolean {
+  return calendarCycleHit(day, TIME_CONFIG.BUDGET_INTERVAL, startDate);
 }
 
-export function isSessionDay(day: number): boolean {
+export function isSessionDay(day: number, startDate?: Date): boolean {
+  if (startDate) return isRealisticSessionDay(day, startDate);
   return day > 0 && day % TIME_CONFIG.SESSION_INTERVAL === 0;
 }
 

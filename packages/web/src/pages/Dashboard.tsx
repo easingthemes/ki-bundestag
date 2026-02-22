@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication } from "../api";
+import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData } from "../api";
 import { CalendarWidget } from "../components/CalendarWidget";
+import { UpcomingCalendar } from "../components/UpcomingCalendar";
 import { usePolling } from "../usePolling";
 import { Button, SkeletonCard, SkeletonTitle } from "../components/shared";
 import { useUser } from "../userContext";
@@ -34,6 +35,8 @@ export function Dashboard() {
   const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [calendarMonth, setCalendarMonth] = useState<string | undefined>(undefined);
+  const [upcomingCalendar, setUpcomingCalendar] = useState<UpcomingCalendarData | null>(null);
+  const [calendarView, setCalendarView] = useState<"upcoming" | "past">("upcoming");
 
   const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
@@ -60,6 +63,11 @@ export function Dashboard() {
   useEffect(() => {
     api.getCalendar(calendarMonth).then(setCalendar).catch(console.error);
   }, [calendarMonth]);
+
+  // Upcoming calendar fetch
+  useEffect(() => {
+    api.getUpcomingCalendar().then(setUpcomingCalendar).catch(console.error);
+  }, []);
 
   if (!state || !simStatus) {
     return (
@@ -314,13 +322,36 @@ export function Dashboard() {
           )}
 
           {/* Calendar */}
-          {calendar && (
+          {(calendar || upcomingCalendar) && (
             <div className="mb-8">
               <div className="flex justify-between items-baseline mb-2">
-                <h2 className="!mb-0">Kalender</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="!mb-0">Kalender</h2>
+                  <div className="flex gap-1 ml-2">
+                    <button
+                      onClick={() => setCalendarView("upcoming")}
+                      className={cn(
+                        "px-2.5 py-0.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
+                        calendarView === "upcoming" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-foreground/30",
+                      )}
+                    >Termine</button>
+                    <button
+                      onClick={() => setCalendarView("past")}
+                      className={cn(
+                        "px-2.5 py-0.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
+                        calendarView === "past" ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-foreground/30",
+                      )}
+                    >Vergangene</button>
+                  </div>
+                </div>
                 <Link to="/log" className="text-xs text-primary">Alle Tage →</Link>
               </div>
-              <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />
+              {calendarView === "upcoming" && upcomingCalendar && (
+                <UpcomingCalendar data={upcomingCalendar} />
+              )}
+              {calendarView === "past" && calendar && (
+                <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />
+              )}
             </div>
           )}
         </div>

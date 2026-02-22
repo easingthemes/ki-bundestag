@@ -293,6 +293,21 @@ export interface CalendarData {
   days: CalendarDay[];
 }
 
+export interface UpcomingEvent {
+  dayNumber: number;
+  date: string;
+  category: string;
+  label: string;
+  detail?: string;
+  link?: string;
+}
+
+export interface UpcomingCalendarData {
+  startDate: string;
+  currentDay: number;
+  events: UpcomingEvent[];
+}
+
 export interface DaySummary {
   dayNumber: number;
   eventCount: number;
@@ -559,6 +574,7 @@ export const api = {
   getDays: () => fetchJson<DaySummary[]>("/simulation/days"),
   getDayEvents: (day: number) => fetchJson<SimulationEvent[]>(`/simulation/days/${day}`),
   getCalendar: (month?: string) => fetchJson<CalendarData>(`/calendar${month ? `?month=${month}` : ""}`),
+  getUpcomingCalendar: () => fetchJson<UpcomingCalendarData>("/calendar/upcoming"),
   getEvents: (limit = 50, offset = 0, type?: string, actor?: string) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (type) params.set("type", type);
