@@ -2,66 +2,40 @@
 
 ## Goal
 
-Decompose five large web page files (Dashboard, PartyDetail, Admin, Elections, BillDetail) into smaller focused components extracted into domain subfolders under `components/`.
+Split `packages/web/src/api.ts` (796 lines) into three focused files under `src/api/` — types, client helpers, and endpoint functions — with a barrel `src/api/index.ts` and a shim `src/api.ts` so all existing imports continue to work unchanged.
 
 ## Ref
 
-docs/plans/03-web-pages.md
+docs/plans/04-web-api-split.md
 
 ## Steps
 
-### Step 1: Extract Dashboard components
+### Step 1: Create `src/api/types.ts`
 
 - **Status**: done
-- **Files**: `src/components/dashboard/OnboardingOverlay.tsx`, `QuickActionsBar.tsx`, `MyImpactCard.tsx`, `CatchupCard.tsx`, `LiveEventTicker.tsx`, `AskPartyWidget.tsx`
-- **Result**: Extracted 6 inline components from Dashboard.tsx into focused files under `components/dashboard/`. Typecheck pass.
+- **Files**: `packages/web/src/api/types.ts`
+- **Result**: All 35 TypeScript interfaces/types moved from api.ts into types.ts. No imports needed. Typecheck pass.
 
-### Step 2: Rewrite Dashboard.tsx shell
-
-- **Status**: done
-- **Files**: `src/pages/Dashboard.tsx`
-- **Result**: Replaced 1110-line file with ~280-line shell that imports all 6 dashboard components. All imports from `@/components/dashboard/`. Typecheck pass.
-
-### Step 3: Extract PartyDetail components
+### Step 2: Create `src/api/client.ts`
 
 - **Status**: done
-- **Files**: `src/components/party/ApprovalChart.tsx`, `PartyBillsList.tsx`, `MdbRosterTable.tsx`, `ProposalForm.tsx`, `QuestionForm.tsx`
-- **Result**: Extracted 5 inline sections from PartyDetail.tsx into focused party components. Typecheck pass.
+- **Files**: `packages/web/src/api/client.ts`
+- **Result**: Moved fetchJson, postJson, deleteJson, added patchJson, moved BASE constant, setErrorHandler, setUserToken, authHeaders. Exported getBase() helper for endpoints.ts. Typecheck pass.
 
-### Step 4: Rewrite PartyDetail.tsx shell
-
-- **Status**: done
-- **Files**: `src/pages/PartyDetail.tsx`
-- **Result**: Replaced 950-line file with ~280-line shell that imports all 5 party components. Typecheck pass.
-
-### Step 5: Extract Admin components
+### Step 3: Create `src/api/endpoints.ts`
 
 - **Status**: done
-- **Files**: `src/components/admin/ActionsReference.tsx`, `InjectForms.tsx`, `ModelConfig.tsx`, `PresetSelector.tsx`
-- **Result**: Extracted ACTIONS data, inject forms, model config table, and preset selector into focused admin components. Typecheck pass.
+- **Files**: `packages/web/src/api/endpoints.ts`
+- **Result**: All ~55 typed API call functions moved, grouped by domain with comments. Imports from ./types.js and ./client.js. Legacy `api` object re-exported for backward compatibility. Typecheck pass.
 
-### Step 6: Rewrite Admin.tsx shell
-
-- **Status**: done
-- **Files**: `src/pages/Admin.tsx`
-- **Result**: Replaced 800-line file with ~60-line shell importing all 4 admin components. Typecheck pass.
-
-### Step 7: Extract Elections components
+### Step 4: Create `src/api/index.ts`
 
 - **Status**: done
-- **Files**: `src/components/elections/BundesadlerIcon.tsx`, `VoteBarChart.tsx`, `CoalitionChips.tsx`, `CoalitionCalculator.tsx`
-- **Result**: Extracted 4 inline components from Elections.tsx into focused elections components. Typecheck pass.
+- **Files**: `packages/web/src/api/index.ts`
+- **Result**: Barrel with export * from all three sub-files. Typecheck pass.
 
-### Step 8: Rewrite Elections.tsx shell
+### Step 5: Update `src/api.ts`
 
 - **Status**: done
-- **Files**: `src/pages/Elections.tsx`
-- **Result**: Replaced 663-line file with ~250-line shell importing all 4 elections components. Removed local `fixColor` definition (now from lib/utils). Typecheck pass.
-
-### Step 9: Extract BillDetail components
-
-- **Status**: pending
-
-### Step 10: Rewrite BillDetail.tsx shell
-
-- **Status**: pending
+- **Files**: `packages/web/src/api.ts`
+- **Result**: Replaced 796-line file with single re-export shim: `export * from "./api/index.js"`. Zero import changes needed in 49 existing call sites. Typecheck pass.
