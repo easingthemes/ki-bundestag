@@ -28,7 +28,7 @@ import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 import { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
-import { generateDailyMedia, getRecentMedia, mediaSentimentImpact } from "./media.js";
+import { generateDailyMedia, getRecentMedia, applyMediaSentiment } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
 import { maybeGenerateReferendum, resolveExpiredReferendums } from "./referendums.js";
 import { processInjections } from "./injections.js";
@@ -1744,21 +1744,7 @@ export async function runDay(): Promise<number> {
   await generateDailyMedia(dayEvents, allParties, currentDay);
 
   // 12c. Apply media sentiment influence
-  const todaysMedia = getRecentMedia(3).filter(a => a.dayNumber === currentDay);
-  if (todaysMedia.length > 0) {
-    const mediaDelta = mediaSentimentImpact(todaysMedia);
-    if (mediaDelta !== 0) {
-      nationalState.publicSentiment = Math.max(5, Math.min(75,
-        Math.round((nationalState.publicSentiment + mediaDelta) * 10) / 10,
-      ));
-      // Re-save national state with media-adjusted sentiment
-      db.update(schema.nationalState)
-        .set({ publicSentiment: nationalState.publicSentiment })
-        .where(eq(schema.nationalState.id, state.id))
-        .run();
-      console.log(`  [Media] Sentiment impact: ${mediaDelta > 0 ? "+" : ""}${mediaDelta}`);
-    }
-  }
+  nationalState.publicSentiment = applyMediaSentiment(currentDay, nationalState.publicSentiment, state.id);
 
   // 12d. Generate daily narrative summary
   const summaryResult = await generateDailySummary(

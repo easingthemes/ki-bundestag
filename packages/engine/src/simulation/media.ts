@@ -1,5 +1,5 @@
 import type { MediaArticle, Party, SimulationEvent } from "@ki-bundestag/types";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { safeParseJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
@@ -150,4 +150,33 @@ Rules:
     }
     logAICall({ task: "media", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
   }
+}
+
+/**
+ * Apply today's media sentiment influence to public sentiment.
+ *
+ * Loads articles for the given day, calculates their aggregate sentiment delta
+ * (capped at ±0.5/day), updates national_state in the DB, and returns the
+ * updated sentiment value (unchanged if no articles or zero delta).
+ */
+export function applyMediaSentiment(currentDay: number, currentSentiment: number, stateId: number): number {
+  const db = getDb();
+  const todaysMedia = getRecentMedia(3).filter(a => a.dayNumber === currentDay);
+  if (todaysMedia.length === 0) return currentSentiment;
+
+  const mediaDelta = mediaSentimentImpact(todaysMedia);
+  if (mediaDelta === 0) return currentSentiment;
+
+  const newSentiment = Math.max(5, Math.min(75,
+    Math.round((currentSentiment + mediaDelta) * 10) / 10,
+  ));
+
+  db.update(schema.nationalState)
+    .set({ publicSentiment: newSentiment })
+    .where(eq(schema.nationalState.id, stateId))
+    .run();
+
+  console.log(`  [Media] Sentiment impact: ${mediaDelta > 0 ? "+" : ""}${mediaDelta}`);
+
+  return newSentiment;
 }
