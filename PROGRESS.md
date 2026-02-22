@@ -2,34 +2,54 @@
 
 ## Goal
 
-Establish shared web infrastructure before page-level decomposition: add `fixColor()` to utils, create `useApiData` hook, `VoteBar` component, and `FilterPills` component. Eliminate the most widespread duplication across 17 pages.
+Decompose five large web page files (Dashboard, PartyDetail, Admin, Elections, BillDetail) into smaller focused components extracted into domain subfolders under `components/`.
 
 ## Ref
 
-docs/plans/02-web-shared.md
+docs/plans/03-web-pages.md
 
 ## Steps
 
-### Step 1: Add `fixColor()` to `lib/utils.ts`
+### Step 1: Extract Dashboard components
 
 - **Status**: done
-- **Files**: `packages/web/src/lib/utils.ts`, `packages/web/src/pages/Dashboard.tsx`, `packages/web/src/pages/Elections.tsx`, `packages/web/src/pages/Parties.tsx`
-- **Result**: Added `fixColor()` export to utils.ts, removed local definitions from 3 pages, updated imports. Typecheck pass.
+- **Files**: `src/components/dashboard/OnboardingOverlay.tsx`, `QuickActionsBar.tsx`, `MyImpactCard.tsx`, `CatchupCard.tsx`, `LiveEventTicker.tsx`, `AskPartyWidget.tsx`
+- **Result**: Extracted 6 inline components from Dashboard.tsx into focused files under `components/dashboard/`. Typecheck pass.
 
-### Step 2: Create `src/hooks/useApiData.ts`
-
-- **Status**: done
-- **Files**: `packages/web/src/hooks/useApiData.ts`
-- **Result**: Created generic `useApiData<T>` hook with useState/useCallback/useEffect/usePolling. Returns `{data, loading, refresh}`. Typecheck pass.
-
-### Step 3: Create `src/components/VoteBar.tsx`
+### Step 2: Rewrite Dashboard.tsx shell
 
 - **Status**: done
-- **Files**: `packages/web/src/components/VoteBar.tsx`, `packages/web/src/pages/Bills.tsx`, `packages/web/src/pages/BillDetail.tsx`, `packages/web/src/pages/Budget.tsx`, `packages/web/src/pages/Motions.tsx`, `packages/web/src/pages/ConfidenceVotes.tsx`, `packages/web/src/pages/Dashboard.tsx`
-- **Result**: Created VoteBar component with yes/no/abstain props and optional height/showCounts. Replaced inline vote bars in 6 pages. Typecheck pass.
+- **Files**: `src/pages/Dashboard.tsx`
+- **Result**: Replaced 1110-line file with ~280-line shell that imports all 6 dashboard components. All imports from `@/components/dashboard/`. Typecheck pass.
 
-### Step 4: Create `src/components/FilterPills.tsx`
+### Step 3: Extract PartyDetail components
 
-- **Status**: done
-- **Files**: `packages/web/src/components/FilterPills.tsx`, `packages/web/src/pages/Notifications.tsx`, `packages/web/src/pages/MyActivity.tsx`, `packages/web/src/pages/Budget.tsx`, `packages/web/src/pages/Interpellations.tsx`, `packages/web/src/pages/ConfidenceVotes.tsx`, `packages/web/src/pages/Admin.tsx`
-- **Result**: Created generic FilterPills<T> component with options/value/onChange props. Replaced inline pill filter rows in 6 pages. ConstitutionalCourt skipped (uses select dropdowns, not pills). Typecheck pass.
+- **Status**: pending
+
+### Step 4: Rewrite PartyDetail.tsx shell
+
+- **Status**: pending
+
+### Step 5: Extract Admin components
+
+- **Status**: pending
+
+### Step 6: Rewrite Admin.tsx shell
+
+- **Status**: pending
+
+### Step 7: Extract Elections components
+
+- **Status**: pending
+
+### Step 8: Rewrite Elections.tsx shell
+
+- **Status**: pending
+
+### Step 9: Extract BillDetail components
+
+- **Status**: pending
+
+### Step 10: Rewrite BillDetail.tsx shell
+
+- **Status**: pending
