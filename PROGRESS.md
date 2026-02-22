@@ -1,43 +1,37 @@
-# Progress: Engine — `loop.ts` Surgery
+# Progress: Engine — DB Layer Split
 
-**Goal**: Extract 4 pieces of inline logic from `loop.ts` into dedicated modules so `loop.ts` becomes a clean orchestrator targeting ~700–900 lines.
+**Goal**: Split oversized `seed.ts` (821L) and `schema.ts` (~400L) into focused files while keeping all imports and runtime behaviour unchanged.
 
-**Ref**: docs/plans/05-engine-loop.md
+**Ref**: docs/plans/06-engine-db.md
 
 ---
 
-### Step 1: Create `src/simulation/bill-pipeline.ts`
+### Step 1: Create `src/db/seed-data.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/bill-pipeline.ts` (created), `packages/engine/src/simulation/loop.ts` (updated)
-- **Result**: Extracted ~215 lines of bill pipeline logic (stages 1–4) into new module; loop.ts replaced with 4-line delegate. Removed unused `assignCommittee`, `generateRecommendation`, `tallyAmendmentVotes`, `applyAmendmentToBill` imports from loop.ts. Typecheck passed.
+- **Files**: `packages/engine/src/db/seed-data.ts` (created)
+- **Result**: Extracted PARTIES array and INITIAL_NATIONAL_STATE constant as pure data; also exported PartySeed interface. Typecheck passed.
 
-### Step 2: Create `src/simulation/veto.ts`
-
-- **Status**: done
-- **Files**: `packages/engine/src/simulation/veto.ts` (created), `packages/engine/src/simulation/loop.ts` (updated)
-- **Result**: Extracted presidential veto logic (~20 lines) into new module; loop.ts replaced with 5-line delegate. Removed `shouldPresidentVeto` from budget.js import in loop.ts. Typecheck passed.
-
-### Step 3: Consolidate approval drift into `src/simulation/opinion.ts`
+### Step 2: Create `src/db/ddl.ts`
 
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/opinion.ts` (updated), `packages/engine/src/simulation/loop.ts` (updated)
-- **Result**: Added `applyDailyApprovalDrift(parties)` to opinion.ts consolidating approval drift + membership bonus loop; loop.ts replaced 18-line block with single call. Removed `count`, `gte`, `applyApprovalDrift`, `membershipBonus` from loop.ts imports. Typecheck passed.
+- **Files**: `packages/engine/src/db/ddl.ts` (created)
+- **Result**: Moved SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS into dedicated file. No imports needed. Typecheck passed.
 
-### Step 4: Consolidate media sentiment into `src/simulation/media.ts`
-
-- **Status**: done
-- **Files**: `packages/engine/src/simulation/media.ts` (updated), `packages/engine/src/simulation/loop.ts` (updated)
-- **Result**: Added `applyMediaSentiment(currentDay, sentiment, stateId)` to media.ts; loop.ts replaced 15-line block with single call. Removed `mediaSentimentImpact` from loop.ts import. Typecheck passed.
-
-### Step 5: Review remaining inline logic in `loop.ts`
+### Step 3: Update `src/db/seed.ts` to import from new files
 
 - **Status**: done
-- **Files**: none
-- **Result**: Verified delegation: constitutional challenge calls `adjudicateChallenge()` + `constitutionalCourtApprovalImpact()` from constitutional-court.ts; confidence votes call `tallyVertrauensfrage()` + `tallyMisstrauensvotum()` from confidence-votes.ts. Remaining orchestration code (DB writes, event creation, coalition role changes) is appropriate to keep in loop.ts. No further extraction needed.
+- **Files**: `packages/engine/src/db/seed.ts` (updated)
+- **Result**: Removed moved constants, added imports from seed-data.js and ddl.js; updated nationalState insert to use INITIAL_NATIONAL_STATE; removed unused PartySeed/CoalitionRole/PolicyPriorities imports. Typecheck passed.
 
-### Step 6: Add `.js` extension imports in new files
+### Step 4: Create `src/db/schema-sim.ts`
 
-- **Status**: done
-- **Files**: none (verified inline in steps 1–4)
-- **Result**: All imports in bill-pipeline.ts, veto.ts, and updated opinion.ts and media.ts correctly use `.js` extensions per Node16 ESM requirements. Typecheck passed.
+- **Status**: pending
+
+### Step 5: Create `src/db/schema-user.ts`
+
+- **Status**: pending
+
+### Step 6: Rewrite `src/db/schema.ts` as re-export barrel
+
+- **Status**: pending
