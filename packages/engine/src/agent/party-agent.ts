@@ -1,5 +1,6 @@
 import type { AgentAction, AgentContext, Bill } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "./client.js";
+import { logAICall } from "./ai-json.js";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 
@@ -11,19 +12,34 @@ export async function runPartyAgent(
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(ctx);
 
-  console.log(`  [Agent] Calling AI for ${ctx.party.name}...`);
-
+  const t0 = Date.now();
   try {
-    const text = await callAI({
+    const { text, model, provider } = await callAI({
       system: systemPrompt,
       prompt: userPrompt,
       maxTokens: 2048,
       partyId: ctx.party.id,
     });
 
-    console.log(`  [Agent] ${ctx.party.name} responded (${text.length} chars)`);
+    let parseOk = true;
+    let validationOk = true;
+    let fallback: string | undefined;
 
-    const parsed = parseAgentResponse(text);
+    let parsed;
+    try {
+      parsed = parseAgentResponse(text);
+    } catch {
+      parseOk = false;
+      fallback = "abstain-all";
+      logAICall({ task: `agent:${ctx.party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk, validationOk, fallback });
+      return votableBills.map(bill => ({
+        type: "vote" as const,
+        billId: bill.id,
+        vote: "abstain" as const,
+        reason: "Agent error - automatic abstain",
+      }));
+    }
+
     const validated = validateActions(
       parsed.actions,
       votableBills,
@@ -35,7 +51,11 @@ export async function runPartyAgent(
       ctx.party.coalitionRole === "leader",
     );
 
-    console.log(`  [Agent] ${ctx.party.name}: ${validated.length} valid actions`);
+    if (validated.length < parsed.actions.length) {
+      validationOk = false; // some actions dropped
+    }
+
+    logAICall({ task: `agent:${ctx.party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk, validationOk });
     return validated;
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
@@ -44,14 +64,14 @@ export async function runPartyAgent(
       console.error(`  [Agent] Error for ${ctx.party.name}:`, error);
     }
 
+    logAICall({ task: `agent:${ctx.party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "abstain-all" });
+
     // Fallback: abstain on all votable bills (third reading)
-    const fallbackActions: AgentAction[] = votableBills.map(bill => ({
+    return votableBills.map(bill => ({
       type: "vote" as const,
       billId: bill.id,
       vote: "abstain" as const,
       reason: "Agent error - automatic abstain",
     }));
-
-    return fallbackActions;
   }
 }

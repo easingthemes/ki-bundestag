@@ -14,7 +14,10 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Tracks providers that have hit usage limits. */
-const providerLimits = new Map<Provider, { until: string; logged: boolean }>();
+const providerLimits = new Map<Provider, { until: string; resetAt: number }>();
+
+const MAX_RETRIES = 2;
+const RETRY_DELAYS = [2_000, 5_000]; // ms
 
 export class AIProviderLimitError extends Error {
   provider: Provider;
@@ -30,13 +33,13 @@ export class AIProviderLimitError extends Error {
 /** Returns true when every configured provider is currently limited. */
 export function allProvidersLimited(): boolean {
   if (providerLimits.size === 0) return false;
-  // Check if the providers we actually use are all limited
+  const now = Date.now();
   const providers = new Set<Provider>();
-  // We always need at least anthropic (daily role default)
   providers.add("anthropic");
   if (process.env.XAI_API_KEY) providers.add("xai");
   for (const p of providers) {
-    if (!providerLimits.has(p)) return false;
+    const limit = providerLimits.get(p);
+    if (!limit || now >= limit.resetAt) return false;
   }
   return true;
 }
@@ -46,8 +49,26 @@ export function clearProviderLimits(): void {
   providerLimits.clear();
 }
 
-function detectLimitError(err: unknown): { provider?: Provider; until?: string } {
-  if (!err || typeof err !== "object") return {};
+type LimitResult =
+  | { type: "hard"; provider: Provider; until: string }
+  | { type: "transient"; provider: Provider }
+  | { type: "none" };
+
+function inferProvider(err: Record<string, unknown>): Provider {
+  const url = typeof err.url === "string" ? err.url : "";
+  return url.includes("x.ai") || url.includes("xai") ? "xai" : "anthropic";
+}
+
+function isNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as Record<string, unknown>).code;
+  if (typeof code === "string" && /^(ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|UND_ERR_CONNECT_TIMEOUT)$/.test(code)) return true;
+  const msg = (err as Record<string, unknown>).message;
+  return typeof msg === "string" && /fetch failed|network|socket hang up/i.test(msg);
+}
+
+function detectLimitError(err: unknown): LimitResult {
+  if (!err || typeof err !== "object") return { type: "none" };
   const e = err as Record<string, unknown>;
 
   // Vercel AI SDK wraps API errors with responseBody / data
@@ -60,31 +81,26 @@ function detectLimitError(err: unknown): { provider?: Provider; until?: string }
           ? e.message
           : "";
 
-  // Match "You have reached your specified API usage limits. You will regain access on <date>"
+  // Hard limit: "You have reached your specified API usage limits. You will regain access on <date>"
   const limitMatch = body.match(
     /usage limits?.*?regain access on ([0-9T :ZZ\-]+)/i
   );
   if (limitMatch) {
-    const until = limitMatch[1].trim();
-    // Infer provider from URL or model
-    const url = typeof e.url === "string" ? e.url : "";
-    const provider: Provider = url.includes("x.ai") || url.includes("xai")
-      ? "xai"
-      : "anthropic";
-    return { provider, until };
+    return { type: "hard", provider: inferProvider(e), until: limitMatch[1].trim() };
   }
 
-  // Match generic rate-limit (429) — short 60s backoff
+  // Transient 429 rate-limit
   const status = typeof e.statusCode === "number" ? e.statusCode : 0;
   if (status === 429) {
-    const url = typeof e.url === "string" ? e.url : "";
-    const provider: Provider = url.includes("x.ai") || url.includes("xai")
-      ? "xai"
-      : "anthropic";
-    return { provider, until: "rate-limited (retry soon)" };
+    return { type: "transient", provider: inferProvider(e) };
   }
 
-  return {};
+  // Transient network errors
+  if (isNetworkError(err)) {
+    return { type: "transient", provider: inferProvider(e) };
+  }
+
+  return { type: "none" };
 }
 
 // ---------------------------------------------------------------------------
@@ -121,13 +137,27 @@ function getModel(provider: Provider, modelId: string) {
  * @param opts.roleKey - Optional role key for system role model selection
  * @returns Generated text response
  */
+/** Parse a date string into a ms timestamp, or return a default TTL offset. */
+function parseResetTime(until: string): number {
+  const parsed = Date.parse(until);
+  if (!isNaN(parsed) && parsed > Date.now()) return parsed;
+  // Default: 10 minutes from now
+  return Date.now() + 10 * 60_000;
+}
+
+export interface AICallResult {
+  text: string;
+  model: string;
+  provider: Provider;
+}
+
 export async function callAI(opts: {
   system: string;
   prompt: string;
   maxTokens: number;
   partyId?: string;
   roleKey?: RoleKey;
-}): Promise<string> {
+}): Promise<AICallResult> {
   let config: ModelConfig;
 
   // Determine which model to use
@@ -136,38 +166,57 @@ export async function callAI(opts: {
   } else if (opts.roleKey) {
     config = getRoleModel(opts.roleKey);
   } else {
-    // Fallback to daily role model
     config = getRoleModel("daily");
   }
 
-  // Circuit breaker: skip call if provider is known-limited
+  // Circuit breaker: skip call if provider is known-limited (with TTL check)
   const limit = providerLimits.get(config.provider);
   if (limit) {
-    throw new AIProviderLimitError(config.provider, limit.until);
+    if (Date.now() >= limit.resetAt) {
+      providerLimits.delete(config.provider);
+      console.log(`  [AI] ${config.provider} limit expired, retrying`);
+    } else {
+      throw new AIProviderLimitError(config.provider, limit.until);
+    }
   }
 
   const model = getModel(config.provider, config.model);
 
-  try {
-    const result = await generateText({
-      model,
-      system: opts.system,
-      prompt: opts.prompt,
-      maxOutputTokens: opts.maxTokens,
-    });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await generateText({
+        model,
+        system: opts.system,
+        prompt: opts.prompt,
+        maxOutputTokens: opts.maxTokens,
+      });
 
-    return result.text;
-  } catch (err) {
-    const detected = detectLimitError(err);
-    if (detected.provider && detected.until) {
-      providerLimits.set(detected.provider, { until: detected.until, logged: false });
-      // Log once, clearly
-      console.error(
-        `\n  *** ${detected.provider.toUpperCase()} API LIMIT REACHED — access resumes ${detected.until} ***` +
-        `\n  *** All further ${detected.provider} calls will be skipped this session ***\n`
-      );
-      throw new AIProviderLimitError(detected.provider, detected.until);
+      return { text: result.text, model: config.model, provider: config.provider };
+    } catch (err) {
+      const detected = detectLimitError(err);
+
+      if (detected.type === "hard") {
+        const resetAt = parseResetTime(detected.until);
+        providerLimits.set(detected.provider, { until: detected.until, resetAt });
+        console.error(
+          `\n  *** ${detected.provider.toUpperCase()} API LIMIT REACHED — access resumes ${detected.until} ***` +
+          `\n  *** ${detected.provider} calls skipped until limit resets ***\n`
+        );
+        throw new AIProviderLimitError(detected.provider, detected.until);
+      }
+
+      if (detected.type === "transient" && attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAYS[attempt];
+        console.warn(`  [AI] Transient error (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      // Not retryable or retries exhausted
+      throw err;
     }
-    throw err;
   }
+
+  // Unreachable, but satisfies TypeScript
+  throw new Error("[AI] Unexpected: retry loop exited without return or throw") as never;
 }

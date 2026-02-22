@@ -92,10 +92,10 @@ export function BillDetail() {
     if (!id) return;
     api.getBill(id).then(b => {
       setBill(b);
-      if (b.status === "second_reading" || b.status === "third_reading") {
+      if (["second_reading", "third_reading", "passed", "rejected", "struck_down"].includes(b.status)) {
         api.getBillSignals(id).then(setSignals).catch(console.error);
       }
-      if (b.status === "third_reading") {
+      if (["third_reading", "passed", "rejected", "struck_down"].includes(b.status)) {
         api.getMdbVotes(id).then(setMdbVotes).catch(() => {});
       }
       // Load speeches for any reading stage
@@ -168,6 +168,27 @@ export function BillDetail() {
           )}
         </div>
       </CardContent></Card>
+
+      {/* Outcome banner — user signal */}
+      {user && bill && (bill.status === "passed" || bill.status === "rejected") && signals?.userSignal && (
+        <div className={cn(
+          "rounded-md border px-4 py-3 text-sm mb-4",
+          bill.status === "passed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
+        )}>
+          You signaled <strong>{signals.userSignal.toUpperCase()}</strong> on this bill. It was <strong>{bill.status.toUpperCase()}</strong>
+          {bill.votes.length > 0 && ` with ${bill.votes.reduce((s: number, v: { vote: string; partyId: string }) => s + (v.vote === "yes" ? (partyMap.get(v.partyId)?.seatCount ?? 0) : 0), 0)} yes votes`}.
+        </div>
+      )}
+
+      {/* Outcome banner — MdB vote */}
+      {user && bill && (bill.status === "passed" || bill.status === "rejected") && mdbVotes?.userVote && (
+        <div className={cn(
+          "rounded-md border px-4 py-3 text-sm mb-4",
+          bill.status === "passed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
+        )}>
+          You voted <strong>{mdbVotes.userVote.toUpperCase()}</strong> as an MdB on this bill. It was <strong>{bill.status.toUpperCase()}</strong>.
+        </div>
+      )}
 
       {/* Description */}
       <div className="mb-6">

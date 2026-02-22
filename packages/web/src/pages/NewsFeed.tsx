@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { api, SimulationEvent, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -237,8 +238,27 @@ export function NewsFeed() {
                               {ev.type.replace(/_/g, " ")}
                             </Badge>
                             {ev.actor !== "system" && (
-                              <span className="text-xs font-semibold" style={{ color: getPartyColor(ev.actor) }}>
+                              <Link
+                                to={`/parties/${ev.actor}`}
+                                className="text-xs font-semibold no-underline hover:underline"
+                                style={{ color: getPartyColor(ev.actor) }}
+                              >
                                 {getPartyName(ev.actor)}
+                              </Link>
+                            )}
+                            {!!ev.data?.billId && (
+                              <Link to={`/bills/${String(ev.data.billId)}`} className="text-[10px] text-blue-600 hover:underline">
+                                View Bill →
+                              </Link>
+                            )}
+                            {!!ev.data?.electionId && (
+                              <Link to="/elections" className="text-[10px] text-blue-600 hover:underline">
+                                View Election →
+                              </Link>
+                            )}
+                            {!!ev.data?.crisisId && ev.type === "crisis_start" && (
+                              <span className="text-[10px] text-red-600 font-medium">
+                                {String(ev.data.severity)}
                               </span>
                             )}
                           </div>

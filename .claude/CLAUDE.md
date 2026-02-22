@@ -76,7 +76,7 @@ AI calls use the **Vercel AI SDK v6** with per-party and per-role model selectio
 | `negotiation` | anthropic:claude-haiku-4-5-20251001 | `MODEL_NEGOTIATION` | Coalition negotiation rounds (per-party) |
 | `synthesis` | anthropic:claude-sonnet-4-5-20250929 | `MODEL_SYNTHESIS` | Coalition agreement synthesis |
 
-**Unified Client**: [`callAI()`](../packages/engine/src/agent/client.ts) function accepts `{system, prompt, maxTokens, partyId?, roleKey?}` and routes to the appropriate provider + model. Per-provider circuit breaker: on API usage limit errors, the provider is marked unavailable and all subsequent calls throw `AIProviderLimitError` immediately (no API hit). `allProvidersLimited()` returns true when all providers are blocked; runner-auto pauses in this case. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
+**Unified Client**: [`callAI()`](../packages/engine/src/agent/client.ts) accepts `{system, prompt, maxTokens, partyId?, roleKey?}` and returns `AICallResult {text, model, provider}`. Routes to the appropriate provider + model. Transient-error retry (2 retries, 2s+5s backoff) for 429s and network errors. Per-provider circuit breaker with TTL: hard API limit errors store a `resetAt` timestamp; entries auto-expire. `allProvidersLimited()` returns true when all providers are blocked; runner-auto pauses in this case. **Shared JSON parser**: `parseAIJson()` in `ai-json.ts` handles code-fence stripping, sanitization, and typed validation for all 11 JSON-returning call sites. **Observability**: `logAICall()` emits `[AI] <task> | <provider>/<model> | <ms>ms | OK|PARSE_FAIL|VALIDATION_FAIL` for all 13 call sites. API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`.
 
 ## Simulation Flow
 

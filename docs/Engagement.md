@@ -1,4 +1,7 @@
-# KI Bundestag — User Engagement Plan: Party Membership & Internal Democracy
+# KI Bundestag — User Engagement Reference: Party Membership & Internal Democracy
+
+> **Doc Status**: Active (current-spec + reference)
+> **Use for**: Membership/proposals/signals behavior and design rationale
 
 **Goal**: Let visitors become active participants — join a party, propose legislation, vote in internal party caucuses, and shape what the AI faction brings to the Bundestag floor.
 
@@ -14,9 +17,7 @@
 
 ---
 
-## Improvements & Design Rationale
-
-### On the original idea
+## Behavioral Notes & Rationale
 
 **Identity without auth**: A UUID token in `localStorage` is enough. No password, no email — just a display name. This removes the #1 barrier to participation. The token is sent as an `X-User-Token` header on write requests.
 
@@ -34,11 +35,11 @@
 
 ---
 
-## Phase E.1 — User Identity & Party Membership ✅ IMPLEMENTED
+## E.1 — User Identity & Party Membership
 
 **What it does**: Users can register with just a name, join one party, and be recognized as a member across sessions.
 
-### New DB Table: `users`
+### Data Model Table: `users`
 
 | Column | Type | Notes |
 |---|---|---|
@@ -58,11 +59,11 @@
 
 Switching party sets `switch_cooldown_until = currentDay + 7`. Rejoining or joining after leaving also checks cooldown.
 
-### Engine changes
+### Engine behavior
 
 None — membership is purely a web/API concern at this phase.
 
-### UI Changes
+### UI behavior
 
 **Parties page**:
 - Each party card shows "👥 N members" count (small, below the seat count)
@@ -91,11 +92,11 @@ On success: token stored to `localStorage` as `ki-bundestag-token`. User object 
 
 ---
 
-## Phase E.2 — Internal Proposals ✅ IMPLEMENTED
+## E.2 — Internal Proposals
 
 **What it does**: Members can submit bill proposals into a party-internal caucus. The AI agent's own daily proposal also appears here as an "AI Suggestion". All proposals are publicly visible (transparency).
 
-### New DB Table: `internal_proposals`
+### Data Model Table: `internal_proposals`
 
 | Column | Type | Notes |
 |---|---|---|
@@ -127,7 +128,7 @@ On success: token stored to `localStorage` as `ki-bundestag-token`. User object 
 - `POST /api/parties/:id/proposals` (auth, must be member) — create proposal
 - `GET /api/proposals/:id` — single proposal detail
 
-### Engine changes
+### Engine behavior
 
 **`loop.ts`** — Party agent daily step: when building `AgentContext`, include `topInternalProposals: InternalProposal[]` (top 3 by vote score that are `open`, for the agent's own party). Agent sees member preferences in its thinking context.
 
@@ -165,11 +166,11 @@ Why now?        [_________________________________] 200 chars
 
 ---
 
-## Phase E.3 — Member Voting on Proposals ✅ IMPLEMENTED
+## E.3 — Member Voting on Proposals
 
 **What it does**: Members can vote up or down on any open proposal (including the AI's suggestion). Voting is visible to everyone; your own vote is highlighted.
 
-### New DB Table: `internal_votes`
+### Data Model Table: `internal_votes`
 
 | Column | Type | Notes |
 |---|---|---|
@@ -188,7 +189,7 @@ Unique constraint: `(proposal_id, user_id)` — one vote per person per proposal
 
 Proposal list responses include `userVote: 1 | -1 | null` when request includes auth token.
 
-### UI Changes
+### UI behavior
 
 Each proposal row in the Proposals tab shows vote buttons:
 
@@ -205,11 +206,11 @@ Non-members see the scores but no vote buttons — "Join to vote".
 
 ---
 
-## Phase E.4 — Party Decision Engine ✅ IMPLEMENTED
+## E.4 — Party Decision Engine
 
 **What it does**: Every sim day, a review step checks if any proposals are ready (age ≥ 5 days, ≥ 3 total votes). The top-scored ready proposal per party is sent to the AI for a focused accept/decline decision.
 
-### Engine changes
+### Engine behavior
 
 **`packages/engine/src/simulation/internal-proposals.ts`** (new file)
 
@@ -251,7 +252,7 @@ Shown in agent context as: "Top member proposals in your caucus (by votes): …"
 
 ---
 
-## Phase E.5 — Membership Influence on Approval ✅ IMPLEMENTED
+## E.5 — Membership Influence on Approval
 
 **What it does**: Party approval rating gets a small bonus based on active membership. Parties with engaged members are more resilient to negative drift.
 
@@ -280,11 +281,11 @@ Party cards on the Parties page add below the approval rating:
 
 ---
 
-## Phase E.6 — Member Bill Signals (Stretch Goal) ✅ IMPLEMENTED
+## E.6 — Member Bill Signals
 
 **What it does**: Before a Bundestag bill reaches third reading, members of any party can signal YES or NO. The party AI agent sees this signal in its vote context. Not binding — just another input.
 
-### New DB Table: `member_signals`
+### Data Model Table: `member_signals`
 
 | Column | Type |
 |---|---|
@@ -301,7 +302,7 @@ Unique: `(bill_id, user_id)`.
 - `POST /api/bills/:id/signal` (auth) — `{signal: "yes" | "no"}`
 - `GET /api/bills/:id/signal` — `{yes: N, no: M, userSignal?: "yes" | "no"}`
 
-### Engine changes
+### Engine behavior
 
 When a bill moves to `third_reading`, compute `memberSignals` per party (count YES/NO from that party's members). Add to agent vote context:
 ```
@@ -317,9 +318,22 @@ Member signals:  [████████░░░░] 68% YES  (25 votes)  [�
 
 ---
 
-## Technical Summary
+## Additional Shipped Engagement UX
 
-### New DB Tables (5)
+The following engagement-oriented UX capabilities are shipped in addition to E.1–E.6:
+
+- Activity and feedback surfaces: user activity feed (`/my-activity`) and contextual outcome linking in bill/proposal flows.
+- Onboarding and prompts: guided onboarding flow plus contextual quick actions based on user role/state.
+- Dashboard participation widgets: impact/catchup-oriented cards and event awareness surfaces.
+- Engagement telemetry foundations: user-action logging and participation-oriented analytics endpoints used by admin/ops pages.
+
+These features support discoverability and sustained participation without changing core democratic mechanics.
+
+---
+
+## Implementation Reference
+
+### Data Model Tables
 | Table | Purpose |
 |---|---|
 | `users` | Registered members |
@@ -327,12 +341,12 @@ Member signals:  [████████░░░░] 68% YES  (25 votes)  [�
 | `internal_votes` | Member votes on proposals |
 | `member_signals` | Member YES/NO on Bundestag bills (E.6) |
 
-### Modified DB Tables
+### Modified Data Model Tables
 | Table | New columns |
 |---|---|
 | `bills` | `member_initiative` (boolean), `proposer_display_name` (text \| null) |
 
-### New API Endpoints (12)
+### API Endpoints
 ```
 POST   /api/users/register
 GET    /api/users/me
@@ -349,35 +363,34 @@ POST   /api/bills/:id/signal          (E.6)
 GET    /api/bills/:id/signal          (E.6)
 ```
 
-### New Engine Files
+### Engine Files
 - `packages/engine/src/simulation/internal-proposals.ts` — review step
 
-### Modified Engine Files
+### Engine Touchpoints
 - `loop.ts` — add proposal review step + AI proposal mirroring + member bonus
 - `prompt.ts` — add `topInternalProposals` to AgentContext
 - `schema.ts` — new tables + bill columns
 - `opinion.ts` — membership bonus in approval drift
 
-### New Web Pages / Sections
+### Web Pages / Sections
 - **Party Detail** — "Proposals" section/tab (replace or extend existing tabs)
 - **Bill Detail** — "Member Initiative" badge + proposer credit
 - **Bills page** — "Member Initiative" badge filter
 
-### Modified Web Pages
+### Web Page Touchpoints
 - **Parties** — member count + Join button on each card
 - **Party Detail** — Join flow, member count in header, proposal list
 
 ---
 
-## Phase Roadmap
+## Source Anchors (Code)
 
-| Phase | Feature | Engine | API | UI | Effort |
-|---|---|---|---|---|---|
-| E.1 | User identity & party join | None | 4 endpoints | Parties + Party Detail | Low |
-| E.2 | Internal proposals (create + list) | loop.ts: mirror AI proposals | 3 endpoints | Proposals tab + form | Medium |
-| E.3 | Member voting on proposals | None | 2 endpoints | Vote buttons in tab | Low |
-| E.4 | Party decision engine (AI review) | internal-proposals.ts | — | Bill badges | Medium |
-| E.5 | Membership → approval bonus | opinion.ts | — | Party card stat | Low |
-| E.6 | Member bill signals | prompt.ts | 2 endpoints | Signal bar on Bills | Medium |
-
-E.1 → E.3 form a complete "democracy loop" (join → propose → vote) without touching the engine. E.4 completes the loop by wiring member input into actual Bundestag outcomes. E.5 and E.6 are refinements that deepen the influence model.
+- Identity and membership API: [packages/api/src/index.ts](packages/api/src/index.ts#L1706-L1797)
+- Proposal APIs and voting APIs: [packages/api/src/index.ts](packages/api/src/index.ts#L1519-L1668)
+- Bill signal API: [packages/api/src/index.ts](packages/api/src/index.ts#L234-L277)
+- Engagement schema tables (`users`, `internal_proposals`, `internal_votes`, `member_signals`): [packages/engine/src/db/schema.ts](packages/engine/src/db/schema.ts#L228-L287)
+- Bill attribution fields (`member_initiative`, `proposer_display_name`): [packages/engine/src/db/schema.ts](packages/engine/src/db/schema.ts#L32-L33)
+- Proposal decision engine: [packages/engine/src/simulation/internal-proposals.ts](packages/engine/src/simulation/internal-proposals.ts#L16-L143)
+- Loop integration points (top proposals, signals, review step, membership bonus): [packages/engine/src/simulation/loop.ts](packages/engine/src/simulation/loop.ts#L913-L969), [packages/engine/src/simulation/loop.ts](packages/engine/src/simulation/loop.ts#L1662-L1736)
+- Agent prompt integration for member proposals/signals: [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts#L169-L177), [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts#L254-L257)
+- Membership bonus function: [packages/engine/src/simulation/opinion.ts](packages/engine/src/simulation/opinion.ts#L49-L54)

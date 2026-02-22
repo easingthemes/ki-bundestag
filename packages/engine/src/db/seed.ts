@@ -458,6 +458,17 @@ const USER_TABLE_DDL = `
     day_number INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS user_actions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    entity_id TEXT,
+    entity_type TEXT,
+    metadata TEXT,
+    sim_day INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `;
 
 /**
@@ -465,6 +476,7 @@ const USER_TABLE_DDL = `
  * ALTER TABLE ADD COLUMN is a no-op if the column already exists (we catch the error).
  */
 const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
+  { table: "citizen_questions", column: "user_id", sql: "ALTER TABLE citizen_questions ADD COLUMN user_id TEXT" },
   { table: "simulation_events", column: "created_at", sql: "ALTER TABLE simulation_events ADD COLUMN created_at TEXT" },
   // Note: Old DBs may have 120 here; migrate-timing.ts rescales to 1461
   { table: "simulation_meta", column: "next_election_day", sql: "ALTER TABLE simulation_meta ADD COLUMN next_election_day INTEGER NOT NULL DEFAULT 1461" },
@@ -675,6 +687,7 @@ export function seedDatabase() {
   // User DB: fresh start
   const userSqlite = getUserSqlite();
   userSqlite.exec(`
+    DROP TABLE IF EXISTS user_actions;
     DROP TABLE IF EXISTS mdb_speeches;
     DROP TABLE IF EXISTS mdb_votes;
     DROP TABLE IF EXISTS mdb_applications;

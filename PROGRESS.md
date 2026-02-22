@@ -1,32 +1,55 @@
 # Progress
 
-## Goal
-Add a calendar widget to the Dashboard showing simulation activities per day, using real calendar dates.
+## Summary
+- **Status**: completed (6 steps)
+- **Date**: 2026-02-22
+- **Goal**: Harden AI engine output quality and reliability — consistent JSON parsing, schema validation with typed fallbacks, tighter prompts, token-budgeted context, transient-error retry, and standardized degradation — without changing core behavior patterns.
+- **Changes**:
+  - Step 1: Audited all 13 callAI sites — cataloged parsers, validators, and fallback gaps
+  - Step 2: Created shared `parseAIJson()` utility; migrated 9 JSON call sites from ad-hoc parsing
+  - Step 3: Added priority-based token-budgeted context trimming + tightened prompt constraints
+  - Step 4: Added transient-error retry (2 retries, 2s+5s backoff) + TTL-based circuit breaker reset
+  - Step 5: Changed `callAI` return to `AICallResult {text, model, provider}`; added `logAICall()` observability to all 13 sites
+  - Step 6: Verified with `npm run simulate 5`; fixed summary empty-system-prompt bug; reconciled docs
 
 ## Steps
 
-### Step 1: Store simulation start date and add calendar API
+### Step 1: Audit AI surface and failure points
 - **Status**: done
-- **Files**: `packages/engine/src/db/schema.ts`, `packages/engine/src/db/seed.ts`, `packages/api/src/index.ts`
-- **Result**: Added `start_date` column to `simulation_meta` (schema + migration + seed + backfill). Added `GET /api/calendar?month=YYYY-MM` endpoint with event importance tiers (3 tiers, routine excluded) returning top 3 events/day. Added `startDate` to `/api/simulation/status`. Typecheck + migrate pass.
+- **Files**: (read-only)
+- **Result**: Cataloged 13 callAI sites — 11 JSON, 2 free text. Found 4 ad-hoc parsers, 5 bare JSON.parse, 1 worst-offender (summary: no code-fence strip).
 
-### Step 2: Build the calendar component
+---
+
+### Step 2: Shared JSON parser + per-feature schema validation
 - **Status**: done
-- **Files**: `packages/web/src/components/CalendarWidget.tsx` (new), `packages/web/src/api.ts`
-- **Result**: Added `CalendarEvent`, `CalendarDay`, `CalendarData` types + `getCalendar()` API method. Created `CalendarWidget.tsx` with month grid (Mo-start, German locale), colored event dots (3 tiers), month nav with bounds, day-click Dialog showing all events with type badges + links. Typecheck passes.
+- **Files**: `ai-json.ts` (NEW), `action-parser.ts`, `media.ts`, `polls.ts`, `referendums.ts`, `summary.ts`, `negotiations.ts`, `internal-proposals.ts`, `seats.ts`, `discipline.ts`, `speeches.ts`
+- **Result**: Created `extractJson` + `safeParseJson` + `parseAIJson` in `ai-json.ts`; migrated 9 JSON sites with typed validators. Sanitizers (`stripLeadingPlus`, `stripTrailingCommas`) moved from action-parser.
 
-### Step 3: Integrate into Dashboard
+---
+
+### Step 3: Prompt quality + token-budgeted context
 - **Status**: done
-- **Files**: `packages/web/src/pages/Dashboard.tsx`
-- **Result**: Added calendar state + fetch in `refreshSlow` (re-fetches on month change). Placed "Kalender" section in main column after Media Highlights with "Alle Tage →" link to `/log`. Typecheck passes.
+- **Files**: `prompt.ts`, `negotiations.ts`, `summary.ts`
+- **Result**: Added `CONTEXT_TOKEN_BUDGET=3000` with 3-tier priority trimming in `buildUserPrompt()`. Added "no code fences / no leading + / no trailing commas" rules to system prompts. Tightened negotiation + summary prompts.
 
-## Notes
-- Day-to-date mapping: `start_date` (ISO string) in `simulation_meta`, day 1 = that date, day N = start_date + (N-1) days
-- Event importance tiers for ranking top 3:
-  - Tier 1 (critical): election_result, government_formed, government_dissolved, crisis_start, constitutional_court_ruled, confidence vote outcomes
-  - Tier 2 (high): bill_proposed, bill_third_reading, presidential_veto, budget_proposed, interpellation_filed
-  - Tier 3 (medium): motion_submitted, statement, amendment_proposed, fraktion_formed
-  - Tier 4 (routine): day_start, economy_update, weekly_report, monthly_report, vote_cast — excluded from top 3
-- Existing `/api/simulation/days` endpoint already groups events by day — calendar endpoint extends this with date mapping and importance ranking
-- Dialog component already available and used across 15+ pages — no new dependencies needed
-- Calendar widget is read-only, no participatory gating needed
+---
+
+### Step 4: Transient error retry + provider-limit TTL
+- **Status**: done
+- **Files**: `client.ts`
+- **Result**: `detectLimitError()` classifies hard vs transient (429/network) errors. Retry loop: 2 retries with [2s, 5s] delays. Circuit breaker entries store `resetAt` timestamp; auto-expire on next check. `allProvidersLimited()` checks TTL.
+
+---
+
+### Step 5: Standardized fallback semantics + console observability
+- **Status**: done
+- **Files**: `ai-json.ts`, `client.ts`, `index.ts` (agent+engine), `party-agent.ts`, `negotiations.ts`, `media.ts`, `polls.ts`, `referendums.ts`, `summary.ts`, `internal-proposals.ts`, `seats.ts`, `discipline.ts`, `speeches.ts`, `questions.ts`, `interpellations.ts`
+- **Result**: `callAI` returns `AICallResult {text, model, provider}`. All 13 sites wrapped with `Date.now()` timing + `logAICall()` emitting `[AI] <task> | <provider>/<model> | <ms>ms | OK|PARSE_FAIL|VALIDATION_FAIL`. Fallback policies documented in `ai-json.ts`.
+
+---
+
+### Step 6: Verify and reconcile docs
+- **Status**: done
+- **Files**: `summary.ts`, `docs/Current_Architecture.md`
+- **Result**: Typecheck 6/6 pass. 5-day simulation verified all log lines. Fixed summary bug (`system: ""` rejected by Anthropic API → minimal system prompt). Architecture doc already reconciled with all changes.

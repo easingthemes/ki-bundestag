@@ -1,6 +1,7 @@
 import type { Government, Interpellation, Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 
 const MAX_ANSWERS_PER_DAY = 2;
@@ -52,8 +53,9 @@ export async function answerPendingInterpellations(
 
     const ministerParty = allParties.find(p => p.id === minister.partyId);
 
+    const t0 = Date.now();
     try {
-      const text = await callAI({
+      const { text, model, provider } = await callAI({
         system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.`,
         prompt: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
         maxTokens: 300,
@@ -80,13 +82,15 @@ export async function answerPendingInterpellations(
         sentimentImpact: impact,
       }));
 
-      console.log(`  [Interpellations] ${minister.name} answered: "${row.title.substring(0, 50)}..."`);
+      logAICall({ task: `interpellation:${minister.partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
     } catch (error) {
       if (error instanceof AIProviderLimitError) {
         console.warn(`  [Interpellations] Skipped (${error.message})`);
-        break;
+      } else {
+        console.error(`  [Interpellations] Error answering "${row.title}":`, error);
       }
-      console.error(`  [Interpellations] Error answering "${row.title}":`, error);
+      logAICall({ task: `interpellation:${minister.partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
+      if (error instanceof AIProviderLimitError) break;
     }
   }
 

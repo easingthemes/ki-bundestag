@@ -21,6 +21,9 @@ RULES:
 15. If you are the coalition leader (coalitionRole "leader"), you may call a Vertrauensfrage (confidence vote) with "call_vertrauensfrage". Parliament votes on whether to maintain your Chancellor's mandate. If the coalition does not hold together (fewer than 368 seats vote yes), the government falls and a snap election is triggered. Use strategically — after a crisis, a controversial bill, or when you want a fresh mandate. Max 1 per turn. Not available during elections.
 16. If you are in opposition (coalitionRole "opposition"), you may file a Konstruktives Misstrauensvotum with "file_misstrauensvotum". You must name a replacement Chancellor and their party. Requires 368 absolute-majority seats to pass. If successful, the opposition takes power immediately without an election. Max 1 per turn. Not available during elections.
 17. You may file a constitutional challenge with "file_constitutional_challenge" (requires Fraktion, not available during elections). Target a recently passed bill (last 14 days). The Bundesverfassungsgericht rules same-day: 30% chance the law is struck down and its economic effects reversed. Max 1 per turn. Use sparingly — only for laws that genuinely violate constitutional principles. A dismissed challenge harms your approval rating.
+18. Do NOT wrap your JSON response in markdown code fences (\`\`\`). Respond with raw JSON only.
+19. Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).
+20. Do NOT include trailing commas in JSON arrays or objects.
 
 RESPONSE SCHEMA:
 {
@@ -105,6 +108,14 @@ RESPONSE SCHEMA:
 }`;
 }
 
+/** Rough token estimate: ~4 chars per token. */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/** Maximum tokens for optional context sections (Priority 2+3). */
+const CONTEXT_TOKEN_BUDGET = 3000;
+
 export function buildUserPrompt(ctx: AgentContext): string {
   const firstReadingBills = ctx.pendingBills.filter(b => b.status === "first_reading");
   const secondReadingBills = ctx.pendingBills.filter(b => b.status === "second_reading");
@@ -188,7 +199,9 @@ ${thirdReadingBills.map(b => `  - "${b.title}" (${b.category}) proposed by ${b.p
     readingSections = "\nNO ACTIVE BILLS IN PARLIAMENT\n";
   }
 
-  return `CURRENT DAY: ${ctx.currentDay}
+  // ── Priority 1: Always included (core decision-making context) ──────────
+
+  const coreLines = `CURRENT DAY: ${ctx.currentDay}
 
 YOUR PARTY: ${ctx.party.name}
   Role: ${ctx.party.coalitionRole}
@@ -208,12 +221,6 @@ NATIONAL STATE:
   GDP Growth: ${ctx.nationalState.economy.gdpGrowth}%
   Public Sentiment: ${ctx.nationalState.publicSentiment}/100
 ${readingSections}
-${proposedBills.length > 0 ? `BILLS RECENTLY PROPOSED (entering pipeline, not yet votable):
-${proposedBills.map(b => `  - "${b.title}" by ${b.proposedBy}`).join("\n")}` : ""}
-
-RECENT EVENTS:
-${ctx.recentEvents.length > 0 ? ctx.recentEvents.slice(-10).map(e => `  [Day ${e.dayNumber}] ${e.title}: ${e.description}`).join("\n") : "  No recent events."}
-
 ${ctx.activeElection ? `ELECTION STATUS:
   Status: ${ctx.activeElection.status}
   Election Day: Day ${ctx.activeElection.electionDay}
@@ -225,35 +232,86 @@ ${ctx.activeCrises.map(c => `  - [${c.severity.toUpperCase()}] ${c.name} (${c.ca
     ${c.description}
     Daily impact: ${JSON.stringify(c.dailyImpact)}`).join("\n")}` : "NO ACTIVE CRISES"}
 
-${ctx.recentMedia && ctx.recentMedia.length > 0 ? `RECENT MEDIA COVERAGE:
-${ctx.recentMedia.map(a => `  - [${a.outlet}, ${a.bias}] "${a.headline}" — ${a.summary}`).join("\n")}` : ""}
-
-${ctx.recentMotions && ctx.recentMotions.length > 0 ? `RECENT MOTIONS (last 3 days):
-${ctx.recentMotions.map(m => `  - [${m.type}, ${m.status}] "${m.title}" by ${m.proposedBy} (Day ${m.dayNumber})`).join("\n")}` : ""}
-
-${ctx.recentInterpellations && ctx.recentInterpellations.length > 0 ? `RECENT INTERPELLATIONS (last 5 days):
-${ctx.recentInterpellations.map(i => `  - [${i.type === "große" ? "Große Anfrage" : "Kleine Anfrage"}, ${i.status}] "${i.title}" by ${i.filedByPartyId} → ${i.targetMinistry} (Day ${i.dayNumber})${i.status === "answered" ? " ✓" : i.status === "expired" ? " ✗ expired" : " pending"}`).join("\n")}` : ""}
-
-${ctx.recentConfidenceVotes && ctx.recentConfidenceVotes.length > 0 ? `RECENT CONFIDENCE VOTES (last 7 days):
-${ctx.recentConfidenceVotes.map(v => `  - [${v.type === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum"}, ${v.status}] "${v.title}" by ${v.initiatedByPartyId} (Day ${v.dayNumber})${v.proposedChancellor ? ` → proposed: ${v.proposedChancellor}` : ""}`).join("\n")}` : ""}
-
-${ctx.recentConstitutionalChallenges && ctx.recentConstitutionalChallenges.length > 0 ? `RECENT CONSTITUTIONAL CHALLENGES (last 7 days):
-${ctx.recentConstitutionalChallenges.map(c => `  - [${c.status === "ruled" ? c.decision ?? "pending" : "pending"}] "${c.billTitle}" challenged by ${c.filedByPartyId} (Day ${c.dayNumber})${c.reasoning ? ` — ${c.reasoning}` : ""}`).join("\n")}` : ""}
-
-${ctx.passedBillsForChallenge && ctx.passedBillsForChallenge.length > 0 ? `RECENTLY PASSED BILLS (challengeable at constitutional court, last 14 days):
-${ctx.passedBillsForChallenge.map(b => `  - [${b.id}] "${b.title}" by ${b.proposedBy} (Day ${b.statusChangedOnDay ?? b.proposedOnDay})`).join("\n")}` : ""}
-
 ${ctx.government ? `FEDERAL GOVERNMENT:
   Chancellor: ${ctx.government.chancellorName} (${ctx.government.chancellorPartyId})
   Ministers:
 ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyId})`).join("\n")}` : "NO ACTIVE GOVERNMENT"}
 
 ALL PARTIES:
-${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}`).join("\n")}
+${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}`).join("\n")}`;
 
-${ctx.topInternalProposals && ctx.topInternalProposals.length > 0 ? `PARTY MEMBER PROPOSALS (top ideas from your base, by support):
-${ctx.topInternalProposals.map(p => `  - "${p.title}" [${p.category}] score:${p.score > 0 ? "+" : ""}${p.score} (${p.totalVotes} vote${p.totalVotes !== 1 ? "s" : ""})`).join("\n")}
-Consider whether these reflect priorities your members care about.` : ""}
+  // ── Priority 2+3: Budget-trimmed optional sections ────────────────────
+
+  // Priority 2: high-value context (events, media, proposals, recently proposed bills)
+  const p2Sections: string[] = [];
+
+  const eventsSection = ctx.recentEvents.length > 0
+    ? `RECENT EVENTS:\n${ctx.recentEvents.slice(-5).map(e => `  [Day ${e.dayNumber}] ${e.title}: ${e.description}`).join("\n")}`
+    : "RECENT EVENTS:\n  No recent events.";
+  p2Sections.push(eventsSection);
+
+  if (ctx.recentMedia && ctx.recentMedia.length > 0) {
+    p2Sections.push(`RECENT MEDIA COVERAGE:\n${ctx.recentMedia.slice(0, 3).map(a => `  - [${a.outlet}, ${a.bias}] "${a.headline}" — ${a.summary}`).join("\n")}`);
+  }
+
+  if (proposedBills.length > 0) {
+    p2Sections.push(`BILLS RECENTLY PROPOSED (entering pipeline, not yet votable):\n${proposedBills.map(b => `  - "${b.title}" by ${b.proposedBy}`).join("\n")}`);
+  }
+
+  if (ctx.topInternalProposals && ctx.topInternalProposals.length > 0) {
+    p2Sections.push(`PARTY MEMBER PROPOSALS (top ideas from your base, by support):\n${ctx.topInternalProposals.map(p => `  - "${p.title}" [${p.category}] score:${p.score > 0 ? "+" : ""}${p.score} (${p.totalVotes} vote${p.totalVotes !== 1 ? "s" : ""})`).join("\n")}\nConsider whether these reflect priorities your members care about.`);
+  }
+
+  // Priority 3: supplementary (motions, interpellations, confidence votes, constitutional challenges, passed bills)
+  const p3Sections: string[] = [];
+
+  if (ctx.recentMotions && ctx.recentMotions.length > 0) {
+    p3Sections.push(`RECENT MOTIONS (last 3 days):\n${ctx.recentMotions.map(m => `  - [${m.type}, ${m.status}] "${m.title}" by ${m.proposedBy} (Day ${m.dayNumber})`).join("\n")}`);
+  }
+
+  if (ctx.recentInterpellations && ctx.recentInterpellations.length > 0) {
+    p3Sections.push(`RECENT INTERPELLATIONS (last 5 days):\n${ctx.recentInterpellations.map(i => `  - [${i.type === "große" ? "Große Anfrage" : "Kleine Anfrage"}, ${i.status}] "${i.title}" by ${i.filedByPartyId} → ${i.targetMinistry} (Day ${i.dayNumber})${i.status === "answered" ? " ✓" : i.status === "expired" ? " ✗ expired" : " pending"}`).join("\n")}`);
+  }
+
+  if (ctx.recentConfidenceVotes && ctx.recentConfidenceVotes.length > 0) {
+    p3Sections.push(`RECENT CONFIDENCE VOTES (last 7 days):\n${ctx.recentConfidenceVotes.map(v => `  - [${v.type === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum"}, ${v.status}] "${v.title}" by ${v.initiatedByPartyId} (Day ${v.dayNumber})${v.proposedChancellor ? ` → proposed: ${v.proposedChancellor}` : ""}`).join("\n")}`);
+  }
+
+  if (ctx.recentConstitutionalChallenges && ctx.recentConstitutionalChallenges.length > 0) {
+    p3Sections.push(`RECENT CONSTITUTIONAL CHALLENGES (last 7 days):\n${ctx.recentConstitutionalChallenges.map(c => `  - [${c.status === "ruled" ? c.decision ?? "pending" : "pending"}] "${c.billTitle}" challenged by ${c.filedByPartyId} (Day ${c.dayNumber})${c.reasoning ? ` — ${c.reasoning}` : ""}`).join("\n")}`);
+  }
+
+  if (ctx.passedBillsForChallenge && ctx.passedBillsForChallenge.length > 0) {
+    p3Sections.push(`RECENTLY PASSED BILLS (challengeable at constitutional court, last 14 days):\n${ctx.passedBillsForChallenge.map(b => `  - [${b.id}] "${b.title}" by ${b.proposedBy} (Day ${b.statusChangedOnDay ?? b.proposedOnDay})`).join("\n")}`);
+  }
+
+  // Greedily include sections within token budget
+  let tokenBudget = CONTEXT_TOKEN_BUDGET;
+  const includedSections: string[] = [];
+
+  for (const section of p2Sections) {
+    const cost = estimateTokens(section);
+    if (cost <= tokenBudget) {
+      includedSections.push(section);
+      tokenBudget -= cost;
+    }
+  }
+
+  for (const section of p3Sections) {
+    const cost = estimateTokens(section);
+    if (cost <= tokenBudget) {
+      includedSections.push(section);
+      tokenBudget -= cost;
+    }
+  }
+
+  if (tokenBudget < CONTEXT_TOKEN_BUDGET && includedSections.length < p2Sections.length + p3Sections.length) {
+    includedSections.push("(Some context sections trimmed for token budget.)");
+  }
+
+  const optionalContext = includedSections.length > 0 ? "\n" + includedSections.join("\n\n") : "";
+
+  return `${coreLines}${optionalContext}
 
 Respond with your actions as JSON.`;
 }

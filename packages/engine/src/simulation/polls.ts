@@ -1,5 +1,6 @@
 import type { Crisis, Party, Poll } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 
@@ -42,8 +43,9 @@ async function createContextPoll(
 
   if (context.length === 0) return null;
 
+  const t0 = Date.now();
   try {
-    const text = await callAI({
+    const { text, model, provider } = await callAI({
       system: `You create opinion poll questions for a German political simulation. Respond with ONLY valid JSON.
 
 RESPONSE SCHEMA:
@@ -62,15 +64,28 @@ Rules:
       roleKey: "daily",
     });
 
-    let jsonStr = text.trim();
-    const match = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) jsonStr = match[1].trim();
+    const parsed = parseAIJson<{ question: string; options: string[]; category: string }>(
+      text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (typeof o.question !== "string") return null;
+        if (!Array.isArray(o.options) || o.options.length < 2) return null;
+        if (!o.options.every((opt: unknown) => typeof opt === "string")) return null;
+        return {
+          question: o.question,
+          options: o.options as string[],
+          category: typeof o.category === "string" ? o.category : "general",
+        };
+      },
+      "Polls",
+    );
 
-    const parsed = JSON.parse(jsonStr);
-
-    if (!parsed.question || !Array.isArray(parsed.options) || parsed.options.length < 2) {
+    if (!parsed) {
+      logAICall({ task: "polls", model, provider, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
       return null;
     }
+
+    logAICall({ task: "polls", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
 
     return {
       id: `poll-ctx-${generateId()}`,
@@ -80,7 +95,7 @@ Rules:
       createdOnDay: currentDay,
       expiresOnDay: currentDay + 14,
       active: true,
-      category: parsed.category || "general",
+      category: parsed.category,
     };
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
@@ -88,6 +103,7 @@ Rules:
     } else {
       console.error("  [Polls] Error generating context poll:", error);
     }
+    logAICall({ task: "polls", latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
     return null;
   }
 }

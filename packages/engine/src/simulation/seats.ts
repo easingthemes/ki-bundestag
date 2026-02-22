@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { getDb, getSqlite, getUserDb, getUserSqlite, schema } from "../db/index.js";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { createNotification } from "./event-queue.js";
 import { getHumanSeatRatio, type TimingPreset } from "./timing.js";
 
@@ -204,8 +205,9 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
         .get();
       const displayName = user?.displayName ?? "Unknown";
 
+      const t0 = Date.now();
       try {
-        const raw = await callAI({
+        const { text: raw, model, provider } = await callAI({
           system: `You are the party leadership of ${party.name} (ideology: ${(party as any).ideology}). A citizen is applying for a Bundestag seat in your party.
 
 Evaluate their application based on these criteria:
@@ -221,15 +223,19 @@ Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<
           partyId,
         });
 
-        let decision: "approve" | "reject" = "reject";
-        let reasoning = "Does not meet current requirements.";
-        try {
-          const parsed = JSON.parse(raw) as { decision: string; reasoning: string };
-          if (parsed.decision === "approve" || parsed.decision === "reject") {
-            decision = parsed.decision;
-            reasoning = parsed.reasoning?.slice(0, 300) || reasoning;
-          }
-        } catch { /* keep defaults */ }
+        const defaultReasoning = "Does not meet current requirements.";
+        const parsed = parseAIJson<{ decision: "approve" | "reject"; reasoning: string }>(
+          raw,
+          (v: unknown) => {
+            const o = v as Record<string, unknown>;
+            if (o.decision !== "approve" && o.decision !== "reject") return null;
+            return { decision: o.decision, reasoning: typeof o.reasoning === "string" ? o.reasoning.slice(0, 300) : defaultReasoning };
+          },
+          "MdB",
+        );
+        const decision = parsed?.decision ?? "reject";
+        const reasoning = parsed?.reasoning ?? defaultReasoning;
+        logAICall({ task: `mdb:${partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "reject" });
 
         if (decision === "approve") {
           // Find an open seat and assign it
@@ -289,9 +295,11 @@ Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<
       } catch (err) {
         if (err instanceof AIProviderLimitError) {
           console.warn(`  [MdB] Skipped application review (${err.message})`);
-          break;
+        } else {
+          console.error(`[MdB] Error reviewing application ${app.id}:`, err);
         }
-        console.error(`[MdB] Error reviewing application ${app.id}:`, err);
+        logAICall({ task: `mdb:${partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "reject" });
+        if (err instanceof AIProviderLimitError) break;
       }
     }
   }

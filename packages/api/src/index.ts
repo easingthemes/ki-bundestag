@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import express from "express";
 import cors from "cors";
-import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, getSqlite, getUserSqlite, dayToDate, isRealisticSessionDay, getHolidaysInRange, isPollDay, isMonthlyDay, isBudgetDay, snapToNextSunday } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, closeDb, getCrisisTemplates, getActiveFraktionen, getActiveGovernment, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, getQueuedEvents, isFeatureEnabled, isParticipatoryPreset, FEATURE_AVAILABILITY, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, getSqlite, getUserSqlite, dayToDate, isRealisticSessionDay, getHolidaysInRange, isPollDay, isMonthlyDay, isBudgetDay, snapToNextSunday, logUserAction } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, inArray, count, sql } from "drizzle-orm";
 import type {
@@ -40,6 +40,32 @@ const PORT = parseInt(process.env.API_PORT || "3001", 10);
 
 app.use(cors());
 app.use(express.json());
+
+// ── Session tracking middleware ──────────────────────────────────────────────
+app.use((req, _res, next) => {
+  try {
+    const token = req.headers["x-user-token"];
+    if (typeof token === "string" && token.length > 0) {
+      const userDb = getUserDb();
+      const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+      if (user) {
+        const now = Date.now();
+        const gap = now - (user.lastActive ?? 0);
+        if (gap > 15 * 60 * 1000) {
+          // New session detected
+          const db = getDb();
+          const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+          logUserAction(token, "session_start", md?.day ?? 0, undefined, undefined, { gap_minutes: Math.round(gap / 60000) });
+        }
+        // Update lastActive
+        userDb.update(schema.users).set({ lastActive: now }).where(eq(schema.users.id, token)).run();
+      }
+    }
+  } catch {
+    // Never block requests due to session tracking
+  }
+  next();
+});
 
 // ── Preset cache (10s TTL) ───────────────────────────────────────────────────
 let cachedPreset: { value: TimingPreset; expiresAt: number } | null = null;
@@ -270,6 +296,7 @@ app.post("/api/bills/:id/signal", (req, res) => {
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch {}
   const allSignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
   res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
 });
@@ -815,6 +842,7 @@ app.post("/api/polls/:id/vote", (req, res) => {
     .where(eq(schema.polls.id, poll.id))
     .run();
 
+  try { const token = getUserToken(req); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; if (token) logUserAction(token, "vote_poll", md?.day ?? 0, req.params.id, "poll", { option }); } catch {}
   res.json({ ...poll, votes });
 });
 
@@ -934,6 +962,7 @@ app.post("/api/questions", (req, res) => {
   const metaRows = db.select().from(schema.simulationMeta).all();
   const currentDay = metaRows[0]?.currentDay ?? 0;
 
+  const token = getUserToken(req);
   const id = `q-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
   db.insert(schema.citizenQuestions).values({
     id,
@@ -943,9 +972,11 @@ app.post("/api/questions", (req, res) => {
     respondedOnDay: null,
     createdOnDay: currentDay,
     status: "pending",
+    userId: token,
   }).run();
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
+  try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch {}
   res.status(201).json(mapQuestion(created, 0, 0, null));
 });
 
@@ -984,6 +1015,8 @@ app.post("/api/questions/:id/vote", (req, res) => {
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_question", md?.day ?? 0, req.params.id, "question", { vote }); } catch {}
 
   // Recompute scores
   const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
@@ -1104,6 +1137,7 @@ app.post("/api/referendums/:id/vote", (req, res) => {
     .where(eq(schema.referendums.id, referendum.id))
     .run();
 
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_referendum", md?.day ?? 0, req.params.id, "referendum", { option }); } catch {}
   res.json({ ...referendum, votes, userVoted: true });
 });
 
@@ -1583,6 +1617,7 @@ app.post("/api/parties/:id/proposals", (req, res) => {
   }).run();
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  try { logUserAction(token, "submit_proposal", currentDay, id, "proposal", { partyId: req.params.id, category }); } catch {}
   const row = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
   res.status(201).json(mapProposal(row));
 });
@@ -1640,6 +1675,7 @@ app.post("/api/proposals/:id/vote", (req, res) => {
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
+  try { const db2 = getDb(); const md = db2.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_proposal", md?.day ?? 0, req.params.id, "proposal", { vote }); } catch {}
   const updated = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   res.json(mapProposal(updated, vote as 1 | -1));
 });
@@ -1688,6 +1724,7 @@ app.post("/api/users/login", (req, res) => {
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
+  try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(u.id, "login", md?.day ?? 0, u.id, "user"); } catch {}
   res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
 });
 
@@ -1722,6 +1759,7 @@ app.post("/api/users/register", (req, res) => {
     }
     throw err;
   }
+  try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(id, "register", md?.day ?? 0, id, "user"); } catch {}
   res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, createdAt: now, lastActive: now, switchCooldownUntil: null });
 });
 
@@ -1734,6 +1772,275 @@ app.get("/api/users/me", (req, res) => {
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
   res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
+});
+
+// GET /api/users/me/activity
+app.get("/api/users/me/activity", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const items: Array<{ type: string; title: string; description: string; dayNumber: number; createdAt: string; entityId?: string; entityType?: string; outcome?: string }> = [];
+
+  // Proposals
+  const proposals = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.proposedBy, token)).all();
+  for (const p of proposals) {
+    items.push({
+      type: "proposal",
+      title: `Proposed: "${p.title}"`,
+      description: `Status: ${p.status}${p.bundestag_bill_id ? ` → Bill ${p.bundestag_bill_id}` : ""}`,
+      dayNumber: p.createdOnDay,
+      createdAt: new Date(p.createdOnDay * 86400000).toISOString(),
+      entityId: p.id,
+      entityType: "proposal",
+      outcome: p.status,
+    });
+  }
+
+  // Signals
+  const signals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.userId, token)).all();
+  for (const s of signals) {
+    items.push({
+      type: "signal",
+      title: `Signaled ${s.signal.toUpperCase()} on a bill`,
+      description: `Bill: ${s.billId}`,
+      dayNumber: 0,
+      createdAt: new Date(s.createdAt).toISOString(),
+      entityId: s.billId,
+      entityType: "bill",
+    });
+  }
+
+  // MdB Votes
+  const mdbVotes = userDb.select().from(schema.mdbVotes).where(eq(schema.mdbVotes.userId, token)).all();
+  for (const v of mdbVotes) {
+    items.push({
+      type: "mdb_vote",
+      title: `MdB vote: ${v.vote.toUpperCase()}`,
+      description: `Bill: ${v.billId}`,
+      dayNumber: 0,
+      createdAt: new Date(v.createdAt).toISOString(),
+      entityId: v.billId,
+      entityType: "bill",
+    });
+  }
+
+  // Speeches
+  const speeches = userDb.select().from(schema.mdbSpeeches).where(eq(schema.mdbSpeeches.userId, token)).all();
+  for (const sp of speeches) {
+    items.push({
+      type: "speech",
+      title: `Speech (Reading ${sp.reading})`,
+      description: sp.content.substring(0, 100) + (sp.content.length > 100 ? "..." : ""),
+      dayNumber: sp.dayNumber,
+      createdAt: new Date(sp.createdAt).toISOString(),
+      entityId: sp.billId,
+      entityType: "bill",
+    });
+  }
+
+  // Applications
+  const apps = userDb.select().from(schema.mdbApplications).where(eq(schema.mdbApplications.userId, token)).all();
+  for (const a of apps) {
+    items.push({
+      type: "application",
+      title: `MdB application (${a.partyId})`,
+      description: `Status: ${a.status}`,
+      dayNumber: a.createdOnDay,
+      createdAt: new Date(a.createdOnDay * 86400000).toISOString(),
+      entityId: a.id,
+      entityType: "application",
+      outcome: a.status,
+    });
+  }
+
+  // Questions
+  const db = getDb();
+  const questions = db.select().from(schema.citizenQuestions).all().filter((q: any) => q.userId === token);
+  for (const q of questions) {
+    items.push({
+      type: "question",
+      title: `Asked ${q.targetPartyId}: "${q.question.substring(0, 60)}..."`,
+      description: q.response ? `Answered: ${q.response.substring(0, 100)}...` : "Awaiting answer",
+      dayNumber: q.createdOnDay,
+      createdAt: new Date(q.createdOnDay * 86400000).toISOString(),
+      entityId: q.id,
+      entityType: "question",
+      outcome: q.status,
+    });
+  }
+
+  // Sort by createdAt descending
+  items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  res.json({ items: items.slice(0, 100) });
+});
+
+// GET /api/users/me/impact (A6)
+app.get("/api/users/me/impact", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const db = getDb();
+
+  // 1. signalAccuracy
+  const signals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.userId, token)).all();
+  let matched = 0;
+  let total = 0;
+  for (const s of signals) {
+    const bill = db.select({ status: schema.bills.status }).from(schema.bills).where(eq(schema.bills.id, s.billId)).all()[0];
+    if (!bill) continue;
+    if (bill.status === "passed" || bill.status === "rejected") {
+      total++;
+      if ((s.signal === "yes" && bill.status === "passed") || (s.signal === "no" && bill.status === "rejected")) {
+        matched++;
+      }
+    }
+  }
+  const signalAccuracy = { matched, total, pct: total > 0 ? Math.round((matched / total) * 100) : 0 };
+
+  // 2. proposalOutcomes
+  const proposals = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.proposedBy, token)).all();
+  const proposalOutcomes = proposals.map(p => ({
+    title: p.title,
+    status: p.status,
+    billId: p.bundestag_bill_id ?? null,
+  }));
+
+  // 3. mdbVoteStats
+  const mdbVotes = userDb.select().from(schema.mdbVotes).where(eq(schema.mdbVotes.userId, token)).all();
+  let withMajority = 0;
+  for (const v of mdbVotes) {
+    const bill = db.select({ status: schema.bills.status }).from(schema.bills).where(eq(schema.bills.id, v.billId)).all()[0];
+    if (!bill) continue;
+    if (bill.status === "passed" || bill.status === "rejected") {
+      if ((v.vote === "yes" && bill.status === "passed") || (v.vote === "no" && bill.status === "rejected")) {
+        withMajority++;
+      }
+    }
+  }
+  const mdbVoteStats = { total: mdbVotes.length, withMajority };
+
+  // 4. partyStats
+  let partyStats: { partyId: string; partyName: string; memberCount: number; approvalPerDay: number } | null = null;
+  if (user.partyId) {
+    const party = db.select({ id: schema.parties.id, name: schema.parties.name }).from(schema.parties).where(eq(schema.parties.id, user.partyId)).all()[0];
+    if (party) {
+      const memberCountRow = userDb.select({ cnt: count() }).from(schema.users).where(eq(schema.users.partyId, user.partyId)).all()[0];
+      const memberCount = memberCountRow?.cnt ?? 0;
+      const history = db.select().from(schema.partyHistory)
+        .where(eq(schema.partyHistory.partyId, user.partyId))
+        .orderBy(desc(schema.partyHistory.dayNumber))
+        .limit(2)
+        .all();
+      let approvalPerDay = 0;
+      if (history.length === 2) {
+        const dayDiff = history[0].dayNumber - history[1].dayNumber;
+        if (dayDiff > 0) {
+          approvalPerDay = Math.round(((history[0].approvalRating - history[1].approvalRating) / dayDiff) * 1000) / 1000;
+        }
+      }
+      partyStats = { partyId: party.id, partyName: party.name, memberCount, approvalPerDay };
+    }
+  }
+
+  res.json({ signalAccuracy, proposalOutcomes, mdbVoteStats, partyStats });
+});
+
+// GET /api/users/me/catchup (A7)
+app.get("/api/users/me/catchup", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const db = getDb();
+  const meta = db.select({ currentDay: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = meta?.currentDay ?? 0;
+
+  // Find last active sim day from user_actions
+  const userRaw = getUserSqlite();
+  const lastActionRow = userRaw.prepare("SELECT MAX(sim_day) as maxDay FROM user_actions WHERE user_id = ?").get(token) as { maxDay: number | null } | undefined;
+  const lastActiveDay = lastActionRow?.maxDay ?? 0;
+
+  const daysMissed = currentDay - lastActiveDay;
+
+  // If user was recently active, return minimal response
+  if (daysMissed < 3) {
+    res.json({
+      daysMissed,
+      billsPassed: [],
+      billsRejected: [],
+      crisesStarted: [],
+      crisesEnded: [],
+      partyApprovalDelta: null,
+      proposalOutcomes: [],
+    });
+    return;
+  }
+
+  // Bills passed/rejected since last active
+  const billsPassed = db.select({ id: schema.bills.id, title: schema.bills.title, status: schema.bills.status })
+    .from(schema.bills)
+    .where(and(eq(schema.bills.status, "passed"), gte(schema.bills.statusChangedOnDay, lastActiveDay)))
+    .all();
+  const billsRejected = db.select({ id: schema.bills.id, title: schema.bills.title, status: schema.bills.status })
+    .from(schema.bills)
+    .where(and(eq(schema.bills.status, "rejected"), gte(schema.bills.statusChangedOnDay, lastActiveDay)))
+    .all();
+
+  // Crises started/ended
+  const crisesStarted = db.select({ id: schema.crises.id, name: schema.crises.name, severity: schema.crises.severity })
+    .from(schema.crises)
+    .where(gte(schema.crises.startDay, lastActiveDay))
+    .all();
+  const simRaw = getSqlite();
+  const crisesEndedRows = simRaw.prepare(
+    "SELECT id, name FROM crises WHERE end_day >= ? AND end_day <= ? AND resolved = 1"
+  ).all(lastActiveDay, currentDay) as { id: string; name: string }[];
+  const crisesEnded = crisesEndedRows.map(c => ({ id: c.id, name: c.name }));
+
+  // Party approval delta
+  let partyApprovalDelta: number | null = null;
+  if (user.partyId) {
+    const older = db.select({ approvalRating: schema.partyHistory.approvalRating })
+      .from(schema.partyHistory)
+      .where(and(eq(schema.partyHistory.partyId, user.partyId), gte(schema.partyHistory.dayNumber, lastActiveDay)))
+      .orderBy(asc(schema.partyHistory.dayNumber))
+      .limit(1)
+      .all()[0];
+    const newer = db.select({ approvalRating: schema.partyHistory.approvalRating })
+      .from(schema.partyHistory)
+      .where(eq(schema.partyHistory.partyId, user.partyId))
+      .orderBy(desc(schema.partyHistory.dayNumber))
+      .limit(1)
+      .all()[0];
+    if (older && newer) {
+      partyApprovalDelta = Math.round((newer.approvalRating - older.approvalRating) * 100) / 100;
+    }
+  }
+
+  // Proposal outcomes since last active
+  const proposals = userDb.select().from(schema.internalProposals)
+    .where(and(eq(schema.internalProposals.proposedBy, token), gte(schema.internalProposals.reviewedOnDay, lastActiveDay)))
+    .all();
+  const proposalOutcomes = proposals.map(p => ({ title: p.title, status: p.status }));
+
+  res.json({
+    daysMissed,
+    billsPassed,
+    billsRejected,
+    crisesStarted,
+    crisesEnded,
+    partyApprovalDelta,
+    proposalOutcomes,
+  });
 });
 
 // POST /api/users/me/join/:partyId
@@ -1770,6 +2077,7 @@ app.post("/api/users/me/join/:partyId", (req, res) => {
     .where(eq(schema.users.id, token))
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  try { logUserAction(token, "join_party", currentDay, req.params.partyId, "party"); } catch {}
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
@@ -1780,6 +2088,7 @@ app.post("/api/users/me/leave", (req, res) => {
   const userDb = getUserDb();
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+  const user = rows[0];
   const db = getDb();
   const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
   const currentDay = metaRow?.day ?? 0;
@@ -1794,6 +2103,7 @@ app.post("/api/users/me/leave", (req, res) => {
     .set({ partyId: null, lastActive: Date.now(), switchCooldownUntil: currentDay + 7 })
     .where(eq(schema.users.id, token))
     .run();
+  try { logUserAction(token, "leave_party", currentDay, user.partyId ?? undefined, "party"); } catch {}
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
@@ -1862,6 +2172,7 @@ app.post("/api/seats/apply", (req, res) => {
     createdOnDay: currentDay,
   }).run();
 
+  try { logUserAction(token, "apply_mdb", currentDay, appId, "application", { partyId: user.partyId }); } catch {}
   res.json({
     id: appId,
     userId: token,
@@ -2135,6 +2446,7 @@ app.post("/api/bills/:id/amendment", (req, res) => {
     consumed: false,
   }).run();
 
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "submit_amendment", md?.day ?? 0, req.params.id, "bill"); } catch {}
   res.json({ status: "queued", message: "Amendment will be processed on next simulation day" });
 });
 
@@ -2198,6 +2510,7 @@ app.post("/api/bills/:id/speech", (req, res) => {
     createdAt: Date.now(),
   }).run();
 
+  try { logUserAction(token, "submit_speech", currentDay, req.params.id, "bill", { reading }); } catch {}
   res.json({ id: speechId, billId: req.params.id, reading, content: content.trim(), dayNumber: currentDay });
 });
 
@@ -2286,6 +2599,7 @@ app.post("/api/bills/:id/mdb-vote", (req, res) => {
     else summary.abstain++;
   }
 
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "cast_mdb_vote", md?.day ?? 0, req.params.id, "bill", { vote }); } catch {}
   res.json({ userVote: vote, summary });
 });
 
@@ -2363,6 +2677,141 @@ app.post("/api/notifications/read-all", (req, res) => {
 app.get("/api/simulation/queue", (_req, res) => {
   const events = getQueuedEvents();
   res.json(events);
+});
+
+// GET /api/admin/analytics — aggregated user analytics (no auth required)
+app.get("/api/admin/analytics", (_req, res) => {
+  try {
+    const userRaw = getUserSqlite();
+    const simRaw = getSqlite();
+
+    // Total registered users
+    const totalUsersRow = userRaw.prepare("SELECT COUNT(*) as cnt FROM users").get() as { cnt: number };
+    const totalUsers = totalUsersRow.cnt;
+
+    // Total actions
+    const totalActionsRow = userRaw.prepare("SELECT COUNT(*) as cnt FROM user_actions").get() as { cnt: number };
+    const totalActions = totalActionsRow.cnt;
+
+    // DAU — distinct users in last 24h
+    const dauRow = userRaw.prepare(
+      "SELECT COUNT(DISTINCT user_id) as cnt FROM user_actions WHERE created_at >= datetime('now', '-1 day')"
+    ).get() as { cnt: number };
+    const dau = dauRow.cnt;
+
+    // WAU — distinct users in last 7 days
+    const wauRow = userRaw.prepare(
+      "SELECT COUNT(DISTINCT user_id) as cnt FROM user_actions WHERE created_at >= datetime('now', '-7 days')"
+    ).get() as { cnt: number };
+    const wau = wauRow.cnt;
+
+    // Action breakdown
+    const actionBreakdown = userRaw.prepare(
+      "SELECT action_type as actionType, COUNT(*) as count FROM user_actions GROUP BY action_type ORDER BY count DESC"
+    ).all() as { actionType: string; count: number }[];
+
+    // Top 20 users by action count
+    const topUsers = userRaw.prepare(`
+      SELECT ua.user_id as userId, u.displayName as displayName, COUNT(*) as actionCount
+      FROM user_actions ua
+      LEFT JOIN users u ON ua.user_id = u.id
+      GROUP BY ua.user_id
+      ORDER BY actionCount DESC
+      LIMIT 20
+    `).all() as { userId: string; displayName: string; actionCount: number }[];
+
+    // Funnel
+    const registeredRow = userRaw.prepare("SELECT COUNT(*) as cnt FROM users").get() as { cnt: number };
+    const joinedPartyRow = userRaw.prepare("SELECT COUNT(*) as cnt FROM users WHERE partyId IS NOT NULL").get() as { cnt: number };
+    const firstActionRow = userRaw.prepare(
+      "SELECT COUNT(DISTINCT user_id) as cnt FROM user_actions WHERE action_type != 'register'"
+    ).get() as { cnt: number };
+    const appliedMdbRow = userRaw.prepare(
+      "SELECT COUNT(DISTINCT user_id) as cnt FROM user_actions WHERE action_type = 'apply_mdb'"
+    ).get() as { cnt: number };
+    // Got seat — check sim DB for active human seats
+    const gotSeatRow = simRaw.prepare(
+      "SELECT COUNT(DISTINCT userId) as cnt FROM bundestagSeats WHERE controller = 'human' AND active = 1 AND userId IS NOT NULL"
+    ).get() as { cnt: number };
+
+    const funnel = {
+      registered: registeredRow.cnt,
+      joinedParty: joinedPartyRow.cnt,
+      firstAction: firstActionRow.cnt,
+      appliedMdb: appliedMdbRow.cnt,
+      gotSeat: gotSeatRow.cnt,
+    };
+
+    // Daily actions for last 30 days
+    const dailyActions = userRaw.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count
+      FROM user_actions
+      WHERE created_at >= datetime('now', '-30 days')
+      GROUP BY date(created_at)
+      ORDER BY date ASC
+    `).all() as { date: string; count: number }[];
+
+    res.json({
+      totalUsers,
+      totalActions,
+      dau,
+      wau,
+      actionBreakdown,
+      topUsers,
+      funnel,
+      dailyActions,
+    });
+  } catch (err) {
+    console.error("Analytics error:", err);
+    res.status(500).json({ error: "Failed to load analytics" });
+  }
+});
+
+// GET /api/simulation/events/latest (A9)
+app.get("/api/simulation/events/latest", (req, res) => {
+  const since = req.query.since as string | undefined;
+  const simRaw = getSqlite();
+
+  if (since) {
+    // Get events newer than the given event id, ordered newest first, limit 5
+    const rows = simRaw.prepare(
+      `SELECT e.id, e.day_number, e.type, e.actor, e.title, e.description, e.data
+       FROM simulation_events e
+       WHERE e.rowid > (SELECT rowid FROM simulation_events WHERE id = ?)
+       ORDER BY e.rowid DESC
+       LIMIT 5`
+    ).all(since) as { id: string; day_number: number; type: string; actor: string; title: string; description: string; data: string | null }[];
+
+    const events = rows.map(r => ({
+      id: r.id,
+      dayNumber: r.day_number,
+      type: r.type,
+      actor: r.actor,
+      title: r.title,
+      description: r.description,
+      data: r.data ? JSON.parse(r.data) : undefined,
+    }));
+    res.json(events);
+  } else {
+    // Return latest 5 events
+    const rows = simRaw.prepare(
+      `SELECT id, day_number, type, actor, title, description, data
+       FROM simulation_events
+       ORDER BY rowid DESC
+       LIMIT 5`
+    ).all() as { id: string; day_number: number; type: string; actor: string; title: string; description: string; data: string | null }[];
+
+    const events = rows.map(r => ({
+      id: r.id,
+      dayNumber: r.day_number,
+      type: r.type,
+      actor: r.actor,
+      title: r.title,
+      description: r.description,
+      data: r.data ? JSON.parse(r.data) : undefined,
+    }));
+    res.json(events);
+  }
 });
 
 const server = app.listen(PORT, () => {

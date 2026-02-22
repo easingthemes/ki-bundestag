@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
 import { eq, and, lte, gte } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
+import { createNotification } from "./event-queue.js";
 
 /**
  * Review internal party proposals each sim day.
@@ -30,6 +32,20 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
       .set({ status: "expired", reviewedOnDay: currentDay })
       .where(eq(schema.internalProposals.id, p.id))
       .run();
+
+    // Notify proposer (if human)
+    if (p.proposedBy !== "ai") {
+      try {
+        createNotification(
+          p.proposedBy,
+          "proposal_expired",
+          `Proposal expired: "${p.title}"`,
+          `Your proposal "${p.title}" expired — it didn't receive enough votes before the review deadline.`,
+          { proposalId: p.id, partyId: p.partyId },
+          currentDay,
+        );
+      } catch {}
+    }
   }
 
   // Find all parties that have a ready proposal
@@ -50,22 +66,27 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
 
     const top = readyProposals[0];
 
+    const t0 = Date.now();
     try {
-      const raw = await callAI({
+      const { text: raw, model, provider } = await callAI({
         system: `You are the party leadership of ${party.name} (ideology: ${party.ideology}). A party member has submitted a bill proposal for your consideration. Decide whether to officially sponsor it. Respond with ONLY valid JSON: {"decision": "accept" | "decline", "reason": "<1 sentence>"}`,
         prompt: `Member proposal: "${top.title}" (${top.category})\n${top.description}\n\nVote score: ${top.voteScore >= 0 ? "+" : ""}${top.voteScore} (${top.totalVotes} votes)\n\nShould ${party.name} sponsor this bill in the Bundestag?`,
         maxTokens: 256,
         partyId: party.id as string,
       });
-      let decision: "accept" | "decline" = "decline";
-      let reason = "Does not align with current party priorities.";
-      try {
-        const parsed = JSON.parse(raw) as { decision: string; reason: string };
-        if (parsed.decision === "accept" || parsed.decision === "decline") {
-          decision = parsed.decision;
-          reason = parsed.reason?.slice(0, 200) || reason;
-        }
-      } catch { /* keep defaults */ }
+      const defaultReason = "Does not align with current party priorities.";
+      const parsed = parseAIJson<{ decision: "accept" | "decline"; reason: string }>(
+        raw,
+        (v: unknown) => {
+          const o = v as Record<string, unknown>;
+          if (o.decision !== "accept" && o.decision !== "decline") return null;
+          return { decision: o.decision, reason: typeof o.reason === "string" ? o.reason.slice(0, 200) : defaultReason };
+        },
+        "InternalProposals",
+      );
+      const decision = parsed?.decision ?? "decline";
+      const reason = parsed?.reason ?? defaultReason;
+      logAICall({ task: `proposals:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "decline" });
 
       if (decision === "accept") {
         // Create bill in Bundestag pipeline
@@ -99,6 +120,20 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
           dayNumber: currentDay,
           actor: party.id as string,
         }).run();
+
+        // Notify proposer
+        if (top.proposedBy !== "ai") {
+          try {
+            createNotification(
+              top.proposedBy,
+              "proposal_accepted",
+              `Proposal accepted: "${top.title}"`,
+              `${party.name} has accepted your proposal "${top.title}" and submitted it to the Bundestag as Bill ${billId}.`,
+              { proposalId: top.id, billId, partyId: party.id },
+              currentDay,
+            );
+          } catch {}
+        }
       } else {
         userDb.update(schema.internalProposals).set({
           status: "declined",
@@ -114,13 +149,29 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
           dayNumber: currentDay,
           actor: party.id as string,
         }).run();
+
+        // Notify proposer
+        if (top.proposedBy !== "ai") {
+          try {
+            createNotification(
+              top.proposedBy,
+              "proposal_declined",
+              `Proposal declined: "${top.title}"`,
+              `${party.name} declined your proposal "${top.title}". Reason: ${reason}`,
+              { proposalId: top.id, partyId: party.id },
+              currentDay,
+            );
+          } catch {}
+        }
       }
     } catch (err) {
       if (err instanceof AIProviderLimitError) {
         console.warn(`  [InternalProposals] Skipped (${err.message})`);
-        break;
+      } else {
+        console.error(`[InternalProposals] Error reviewing proposal ${top.id}:`, err);
       }
-      console.error(`[InternalProposals] Error reviewing proposal ${top.id}:`, err);
+      logAICall({ task: `proposals:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "decline" });
+      if (err instanceof AIProviderLimitError) break;
     }
   }
 }

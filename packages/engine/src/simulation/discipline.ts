@@ -11,6 +11,7 @@
 import { and, eq, gte } from "drizzle-orm";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
+import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { createNotification } from "./event-queue.js";
 
 const LEVEL_LABELS = ["Gut", "Verwarnung", "Eingeschränkt", "Fraktionszwang"];
@@ -132,6 +133,7 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
 
     // AI call for reasoning text (1 call per party, batch all updates)
     let reasonings: Record<string, string> = {};
+    const t0 = Date.now();
     try {
       const memberSummaries = membersToUpdate.map(m => {
         const user = userDb.select().from(schema.users)
@@ -141,25 +143,31 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
         return `- ${name} (${m.seat.userId}): ${m.votesAgainst} Gegenstimmen, Stufe ${m.seat.disciplineLevel}→${m.newLevel} (${direction})`;
       }).join("\n");
 
-      const raw = await callAI({
+      const { text: raw, model, provider } = await callAI({
         system: `Du bist die Fraktionsführung der ${party.name}. Gib kurze Begründungen für Disziplinarentscheidungen über Fraktionsmitglieder im Bundestag. Antworte NUR mit validem JSON: {"reasonings": {"<userId>": "<1-2 Sätze Begründung auf Deutsch>"}}`,
         prompt: `Fraktionsdisziplin-Überprüfung:\n${memberSummaries}\n\nStufen: 0=Gut, 1=Verwarnung, 2=Eingeschränkt (kein Rederecht-Priorität), 3=Fraktionszwang (Stimmabgabe wird erzwungen), 4=Ausschluss.\n\nBegründe jede Änderung.`,
         maxTokens: 512,
         partyId: party.id as string,
       });
 
-      try {
-        const parsed = JSON.parse(raw) as { reasonings: Record<string, string> };
-        if (parsed.reasonings && typeof parsed.reasonings === "object") {
-          reasonings = parsed.reasonings;
-        }
-      } catch { /* use defaults */ }
+      const parsed = parseAIJson<{ reasonings: Record<string, string> }>(
+        raw,
+        (v: unknown) => {
+          const o = v as Record<string, unknown>;
+          if (!o.reasonings || typeof o.reasonings !== "object" || Array.isArray(o.reasonings)) return null;
+          return { reasonings: o.reasonings as Record<string, string> };
+        },
+        "Discipline",
+      );
+      if (parsed) reasonings = parsed.reasonings;
+      logAICall({ task: `discipline:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "default-reasons" });
     } catch (err) {
       if (err instanceof AIProviderLimitError) {
         console.warn(`  [Discipline] Skipped AI reasoning for ${party.name} (${(err as Error).message})`);
       } else {
         console.error(`  [Discipline] AI reasoning error for ${party.name}:`, err);
       }
+      logAICall({ task: `discipline:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "default-reasons" });
     }
 
     // Apply updates

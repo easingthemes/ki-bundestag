@@ -62,6 +62,7 @@ export function Login() {
     setErrMsg("");
     try {
       const newUser = await api.registerUser(trimmed);
+      localStorage.setItem("ki-onboarding", "1");
       login(newUser.id, newUser);
       navigate(redirect, { replace: true });
     } catch (err) {

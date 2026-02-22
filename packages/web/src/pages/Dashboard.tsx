@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData } from "../api";
+import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData, type ImpactData, type CatchupData } from "../api";
 import { CalendarWidget } from "../components/CalendarWidget";
 import { UpcomingCalendar } from "../components/UpcomingCalendar";
 import { usePolling } from "../usePolling";
@@ -18,6 +18,334 @@ const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
 };
 
 function fixColor(c: string) { return c === "#FFED00" ? "#c4a900" : c; }
+
+function OnboardingOverlay() {
+  const { user } = useUser();
+  const [step, setStep] = useState(0);
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (user && localStorage.getItem("ki-onboarding") === "1") {
+      setShow(true);
+    }
+  }, [user]);
+
+  if (!show) return null;
+
+  const steps = [
+    { title: "Join a Party", desc: "Pick a political party to represent. This unlocks proposals, voting, and more.", link: "/parties", cta: "Browse Parties" },
+    { title: "Ask a Question", desc: "Ask any party a question. AI-powered party spokespersons will answer.", link: "/questions", cta: "Ask Now" },
+    { title: "Vote on Polls", desc: "Share your opinion in active polls and see what others think.", link: "/polls", cta: "View Polls" },
+    { title: "Propose a Bill", desc: "As a party member, propose legislation for your party to sponsor.", link: null, cta: "Join a party first" },
+    { title: "Apply for MdB Seat", desc: "Become a Member of Bundestag — vote directly on bills and give speeches.", link: null, cta: "Join a party first" },
+  ];
+
+  const current = steps[step];
+
+  const dismiss = () => {
+    localStorage.removeItem("ki-onboarding");
+    setShow(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-medium text-muted-foreground">Step {step + 1} of {steps.length}</span>
+          <button onClick={dismiss} className="text-xs text-muted-foreground hover:text-foreground">Skip</button>
+        </div>
+        <h3 className="text-lg font-semibold mb-1">{current.title}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{current.desc}</p>
+        <div className="flex items-center gap-2">
+          {step > 0 && (
+            <button
+              onClick={() => setStep(s => s - 1)}
+              className="px-3 py-2 text-sm rounded border border-input hover:bg-accent cursor-pointer"
+            >
+              Back
+            </button>
+          )}
+          {step < steps.length - 1 ? (
+            <button
+              onClick={() => setStep(s => s + 1)}
+              className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={dismiss}
+              className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90"
+            >
+              Get Started
+            </button>
+          )}
+          {current.link && (
+            <a href={current.link} onClick={dismiss} className="text-sm text-blue-600 hover:underline ml-auto">
+              {current.cta} →
+            </a>
+          )}
+        </div>
+        {/* Progress dots */}
+        <div className="flex justify-center gap-1.5 mt-4">
+          {steps.map((_, i) => (
+            <div key={i} className={cn("w-2 h-2 rounded-full", i === step ? "bg-foreground" : i < step ? "bg-foreground/40" : "bg-muted")} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── A5: Quick Actions Bar ─────────────────────────────────────────── */
+function QuickActionsBar({ user, parties, mySeat, bills, polls }: {
+  user: { id: string; partyId: string | null } | null;
+  parties: Party[];
+  mySeat: BundestagSeat | null;
+  bills: Bill[];
+  polls: Poll[];
+}) {
+  if (!user) return null;
+
+  const actions: { label: string; to: string; primary?: boolean }[] = [];
+
+  if (!user.partyId) {
+    actions.push({ label: "Join a Party", to: "/parties", primary: true });
+  } else {
+    if (!mySeat) {
+      actions.push({ label: "Propose a Bill", to: `/parties/${user.partyId}` });
+      actions.push({ label: "Ask a Question", to: "/questions" });
+      actions.push({ label: "Apply for MdB Seat", to: `/parties/${user.partyId}` });
+    } else {
+      const thirdReading = bills.filter(b => b.status === "third_reading");
+      if (thirdReading.length > 0) {
+        actions.push({ label: `Vote on ${thirdReading.length} Bill${thirdReading.length !== 1 ? "s" : ""}`, to: "/bills?status=third_reading", primary: true });
+      }
+      actions.push({ label: "Submit Speech", to: "/bills" });
+    }
+  }
+
+  if (polls.length > 0) {
+    actions.push({ label: "Vote on Polls", to: "/polls" });
+  }
+  actions.push({ label: "Referendums", to: "/referendums" });
+
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-6">
+      {actions.map(a => (
+        <Link
+          key={a.label}
+          to={a.to}
+          className={cn(
+            "px-4 py-2 rounded-full text-sm font-medium no-underline transition-colors",
+            a.primary
+              ? "bg-foreground text-background hover:opacity-90"
+              : "border border-input bg-card text-foreground hover:bg-accent"
+          )}
+        >
+          {a.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* ── A6: My Impact Card ───────────────────────────────────────────── */
+function MyImpactCard() {
+  const { user } = useUser();
+  const [impact, setImpact] = useState<ImpactData | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    api.getMyImpact().then(setImpact).catch(() => {});
+  }, [user]);
+
+  if (!user || !impact) return null;
+
+  const hasData = impact.signalAccuracy.total > 0 || impact.mdbVoteStats.total > 0 || impact.proposalOutcomes.length > 0 || impact.partyStats;
+  if (!hasData) return null;
+
+  return (
+    <Card className="py-4">
+      <CardContent className="px-4">
+        <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Your Impact</div>
+        {impact.signalAccuracy.total > 0 && (
+          <div className="mb-2">
+            <div className="text-sm">
+              <span className="font-semibold">{impact.signalAccuracy.matched}/{impact.signalAccuracy.total}</span>
+              <span className="text-muted-foreground ml-1">signals matched outcome</span>
+            </div>
+            <div className="flex h-1.5 rounded overflow-hidden mt-1 bg-muted">
+              <div className="h-full rounded bg-emerald-500" style={{ width: `${impact.signalAccuracy.pct}%` }} />
+            </div>
+          </div>
+        )}
+        {impact.mdbVoteStats.total > 0 && (
+          <div className="mb-2 text-sm">
+            <span className="font-semibold">{impact.mdbVoteStats.total}</span> MdB votes, <span className="font-semibold">{impact.mdbVoteStats.withMajority}</span> with majority
+          </div>
+        )}
+        {impact.proposalOutcomes.length > 0 && (
+          <div className="mb-2">
+            {impact.proposalOutcomes.slice(0, 3).map((p, i) => (
+              <div key={i} className="text-sm flex items-center gap-1.5">
+                <Badge variant="outline" className={cn("text-xs", p.status === "accepted" ? "text-emerald-600 border-emerald-300" : p.status === "declined" ? "text-destructive border-destructive/30" : "")}>
+                  {p.status}
+                </Badge>
+                {p.billId ? (
+                  <Link to={`/bills/${p.billId}`} className="text-sm hover:underline truncate">{p.title}</Link>
+                ) : (
+                  <span className="truncate">{p.title}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {impact.partyStats && (
+          <div className="text-xs text-muted-foreground border-t border-border pt-2 mt-2">
+            {impact.partyStats.partyName}: {impact.partyStats.memberCount} members · {impact.partyStats.approvalPerDay >= 0 ? "+" : ""}{impact.partyStats.approvalPerDay.toFixed(3)}/day
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── A7: Catchup Card ─────────────────────────────────────────────── */
+function CatchupCard() {
+  const { user } = useUser();
+  const [catchup, setCatchup] = useState<CatchupData | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    api.getMyCatchup().then(setCatchup).catch(() => {});
+  }, [user]);
+
+  if (!user || !catchup || catchup.daysMissed < 3 || dismissed) return null;
+
+  const hasContent = catchup.billsPassed.length > 0 || catchup.billsRejected.length > 0 || catchup.crisesStarted.length > 0 || catchup.crisesEnded.length > 0 || catchup.proposalOutcomes.length > 0;
+  if (!hasContent) return null;
+
+  return (
+    <Card className="mb-6 border-l-4 border-l-blue-500">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <div className="font-bold text-sm">While You Were Gone</div>
+            <div className="text-xs text-muted-foreground">{catchup.daysMissed} sim days missed</div>
+          </div>
+          <button onClick={() => setDismissed(true)} className="text-xs text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer">Dismiss</button>
+        </div>
+        <div className="text-sm space-y-1.5">
+          {catchup.billsPassed.length > 0 && (
+            <div>
+              <span className="font-medium text-emerald-600">{catchup.billsPassed.length} bill{catchup.billsPassed.length !== 1 ? "s" : ""} passed</span>
+              {catchup.billsPassed.slice(0, 2).map(b => (
+                <Link key={b.id} to={`/bills/${b.id}`} className="block text-xs text-muted-foreground hover:underline ml-2 truncate">{b.title}</Link>
+              ))}
+            </div>
+          )}
+          {catchup.billsRejected.length > 0 && (
+            <div>
+              <span className="font-medium text-destructive">{catchup.billsRejected.length} bill{catchup.billsRejected.length !== 1 ? "s" : ""} rejected</span>
+            </div>
+          )}
+          {catchup.crisesStarted.length > 0 && (
+            <div>
+              <span className="font-medium text-red-600">{catchup.crisesStarted.length} new cris{catchup.crisesStarted.length !== 1 ? "es" : "is"}</span>
+              {catchup.crisesStarted.map(c => (
+                <span key={c.id} className="block text-xs text-muted-foreground ml-2">{c.name} ({c.severity})</span>
+              ))}
+            </div>
+          )}
+          {catchup.crisesEnded.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {catchup.crisesEnded.length} cris{catchup.crisesEnded.length !== 1 ? "es" : "is"} resolved
+            </div>
+          )}
+          {catchup.partyApprovalDelta != null && catchup.partyApprovalDelta !== 0 && (
+            <div className="text-xs">
+              Your party: <span style={{ color: catchup.partyApprovalDelta > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
+                {catchup.partyApprovalDelta > 0 ? "+" : ""}{catchup.partyApprovalDelta.toFixed(1)} approval
+              </span>
+            </div>
+          )}
+          {catchup.proposalOutcomes.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {catchup.proposalOutcomes.length} of your proposal{catchup.proposalOutcomes.length !== 1 ? "s" : ""} reviewed
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── A9: Live Event Ticker ────────────────────────────────────────── */
+function LiveEventTicker({ simStatus }: { simStatus: SimulationStatus }) {
+  const [toasts, setToasts] = useState<SimulationEvent[]>([]);
+  const lastEventId = useRef<string | null>(null);
+  const isRunning = simStatus.dayStartedAt && simStatus.lastRunAt &&
+    new Date(simStatus.dayStartedAt).getTime() > new Date(simStatus.lastRunAt).getTime();
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const poll = () => {
+      api.getLatestEvents(lastEventId.current ?? undefined)
+        .then(newEvents => {
+          if (newEvents.length > 0) {
+            lastEventId.current = newEvents[0].id;
+            setToasts(prev => {
+              const combined = [...newEvents.filter(e => e.type !== "day_start"), ...prev];
+              return combined.slice(0, 3);
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [isRunning]);
+
+  // Auto-dismiss after 8s
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const id = setTimeout(() => setToasts(prev => prev.slice(0, -1)), 8000);
+    return () => clearTimeout(id);
+  }, [toasts]);
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+      {toasts.map(ev => (
+        <div
+          key={ev.id}
+          className="bg-card border border-border rounded-lg shadow-lg px-4 py-3 animate-in slide-in-from-right-3 fade-in duration-300"
+        >
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <div className="text-xs text-muted-foreground">Day {ev.dayNumber} · {ev.type.replace(/_/g, " ")}</div>
+              <div className="font-semibold text-sm mt-0.5">{ev.title}</div>
+            </div>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== ev.id))}
+              className="text-xs text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer shrink-0"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function Dashboard() {
   const { user } = useUser();
@@ -125,6 +453,7 @@ export function Dashboard() {
 
   return (
     <div>
+      <OnboardingOverlay />
       <h1>Dashboard — Day {simStatus.currentDay}</h1>
 
       {/* Hero summary */}
@@ -158,6 +487,12 @@ export function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Quick actions */}
+      <QuickActionsBar user={user} parties={parties} mySeat={mySeat} bills={bills} polls={polls} />
+
+      {/* Catchup card */}
+      <CatchupCard />
 
       {/* === 2-column grid === */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
@@ -514,6 +849,9 @@ export function Dashboard() {
           {parties.length > 0 && (
             <AskPartyWidget parties={parties} coalitionParties={state.coalitionParties} />
           )}
+
+          {/* My Impact card */}
+          <MyImpactCard />
         </div>
       </div>
 
@@ -573,6 +911,9 @@ export function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Live event ticker */}
+      <LiveEventTicker simStatus={simStatus} />
     </div>
   );
 }

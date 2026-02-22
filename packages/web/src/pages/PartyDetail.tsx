@@ -771,7 +771,12 @@ export function PartyDetail() {
                         </div>
                         <div className="text-sm text-muted-foreground">{p.description}</div>
                         {p.bundestagBillId && (
-                          <div className="text-xs text-emerald-500 mt-1">✓ Submitted to Bundestag</div>
+                          <div className="text-xs text-emerald-500 mt-1">
+                            ✓ Submitted to Bundestag —{" "}
+                            <Link to={`/bills/${p.bundestagBillId}`} className="text-xs text-blue-600 hover:underline">
+                              View Bill →
+                            </Link>
+                          </div>
                         )}
                         {p.declineReason && (
                           <div className="text-xs text-muted-foreground mt-1 italic">Party: "{p.declineReason}"</div>
