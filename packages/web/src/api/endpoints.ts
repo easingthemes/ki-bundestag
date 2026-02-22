@@ -1,0 +1,358 @@
+// All typed API call functions, grouped by domain.
+
+import {
+  Party,
+  Bill,
+  Election,
+  NationalState,
+  SimulationStatus,
+  SimulationEvent,
+  DaySummary,
+  CalendarData,
+  UpcomingCalendarData,
+  Crisis,
+  CrisisTemplate,
+  PendingInjection,
+  Poll,
+  CitizenQuestion,
+  Referendum,
+  Motion,
+  Fraktion,
+  Government,
+  Interpellation,
+  ConfidenceVote,
+  ConstitutionalChallenge,
+  Budget,
+  MediaArticle,
+  AlignmentData,
+  PartyHistory,
+  PartyVoteRecord,
+  InternalProposal,
+  User,
+  ActivityItem,
+  AppNotification,
+  PresetInfo,
+  TimingPreset,
+  BundestagSeat,
+  MdbApplication,
+  MdbSpeech,
+  MdbVoteSummary,
+  AnalyticsData,
+  ImpactData,
+  CatchupData,
+} from "./types.js";
+import { fetchJson, postJson, deleteJson, getBase } from "./client.js";
+
+// ── Parties & proposals ───────────────────────────────────────────────────────
+
+export const getParties = () => fetchJson<Party[]>("/parties");
+export const getAlignment = () => fetchJson<AlignmentData>("/parties/alignment");
+export const getParty = (id: string) => fetchJson<Party>(`/parties/${id}`);
+export const getPartyHistory = (id: string) => fetchJson<PartyHistory[]>(`/parties/${id}/history`);
+export const getPartyBills = (id: string) => fetchJson<Bill[]>(`/parties/${id}/bills`);
+export const getPartyVotes = (id: string) => fetchJson<PartyVoteRecord[]>(`/parties/${id}/votes`);
+export const getPartyStatements = (id: string) => fetchJson<SimulationEvent[]>(`/parties/${id}/statements`);
+
+export const getPartyProposals = (partyId: string, status?: string) =>
+  fetchJson<InternalProposal[]>(`/parties/${partyId}/proposals${status ? `?status=${status}` : ""}`);
+export const createProposal = (partyId: string, body: { title: string; description: string; category: string; rationale?: string }) =>
+  postJson<InternalProposal>(`/parties/${partyId}/proposals`, body);
+export const getProposal = (id: string) => fetchJson<InternalProposal>(`/proposals/${id}`);
+export const voteOnProposal = (id: string, vote: 1 | -1) => postJson<InternalProposal>(`/proposals/${id}/vote`, { vote });
+export const retractProposalVote = (id: string) => deleteJson<InternalProposal>(`/proposals/${id}/vote`);
+
+// ── Bills ─────────────────────────────────────────────────────────────────────
+
+export const getBills = (status?: string) => fetchJson<Bill[]>(`/bills${status ? `?status=${status}` : ""}`);
+export const getBill = (id: string) => fetchJson<Bill>(`/bills/${id}`);
+
+export const getBillSignals = (billId: string) =>
+  fetchJson<{ yes: number; no: number; userSignal: "yes" | "no" | null }>(`/bills/${billId}/signal`);
+export const signalBill = (billId: string, signal: "yes" | "no") =>
+  postJson<{ yes: number; no: number; userSignal: "yes" | "no" | null }>(`/bills/${billId}/signal`, { signal });
+
+export const castMdbVote = (billId: string, vote: "yes" | "no" | "abstain") =>
+  postJson<{ userVote: string; summary: { yes: number; no: number; abstain: number; total: number } }>(`/bills/${billId}/mdb-vote`, { vote });
+export const getMdbVotes = (billId: string) => fetchJson<MdbVoteSummary>(`/bills/${billId}/mdb-votes`);
+
+export const submitSpeech = (billId: string, reading: number, content: string) =>
+  postJson<{ status: string }>(`/bills/${billId}/speech`, { reading, content });
+export const getSpeeches = (billId: string) =>
+  fetchJson<{ speeches: MdbSpeech[]; byReading: Record<string, MdbSpeech[]> }>(`/bills/${billId}/speeches`);
+
+export const submitAmendment = (billId: string, body: { title: string; description: string; impactChange?: Record<string, number> }) =>
+  postJson<{ status: string }>(`/bills/${billId}/amendment`, body);
+
+// ── Elections & government ────────────────────────────────────────────────────
+
+export const getElections = (status?: string) =>
+  fetchJson<Election[]>(`/elections${status ? `?status=${status}` : ""}`);
+export const getActiveElection = () => fetchJson<Election | null>("/elections/active");
+export const getElection = (id: string) => fetchJson<Election>(`/elections/${id}`);
+
+export const getGovernment = () => fetchJson<Government | null>("/government");
+export const getGovernmentHistory = () => fetchJson<Government[]>("/government/history");
+
+// ── Simulation & state ────────────────────────────────────────────────────────
+
+export const getState = () => fetchJson<NationalState>("/state");
+export const getSimulationStatus = () => fetchJson<SimulationStatus>("/simulation/status");
+export const getDays = () => fetchJson<DaySummary[]>("/simulation/days");
+export const getDayEvents = (day: number) => fetchJson<SimulationEvent[]>(`/simulation/days/${day}`);
+export const getCalendar = (month?: string) => fetchJson<CalendarData>(`/calendar${month ? `?month=${month}` : ""}`);
+export const getUpcomingCalendar = () => fetchJson<UpcomingCalendarData>("/calendar/upcoming");
+export const getEvents = (limit = 50, offset = 0, type?: string, actor?: string) => {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (type) params.set("type", type);
+  if (actor) params.set("actor", actor);
+  return fetchJson<{ events: SimulationEvent[]; total: number }>(`/simulation/events?${params}`);
+};
+export const getLatestEvents = (since?: string) =>
+  fetchJson<SimulationEvent[]>(`/simulation/events/latest${since ? `?since=${since}` : ""}`);
+
+export const injectEvent = (type: string, data?: Record<string, unknown>) =>
+  postJson<PendingInjection>("/simulate/inject", { type, data });
+export const getInjections = () => fetchJson<PendingInjection[]>("/simulate/injections");
+
+// ── Parliament (motions, interpellations, confidence votes, constitutional court) ──
+
+export const getFraktionen = (status?: string) =>
+  fetchJson<Fraktion[]>(`/fraktionen${status ? `?status=${status}` : ""}`);
+export const getFraktion = (id: string) => fetchJson<Fraktion>(`/fraktionen/${id}`);
+
+export const getMotions = (status?: string, type?: string) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (type) params.set("type", type);
+  const qs = params.toString();
+  return fetchJson<Motion[]>(`/motions${qs ? `?${qs}` : ""}`);
+};
+export const getMotion = (id: string) => fetchJson<Motion>(`/motions/${id}`);
+export const submitMotion = (body: { motionType: string; title: string; description: string }) =>
+  postJson<{ status: string }>("/motions/submit", body);
+
+export const getInterpellations = (status?: string, partyId?: string, targetMinistry?: string) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (partyId) params.set("partyId", partyId);
+  if (targetMinistry) params.set("targetMinistry", targetMinistry);
+  const qs = params.toString();
+  return fetchJson<Interpellation[]>(`/interpellations${qs ? `?${qs}` : ""}`);
+};
+export const getInterpellation = (id: string) => fetchJson<Interpellation>(`/interpellations/${id}`);
+export const submitInterpellation = (body: { interpellationType: string; title: string; question: string; targetMinistry: string }) =>
+  postJson<{ status: string }>("/interpellations/submit", body);
+
+export const getConfidenceVotes = (status?: string, type?: string) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (type) params.set("type", type);
+  const qs = params.toString();
+  return fetchJson<ConfidenceVote[]>(`/confidence-votes${qs ? `?${qs}` : ""}`);
+};
+export const getConfidenceVote = (id: string) => fetchJson<ConfidenceVote>(`/confidence-votes/${id}`);
+
+export const getConstitutionalChallenges = (status?: string, billId?: string) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (billId) params.set("billId", billId);
+  const qs = params.toString();
+  return fetchJson<ConstitutionalChallenge[]>(`/constitutional-court${qs ? `?${qs}` : ""}`);
+};
+export const getConstitutionalChallenge = (id: string) =>
+  fetchJson<ConstitutionalChallenge>(`/constitutional-court/${id}`);
+
+// ── Content (media, questions, polls, referendums, crises) ───────────────────
+
+export const getMedia = (day?: number) =>
+  fetchJson<MediaArticle[]>(`/media${day != null ? `?day=${day}` : ""}`);
+export const getMediaArticle = (id: string) => fetchJson<MediaArticle>(`/media/${id}`);
+
+export const getQuestions = (partyId?: string, status?: string) => {
+  const params = new URLSearchParams();
+  if (partyId) params.set("partyId", partyId);
+  if (status) params.set("status", status);
+  const qs = params.toString();
+  return fetchJson<CitizenQuestion[]>(`/questions${qs ? `?${qs}` : ""}`);
+};
+export const getQuestion = (id: string) => fetchJson<CitizenQuestion>(`/questions/${id}`);
+export const submitQuestion = (question: string, targetPartyId: string) =>
+  postJson<CitizenQuestion>("/questions", { question, targetPartyId });
+export const voteOnQuestion = (id: string, vote: 1 | -1) =>
+  postJson<CitizenQuestion>(`/questions/${id}/vote`, { vote });
+export const retractQuestionVote = (id: string) =>
+  deleteJson<CitizenQuestion>(`/questions/${id}/vote`);
+
+export const getPolls = (activeOnly = false) =>
+  fetchJson<Poll[]>(`/polls${activeOnly ? "?active=true" : ""}`);
+export const getPoll = (id: string) => fetchJson<Poll>(`/polls/${id}`);
+export const votePoll = (id: string, option: string) =>
+  postJson<Poll>(`/polls/${id}/vote`, { option });
+
+export const getReferendums = (status?: string) =>
+  fetchJson<Referendum[]>(`/referendums${status ? `?status=${status}` : ""}`);
+export const getReferendum = (id: string) => fetchJson<Referendum>(`/referendums/${id}`);
+export const voteReferendum = (id: string, option: string) =>
+  postJson<Referendum>(`/referendums/${id}/vote`, { option });
+
+export const getCrises = (activeOnly = false) =>
+  fetchJson<Crisis[]>(`/crises${activeOnly ? "?active=true" : ""}`);
+export const getCrisis = (id: string) => fetchJson<Crisis>(`/crises/${id}`);
+export const getCrisisTemplates = () => fetchJson<CrisisTemplate[]>("/crisis-templates");
+
+// ── Budget ────────────────────────────────────────────────────────────────────
+
+export const getBudgets = (status?: string) =>
+  fetchJson<Budget[]>(`/budgets${status ? `?status=${status}` : ""}`);
+export const getBudget = (id: string) => fetchJson<Budget>(`/budgets/${id}`);
+
+// ── Users & auth ──────────────────────────────────────────────────────────────
+
+export const registerUser = (displayName: string, partyId?: string) =>
+  postJson<User>("/users/register", partyId ? { displayName, partyId } : { displayName });
+export const loginUser = async (displayName: string): Promise<User | null> => {
+  const res = await fetch(`${getBase()}/users/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ displayName }),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Login failed");
+  return res.json();
+};
+export const getMe = () => fetchJson<User>("/users/me");
+export const getMyActivity = () => fetchJson<{ items: ActivityItem[] }>("/users/me/activity");
+export const joinParty = (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {});
+export const leaveParty = () => postJson<User>("/users/me/leave", {});
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export const getNotifications = (unreadOnly = false, limit?: number) => {
+  const params = new URLSearchParams();
+  if (unreadOnly) params.set("unread", "true");
+  if (limit) params.set("limit", String(limit));
+  const qs = params.toString();
+  return fetchJson<AppNotification[]>(`/notifications${qs ? `?${qs}` : ""}`);
+};
+export const getUnreadCount = () => fetchJson<{ count: number }>("/notifications/unread-count");
+export const markNotificationRead = (id: string) => postJson<{ success: boolean }>(`/notifications/${id}/read`, {});
+export const markAllNotificationsRead = () => postJson<{ marked: number }>("/notifications/read-all", {});
+
+// ── Timing preset ─────────────────────────────────────────────────────────────
+
+export const getPreset = () => fetchJson<PresetInfo>("/simulation/preset");
+export const setPreset = (preset: TimingPreset) =>
+  postJson<{ success: boolean; preset: TimingPreset }>("/simulation/preset", { preset });
+
+// ── Seats ─────────────────────────────────────────────────────────────────────
+
+export const getMySeat = () =>
+  fetchJson<{ seat: BundestagSeat | null; applications: MdbApplication[] }>("/seats/my-seat");
+export const getPartySeats = (partyId: string) => fetchJson<BundestagSeat[]>(`/seats/party/${partyId}`);
+export const getAvailableSeats = () =>
+  fetchJson<Record<string, { open: number; humanTotal: number; total: number }>>("/seats/available");
+export const applyForSeat = (applicationText: string, policyFocus?: string) =>
+  postJson<{ status: string }>("/seats/apply", { applicationText, policyFocus: policyFocus ? [policyFocus] : undefined });
+
+// ── MdB Parliamentary Actions ─────────────────────────────────────────────────
+
+// (submitMotion, submitInterpellation, submitAmendment already defined above under Parliament)
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export const getAnalytics = () => fetchJson<AnalyticsData>("/admin/analytics");
+
+// ── Impact & Catchup ──────────────────────────────────────────────────────────
+
+export const getMyImpact = () => fetchJson<ImpactData>("/users/me/impact");
+export const getMyCatchup = () => fetchJson<CatchupData>("/users/me/catchup");
+
+// ── Legacy `api` object — keeps all call sites that use `api.xxx()` working ───
+
+export const api = {
+  getParties,
+  getAlignment,
+  getParty,
+  getPartyHistory,
+  getPartyBills,
+  getPartyVotes,
+  getPartyStatements,
+  getBills,
+  getBill,
+  getState,
+  getSimulationStatus,
+  getDays,
+  getDayEvents,
+  getCalendar,
+  getUpcomingCalendar,
+  getEvents,
+  getCrises,
+  getCrisis,
+  getElections,
+  getActiveElection,
+  getElection,
+  getPolls,
+  getPoll,
+  votePoll,
+  getQuestions,
+  getQuestion,
+  submitQuestion,
+  voteOnQuestion,
+  retractQuestionVote,
+  getReferendums,
+  getReferendum,
+  voteReferendum,
+  getCrisisTemplates,
+  injectEvent,
+  getInjections,
+  getMotions,
+  getMotion,
+  getMedia,
+  getMediaArticle,
+  getFraktionen,
+  getFraktion,
+  getGovernment,
+  getGovernmentHistory,
+  getInterpellations,
+  getInterpellation,
+  getConfidenceVotes,
+  getConfidenceVote,
+  getConstitutionalChallenges,
+  getConstitutionalChallenge,
+  getBudgets,
+  getBudget,
+  getPartyProposals,
+  createProposal,
+  getProposal,
+  voteOnProposal,
+  getBillSignals,
+  signalBill,
+  retractProposalVote,
+  registerUser,
+  loginUser,
+  getMe,
+  getMyActivity,
+  joinParty,
+  leaveParty,
+  getPreset,
+  setPreset,
+  getNotifications,
+  getUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  getMySeat,
+  getPartySeats,
+  getAvailableSeats,
+  applyForSeat,
+  castMdbVote,
+  getMdbVotes,
+  submitSpeech,
+  getSpeeches,
+  submitMotion,
+  submitInterpellation,
+  submitAmendment,
+  getAnalytics,
+  getMyImpact,
+  getMyCatchup,
+  getLatestEvents,
+};
