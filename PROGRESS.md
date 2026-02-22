@@ -24,7 +24,9 @@ docs/plans/02-web-shared.md
 
 ### Step 3: Create `src/components/VoteBar.tsx`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `packages/web/src/components/VoteBar.tsx`, `packages/web/src/pages/Bills.tsx`, `packages/web/src/pages/BillDetail.tsx`, `packages/web/src/pages/Budget.tsx`, `packages/web/src/pages/Motions.tsx`, `packages/web/src/pages/ConfidenceVotes.tsx`, `packages/web/src/pages/Dashboard.tsx`
+- **Result**: Created VoteBar component with yes/no/abstain props and optional height/showCounts. Replaced inline vote bars in 6 pages. Typecheck pass.
 
 ### Step 4: Create `src/components/FilterPills.tsx`
 

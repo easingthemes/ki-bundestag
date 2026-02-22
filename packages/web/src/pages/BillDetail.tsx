@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_COLORS, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES, MDB_BADGE } from "@/lib/colors";
 import { usePolling } from "../usePolling";
+import { VoteBar } from "@/components/VoteBar";
 
 const STATUS_LABELS: Record<string, string> = {
   third_reading: "Third Reading",
@@ -279,10 +280,8 @@ export function BillDetail() {
               const noPct = total > 0 ? Math.round(s.no / total * 100) : 0;
               return (
                 <div>
-                  <div className="flex h-5 rounded overflow-hidden mb-2">
-                    {s.yes > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${yesPct}%` }} />}
-                    {s.no > 0 && <div className={VOTE_COLORS.no} style={{ width: `${noPct}%` }} />}
-                    {s.abstain > 0 && <div className={VOTE_COLORS.abstain} style={{ width: `${100 - yesPct - noPct}%` }} />}
+                  <div className="mb-2">
+                    <VoteBar yes={s.yes} no={s.no} abstain={s.abstain} total={total} />
                   </div>
                   <div className="text-xs text-muted-foreground mb-3">
                     <strong style={{ color: SEMANTIC_HEX.positive }}>{s.yes} Yes</strong>
@@ -502,11 +501,9 @@ export function BillDetail() {
                 <div style={{ fontSize: "0.9rem", color: "#555", marginTop: "0.5rem" }}>{a.description}</div>
                 {a.votes.length > 0 && aTotal > 0 && (
                   <>
-                    <div className="flex h-5 rounded overflow-hidden mt-2">
-                      {aYes > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${(aYes / aTotal) * 100}%` }} />}
-                      {aNo > 0 && <div className={VOTE_COLORS.no} style={{ width: `${(aNo / aTotal) * 100}%` }} />}
-                    </div>
-                    <div style={{ fontSize: "0.75rem", color: "#888" }}>Yes: {aYes} · No: {aNo}</div>
+                    <div className="mt-2">
+                    <VoteBar yes={aYes} no={aNo} abstain={0} total={aTotal} showCounts />
+                  </div>
                   </>
                 )}
               </CardContent></Card>
@@ -556,14 +553,10 @@ export function BillDetail() {
         <div className="mb-6">
           <h2 className="section-title">Schlussabstimmung</h2>
           <Card><CardContent className="p-5">
-            <div className="flex h-5 rounded overflow-hidden my-2">
-              {yesSeats > 0 && <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />}
-              {noSeats > 0 && <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />}
-              {abstainSeats > 0 && <div className={VOTE_COLORS.abstain} style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />}
+            <div className="my-2">
+              <VoteBar yes={yesSeats} no={noSeats} abstain={abstainSeats} total={totalSeats} showCounts />
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#888", marginBottom: "0.75rem" }}>
-              Yes: {yesSeats} · No: {noSeats} · Abstain: {abstainSeats}
-            </div>
+            <div className="mb-3" />
             {bill.votes.map(v => {
               const p = partyMap.get(v.partyId);
               return (

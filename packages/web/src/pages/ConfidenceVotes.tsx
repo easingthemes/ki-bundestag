@@ -5,7 +5,8 @@ import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, CONFIDENCE_TYPE_BADGE, VOTE_COLORS, SEMANTIC_HEX } from "@/lib/colors";
+import { STATUS_BADGE, CONFIDENCE_TYPE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { VoteBar } from "@/components/VoteBar";
 
 const STATUS_OPTIONS = ["all", "passed", "failed"] as const;
 const TYPE_OPTIONS = ["all", "vertrauensfrage", "misstrauensvotum"] as const;
@@ -198,10 +199,7 @@ function ConfidenceVoteCard({
         {/* Seat vote bar */}
         {totalSeats > 0 && (
           <div className="my-2">
-            <div className="flex h-2 rounded overflow-hidden bg-muted">
-              <div className={VOTE_COLORS.yes} style={{ width: `${(totalYes / totalSeats) * 100}%` }} />
-              <div className={VOTE_COLORS.no} style={{ width: `${(totalNo / totalSeats) * 100}%` }} />
-            </div>
+            <VoteBar yes={totalYes} no={totalNo} abstain={0} total={totalSeats} height="h-2" />
             <p className="text-xs text-muted-foreground mt-0.5">
               <span style={{ color: SEMANTIC_HEX.positive }}>Yes: {totalYes}</span>
               {" · "}

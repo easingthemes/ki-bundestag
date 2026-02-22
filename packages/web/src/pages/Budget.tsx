@@ -5,7 +5,8 @@ import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, VOTE_COLORS, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { STATUS_BADGE, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { VoteBar } from "@/components/VoteBar";
 
 const MINISTRY_LABELS: Record<keyof BudgetAllocations, string> = {
   finance: "Finance",
@@ -137,15 +138,8 @@ export function Budget() {
                 <div className="text-xs text-muted-foreground mb-1">
                   Parliament vote — Yes: {budget.yesSeats ?? 0} / No: {budget.noSeats ?? 0} seats
                 </div>
-                <div className="flex h-5 rounded overflow-hidden my-2">
-                  <div
-                    className={VOTE_COLORS.yes}
-                    style={{ width: `${((budget.yesSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
-                  />
-                  <div
-                    className={VOTE_COLORS.no}
-                    style={{ width: `${((budget.noSeats ?? 0) / TOTAL_SEATS) * 100}%` }}
-                  />
+                <div className="my-2">
+                  <VoteBar yes={budget.yesSeats ?? 0} no={budget.noSeats ?? 0} abstain={0} total={TOTAL_SEATS} />
                 </div>
               </div>
 
