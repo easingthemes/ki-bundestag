@@ -32,8 +32,12 @@
 
 ### Step 5: Review remaining inline logic in `loop.ts`
 
-- **Status**: pending
+- **Status**: done
+- **Files**: none
+- **Result**: Verified delegation: constitutional challenge calls `adjudicateChallenge()` + `constitutionalCourtApprovalImpact()` from constitutional-court.ts; confidence votes call `tallyVertrauensfrage()` + `tallyMisstrauensvotum()` from confidence-votes.ts. Remaining orchestration code (DB writes, event creation, coalition role changes) is appropriate to keep in loop.ts. No further extraction needed.
 
 ### Step 6: Add `.js` extension imports in new files
 
-- **Status**: pending (covered inline in steps 1–4)
+- **Status**: done
+- **Files**: none (verified inline in steps 1–4)
+- **Result**: All imports in bill-pipeline.ts, veto.ts, and updated opinion.ts and media.ts correctly use `.js` extensions per Node16 ESM requirements. Typecheck passed.
