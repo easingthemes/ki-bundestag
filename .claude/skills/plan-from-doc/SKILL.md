@@ -1,4 +1,3 @@
-````skill
 ---
 name: plan-from-doc
 description: Convert an existing docs/plans/*.md plan document into a structured Progress.md ready for plan-do and plan-exe
@@ -94,7 +93,8 @@ Example for multi-group:
 - **Keep descriptions short** — 2-3 sentences. The full detail is in the source plan doc (linked via `Ref`).
 - **One step = one numbered item** in the source doc's Steps section. If the plan has sub-steps, keep them as a group under one Progress.md step.
 - **Include validation** — if the plan doc has a Verification section, add the commands to the relevant steps.
-- **Ask before overwriting** — if Progress.md already has in-progress or done steps, don't silently overwrite.
+- **Overwrite Progress.md silently** if all existing steps are `done` — the feature is complete and git preserves the history.
+- **Ask before overwriting** only if Progress.md has `pending` or `in-progress` steps — live work in progress could be lost.
 
 ## Output
 
@@ -103,5 +103,3 @@ After creating the progress file, summarize:
 - Path to the progress file created
 - Next suggested command: `plan-do` (to research + detail each step) or `plan-exe` (if steps are already detailed enough to implement directly from the plan doc)
 - Note: if the plan doc steps are already very detailed (have explicit file paths and actions), `/plan-exe` can run directly without `/plan-do` first
-
-````

@@ -1,6 +1,6 @@
 ---
 name: plan-exe
-description: Execute the next planned step from Progress.md — implement code, run validation, update progress
+description: Execute planned steps from Progress.md — implement code, run validation, update progress. Use 'all' to run all steps automatically.
 disable-model-invocation: false
 ---
 
@@ -14,8 +14,9 @@ Read `Progress.md` (or a named progress file if specified) to understand the ful
 
 ### 2. Determine Focus
 
+- If **`all`** is provided (e.g. `plan-exe all`), run all remaining `pending`/`planned` steps automatically without pausing between them. Stop only on validation failure or a blocker.
 - If a **step parameter** is provided (e.g. `step1`, `step2`), implement only that step.
-- If **no parameter** is given, implement the next `planned` step (not `done` or `in-progress`).
+- If **no parameter** is given, implement the next `planned` or `pending` step (not `done` or `in-progress`).
 - Never skip ahead — implement steps in order unless told otherwise.
 
 ### 3. Implement
@@ -38,17 +39,16 @@ For the step in focus:
 
 Replace the Plan section with the compact Result — detailed plan history is in git.
 
-### 4. Offer to Continue
+### 4. Continue or Offer to Continue
 
-After completing a step, ask the developer:
-
-> "Step N completed. Continue to step N+1: < title >?"
-
-If the developer confirms, proceed to the next step without requiring a new command invocation.
+- If running in **`all` mode**: automatically proceed to the next `pending`/`planned` step after each successful validation. Only stop if a step fails or is blocked — then report and wait.
+- Otherwise: after completing a step, ask the developer:
+  > "Step N completed. Continue to step N+1: < title >?"
+  > If the developer confirms, proceed without requiring a new command invocation.
 
 ### Rules
 
-- **One step at a time** — finish and validate the current step before offering the next.
+- **One step at a time** — finish and validate the current step before starting the next, even in `all` mode.
 - **Update Progress.md in real time** — mark `in-progress` when starting, `done` when finished.
 - **Follow project conventions** — use naming, structure, and coding patterns from the project's instruction files and existing code.
 - **Don't skip validation** — every step ends with a build/lint/test check.

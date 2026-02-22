@@ -1,0 +1,73 @@
+import express from "express";
+import { getDb, getUserDb, schema, logUserAction, isParticipatoryPreset, isFeatureEnabled } from "@ki-bundestag/engine";
+import type { TimingPreset } from "@ki-bundestag/engine";
+import { eq } from "drizzle-orm";
+
+// ── Session tracking middleware ──────────────────────────────────────────────
+export function sessionTracking(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  try {
+    const token = req.headers["x-user-token"];
+    if (typeof token === "string" && token.length > 0) {
+      const userDb = getUserDb();
+      const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+      if (user) {
+        const now = Date.now();
+        const gap = now - (user.lastActive ?? 0);
+        if (gap > 15 * 60 * 1000) {
+          // New session detected
+          const db = getDb();
+          const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+          logUserAction(token, "session_start", md?.day ?? 0, undefined, undefined, { gap_minutes: Math.round(gap / 60000) });
+        }
+        // Update lastActive
+        userDb.update(schema.users).set({ lastActive: now }).where(eq(schema.users.id, token)).run();
+      }
+    }
+  } catch {
+    // Never block requests due to session tracking
+  }
+  next();
+}
+
+// ── Preset cache (10s TTL) ───────────────────────────────────────────────────
+let cachedPreset: { value: TimingPreset; expiresAt: number } | null = null;
+
+export function getTimingPreset(): TimingPreset {
+  const now = Date.now();
+  if (cachedPreset && now < cachedPreset.expiresAt) return cachedPreset.value;
+  const db = getDb();
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  const preset = ((meta as any)?.timingPreset ?? "normal") as TimingPreset;
+  cachedPreset = { value: preset, expiresAt: now + 10_000 };
+  return preset;
+}
+
+/**
+ * Guard for participatory endpoints. Returns true (and sends 403) if blocked.
+ */
+export function requireParticipatory(_req: express.Request, res: express.Response, feature?: string): boolean {
+  const preset = getTimingPreset();
+  if (!isParticipatoryPreset(preset)) {
+    res.status(403).json({
+      error: "Watch-only mode",
+      preset,
+      message: `Simulation is in ${preset} mode. Switch to Normal or Slow to interact.`,
+    });
+    return true;
+  }
+  if (feature && !isFeatureEnabled(preset, feature)) {
+    res.status(403).json({
+      error: "Feature not available",
+      preset,
+      feature,
+      message: `"${feature}" is not enabled in ${preset} mode.`,
+    });
+    return true;
+  }
+  return false;
+}
+
+export function getUserToken(req: express.Request): string | null {
+  const h = req.headers["x-user-token"];
+  return typeof h === "string" && h.length > 0 ? h : null;
+}
