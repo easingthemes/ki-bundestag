@@ -270,6 +270,27 @@ export interface SimulationStatus {
   provisionalBudget: boolean;
   dailySummary: string | null;
   timingPreset: TimingPreset;
+  startDate: string | null;
+}
+
+export interface CalendarEvent {
+  id: string;
+  type: string;
+  title: string;
+  actor: string;
+}
+
+export interface CalendarDay {
+  dayNumber: number;
+  date: string;
+  topEvents: CalendarEvent[];
+  totalCount: number;
+}
+
+export interface CalendarData {
+  startDate: string;
+  currentDay: number;
+  days: CalendarDay[];
 }
 
 export interface DaySummary {
@@ -537,6 +558,7 @@ export const api = {
   getSimulationStatus: () => fetchJson<SimulationStatus>("/simulation/status"),
   getDays: () => fetchJson<DaySummary[]>("/simulation/days"),
   getDayEvents: (day: number) => fetchJson<SimulationEvent[]>(`/simulation/days/${day}`),
+  getCalendar: (month?: string) => fetchJson<CalendarData>(`/calendar${month ? `?month=${month}` : ""}`),
   getEvents: (limit = 50, offset = 0, type?: string, actor?: string) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (type) params.set("type", type);

@@ -206,8 +206,17 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
 
       try {
         const raw = await callAI({
-          system: `You are the party leadership of ${party.name} (ideology: ${(party as any).ideology}). A citizen is applying for a Bundestag seat in your party. Evaluate their application. Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<1–2 sentences>"}`,
-          prompt: `Applicant: ${displayName}\nApplication: "${app.applicationText}"${app.policyFocus ? `\nPolicy focus: ${JSON.stringify(app.policyFocus)}` : ""}\nActivity score: ${score.toFixed(1)}\n\nShould ${party.name} grant this member a Bundestag seat?`,
+          system: `You are the party leadership of ${party.name} (ideology: ${(party as any).ideology}). A citizen is applying for a Bundestag seat in your party.
+
+Evaluate their application based on these criteria:
+1. Ideological alignment: Does the application show understanding of and alignment with ${party.name}'s core positions?
+2. Policy substance: Does the applicant articulate concrete policy goals (not just generic statements)?
+3. Engagement: The applicant's activity score reflects their prior participation (questions, proposals, signals). Higher scores indicate more engaged members.
+
+Be generous — this is a simulation. Approve applicants who show genuine interest in the party's direction, even if their application is brief. Only reject if the application is clearly off-topic, contradicts the party's core ideology, or shows no effort.
+
+Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<1–2 sentences explaining what was good or what was missing>"}`,
+          prompt: `Applicant: ${displayName}\nApplication: "${app.applicationText}"${app.policyFocus ? `\nPolicy focus: ${JSON.stringify(app.policyFocus)}` : ""}\nActivity score: ${score.toFixed(1)}/6\n\nShould ${party.name} grant this member a Bundestag seat?`,
           maxTokens: 256,
           partyId,
         });
@@ -263,14 +272,14 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
             aiReasoning: reasoning,
             priorityScore: Math.round(score * 100) / 100,
             reviewedOnDay: currentDay,
-            cooldownUntilDay: currentDay + 14, // 14-day cooldown before re-applying
+            cooldownUntilDay: currentDay + 7, // 7-day cooldown before re-applying
           }).where(eq(schema.mdbApplications.id, app.id)).run();
 
           createNotification(
             app.userId,
             "mdb_rejected",
             `MdB-Bewerbung abgelehnt — ${party.name}`,
-            `Ihre Bewerbung wurde leider abgelehnt. ${reasoning} Sie können sich in 14 Tagen erneut bewerben.`,
+            `Ihre Bewerbung wurde leider abgelehnt. ${reasoning}\n\nTipps für eine erfolgreiche Bewerbung:\n• Zeigen Sie Verständnis für die Positionen von ${party.name}\n• Nennen Sie konkrete politische Ziele\n• Steigern Sie Ihre Aktivität (Fragen, Vorschläge, Signale)\n\nSie können sich in 7 Tagen erneut bewerben.`,
             { partyId },
             currentDay,
           );

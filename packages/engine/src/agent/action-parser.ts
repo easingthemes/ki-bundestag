@@ -13,6 +13,18 @@ const VALID_MINISTRY_PORTFOLIOS: MinistryPortfolio[] = [
   "defence", "education", "health", "infrastructure",
 ];
 
+function isBillImpact(value: unknown): boolean {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
+  const impact = value as Record<string, unknown>;
+  const keys = ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"];
+  for (const key of keys) {
+    if (impact[key] != null && typeof impact[key] !== "number") {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function parseAgentResponse(raw: string): AgentResponse {
   // Try to extract JSON from the response (handle markdown code blocks)
   let jsonStr = raw.trim();
@@ -114,6 +126,10 @@ export function validateActions(
         }
         if (!action.billId || !action.title || !action.description) {
           console.warn(`[${partyId}] Amendment missing fields, skipping`);
+          continue;
+        }
+        if (!isBillImpact((action as any).impactChange)) {
+          console.warn(`[${partyId}] Amendment missing/invalid impactChange, skipping`);
           continue;
         }
         // Must target a second_reading bill

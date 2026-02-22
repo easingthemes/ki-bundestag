@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, type Bill, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication } from "../api";
+import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication } from "../api";
+import { CalendarWidget } from "../components/CalendarWidget";
 import { usePolling } from "../usePolling";
 import { Button, SkeletonCard, SkeletonTitle } from "../components/shared";
 import { useUser } from "../userContext";
@@ -31,6 +32,8 @@ export function Dashboard() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
   const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
+  const [calendar, setCalendar] = useState<CalendarData | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<string | undefined>(undefined);
 
   const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
@@ -52,6 +55,11 @@ export function Dashboard() {
   useEffect(() => { refreshCore(); refreshSlow(); }, [refreshCore, refreshSlow]);
   usePolling(refreshCore);
   usePolling(refreshSlow, 60000);
+
+  // Calendar fetch — separate so month navigation doesn't re-fetch everything
+  useEffect(() => {
+    api.getCalendar(calendarMonth).then(setCalendar).catch(console.error);
+  }, [calendarMonth]);
 
   if (!state || !simStatus) {
     return (
@@ -302,6 +310,17 @@ export function Dashboard() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Calendar */}
+          {calendar && (
+            <div className="mb-8">
+              <div className="flex justify-between items-baseline mb-2">
+                <h2 className="!mb-0">Kalender</h2>
+                <Link to="/log" className="text-xs text-primary">Alle Tage →</Link>
+              </div>
+              <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />
             </div>
           )}
         </div>
