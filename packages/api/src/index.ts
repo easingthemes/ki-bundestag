@@ -1019,10 +1019,20 @@ app.delete("/api/questions/:id/vote", (req, res) => {
 // GET /api/referendums
 app.get("/api/referendums", (req, res) => {
   const db = getDb();
+  const userDb = getUserDb();
   const allRows = db.select().from(schema.referendums).all();
   const statusFilter = req.query.status as string | undefined;
   const rows = statusFilter ? allRows.filter((r: any) => r.status === statusFilter) : allRows;
-  const referendums: Referendum[] = rows.map(mapReferendum);
+
+  const token = getUserToken(req);
+  const votedSet = new Set<string>();
+  if (token) {
+    const userVotes = userDb.select().from(schema.referendumVotes)
+      .where(eq(schema.referendumVotes.userId, token)).all();
+    for (const v of userVotes) votedSet.add(v.referendumId);
+  }
+
+  const referendums = rows.map(r => ({ ...mapReferendum(r), userVoted: votedSet.has(r.id) }));
   referendums.sort((a, b) => b.createdOnDay - a.createdOnDay);
   res.json(referendums);
 });
@@ -1030,18 +1040,30 @@ app.get("/api/referendums", (req, res) => {
 // GET /api/referendums/:id
 app.get("/api/referendums/:id", (req, res) => {
   const db = getDb();
+  const userDb = getUserDb();
   const rows = db.select().from(schema.referendums).where(eq(schema.referendums.id, req.params.id)).all();
   if (rows.length === 0) {
     res.status(404).json({ error: "Referendum not found" });
     return;
   }
-  res.json(mapReferendum(rows[0]));
+  const token = getUserToken(req);
+  let userVoted = false;
+  if (token) {
+    const existing = userDb.select().from(schema.referendumVotes)
+      .where(and(eq(schema.referendumVotes.referendumId, req.params.id), eq(schema.referendumVotes.userId, token))).all();
+    userVoted = existing.length > 0;
+  }
+  res.json({ ...mapReferendum(rows[0]), userVoted });
 });
 
 // POST /api/referendums/:id/vote
 app.post("/api/referendums/:id/vote", (req, res) => {
   if (requireParticipatory(req, res, "vote_referendums")) return;
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Login required to vote" }); return; }
+
   const db = getDb();
+  const userDb = getUserDb();
   const rows = db.select().from(schema.referendums).where(eq(schema.referendums.id, req.params.id)).all();
   if (rows.length === 0) {
     res.status(404).json({ error: "Referendum not found" });
@@ -1060,6 +1082,20 @@ app.post("/api/referendums/:id/vote", (req, res) => {
     return;
   }
 
+  // Check for existing vote
+  const existing = userDb.select().from(schema.referendumVotes)
+    .where(and(eq(schema.referendumVotes.referendumId, referendum.id), eq(schema.referendumVotes.userId, token))).all();
+  if (existing.length > 0) {
+    res.status(400).json({ error: "Already voted on this referendum" });
+    return;
+  }
+
+  // Record user vote
+  const voteId = `rvote-${randomUUID().slice(0, 8)}`;
+  userDb.insert(schema.referendumVotes).values({
+    id: voteId, referendumId: referendum.id, userId: token, option, createdAt: Date.now(),
+  }).run();
+
   const votes = { ...referendum.votes };
   votes[option] = (votes[option] || 0) + 1;
 
@@ -1068,7 +1104,7 @@ app.post("/api/referendums/:id/vote", (req, res) => {
     .where(eq(schema.referendums.id, referendum.id))
     .run();
 
-  res.json({ ...referendum, votes });
+  res.json({ ...referendum, votes, userVoted: true });
 });
 
 // GET /api/government

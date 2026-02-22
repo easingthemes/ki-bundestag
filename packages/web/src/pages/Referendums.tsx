@@ -14,7 +14,6 @@ export function Referendums() {
   const { user } = useUser();
   const [referendums, setReferendums] = useState<Referendum[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("");
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [pastVisible, setPastVisible] = useState(5);
 
   const refresh = useCallback(() => {
@@ -26,10 +25,8 @@ export function Referendums() {
   usePolling(refresh, 10000);
 
   const handleVote = async (id: string, option: string) => {
-    if (votedIds.has(id)) return;
     try {
       await api.voteReferendum(id, option);
-      setVotedIds(prev => new Set(prev).add(id));
       refresh();
     } catch (err) {
       console.error("Vote failed:", err);
@@ -41,7 +38,7 @@ export function Referendums() {
   const active = referendums.filter(r => r.status === "active");
   const past = referendums.filter(r => r.status !== "active");
 
-  const unvotedActive = active.filter(r => !votedIds.has(r.id));
+  const unvotedActive = active.filter(r => !r.userVoted);
 
   return (
     <div>
@@ -78,7 +75,6 @@ export function Referendums() {
             <ReferendumCard
               key={ref.id}
               referendum={ref}
-              hasVoted={votedIds.has(ref.id)}
               onVote={handleVote}
             />
           ))}
@@ -92,7 +88,6 @@ export function Referendums() {
             <ReferendumCard
               key={ref.id}
               referendum={ref}
-              hasVoted={true}
               onVote={handleVote}
             />
           ))}
@@ -118,13 +113,12 @@ export function Referendums() {
 
 function ReferendumCard({
   referendum,
-  hasVoted,
   onVote,
 }: {
   referendum: Referendum;
-  hasVoted: boolean;
   onVote: (id: string, option: string) => void;
 }) {
+  const hasVoted = !!referendum.userVoted;
   const totalVotes = Object.values(referendum.votes).reduce((s, v) => s + v, 0);
   const showResults = hasVoted || referendum.status !== "active";
 

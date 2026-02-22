@@ -364,6 +364,7 @@ export interface Referendum {
   result: string | null;
   impact: BillImpact | null;
   category: string;
+  userVoted?: boolean;
 }
 
 export interface CrisisTemplate {

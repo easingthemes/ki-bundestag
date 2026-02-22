@@ -168,11 +168,43 @@ export function About() {
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
           <h2>How You Can Participate</h2>
-          <ul className="my-2 ml-6 list-disc">
+          <p className="mb-4">
+            Your level of influence grows as you go from visitor to registered user to party member to elected MdB (Mitglied des Bundestages).
+          </p>
+
+          <h3 className="text-base">Visitor (no account needed)</h3>
+          <ul className="my-2 ml-6 list-disc mb-4">
+            <li className="mb-1"><strong>Browse everything</strong> — follow bills, elections, budgets, media, polls, and the full simulation log.</li>
+            <li className="mb-1"><strong>Inject events</strong> — trigger crises, snap elections, economic shocks, or budget cycles from the Admin panel.</li>
+            <li className="mb-1"><strong>Coalition Calculator</strong> — experiment with party combinations on the Elections page to check majority math and ideological spread.</li>
+          </ul>
+
+          <h3 className="text-base">Registered User (free account)</h3>
+          <ul className="my-2 ml-6 list-disc mb-4">
             <li className="mb-1"><strong>Vote in polls</strong> — weekly opinion polls let you weigh in on party preferences and policy questions.</li>
             <li className="mb-1"><strong>Vote in referendums</strong> — citizens vote on major policy questions that directly impact the economy and legislation.</li>
             <li className="mb-1"><strong>Ask parties questions</strong> — submit a question to any party and receive an AI-generated response in character.</li>
-            <li className="mb-1"><strong>Inject events</strong> — from the Dashboard, you can trigger crises, snap elections, or economic shocks to see how the political system responds.</li>
+            <li className="mb-1"><strong>Upvote/downvote questions</strong> — community voting determines which citizen questions get answered first.</li>
+            <li className="mb-1"><strong>Join a party</strong> — become a member of one of the six parties (7-day cooldown on switching).</li>
+          </ul>
+
+          <h3 className="text-base">Party Member</h3>
+          <ul className="my-2 ml-6 list-disc mb-4">
+            <li className="mb-1"><strong>Propose internal bills</strong> — submit legislation to your party's caucus for review; if accepted by AI, it enters the Bundestag pipeline.</li>
+            <li className="mb-1"><strong>Vote on caucus proposals</strong> — support or oppose other members' proposals during the 5-day review window.</li>
+            <li className="mb-1"><strong>Signal on bills</strong> — express YES/NO on bills in 2nd or 3rd reading; signals are injected into the AI's voting context.</li>
+            <li className="mb-1"><strong>Membership bonus</strong> — active members boost their party's daily approval drift.</li>
+            <li className="mb-1"><strong>Apply for MdB seat</strong> — submit an application to become a Mitglied des Bundestages (AI-reviewed).</li>
+          </ul>
+
+          <h3 className="text-base">MdB (Mitglied des Bundestages)</h3>
+          <ul className="my-2 ml-6 list-disc">
+            <li className="mb-1"><strong>Vote directly on bills</strong> — cast your own Yes/No/Abstain vote in 3rd reading, counted alongside AI seats.</li>
+            <li className="mb-1"><strong>Give speeches</strong> — deliver a speech during any reading stage of a bill (one per reading).</li>
+            <li className="mb-1"><strong>File motions</strong> — submit Antr&auml;ge (motions) or Entschlie&szlig;ungen (resolutions) for a same-day vote.</li>
+            <li className="mb-1"><strong>File interpellations</strong> — submit Kleine or Gro&szlig;e Anfragen to question government ministers (opposition MdBs only).</li>
+            <li className="mb-1"><strong>Propose amendments</strong> — suggest changes to bills during 2nd reading.</li>
+            <li className="mb-1"><strong>Discipline system</strong> — your voting record is tracked; deviating from the party line affects your discipline level (warn &rarr; restrict &rarr; whip &rarr; expel).</li>
           </ul>
         </CardContent>
       </Card>

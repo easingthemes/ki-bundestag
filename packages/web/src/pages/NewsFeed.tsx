@@ -79,13 +79,9 @@ export function NewsFeed() {
     : undefined;
 
   const refresh = useCallback(() => {
-    api.getEvents(PAGE_SIZE, offset, activeTypeString)
+    api.getEvents(PAGE_SIZE + offset, 0, activeTypeString)
       .then(({ events: ev, total: t }) => {
-        if (offset === 0) {
-          setEvents(ev);
-        } else {
-          setEvents(prev => [...prev, ...ev]);
-        }
+        setEvents(ev);
         setTotal(t);
       })
       .catch(console.error);
