@@ -9,7 +9,7 @@ import { Button, SkeletonCard, SkeletonTitle } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, fixColor } from "@/lib/utils";
 import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, VOTE_COLORS, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL } from "@/lib/colors";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
@@ -17,8 +17,6 @@ const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Volksstimme": { color: "#dc2626", label: "Volksstimme" },
   "Wirtschaftswoche": { color: "#334155", label: "WiWo" },
 };
-
-function fixColor(c: string) { return c === "#FFED00" ? "#c4a900" : c; }
 
 /* ── Onboarding Overlay ───────────────────────────────────────────── */
 

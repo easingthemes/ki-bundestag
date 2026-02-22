@@ -3,7 +3,7 @@ import { api, type Election, type ElectionResult, type NationalState, type Party
 import { usePolling } from "../usePolling";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, fixColor } from "@/lib/utils";
 import { ROLE_BADGE, PHASE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { TERM_DURATION, PRESET_LABEL, formatTimeToElection } from "@/lib/timing";
 import { Hemicycle } from "@/components/Hemicycle";
@@ -11,10 +11,6 @@ import { Hemicycle } from "@/components/Hemicycle";
 const MAJORITY_THRESHOLD = 368;
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
-
-function fixColor(c: string): string {
-  return c === "#FFED00" ? "#c4a900" : c;
-}
 
 /** Convert election results + parties → SeatGroup[] for the Hemicycle component */
 function resultsToSeats(results: ElectionResult[], parties: Party[]) {

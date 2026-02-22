@@ -171,3 +171,8 @@ Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABA
 ## ESM
 
 All packages use `"type": "module"`. Internal imports within engine use `.js` extensions (Node16 ESM requirement). Base tsconfig: `module: Node16`, `moduleResolution: Node16`, target `ES2022`.
+
+
+## MCP
+
+Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
