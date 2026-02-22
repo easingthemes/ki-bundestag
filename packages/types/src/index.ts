@@ -259,7 +259,8 @@ export type SimulationEventType =
   | "provisional_budget_started"
   | "budget_revision_rejected"
   | "presidential_veto"
-  | "bill_committee_rejected";
+  | "bill_committee_rejected"
+  | "mdb_speech";
 
 export interface SimulationEvent {
   id: string;
@@ -293,6 +294,7 @@ export interface AgentContext {
   government?: Government;
   topInternalProposals?: Array<{ title: string; category: string; score: number; totalVotes: number }>;
   memberSignals?: Record<string, { yes: number; no: number }>;  // keyed by billId
+  mdbVoteSummary?: Record<string, { yes: number; no: number; abstain: number; total: number }>;  // keyed by billId
 }
 
 export interface ProposeBillAction {
@@ -531,6 +533,59 @@ export interface Motion {
   votes: BillVote[];
   dayNumber: number;
   sentimentImpact?: number;
+}
+
+// MdB (Bundestag Member) types
+export type SeatController = "human" | "ai";
+export type ProxyDefault = "party_line" | "abstain";
+export type MdbApplicationStatus = "pending" | "approved" | "rejected" | "expired";
+
+export interface BundestagSeat {
+  id: string;
+  seatNumber: number;
+  partyId: string;
+  controller: SeatController;
+  userId: string | null;
+  electionId: string | null;
+  active: boolean;
+  proxyDefault: ProxyDefault;
+  disciplineLevel: number;    // 0-3
+  disciplineReason: string | null;
+  allocatedOnDay: number;
+}
+
+export interface MdbApplication {
+  id: string;
+  userId: string;
+  partyId: string;
+  applicationText: string;
+  policyFocus: string[] | null;
+  status: MdbApplicationStatus;
+  aiReasoning: string | null;
+  priorityScore: number | null;
+  createdOnDay: number;
+  reviewedOnDay: number | null;
+  cooldownUntilDay: number | null;
+}
+
+export interface MdbVote {
+  id: string;
+  seatId: string;
+  billId: string;
+  userId: string;
+  vote: VoteChoice;
+  createdAt: number;
+}
+
+export interface MdbSpeech {
+  id: string;
+  userId: string;
+  billId: string;
+  reading: number;
+  content: string;
+  sentimentImpact: number | null;
+  dayNumber: number;
+  createdAt: number;
 }
 
 // Budget

@@ -41,6 +41,11 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, shouldPresidentVeto, BUDGET_TOTAL } from "./budget.js";
 import { generateDailySummary } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
+import { resetAllSeats, allocateSeats, reviewMdbApplications } from "./seats.js";
+import { processDaySpeeches } from "./speeches.js";
+import { processMdbActions } from "./mdb-actions.js";
+import { reviewPartyDiscipline } from "./discipline.js";
+import type { TimingPreset } from "./timing.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -503,6 +508,19 @@ export async function runDay(): Promise<number> {
       });
       console.log(`  [Cabinet] Chancellor: ${cabinet.chancellorName}, ${cabinet.ministers.length} ministers`);
 
+      // Allocate Bundestag seats per party based on election results
+      const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
+      resetAllSeats();
+      for (const result of activeElection.results!) {
+        allocateSeats(result.partyId, result.seatsWon, activeElection.id, currentDay, timingPreset);
+      }
+
+      // Expire pending MdB applications from previous term
+      try {
+        const userSqlite = (await import("../db/index.js")).getUserSqlite();
+        userSqlite.prepare("UPDATE mdb_applications SET status = 'expired' WHERE status = 'pending'").run();
+      } catch { /* table may not exist yet */ }
+
       console.log(`  [Election] New coalition: ${coalitionNames}`);
       activeElection = null;
     } else {
@@ -813,6 +831,25 @@ export async function runDay(): Promise<number> {
     // 5f. Load active government for agent context
     const activeGov = getActiveGovernment();
 
+    // 5g. Process MdB parliamentary actions (motions, interpellations, amendments)
+    try {
+      const mdbActionResult = processMdbActions(
+        currentDay,
+        allParties as any,
+        nationalState.coalitionParties,
+      );
+      for (const ev of mdbActionResult.events) {
+        addEvent(dayEvents, ev);
+      }
+      if (mdbActionResult.sentimentDelta !== 0) {
+        nationalState.publicSentiment = Math.max(5, Math.min(75,
+          Math.round((nationalState.publicSentiment + mdbActionResult.sentimentDelta) * 10) / 10,
+        ));
+      }
+    } catch (err) {
+      console.error("[Loop] Error processing MdB actions:", err);
+    }
+
     // 6. Run each party agent
     const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
 
@@ -848,6 +885,24 @@ export async function runDay(): Promise<number> {
       } catch { /* table may not exist yet */ }
     }
 
+    // Load MdB vote summaries for third_reading bills (for agent context)
+    const mdbVoteSummaryByBill: Record<string, { yes: number; no: number; abstain: number; total: number }> = {};
+    if (thirdReadingBills.length > 0) {
+      try {
+        const billIds = thirdReadingBills.map(b => b.id);
+        const mdbVotesAll = getUserDb().select().from(schema.mdbVotes)
+          .where(inArray(schema.mdbVotes.billId, billIds))
+          .all();
+        for (const v of mdbVotesAll) {
+          if (!mdbVoteSummaryByBill[v.billId]) mdbVoteSummaryByBill[v.billId] = { yes: 0, no: 0, abstain: 0, total: 0 };
+          mdbVoteSummaryByBill[v.billId].total++;
+          if (v.vote === "yes") mdbVoteSummaryByBill[v.billId].yes++;
+          else if (v.vote === "no") mdbVoteSummaryByBill[v.billId].no++;
+          else mdbVoteSummaryByBill[v.billId].abstain++;
+        }
+      } catch { /* table may not exist yet */ }
+    }
+
     for (const party of allParties) {
       const fraktion = fraktionByParty.get(party.id);
 
@@ -871,6 +926,7 @@ export async function runDay(): Promise<number> {
         government: activeGov ?? undefined,
         topInternalProposals: internalProposalsByParty.get(party.id),
         memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
+        mdbVoteSummary: Object.keys(mdbVoteSummaryByBill).length > 0 ? mdbVoteSummaryByBill : undefined,
       };
 
       const actions = await runPartyAgent(ctx, thirdReadingBills, secondReadingBills);
@@ -1011,8 +1067,42 @@ export async function runDay(): Promise<number> {
         .where(eq(schema.bills.id, bill.id))
         .run();
 
+      // Load MdB votes for this bill + human seat counts for tally
+      let mdbVoteEntries: import("./voting.js").MdbVoteEntry[] = [];
+      let humanSeatCountsForTally: Record<string, number> = {};
+      try {
+        const rawMdbVotes = getUserDb().select().from(schema.mdbVotes)
+          .where(eq(schema.mdbVotes.billId, bill.id))
+          .all();
+        if (rawMdbVotes.length > 0) {
+          // Look up each voter's seat to get partyId, proxyDefault, disciplineLevel
+          for (const mv of rawMdbVotes) {
+            const seat = db.select().from(schema.bundestagSeats)
+              .where(eq(schema.bundestagSeats.id, mv.seatId))
+              .get();
+            if (seat) {
+              mdbVoteEntries.push({
+                seatId: mv.seatId,
+                partyId: seat.partyId,
+                userId: mv.userId,
+                vote: mv.vote as import("@ki-bundestag/types").VoteChoice,
+                proxyDefault: seat.proxyDefault,
+                disciplineLevel: seat.disciplineLevel,
+              });
+            }
+          }
+          // Count human seats per party (for proxy calculation)
+          const humanSeats = db.select().from(schema.bundestagSeats)
+            .where(and(eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "human")))
+            .all();
+          for (const s of humanSeats) {
+            humanSeatCountsForTally[s.partyId] = (humanSeatCountsForTally[s.partyId] ?? 0) + 1;
+          }
+        }
+      } catch { /* tables may not exist yet */ }
+
       // Tally and determine outcome
-      const result = tallyVotes(bill, allParties);
+      const result = tallyVotes(bill, allParties, mdbVoteEntries.length > 0 ? mdbVoteEntries : undefined, Object.keys(humanSeatCountsForTally).length > 0 ? humanSeatCountsForTally : undefined);
       const newStatus = result.passed ? "passed" : "rejected";
 
       db.update(schema.bills)
@@ -1495,6 +1585,18 @@ export async function runDay(): Promise<number> {
     }
   }
 
+  // 10a2. Process MdB speeches
+  try {
+    const speechSentimentDelta = processDaySpeeches(currentDay);
+    if (speechSentimentDelta !== 0) {
+      nationalState.publicSentiment = Math.max(5, Math.min(75,
+        Math.round((nationalState.publicSentiment + speechSentimentDelta) * 10) / 10,
+      ));
+    }
+  } catch (err) {
+    console.error("[Loop] Error processing MdB speeches:", err);
+  }
+
   // 10b. Answer pending citizen questions
   await answerPendingQuestions(allParties, currentDay);
 
@@ -1503,6 +1605,22 @@ export async function runDay(): Promise<number> {
     await reviewInternalProposals(currentDay);
   } catch (err) {
     console.error("[Loop] Error reviewing internal proposals:", err);
+  }
+
+  // 10d. Review MdB seat applications
+  try {
+    await reviewMdbApplications(currentDay);
+  } catch (err) {
+    console.error("[Loop] Error reviewing MdB applications:", err);
+  }
+
+  // 10d2. Review party discipline (every 7 sim days)
+  if (currentDay % 7 === 0) {
+    try {
+      await reviewPartyDiscipline(currentDay);
+    } catch (err) {
+      console.error("[Loop] Error reviewing party discipline:", err);
+    }
   }
 
   // 10e. Answer pending interpellations + expire overdue ones

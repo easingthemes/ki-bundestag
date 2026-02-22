@@ -1,6 +1,7 @@
 export { runDay } from "./loop.js";
 export { applyEconomicDrift, applyBillImpact } from "./economy.js";
 export { tallyVotes } from "./voting.js";
+export type { MdbVoteEntry, VoteResult } from "./voting.js";
 export { updateApproval, updateSentiment, applyApprovalDrift, applySentimentDrift } from "./opinion.js";
 export { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises, getCrisisTemplates, triggerCrisisFromTemplate } from "./crises.js";
 export { isPollDay, isWeeklyDay, isMonthlyDay, isBudgetDay, isSessionDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
@@ -17,3 +18,8 @@ export { TIME_CONFIG, getPresetConfig, isParticipatoryPreset, isFeatureEnabled, 
 export type { TimingPreset, NightMode, PresetConfig } from "./timing.js";
 export { queueEvent, getQueuedEvents, drainQueue, createNotification, createNotificationForAll, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, generateMorningSummary } from "./event-queue.js";
 export type { QueuedEvent, Notification } from "./event-queue.js";
+export { allocateSeats, resetAllSeats, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, reviewMdbApplications } from "./seats.js";
+export { processDaySpeeches } from "./speeches.js";
+export { processMdbActions } from "./mdb-actions.js";
+export type { MdbActionResult } from "./mdb-actions.js";
+export { reviewPartyDiscipline } from "./discipline.js";

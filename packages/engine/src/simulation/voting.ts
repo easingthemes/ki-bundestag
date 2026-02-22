@@ -1,4 +1,13 @@
-import type { Amendment, Bill, BillImpact, BillVote, Party } from "@ki-bundestag/types";
+import type { Amendment, Bill, BillImpact, BillVote, Party, VoteChoice } from "@ki-bundestag/types";
+
+export interface MdbVoteEntry {
+  seatId: string;
+  partyId: string;
+  userId: string;
+  vote: VoteChoice;
+  proxyDefault: string;
+  disciplineLevel: number;
+}
 
 export interface VoteResult {
   passed: boolean;
@@ -6,37 +15,116 @@ export interface VoteResult {
   noSeats: number;
   abstainSeats: number;
   totalVotingSeats: number;
+  humanYes?: number;
+  humanNo?: number;
+  humanAbstain?: number;
 }
 
-// Seat-weighted majority voting. Abstentions don't count toward the total.
-export function tallyVotes(bill: Bill, parties: Party[]): VoteResult {
+/**
+ * Seat-weighted majority voting with optional MdB (human) vote integration.
+ * Abstentions don't count toward the total.
+ *
+ * If mdbVotes are provided, the seat count for each party is split:
+ *   - Human-voted seats: counted directly per their vote
+ *   - Human seats with no vote (proxy): follow party AI vote (party_line) or abstain
+ *   - AI seats: follow party AI vote as before
+ *
+ * If no mdbVotes: works exactly as before (backward compatible).
+ */
+export function tallyVotes(
+  bill: Bill,
+  parties: Party[],
+  mdbVotes?: MdbVoteEntry[],
+  humanSeatCounts?: Record<string, number>,
+): VoteResult {
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
+  // No MdB votes — original behavior
+  if (!mdbVotes || mdbVotes.length === 0 || !humanSeatCounts) {
+    let yesSeats = 0;
+    let noSeats = 0;
+    let abstainSeats = 0;
+
+    for (const vote of bill.votes) {
+      const party = partyMap.get(vote.partyId);
+      if (!party) continue;
+
+      switch (vote.vote) {
+        case "yes": yesSeats += party.seatCount; break;
+        case "no": noSeats += party.seatCount; break;
+        case "abstain": abstainSeats += party.seatCount; break;
+      }
+    }
+
+    const totalVotingSeats = yesSeats + noSeats;
+    const passed = totalVotingSeats > 0 && yesSeats > noSeats;
+    return { passed, yesSeats, noSeats, abstainSeats, totalVotingSeats };
+  }
+
+  // With MdB votes — split seat counting
   let yesSeats = 0;
   let noSeats = 0;
   let abstainSeats = 0;
+  let humanYes = 0;
+  let humanNo = 0;
+  let humanAbstain = 0;
 
-  for (const vote of bill.votes) {
-    const party = partyMap.get(vote.partyId);
+  // Group MdB votes by party
+  const mdbByParty = new Map<string, MdbVoteEntry[]>();
+  for (const mv of mdbVotes) {
+    const arr = mdbByParty.get(mv.partyId) ?? [];
+    arr.push(mv);
+    mdbByParty.set(mv.partyId, arr);
+  }
+
+  for (const partyVote of bill.votes) {
+    const party = partyMap.get(partyVote.partyId);
     if (!party) continue;
 
-    switch (vote.vote) {
-      case "yes":
-        yesSeats += party.seatCount;
-        break;
-      case "no":
-        noSeats += party.seatCount;
-        break;
-      case "abstain":
-        abstainSeats += party.seatCount;
-        break;
+    const totalHumanSeats = humanSeatCounts[party.id] ?? 0;
+    const aiSeats = party.seatCount - totalHumanSeats;
+    const partyMdbVotes = mdbByParty.get(party.id) ?? [];
+
+    // Count direct human votes
+    let humanVotedCount = 0;
+    for (const mv of partyMdbVotes) {
+      // Whipped MdBs (level 3) are forced to party line
+      const effectiveVote = mv.disciplineLevel >= 3 ? partyVote.vote : mv.vote;
+      switch (effectiveVote) {
+        case "yes": yesSeats++; humanYes++; break;
+        case "no": noSeats++; humanNo++; break;
+        case "abstain": abstainSeats++; humanAbstain++; break;
+      }
+      humanVotedCount++;
+    }
+
+    // Proxy for human seats without a vote
+    const proxySeats = totalHumanSeats - humanVotedCount;
+    if (proxySeats > 0) {
+      // For proxy, we follow the party AI vote (party_line is the default)
+      // Individual proxy defaults would require per-seat lookup; for simplicity,
+      // all unvoted human seats follow party line
+      switch (partyVote.vote) {
+        case "yes": yesSeats += proxySeats; break;
+        case "no": noSeats += proxySeats; break;
+        case "abstain": abstainSeats += proxySeats; break;
+      }
+    }
+
+    // AI seats follow party vote
+    if (aiSeats > 0) {
+      switch (partyVote.vote) {
+        case "yes": yesSeats += aiSeats; break;
+        case "no": noSeats += aiSeats; break;
+        case "abstain": abstainSeats += aiSeats; break;
+      }
     }
   }
 
-  const totalVotingSeats = yesSeats + noSeats; // abstentions excluded
+  const totalVotingSeats = yesSeats + noSeats;
   const passed = totalVotingSeats > 0 && yesSeats > noSeats;
 
-  return { passed, yesSeats, noSeats, abstainSeats, totalVotingSeats };
+  return { passed, yesSeats, noSeats, abstainSeats, totalVotingSeats, humanYes, humanNo, humanAbstain };
 }
 
 /**
