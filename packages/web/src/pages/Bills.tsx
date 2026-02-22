@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { api, Bill, Party } from "../api";
+import { api, Bill, Party, type BundestagSeat } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/shared";
+import { ShowMoreButton, UserActionIcon, MdbActionIcon } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,11 @@ export function Bills() {
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [groupLimits, setGroupLimits] = useState<Record<string, number>>({});
+  const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
+
+  useEffect(() => {
+    if (user) api.getMySeat().then(r => setMySeat(r.seat)).catch(() => {});
+  }, [user]);
 
   const refresh = useCallback(() => {
     api.getBills().then(setBills).catch(console.error);
@@ -64,7 +69,7 @@ export function Bills() {
 
   const grouped = STATUS_ORDER.map(status => ({
     status,
-    bills: filteredBills.filter(b => b.status === status),
+    bills: filteredBills.filter(b => b.status === status).sort((a, b) => b.proposedOnDay - a.proposedOnDay),
   })).filter(g => g.bills.length > 0);
 
   const hasFilters = !!(filterCategory || filterParty || filterSearch || filterStatus);
@@ -134,7 +139,7 @@ export function Bills() {
               {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
             </h2>
             {visible.map(bill => (
-              <BillCard key={bill.id} bill={bill} partyMap={partyMap} />
+              <BillCard key={bill.id} bill={bill} partyMap={partyMap} isMember={!!user?.partyId} hasSeat={!!mySeat} />
             ))}
             <ShowMoreButton
               total={group.bills.length}
@@ -149,7 +154,7 @@ export function Bills() {
   );
 }
 
-function BillCard({ bill, partyMap }: { bill: Bill; partyMap: Map<string, Party> }) {
+function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap: Map<string, Party>; isMember: boolean; hasSeat: boolean }) {
   const proposer = partyMap.get(bill.proposedBy);
   const totalSeats = bill.votes.reduce((sum, v) => {
     const p = partyMap.get(v.partyId);
@@ -179,6 +184,12 @@ function BillCard({ bill, partyMap }: { bill: Bill; partyMap: Map<string, Party>
             <span className="ml-2 text-xs text-muted-foreground">({bill.category})</span>
           </div>
           <span className="flex gap-1.5 items-center">
+            {hasSeat && ["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
+              <MdbActionIcon title={bill.status === "third_reading" ? "Vote & speak as MdB" : "Speak as MdB"} />
+            )}
+            {isMember && !hasSeat && (bill.status === "second_reading" || bill.status === "third_reading") && (
+              <UserActionIcon title="Signal your position" />
+            )}
             {bill.isGovernmentBill && (
               <Badge variant="outline" className={GOVT_BILL_BADGE}>Govt. Bill</Badge>
             )}
@@ -195,7 +206,10 @@ function BillCard({ bill, partyMap }: { bill: Bill; partyMap: Map<string, Party>
         </div>
         <p className="text-sm text-muted-foreground mt-1">{bill.description}</p>
         <p className="text-xs text-muted-foreground">
-          Proposed by {proposer?.name ?? bill.proposedBy} on day {bill.proposedOnDay}
+          Proposed by {bill.memberInitiative && bill.proposerDisplayName
+            ? <><span className="font-medium text-purple-700">{bill.proposerDisplayName}</span> ({proposer?.name ?? bill.proposedBy})</>
+            : proposer?.name ?? bill.proposedBy
+          } on day {bill.proposedOnDay}
         </p>
 
         {bill.committeeName && (

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat } from "../api";
+import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat, type MdbApplication } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ROLE_BADGE, STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX, DISCIPLINE_BADGE, DISCIPLINE_LABEL, MDB_BADGE } from "@/lib/colors";
+import { UserActionIcon } from "../components/shared";
 
 
 const PROPOSAL_STATUS: Record<string, string> = {
@@ -100,12 +101,13 @@ export function PartyDetail() {
   const [applyFocus, setApplyFocus] = useState("");
   const [applySubmitting, setApplySubmitting] = useState(false);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
+  const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
 
   const refresh = useCallback(() => {
     if (!id) return;
     api.getParty(id).then(setParty).catch(console.error);
     api.getPartyHistory(id).then(setHistory).catch(console.error);
-    api.getPartyBills(id).then(setBills).catch(console.error);
+    api.getPartyBills(id).then(b => setBills(b.sort((a, c) => c.proposedOnDay - a.proposedOnDay))).catch(console.error);
     api.getPartyVotes(id).then(setVotes).catch(console.error);
     api.getPartyStatements(id).then(setStatements).catch(console.error);
     api.getQuestions(id).then(setQuestions).catch(console.error);
@@ -114,6 +116,7 @@ export function PartyDetail() {
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getPartySeats(id).then(setSeats).catch(console.error);
     api.getAvailableSeats().then(setAvailableSeats).catch(console.error);
+    if (user) api.getMySeat().then(r => setMyApplications(r.applications)).catch(() => {});
     api.getFraktionen().then(all => {
       const active = all.find(f => f.partyId === id && f.status === "active");
       if (active) {
@@ -125,7 +128,7 @@ export function PartyDetail() {
         setFraktion(dissolved[0] || null);
       }
     }).catch(console.error);
-  }, [id]);
+  }, [id, user]);
 
   const handleSubmitQuestion = async () => {
     if (!id || questionText.trim().length < 5) return;
@@ -294,15 +297,24 @@ export function PartyDetail() {
                   {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} open)</span>}
                 </span>
               </h2>
-              {isMyParty && !showApplyForm && openCount > 0 && !seats.some(s => s.userId === user?.id) && (
-                <button
-                  onClick={() => setShowApplyForm(true)}
-                  className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
-                  style={{ borderColor: displayColor, color: displayColor }}
-                >
-                  Apply for a Seat
-                </button>
-              )}
+              {isMyParty && !seats.some(s => s.userId === user?.id) && (() => {
+                const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
+                if (pendingApp) return (
+                  <Badge variant="outline" className={STATUS_BADGE.pending}>
+                    Application pending (Day {pendingApp.createdOnDay})
+                  </Badge>
+                );
+                if (!showApplyForm && openCount > 0) return (
+                  <button
+                    onClick={() => setShowApplyForm(true)}
+                    className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
+                    style={{ borderColor: displayColor, color: displayColor }}
+                  >
+                    Apply for a Seat
+                  </button>
+                );
+                return null;
+              })()}
             </div>
 
             {showApplyForm && (
@@ -317,14 +329,21 @@ export function PartyDetail() {
                     rows={3}
                     className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
                   />
-                  <input
-                    type="text"
+                  <select
                     value={applyFocus}
                     onChange={e => setApplyFocus(e.target.value)}
-                    placeholder="Policy focus (optional, e.g. economy, environment)"
-                    maxLength={100}
-                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
-                  />
+                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 bg-transparent"
+                  >
+                    <option value="">Policy focus (optional)</option>
+                    <option value="economy">Economy</option>
+                    <option value="social">Social</option>
+                    <option value="environment">Environment</option>
+                    <option value="immigration">Immigration</option>
+                    <option value="defense">Defense</option>
+                    <option value="education">Education</option>
+                    <option value="healthcare">Healthcare</option>
+                    <option value="infrastructure">Infrastructure</option>
+                  </select>
                   <div className="flex gap-2 items-center flex-wrap">
                     <button
                       onClick={async () => {
@@ -739,6 +758,7 @@ export function PartyDetail() {
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1">
                         <div className="flex gap-1.5 flex-wrap items-center mb-1">
+                          {isOpen && user?.partyId === id && <UserActionIcon title="Vote on this proposal" />}
                           <span className="font-semibold text-sm">{p.title}</span>
                           <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-50">{p.category}</Badge>
                           <Badge variant="outline" className={p.proposedBy === "ai"

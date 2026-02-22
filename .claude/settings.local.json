@@ -38,7 +38,10 @@
       "WebFetch(domain:ai-sdk.dev)",
       "Bash(ls:*)",
       "Bash(echo === $tbl DIFFERS ===:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git add:*)",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__wait_for"
     ]
   },
   "enableAllProjectMcpServers": true,

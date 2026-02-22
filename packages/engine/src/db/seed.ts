@@ -2,6 +2,7 @@ import type { PolicyPriorities, CoalitionRole } from "@ki-bundestag/types";
 import { getDb, getSqlite, getUserDb, getUserSqlite, getUserDbPath, schema } from "./connection.js";
 import { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../simulation/fraktionen.js";
 import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/government.js";
+import { getHumanSeatRatio } from "../simulation/timing.js";
 
 interface PartySeed {
   id: string;
@@ -540,6 +541,74 @@ export function migrateDatabase() {
     }
   } catch {
     // fraktionen table might not exist yet — that's fine
+  }
+
+  // Backfill initial election + bundestag seats if parliament exists but no election record
+  try {
+    const electionCount = sqlite.prepare("SELECT COUNT(*) as cnt FROM elections").get() as { cnt: number };
+    const partyRows = sqlite.prepare("SELECT id, seat_count, coalition_role FROM parties").all() as Array<{ id: string; seat_count: number; coalition_role: string }>;
+    if (electionCount.cnt === 0 && partyRows.length > 0 && partyRows.some(p => p.seat_count > 0)) {
+      const coalition = partyRows.filter(p => p.coalition_role === "leader" || p.coalition_role === "junior").map(p => p.id);
+      const opposition = partyRows.filter(p => p.coalition_role === "opposition").map(p => p.id);
+      const results = partyRows.map(p => ({ partyId: p.id, seatsWon: p.seat_count, voteShare: +(p.seat_count / 735 * 100).toFixed(1) }));
+      const electionId = "election-initial";
+
+      sqlite.prepare(
+        "INSERT INTO elections (id, trigger_reason, announced_on_day, campaign_start_day, election_day, status, results, new_coalition, new_opposition, negotiation_rounds, coalition_agreement) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        electionId, "Initial parliament formation", 0, 0, 0, "completed",
+        JSON.stringify(results), JSON.stringify(coalition), JSON.stringify(opposition),
+        JSON.stringify([]), null,
+      );
+      console.log(`[Migrate] Created initial election record (${coalition.length} coalition, ${opposition.length} opposition)`);
+
+      // Backfill bundestag seats linked to the synthetic election
+      const seatCount = sqlite.prepare("SELECT COUNT(*) as cnt FROM bundestag_seats").get() as { cnt: number };
+      if (seatCount.cnt === 0) {
+        const metaRow = sqlite.prepare("SELECT timing_preset FROM simulation_meta LIMIT 1").get() as { timing_preset?: string } | undefined;
+        const preset = (metaRow?.timing_preset ?? "normal") as import("../simulation/timing.js").TimingPreset;
+        const humanRatio = getHumanSeatRatio(preset);
+        let totalInserted = 0;
+        for (const row of partyRows) {
+          if (row.seat_count <= 0) continue;
+          const humanCount = Math.round(row.seat_count * humanRatio);
+          const aiCount = row.seat_count - humanCount;
+          let seatNum = 1;
+          for (let i = 0; i < humanCount; i++) {
+            sqlite.prepare(
+              "INSERT INTO bundestag_seats (id, seat_number, party_id, controller, user_id, election_id, active, proxy_default, discipline_level, discipline_reason, allocated_on_day) VALUES (?, ?, ?, 'human', NULL, ?, 1, 'party_line', 0, NULL, 0)"
+            ).run(`seat-${row.id}-${seatNum}`, seatNum, row.id, electionId);
+            seatNum++;
+          }
+          for (let i = 0; i < aiCount; i++) {
+            sqlite.prepare(
+              "INSERT INTO bundestag_seats (id, seat_number, party_id, controller, user_id, election_id, active, proxy_default, discipline_level, discipline_reason, allocated_on_day) VALUES (?, ?, ?, 'ai', NULL, ?, 1, 'party_line', 0, NULL, 0)"
+            ).run(`seat-${row.id}-${seatNum}`, seatNum, row.id, electionId);
+            seatNum++;
+          }
+          totalInserted += row.seat_count;
+        }
+        if (totalInserted > 0) {
+          console.log(`[Migrate] Auto-populated ${totalInserted} Bundestag seats (${Math.round(humanRatio * 100)}% human)`);
+        }
+      } else {
+        // Seats exist but have no election_id — link them to the synthetic election
+        const unlinked = sqlite.prepare("UPDATE bundestag_seats SET election_id = ? WHERE election_id IS NULL").run(electionId);
+        if (unlinked.changes > 0) {
+          console.log(`[Migrate] Linked ${unlinked.changes} existing seats to initial election`);
+        }
+      }
+
+      // Link initial government to the election if it has no election_id
+      try {
+        const govUpdate = sqlite.prepare("UPDATE government SET election_id = ? WHERE election_id IS NULL OR election_id = ''").run(electionId);
+        if (govUpdate.changes > 0) {
+          console.log(`[Migrate] Linked government to initial election`);
+        }
+      } catch { /* government table might not have election_id column */ }
+    }
+  } catch {
+    // tables might not exist yet — that's fine
   }
 
   // ── User DB ──

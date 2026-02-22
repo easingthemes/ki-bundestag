@@ -23,7 +23,7 @@ import { About } from "./pages/About";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
-import { api, setErrorHandler, setUserToken, type User, type SimulationStatus } from "./api";
+import { api, setErrorHandler, setUserToken, type User, type SimulationStatus, type BundestagSeat } from "./api";
 import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -212,11 +212,16 @@ function MobileLogout() {
 function UserMenu({ user }: { user: User }) {
   const { logout } = useUser();
   const [open, setOpen] = useState(false);
+  const [seat, setSeat] = useState<BundestagSeat | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const location = useLocation();
 
   useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    api.getMySeat().then(r => setSeat(r.seat)).catch(() => {});
+  }, [user.id]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -253,9 +258,14 @@ function UserMenu({ user }: { user: User }) {
       {open && (
         <div className="absolute top-[calc(100%+6px)] right-0 min-w-[200px] bg-[#1e1e36] border border-white/[0.08] rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1.5 z-[200] animate-in fade-in slide-in-from-top-1.5 duration-150">
           <div className="px-4 py-2 border-b border-white/[0.08]">
-            <div className="text-sm font-semibold text-white">{user.displayName}</div>
+            <div className="text-sm font-semibold text-white flex items-center gap-2">
+              {user.displayName}
+              {seat && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 leading-none">MdB</span>
+              )}
+            </div>
             {user.partyId && (
-              <div className="text-xs text-[#b0b0c0] mt-0.5">{user.partyId}</div>
+              <div className="text-xs text-[#b0b0c0] mt-0.5">{user.partyId}{seat ? ` · Seat #${seat.seatNumber}` : ""}</div>
             )}
           </div>
           {user.partyId && (

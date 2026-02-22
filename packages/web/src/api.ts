@@ -672,8 +672,8 @@ export const api = {
   getMySeat: () => fetchJson<{ seat: BundestagSeat | null; applications: MdbApplication[] }>("/seats/my-seat"),
   getPartySeats: (partyId: string) => fetchJson<BundestagSeat[]>(`/seats/party/${partyId}`),
   getAvailableSeats: () => fetchJson<Record<string, { open: number; humanTotal: number; total: number }>>("/seats/available"),
-  applyForSeat: (motivation: string, policyFocus?: string) =>
-    postJson<{ status: string }>("/seats/apply", { motivation, policyFocus }),
+  applyForSeat: (applicationText: string, policyFocus?: string) =>
+    postJson<{ status: string }>("/seats/apply", { applicationText, policyFocus: policyFocus ? [policyFocus] : undefined }),
 
   // MdB Voting
   castMdbVote: (billId: string, vote: "yes" | "no" | "abstain") =>

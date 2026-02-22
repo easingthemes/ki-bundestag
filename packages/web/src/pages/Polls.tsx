@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api, Poll } from "../api";
 import { usePolling } from "../usePolling";
-import { ShowMoreButton } from "../components/shared";
+import { ShowMoreButton, UserActionIcon } from "../components/shared";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -160,12 +160,15 @@ function PollCard({
               {totalVotes > 0 && ` · ${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`}
             </div>
           </div>
-          <Badge variant="outline" className={poll.active
-            ? STATUS_BADGE.active
-            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
-          }>
-            {poll.active ? "Active" : "Closed"}
-          </Badge>
+          <span className="flex gap-1.5 items-center">
+            {poll.active && !hasVoted && <UserActionIcon title="Cast your vote" />}
+            <Badge variant="outline" className={poll.active
+              ? STATUS_BADGE.active
+              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
+            }>
+              {poll.active ? "Active" : "Closed"}
+            </Badge>
+          </span>
         </div>
 
         {showResults ? (
