@@ -25,6 +25,93 @@ function isBillImpact(value: unknown): boolean {
   return true;
 }
 
+function stripLeadingPlusInJsonNumbers(input: string): string {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inString) {
+      result += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === "+") {
+      let j = result.length - 1;
+      while (j >= 0 && /\s/.test(result[j])) j--;
+      const prev = j >= 0 ? result[j] : "";
+      const next = i + 1 < input.length ? input[i + 1] : "";
+
+      const afterJsonValueStart = prev === ":" || prev === "," || prev === "[";
+      const beforeNumber = /[0-9.]/.test(next);
+
+      if (afterJsonValueStart && beforeNumber) {
+        continue;
+      }
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
+function stripTrailingCommasInJson(input: string): string {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (inString) {
+      result += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) j++;
+      const next = j < input.length ? input[j] : "";
+      if (next === "}" || next === "]") {
+        continue;
+      }
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
 export function parseAgentResponse(raw: string): AgentResponse {
   // Try to extract JSON from the response (handle markdown code blocks)
   let jsonStr = raw.trim();
@@ -33,7 +120,15 @@ export function parseAgentResponse(raw: string): AgentResponse {
     jsonStr = match[1].trim();
   }
 
-  const parsed = JSON.parse(jsonStr);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (error) {
+    let sanitized = stripLeadingPlusInJsonNumbers(jsonStr);
+    sanitized = stripTrailingCommasInJson(sanitized);
+    if (sanitized === jsonStr) throw error;
+    parsed = JSON.parse(sanitized);
+  }
 
   if (!parsed.actions || !Array.isArray(parsed.actions)) {
     throw new Error("Response must have an 'actions' array");

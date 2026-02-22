@@ -41,7 +41,10 @@
       "Bash(cd:*)",
       "Bash(git add:*)",
       "mcp__chrome-devtools__fill",
-      "mcp__chrome-devtools__wait_for"
+      "mcp__chrome-devtools__wait_for",
+      "WebFetch(domain:www.bundestag.de)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.timeanddate.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

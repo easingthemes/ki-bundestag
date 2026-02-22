@@ -10,3 +10,5 @@ export { getNotifications, getUnreadCount, markNotificationRead, markAllNotifica
 export type { QueuedEvent, Notification } from "./simulation/event-queue.js";
 export { allocateSeats, resetAllSeats, getActiveSeats, getUserSeat, getOpenSeatCounts, deactivateUserSeat, reviewMdbApplications } from "./simulation/seats.js";
 export { getHumanSeatRatio } from "./simulation/timing.js";
+export { dayToDate, isRealisticSessionDay, getHolidaysInRange, isWorkday, snapToNextWorkday, snapToNextSunday, isPollDay, isMonthlyDay, isBudgetDay, isSessionDay } from "./simulation/index.js";
+export type { PublicHoliday } from "./simulation/index.js";

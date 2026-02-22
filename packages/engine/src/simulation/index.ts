@@ -23,3 +23,5 @@ export { processDaySpeeches } from "./speeches.js";
 export { processMdbActions } from "./mdb-actions.js";
 export type { MdbActionResult } from "./mdb-actions.js";
 export { reviewPartyDiscipline } from "./discipline.js";
+export { dayToDate, easterSunday, germanPublicHolidays, isWeekend, isPublicHoliday, getPublicHoliday, isWorkday, snapToNextWorkday, snapToNextSunday, isRecessDay, isRealisticSessionDay, getHolidaysInRange } from "./calendar.js";
+export type { PublicHoliday } from "./calendar.js";
