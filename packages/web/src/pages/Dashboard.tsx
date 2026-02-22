@@ -10,7 +10,8 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn, fixColor } from "@/lib/utils";
-import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, VOTE_COLORS, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL } from "@/lib/colors";
+import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL } from "@/lib/colors";
+import { VoteBar } from "@/components/VoteBar";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Berliner Tagesspiegel": { color: "#1d4ed8", label: "Tagesspiegel" },
@@ -1009,9 +1010,8 @@ export function Dashboard() {
                     {total > 0 && <span className="text-[11px] text-muted-foreground">Ja {yesSeats} · Nein {noSeats}</span>}
                   </div>
                   {total > 0 && (
-                    <div className="flex h-1.5 rounded overflow-hidden mt-2">
-                      <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / total) * 100}%` }} />
-                      <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / total) * 100}%` }} />
+                    <div className="mt-2">
+                      <VoteBar yes={yesSeats} no={noSeats} abstain={0} total={total} height="h-1.5" />
                     </div>
                   )}
                 </CardContent>

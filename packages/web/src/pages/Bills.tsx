@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_COLORS, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { VoteBar } from "@/components/VoteBar";
 
 const GROUP_INITIAL = 5;
 
@@ -253,20 +254,9 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
 
         {bill.votes.length > 0 && totalSeats > 0 && (
           <>
-            <div className="flex h-5 rounded overflow-hidden my-2">
-              {yesSeats > 0 && (
-                <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
-              )}
-              {noSeats > 0 && (
-                <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
-              )}
-              {abstainSeats > 0 && (
-                <div className={VOTE_COLORS.abstain} style={{ width: `${(abstainSeats / totalSeats) * 100}%` }} />
-              )}
+            <div className="my-2">
+              <VoteBar yes={yesSeats} no={noSeats} abstain={abstainSeats} total={totalSeats} showCounts />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Yes: {yesSeats} · No: {noSeats} · Abstain: {abstainSeats}
-            </p>
             <div className="mt-2">
               {bill.votes.map(v => {
                 const p = partyMap.get(v.partyId);

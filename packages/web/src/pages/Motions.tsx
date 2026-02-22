@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, MOTION_TYPE_BADGE, VOTE_COLORS } from "@/lib/colors";
+import { VoteBar } from "@/components/VoteBar";
 
 const STATUS_ORDER = ["passed", "rejected"];
 
@@ -104,17 +105,9 @@ function MotionCard({ motion, partyMap }: { motion: Motion; partyMap: Map<string
 
         {motion.votes.length > 0 && totalSeats > 0 && (
           <>
-            <div className="flex h-5 rounded overflow-hidden my-2">
-              {yesSeats > 0 && (
-                <div className={VOTE_COLORS.yes} style={{ width: `${(yesSeats / totalSeats) * 100}%` }} />
-              )}
-              {noSeats > 0 && (
-                <div className={VOTE_COLORS.no} style={{ width: `${(noSeats / totalSeats) * 100}%` }} />
-              )}
+            <div className="my-2">
+              <VoteBar yes={yesSeats} no={noSeats} abstain={0} total={totalSeats} showCounts />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Yes: {yesSeats} · No: {noSeats}
-            </p>
             <div className="mt-2">
               {motion.votes.map(v => {
                 const p = partyMap.get(v.partyId);
