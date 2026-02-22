@@ -221,7 +221,7 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## API Surface (current)
 
-`packages/api/src/index.ts` currently defines 88 REST routes (including health), grouped as:
+`packages/api/src/` uses 10 domain routers in `src/routes/` (parties, bills, elections, simulation, parliament, content, users, seats, budget, admin) with shared middleware in `src/middleware/` and mappers in `src/mappers/`. `src/index.ts` is a ~45-line bootstrap. 88 REST routes (including health), grouped as:
 
 - Health: `/api/health`
 - Parties: `/api/parties`, `/api/parties/alignment`, `/api/parties/:id`, `/api/parties/:id/history`, `/api/parties/:id/bills`, `/api/parties/:id/votes`, `/api/parties/:id/statements`, `/api/parties/:id/proposals`, `POST /api/parties/:id/proposals`
@@ -282,24 +282,50 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## Source Anchors
 
-- Core simulation loop: [packages/engine/src/simulation/loop.ts](packages/engine/src/simulation/loop.ts#L63-L2084)
-- Election trigger + phase constants: [packages/engine/src/simulation/elections.ts](packages/engine/src/simulation/elections.ts#L22-L77)
-- Timing constants/presets/feature gates: [packages/engine/src/simulation/timing.ts](packages/engine/src/simulation/timing.ts#L30-L287)
-- Calendar-aware cycle checks: [packages/engine/src/simulation/cycles.ts](packages/engine/src/simulation/cycles.ts#L1-L93)
-- Sentiment/approval constants: [packages/engine/src/simulation/opinion.ts](packages/engine/src/simulation/opinion.ts#L3-L34)
-- Budget constants/vote logic/veto logic: [packages/engine/src/simulation/budget.ts](packages/engine/src/simulation/budget.ts#L3-L211)
-- Confidence vote threshold/logic: [packages/engine/src/simulation/confidence-votes.ts](packages/engine/src/simulation/confidence-votes.ts#L11-L120)
-- Questions/interpellations daily limits: [packages/engine/src/simulation/questions.ts](packages/engine/src/simulation/questions.ts#L7-L88), [packages/engine/src/simulation/interpellations.ts](packages/engine/src/simulation/interpellations.ts#L6-L122)
-- Seat split ratio + seat allocation: [packages/engine/src/simulation/timing.ts](packages/engine/src/simulation/timing.ts#L251-L260), [packages/engine/src/simulation/seats.ts](packages/engine/src/simulation/seats.ts#L20-L67)
-- AI routing + circuit breaker + retry: [packages/engine/src/agent/client.ts](packages/engine/src/agent/client.ts#L17-L223)
-- Shared JSON parser + observability: [packages/engine/src/agent/ai-json.ts](packages/engine/src/agent/ai-json.ts#L1-L207)
-- Model config defaults/overrides: [packages/engine/src/agent/model-config.ts](packages/engine/src/agent/model-config.ts#L23-L93)
-- Token-budgeted prompt builder: [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts#L116-L320)
-- Event queue + notifications: [packages/engine/src/simulation/event-queue.ts](packages/engine/src/simulation/event-queue.ts#L1-L296)
-- Committee assignment + recommendation: [packages/engine/src/simulation/committees.ts](packages/engine/src/simulation/committees.ts#L1-L55)
-- DB schema (all tables): [packages/engine/src/db/schema.ts](packages/engine/src/db/schema.ts#L3-L398)
-- API route surface: [packages/api/src/index.ts](packages/api/src/index.ts#L109-L2771)
-- Web route map: [packages/web/src/main.tsx](packages/web/src/main.tsx#L525-L548)
+**Engine — Simulation**:
+- Core simulation loop: [packages/engine/src/simulation/loop.ts](packages/engine/src/simulation/loop.ts)
+- Bill pipeline (reading stages): [packages/engine/src/simulation/bill-pipeline.ts](packages/engine/src/simulation/bill-pipeline.ts)
+- Presidential veto check: [packages/engine/src/simulation/veto.ts](packages/engine/src/simulation/veto.ts)
+- Sentiment/approval drift: [packages/engine/src/simulation/opinion.ts](packages/engine/src/simulation/opinion.ts)
+- Media generation + sentiment: [packages/engine/src/simulation/media.ts](packages/engine/src/simulation/media.ts)
+- Election trigger + phases: [packages/engine/src/simulation/elections.ts](packages/engine/src/simulation/elections.ts)
+- Timing constants/presets/feature gates: [packages/engine/src/simulation/timing.ts](packages/engine/src/simulation/timing.ts)
+- Calendar-aware cycle checks: [packages/engine/src/simulation/cycles.ts](packages/engine/src/simulation/cycles.ts)
+- Budget vote/effects: [packages/engine/src/simulation/budget.ts](packages/engine/src/simulation/budget.ts)
+- Confidence votes: [packages/engine/src/simulation/confidence-votes.ts](packages/engine/src/simulation/confidence-votes.ts)
+- Questions/interpellations: [packages/engine/src/simulation/questions.ts](packages/engine/src/simulation/questions.ts), [packages/engine/src/simulation/interpellations.ts](packages/engine/src/simulation/interpellations.ts)
+- Seat allocation: [packages/engine/src/simulation/seats.ts](packages/engine/src/simulation/seats.ts)
+- Event queue + notifications: [packages/engine/src/simulation/event-queue.ts](packages/engine/src/simulation/event-queue.ts)
+- Committee assignment: [packages/engine/src/simulation/committees.ts](packages/engine/src/simulation/committees.ts)
+
+**Engine — AI**:
+- AI routing + circuit breaker + retry: [packages/engine/src/agent/client.ts](packages/engine/src/agent/client.ts)
+- Shared JSON parser + observability: [packages/engine/src/agent/ai-json.ts](packages/engine/src/agent/ai-json.ts)
+- Model config defaults/overrides: [packages/engine/src/agent/model-config.ts](packages/engine/src/agent/model-config.ts)
+- Token-budgeted prompt builder: [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts)
+
+**Engine — DB**:
+- DB schema barrel: [packages/engine/src/db/schema.ts](packages/engine/src/db/schema.ts) (re-exports schema-sim.ts + schema-user.ts)
+- Simulation DB tables: [packages/engine/src/db/schema-sim.ts](packages/engine/src/db/schema-sim.ts)
+- User DB tables: [packages/engine/src/db/schema-user.ts](packages/engine/src/db/schema-user.ts)
+- Seed data (parties, initial state): [packages/engine/src/db/seed-data.ts](packages/engine/src/db/seed-data.ts)
+- DDL + migrations: [packages/engine/src/db/ddl.ts](packages/engine/src/db/ddl.ts)
+
+**API**:
+- Bootstrap: [packages/api/src/index.ts](packages/api/src/index.ts) (~45 lines)
+- Domain routers: [packages/api/src/routes/](packages/api/src/routes/) (parties, bills, elections, simulation, parliament, content, users, seats, budget, admin)
+- Middleware: [packages/api/src/middleware/](packages/api/src/middleware/) (auth, session, participatory gate)
+- Mappers: [packages/api/src/mappers/](packages/api/src/mappers/) (party, bill)
+
+**Types**:
+- Barrel: [packages/types/src/index.ts](packages/types/src/index.ts) (re-exports 7 domain files)
+- Domain files: parties.ts, economy.ts, bills.ts, elections.ts, parliament.ts, agent.ts, meta.ts in [packages/types/src/types/](packages/types/src/types/)
+
+**Web**:
+- Route map: [packages/web/src/main.tsx](packages/web/src/main.tsx)
+- API client: [packages/web/src/api/](packages/web/src/api/) (types.ts, client.ts, endpoints.ts)
+- Shared components: VoteBar, FilterPills, MdbBadge in [packages/web/src/components/](packages/web/src/components/)
+- Page sub-components: [packages/web/src/components/dashboard/](packages/web/src/components/dashboard/), [packages/web/src/components/bills/](packages/web/src/components/bills/), etc.
 
 ## Related Docs
 

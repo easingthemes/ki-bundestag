@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(git log:*)",
@@ -104,6 +105,17 @@
         ]
       }
     ],
-    "PostToolUse": []
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-impl-remind.sh",
+            "statusMessage": "Checking docs..."
+          }
+        ]
+      }
+    ]
   }
 }
