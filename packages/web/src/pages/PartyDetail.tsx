@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat, type MdbApplication } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -8,63 +7,12 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX, DISCIPLINE_BADGE, DISCIPLINE_LABEL, MDB_BADGE } from "@/lib/colors";
-import { UserActionIcon } from "../components/shared";
-
-
-const PROPOSAL_STATUS: Record<string, string> = {
-  open: STATUS_BADGE.proposed,
-  accepted: STATUS_BADGE.passed,
-  declined: STATUS_BADGE.rejected,
-};
-
-const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
-
-function ApprovalChart({ history, color, partyId }: { history: PartyHistory[]; color: string; partyId: string }) {
-  if (history.length < 2) return null;
-  const partyColor = color === "#FFED00" ? "#c4a900" : color;
-  const chartData = history.map(h => ({ day: h.dayNumber, approval: h.approvalRating }));
-  const gradId = `grad-${partyId}`;
-
-  return (
-    <ResponsiveContainer width="100%" height={180}>
-      <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={partyColor} stopOpacity={0.25} />
-            <stop offset="95%" stopColor={partyColor} stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis
-          dataKey="day"
-          tick={{ fontSize: 11 }}
-          tickLine={false}
-          label={{ value: "Day", position: "insideBottomRight", offset: -4, fontSize: 11 }}
-        />
-        <YAxis
-          domain={[0, 60]}
-          tick={{ fontSize: 11 }}
-          tickLine={false}
-          width={32}
-          tickFormatter={(v: number) => `${v}%`}
-        />
-        <Tooltip
-          formatter={(v: number) => [`${v.toFixed(1)}%`, "Approval"]}
-          labelFormatter={(l: number) => `Day ${l}`}
-        />
-        <Area
-          type="monotone"
-          dataKey="approval"
-          stroke={partyColor}
-          strokeWidth={2}
-          fill={`url(#${gradId})`}
-          dot={false}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
+import { STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { ApprovalChart } from "@/components/party/ApprovalChart";
+import { PartyBillsList } from "@/components/party/PartyBillsList";
+import { MdbRosterTable } from "@/components/party/MdbRosterTable";
+import { ProposalForm } from "@/components/party/ProposalForm";
+import { QuestionForm } from "@/components/party/QuestionForm";
 
 export function PartyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -78,19 +26,10 @@ export function PartyDetail() {
   const [allParties, setAllParties] = useState<Party[]>([]);
   const [fraktion, setFraktion] = useState<Fraktion | null>(null);
   const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
-  const [questionText, setQuestionText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitMsg, setSubmitMsg] = useState<string | null>(null);
   const [visibleBills, setVisibleBills] = useState(5);
   const [visibleVotes, setVisibleVotes] = useState(5);
   const [visibleStatements, setVisibleStatements] = useState(5);
   const [proposals, setProposals] = useState<InternalProposal[]>([]);
-  const [showProposalForm, setShowProposalForm] = useState(false);
-  const [propTitle, setPropTitle] = useState("");
-  const [propDesc, setPropDesc] = useState("");
-  const [propCategory, setPropCategory] = useState("economy");
-  const [propSubmitting, setPropSubmitting] = useState(false);
-  const [propMsg, setPropMsg] = useState<string | null>(null);
   const [joinStatus, setJoinStatus] = useState<"idle" | "loading" | "error">("idle");
   const [joinError, setJoinError] = useState("");
   const joinNavigate = useNavigate();
@@ -130,29 +69,48 @@ export function PartyDetail() {
     }).catch(console.error);
   }, [id, user]);
 
-  const handleSubmitQuestion = async () => {
-    if (!id || questionText.trim().length < 5) return;
-    setSubmitting(true);
-    setSubmitMsg(null);
-    try {
-      await api.submitQuestion(questionText.trim(), id);
-      setQuestionText("");
-      setSubmitMsg("Question submitted!");
-      refresh();
-    } catch {
-      setSubmitMsg("Failed to submit question.");
-    } finally {
-      setSubmitting(false);
-      setTimeout(() => setSubmitMsg(null), 3000);
-    }
-  };
-
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
   if (!party) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
 
   const displayColor = party.color === "#FFED00" ? "#c4a900" : party.color;
+  const isMyParty = user?.partyId === id;
+
+  const partyAvail = availableSeats[id!];
+  const openCount = partyAvail?.open ?? 0;
+  const hasSeat = seats.some(s => s.userId === user?.id);
+  const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
+  const rejectedApp = myApplications.find(a => a.status === "rejected" && a.partyId === id);
+  const canApply = isMyParty && !hasSeat && !pendingApp && openCount > 0;
+  const humanSeats = seats.filter(s => s.controller === "human");
+
+  const handleJoin = async () => {
+    if (!user) {
+      joinNavigate(`/login?redirect=/parties/${id}`);
+      return;
+    }
+    if (joinStatus === "loading") return;
+    setJoinStatus("loading");
+    setJoinError("");
+    try {
+      const result = await api.joinParty(id!);
+      login(result.id, result);
+      setJoinStatus("idle");
+      api.getParty(id!).then(setParty).catch(console.error);
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Failed to join");
+      setJoinStatus("error");
+    }
+  };
+
+  const handleLeave = async () => {
+    try {
+      const result = await api.leaveParty();
+      login(result.id, result);
+      api.getParty(id!).then(setParty).catch(console.error);
+    } catch { /* ignore */ }
+  };
 
   return (
     <div>
@@ -200,64 +158,32 @@ export function PartyDetail() {
           </div>
 
           {/* Membership section */}
-          {/* id anchor: join-party */}
-          {(() => {
-            const isMyParty = user?.partyId === id;
-            const handleJoin = async () => {
-              if (!user) {
-                joinNavigate(`/login?redirect=/parties/${id}`);
-                return;
-              }
-              if (joinStatus === "loading") return;
-              setJoinStatus("loading");
-              setJoinError("");
-              try {
-                const result = await api.joinParty(id!);
-                login(result.id, result);
-                setJoinStatus("idle");
-                api.getParty(id!).then(setParty).catch(console.error);
-              } catch (err) {
-                setJoinError(err instanceof Error ? err.message : "Failed to join");
-                setJoinStatus("error");
-              }
-            };
-            const handleLeave = async () => {
-              try {
-                const result = await api.leaveParty();
-                login(result.id, result);
-                api.getParty(id!).then(setParty).catch(console.error);
-              } catch { /* ignore */ }
-            };
-
-            return (
-              <div id="join-party" className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
-                <span className="text-sm text-muted-foreground">
-                  👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
-                  {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>Mitglied</span>}
-                </span>
-                {isMyParty ? (
-                  <button
-                    onClick={handleLeave}
-                    className="text-xs px-3 py-1 rounded border border-input bg-card text-muted-foreground cursor-pointer hover:bg-accent"
-                  >
-                    Austreten
-                  </button>
-                ) : (
-                  <div className="flex gap-1.5 items-center flex-wrap">
-                    <button
-                      onClick={handleJoin}
-                      disabled={joinStatus === "loading"}
-                      className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80 disabled:opacity-50"
-                      style={{ borderColor: displayColor, color: displayColor }}
-                    >
-                      {joinStatus === "loading" ? "Beitritt…" : "Beitreten"}
-                    </button>
-                    {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
-                  </div>
-                )}
+          <div id="join-party" className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
+            <span className="text-sm text-muted-foreground">
+              👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
+              {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>Mitglied</span>}
+            </span>
+            {isMyParty ? (
+              <button
+                onClick={handleLeave}
+                className="text-xs px-3 py-1 rounded border border-input bg-card text-muted-foreground cursor-pointer hover:bg-accent"
+              >
+                Austreten
+              </button>
+            ) : (
+              <div className="flex gap-1.5 items-center flex-wrap">
+                <button
+                  onClick={handleJoin}
+                  disabled={joinStatus === "loading"}
+                  className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80 disabled:opacity-50"
+                  style={{ borderColor: displayColor, color: displayColor }}
+                >
+                  {joinStatus === "loading" ? "Beitritt…" : "Beitreten"}
+                </button>
+                {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
               </div>
-            );
-          })()}
+            )}
+          </div>
         </div>
       </div>
 
@@ -285,211 +211,149 @@ export function PartyDetail() {
       )}
 
       {/* Bundestag Members (MdB Roster) */}
-      {seats.length > 0 && (() => {
-        const isMyParty = user?.partyId === id;
-        const humanSeats = seats.filter(s => s.controller === "human");
-        const aiSeats = seats.filter(s => s.controller === "ai");
-        const partyAvail = availableSeats[id!];
-        const openCount = partyAvail?.open ?? 0;
-        const hasSeat = seats.some(s => s.userId === user?.id);
-        const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
-        const rejectedApp = myApplications.find(a => a.status === "rejected" && a.partyId === id);
-        const canApply = isMyParty && !hasSeat && !pendingApp && openCount > 0;
+      {seats.length > 0 && (
+        <div id="mdb-seats" className="mb-8">
+          <h2 className="section-title">
+            Bundestagsabgeordnete
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              {humanSeats.filter(s => s.userId).length}/{humanSeats.length} besetzt · {seats.length} Sitze gesamt
+              {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} frei)</span>}
+            </span>
+          </h2>
 
-        return (
-          <div id="mdb-seats" className="mb-8">
-            <h2 className="section-title">
-              Bundestagsabgeordnete
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                {humanSeats.filter(s => s.userId).length}/{humanSeats.length} besetzt · {seats.length} Sitze gesamt
-                {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} frei)</span>}
-              </span>
-            </h2>
-
-            {/* ── Prominent MdB Apply CTA ── */}
-            {canApply && !showApplyForm && (
-              <Card className="mb-4 border-2" style={{ borderColor: `${displayColor}40` }}>
-                <CardContent className="p-5">
-                  <div className="flex flex-col md:flex-row gap-4 md:items-start">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-base mb-1.5" style={{ color: displayColor }}>Werde MdB für {party.name}</div>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Als Mitglied des Bundestags nimmst du direkt an der parlamentarischen Arbeit teil.
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-3">
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                          <span>Direkte Abstimmung über Gesetze in 3. Lesung</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                          <span>Reden halten in allen Lesungen</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                          <span>Anträge und Entschließungen einbringen</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                          <span>Änderungsanträge in 2. Lesung stellen</span>
-                        </div>
+          {/* Prominent MdB Apply CTA */}
+          {canApply && !showApplyForm && (
+            <Card className="mb-4 border-2" style={{ borderColor: `${displayColor}40` }}>
+              <CardContent className="p-5">
+                <div className="flex flex-col md:flex-row gap-4 md:items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-base mb-1.5" style={{ color: displayColor }}>Werde MdB für {party.name}</div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Als Mitglied des Bundestags nimmst du direkt an der parlamentarischen Arbeit teil.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-3">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                        <span>Direkte Abstimmung über Gesetze in 3. Lesung</span>
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>Voraussetzung: Parteimitglied</span>
-                        <span>·</span>
-                        <span>KI-Bewertung der Bewerbung</span>
-                        <span>·</span>
-                        <span>7 Tage Wartezeit nach Ablehnung</span>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                        <span>Reden halten in allen Lesungen</span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                        <span>Anträge und Entschließungen einbringen</span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
+                        <span>Änderungsanträge in 2. Lesung stellen</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowApplyForm(true)}
-                      className="shrink-0 px-5 py-2.5 rounded-lg text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{ background: displayColor }}
-                    >
-                      Jetzt bewerben
-                    </button>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>Voraussetzung: Parteimitglied</span>
+                      <span>·</span>
+                      <span>KI-Bewertung der Bewerbung</span>
+                      <span>·</span>
+                      <span>7 Tage Wartezeit nach Ablehnung</span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Pending application notice */}
-            {pendingApp && (
-              <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800 flex items-center gap-2">
-                <span className="font-semibold">Bewerbung läuft</span>
-                <span className="text-xs text-amber-600">— eingereicht Tag {pendingApp.createdOnDay}, wird demnächst geprüft</span>
-              </div>
-            )}
-
-            {/* Rejected with cooldown notice */}
-            {rejectedApp && rejectedApp.cooldownUntilDay && simStatus && rejectedApp.cooldownUntilDay > simStatus.currentDay && (
-              <div className="mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-sm text-muted-foreground">
-                Letzte Bewerbung abgelehnt — erneute Bewerbung ab Tag {rejectedApp.cooldownUntilDay} möglich
-              </div>
-            )}
-
-            {/* Apply form */}
-            {showApplyForm && (
-              <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
-                <CardContent className="p-5">
-                  <div className="font-semibold mb-1">Bewerbung als Bundestagsabgeordnete/r</div>
-                  <p className="text-xs text-muted-foreground mb-3">Begründe, warum du diese Partei vertreten willst. Nenne konkrete politische Ziele — die KI-Fraktionsführung bewertet Substanz und Parteinähe.</p>
-                  <textarea
-                    value={applyMotivation}
-                    onChange={e => setApplyMotivation(e.target.value)}
-                    placeholder="Warum willst du diese Partei vertreten? (20–500 Zeichen)"
-                    maxLength={500}
-                    rows={3}
-                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
-                  />
-                  <select
-                    value={applyFocus}
-                    onChange={e => setApplyFocus(e.target.value)}
-                    aria-label="Politischer Schwerpunkt"
-                    className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 bg-transparent"
+                  <button
+                    onClick={() => setShowApplyForm(true)}
+                    className="shrink-0 px-5 py-2.5 rounded-lg text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ background: displayColor }}
                   >
-                    <option value="">Politischer Schwerpunkt (optional)</option>
-                    <option value="economy">Wirtschaft</option>
-                    <option value="social">Soziales</option>
-                    <option value="environment">Umwelt</option>
-                    <option value="immigration">Migration</option>
-                    <option value="defense">Verteidigung</option>
-                    <option value="education">Bildung</option>
-                    <option value="healthcare">Gesundheit</option>
-                    <option value="infrastructure">Infrastruktur</option>
-                  </select>
-                  <div className="flex gap-2 items-center flex-wrap">
-                    <button
-                      onClick={async () => {
-                        if (applyMotivation.trim().length < 20) return;
-                        setApplySubmitting(true);
-                        setApplyMsg(null);
-                        try {
-                          await api.applyForSeat(applyMotivation.trim(), applyFocus.trim() || undefined);
-                          setApplyMotivation(""); setApplyFocus("");
-                          setShowApplyForm(false);
-                          setApplyMsg("Bewerbung eingereicht! Du wirst über das Ergebnis benachrichtigt.");
-                          refresh();
-                        } catch (e) {
-                          setApplyMsg(e instanceof Error ? e.message : "Fehler beim Einreichen");
-                        } finally {
-                          setApplySubmitting(false);
-                          setTimeout(() => setApplyMsg(null), 5000);
-                        }
-                      }}
-                      disabled={applySubmitting || applyMotivation.trim().length < 20}
-                      className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
-                      style={{ background: displayColor }}
-                    >
-                      {applySubmitting ? "Wird gesendet…" : "Bewerben"}
-                    </button>
-                    <button
-                      onClick={() => { setShowApplyForm(false); setApplyMotivation(""); setApplyFocus(""); }}
-                      className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
-                    >
-                      Abbrechen
-                    </button>
-                    {applyMsg && <span className={`text-xs ${applyMsg.includes("Fehler") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Seat roster table */}
-            <Card>
-              <CardContent className="p-0">
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr>
-                      <th className="text-left px-3 py-2 border-b-2 border-border">Sitz</th>
-                      <th className="text-left px-3 py-2 border-b-2 border-border">Mitglied</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Typ</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Disziplin</th>
-                      <th className="text-center px-3 py-2 border-b-2 border-border">Stellvertretung</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {humanSeats.map(seat => (
-                      <tr key={seat.id}>
-                        <td className="px-3 py-2 border-b border-border font-mono text-xs">#{seat.seatNumber}</td>
-                        <td className="px-3 py-2 border-b border-border">
-                          {seat.displayName ? (
-                            <span className="font-semibold">{seat.displayName}</span>
-                          ) : (
-                            <span className="text-emerald-600 italic">Frei</span>
-                          )}
-                          {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">(Du)</span>}
-                        </td>
-                        <td className="px-3 py-2 border-b border-border text-center">
-                          <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
-                        </td>
-                        <td className="px-3 py-2 border-b border-border text-center">
-                          {seat.userId && (
-                            <Badge variant="outline" className={cn("text-xs", DISCIPLINE_BADGE[seat.disciplineLevel] ?? DISCIPLINE_BADGE[0])}>
-                              {DISCIPLINE_LABEL[seat.disciplineLevel] ?? "?"}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 border-b border-border text-center text-xs text-muted-foreground">
-                          {seat.userId ? (seat.proxyDefault === "party_line" ? "Parteilinie" : "Enthaltung") : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                    {aiSeats.length > 0 && (
-                      <tr>
-                        <td className="px-3 py-2 border-b border-border text-muted-foreground" colSpan={5}>
-                          + {aiSeats.length} KI-gesteuerte{aiSeats.length !== 1 ? " Sitze" : "r Sitz"}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    Jetzt bewerben
+                  </button>
+                </div>
               </CardContent>
             </Card>
-          </div>
-        );
-      })()}
+          )}
+
+          {/* Pending application notice */}
+          {pendingApp && (
+            <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800 flex items-center gap-2">
+              <span className="font-semibold">Bewerbung läuft</span>
+              <span className="text-xs text-amber-600">— eingereicht Tag {pendingApp.createdOnDay}, wird demnächst geprüft</span>
+            </div>
+          )}
+
+          {/* Rejected with cooldown notice */}
+          {rejectedApp && rejectedApp.cooldownUntilDay && simStatus && rejectedApp.cooldownUntilDay > simStatus.currentDay && (
+            <div className="mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-sm text-muted-foreground">
+              Letzte Bewerbung abgelehnt — erneute Bewerbung ab Tag {rejectedApp.cooldownUntilDay} möglich
+            </div>
+          )}
+
+          {/* Apply form */}
+          {showApplyForm && (
+            <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
+              <CardContent className="p-5">
+                <div className="font-semibold mb-1">Bewerbung als Bundestagsabgeordnete/r</div>
+                <p className="text-xs text-muted-foreground mb-3">Begründe, warum du diese Partei vertreten willst. Nenne konkrete politische Ziele — die KI-Fraktionsführung bewertet Substanz und Parteinähe.</p>
+                <textarea
+                  value={applyMotivation}
+                  onChange={e => setApplyMotivation(e.target.value)}
+                  placeholder="Warum willst du diese Partei vertreten? (20–500 Zeichen)"
+                  maxLength={500}
+                  rows={3}
+                  className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
+                />
+                <select
+                  value={applyFocus}
+                  onChange={e => setApplyFocus(e.target.value)}
+                  aria-label="Politischer Schwerpunkt"
+                  className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 bg-transparent"
+                >
+                  <option value="">Politischer Schwerpunkt (optional)</option>
+                  <option value="economy">Wirtschaft</option>
+                  <option value="social">Soziales</option>
+                  <option value="environment">Umwelt</option>
+                  <option value="immigration">Migration</option>
+                  <option value="defense">Verteidigung</option>
+                  <option value="education">Bildung</option>
+                  <option value="healthcare">Gesundheit</option>
+                  <option value="infrastructure">Infrastruktur</option>
+                </select>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <button
+                    onClick={async () => {
+                      if (applyMotivation.trim().length < 20) return;
+                      setApplySubmitting(true);
+                      setApplyMsg(null);
+                      try {
+                        await api.applyForSeat(applyMotivation.trim(), applyFocus.trim() || undefined);
+                        setApplyMotivation(""); setApplyFocus("");
+                        setShowApplyForm(false);
+                        setApplyMsg("Bewerbung eingereicht! Du wirst über das Ergebnis benachrichtigt.");
+                        refresh();
+                      } catch (e) {
+                        setApplyMsg(e instanceof Error ? e.message : "Fehler beim Einreichen");
+                      } finally {
+                        setApplySubmitting(false);
+                        setTimeout(() => setApplyMsg(null), 5000);
+                      }
+                    }}
+                    disabled={applySubmitting || applyMotivation.trim().length < 20}
+                    className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
+                    style={{ background: displayColor }}
+                  >
+                    {applySubmitting ? "Wird gesendet…" : "Bewerben"}
+                  </button>
+                  <button
+                    onClick={() => { setShowApplyForm(false); setApplyMotivation(""); setApplyFocus(""); }}
+                    className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
+                  >
+                    Abbrechen
+                  </button>
+                  {applyMsg && <span className={`text-xs ${applyMsg.includes("Fehler") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <MdbRosterTable seats={seats} partyId={id!} />
+        </div>
+      )}
 
       {/* Approval chart */}
       {history.length >= 2 && (
@@ -506,44 +370,11 @@ export function PartyDetail() {
       {/* Bills proposed */}
       <div className="mb-8">
         <h2 className="section-title">Gesetzentwürfe ({bills.length})</h2>
-        {bills.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No bills proposed yet.</p>
-        ) : (
-          <Card>
-            <CardContent className="p-0">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th className="text-left px-3 py-2 border-b-2 border-border">Title</th>
-                    <th className="text-left px-3 py-2 border-b-2 border-border">Category</th>
-                    <th className="text-center px-3 py-2 border-b-2 border-border">Day</th>
-                    <th className="text-center px-3 py-2 border-b-2 border-border">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.slice(0, visibleBills).map(b => (
-                    <tr key={b.id}>
-                      <td className="px-3 py-2 border-b border-border">
-                        <Link to={`/bills/${b.id}`} className="text-inherit no-underline hover:text-primary">{b.title}</Link>
-                      </td>
-                      <td className="px-3 py-2 border-b border-border text-muted-foreground">{b.category}</td>
-                      <td className="px-3 py-2 border-b border-border text-center">{b.proposedOnDay}</td>
-                      <td className="px-3 py-2 border-b border-border text-center">
-                        <Badge variant="outline" className={STATUS_BADGE[b.status] || ""}>{b.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <ShowMoreButton
-                total={bills.length}
-                visible={Math.min(visibleBills, bills.length)}
-                increment={5}
-                onShowMore={() => setVisibleBills(v => v + 5)}
-              />
-            </CardContent>
-          </Card>
-        )}
+        <PartyBillsList
+          bills={bills}
+          visibleBills={visibleBills}
+          onShowMore={() => setVisibleBills(v => v + 5)}
+        />
       </div>
 
       {/* Voting record */}
@@ -707,243 +538,24 @@ export function PartyDetail() {
       </div>
 
       {/* Member Proposals */}
-      <div id="proposals" className="mb-8">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="section-title m-0">Mitgliedervorschläge ({proposals.length})</h2>
-          {user?.partyId === id && !showProposalForm && (
-            <button
-              onClick={() => setShowProposalForm(true)}
-              className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
-              style={{ borderColor: displayColor, color: displayColor }}
-            >
-              + Propose a Bill
-            </button>
-          )}
-        </div>
-
-        {showProposalForm && (
-          <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
-            <CardContent className="p-5">
-              <div className="font-semibold mb-2">New Member Proposal</div>
-              <input
-                type="text"
-                value={propTitle}
-                onChange={e => setPropTitle(e.target.value)}
-                placeholder="Bill title (10–120 chars)"
-                maxLength={120}
-                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
-              />
-              <textarea
-                value={propDesc}
-                onChange={e => setPropDesc(e.target.value)}
-                placeholder="Brief description (20–300 chars)"
-                maxLength={300}
-                rows={3}
-                className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
-              />
-              <div className="flex gap-2 items-center flex-wrap">
-                <select
-                  value={propCategory}
-                  onChange={e => setPropCategory(e.target.value)}
-                  className={SELECT_CLS}
-                >
-                  {["economy","social","environment","immigration","defense","education","healthcare","infrastructure"].map(c => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={async () => {
-                    if (propTitle.trim().length < 10 || propDesc.trim().length < 20) return;
-                    setPropSubmitting(true);
-                    setPropMsg(null);
-                    try {
-                      await api.createProposal(id!, { title: propTitle.trim(), description: propDesc.trim(), category: propCategory });
-                      setPropTitle(""); setPropDesc(""); setPropCategory("economy");
-                      setShowProposalForm(false);
-                      setPropMsg("Proposal submitted!");
-                      api.getPartyProposals(id!).then(setProposals).catch(console.error);
-                    } catch (e) {
-                      setPropMsg(e instanceof Error ? e.message : "Failed to submit");
-                    } finally {
-                      setPropSubmitting(false);
-                      setTimeout(() => setPropMsg(null), 4000);
-                    }
-                  }}
-                  disabled={propSubmitting || propTitle.trim().length < 10 || propDesc.trim().length < 20}
-                  className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
-                  style={{ background: displayColor }}
-                >
-                  {propSubmitting ? "Submitting…" : "Submit"}
-                </button>
-                <button
-                  onClick={() => { setShowProposalForm(false); setPropTitle(""); setPropDesc(""); }}
-                  className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
-                >
-                  Cancel
-                </button>
-                {propMsg && <span className={`text-xs ${propMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {proposals.length === 0 ? (
-          <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-            <span>No proposals yet.{user?.partyId === id ? " Be the first to propose a bill!" : " Join this party to propose bills."}</span>
-            {user?.partyId !== id && (
-              <button
-                onClick={() => {
-                  if (!user) joinNavigate(`/login?redirect=/parties/${id}`);
-                  else document.querySelector(".card")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="text-sm px-3 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
-                style={{ borderColor: displayColor, color: displayColor }}
-              >
-                Join {party.name}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div>
-            {proposals.slice(0, 20).map(p => {
-              const isOpen = p.status === "open";
-              const daysLeft = p.reviewByDay - (simStatus?.currentDay ?? p.createdOnDay);
-              return (
-                <Card key={p.id} className="mb-2" style={{ opacity: isOpen ? 1 : 0.75 }}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1">
-                        <div className="flex gap-1.5 flex-wrap items-center mb-1">
-                          {isOpen && user?.partyId === id && <UserActionIcon title="Vote on this proposal" />}
-                          <span className="font-semibold text-sm">{p.title}</span>
-                          <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-50">{p.category}</Badge>
-                          <Badge variant="outline" className={p.proposedBy === "ai"
-                            ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-50"
-                            : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                          }>
-                            {p.proposedBy === "ai" ? "AI" : "Member"}
-                          </Badge>
-                          <Badge variant="outline" className={PROPOSAL_STATUS[p.status] || ""}>{p.status}</Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">{p.description}</div>
-                        {p.bundestagBillId && (
-                          <div className="text-xs text-emerald-500 mt-1">
-                            ✓ Submitted to Bundestag —{" "}
-                            <Link to={`/bills/${p.bundestagBillId}`} className="text-xs text-blue-600 hover:underline">
-                              View Bill →
-                            </Link>
-                          </div>
-                        )}
-                        {p.declineReason && (
-                          <div className="text-xs text-muted-foreground mt-1 italic">Party: "{p.declineReason}"</div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                        {isOpen && user?.partyId === id ? (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={async () => {
-                                const updated = p.userVote === 1
-                                  ? await api.retractProposalVote(p.id)
-                                  : await api.voteOnProposal(p.id, 1);
-                                setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
-                              }}
-                              title={p.userVote === 1 ? "Retract upvote" : "Upvote"}
-                              className="border-none bg-transparent cursor-pointer text-lg p-0"
-                              style={{ color: p.userVote === 1 ? SEMANTIC_HEX.positive : "#aaa" }}
-                            >▲</button>
-                            <span className="font-bold text-base min-w-7 text-center" style={{ color: p.voteScore >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-                              {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
-                            </span>
-                            <button
-                              onClick={async () => {
-                                const updated = p.userVote === -1
-                                  ? await api.retractProposalVote(p.id)
-                                  : await api.voteOnProposal(p.id, -1);
-                                setProposals(prev => prev.map(x => x.id === p.id ? updated : x));
-                              }}
-                              title={p.userVote === -1 ? "Retract downvote" : "Downvote"}
-                              className="border-none bg-transparent cursor-pointer text-lg p-0"
-                              style={{ color: p.userVote === -1 ? SEMANTIC_HEX.negative : "#aaa" }}
-                            >▼</button>
-                          </div>
-                        ) : (
-                          <div className="font-bold text-base" style={{ color: p.voteScore >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-                            {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
-                          </div>
-                        )}
-                        <div className="text-xs text-muted-foreground">{p.totalVotes} vote{p.totalVotes !== 1 ? "s" : ""}</div>
-                        {isOpen && daysLeft >= 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {daysLeft === 0 ? "Reviewed today" : `${daysLeft}d left`}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <ProposalForm
+        partyId={id!}
+        displayColor={displayColor}
+        proposals={proposals}
+        simCurrentDay={simStatus?.currentDay}
+        onProposalsChange={setProposals}
+        onNavigateToLogin={() => {
+          if (!user) joinNavigate(`/login?redirect=/parties/${id}`);
+        }}
+      />
 
       {/* Ask a Question */}
-      <div id="ask-question" className="mb-8">
-        <h2 className="section-title">Frage an {party.name}</h2>
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={questionText}
-                onChange={e => setQuestionText(e.target.value)}
-                placeholder="Type your question..."
-                maxLength={500}
-                className="flex-1 px-3 py-2 rounded border border-input text-sm"
-                onKeyDown={e => { if (e.key === "Enter") handleSubmitQuestion(); }}
-              />
-              <button
-                onClick={handleSubmitQuestion}
-                disabled={submitting || questionText.trim().length < 5}
-                className="px-4 py-2 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: displayColor }}
-              >
-                {submitting ? "..." : "Submit"}
-              </button>
-            </div>
-            {submitMsg && (
-              <div className={`text-sm mt-1.5 ${submitMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>
-                {submitMsg}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {questions.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-base font-semibold mb-3">Aktuelle Fragen ({questions.length})</h3>
-            {questions.slice(0, 10).map(q => (
-              <Card key={q.id} className="mb-2" style={{ borderLeft: `4px solid ${displayColor}` }}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Badge variant="outline" className={q.status === "pending" ? STATUS_BADGE.pending : STATUS_BADGE.answered}>
-                      {q.status}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground ml-auto">Day {q.createdOnDay}</span>
-                  </div>
-                  <p className="text-sm italic mb-1.5">{q.question}</p>
-                  {q.response && (
-                    <div className="bg-muted rounded p-2 px-3 text-sm leading-relaxed">
-                      <strong>{party.name}:</strong> {q.response}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      <QuestionForm
+        partyId={id!}
+        partyName={party.name}
+        displayColor={displayColor}
+        questions={questions}
+      />
     </div>
   );
 }

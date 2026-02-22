@@ -24,11 +24,15 @@ docs/plans/03-web-pages.md
 
 ### Step 3: Extract PartyDetail components
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/components/party/ApprovalChart.tsx`, `PartyBillsList.tsx`, `MdbRosterTable.tsx`, `ProposalForm.tsx`, `QuestionForm.tsx`
+- **Result**: Extracted 5 inline sections from PartyDetail.tsx into focused party components. Typecheck pass.
 
 ### Step 4: Rewrite PartyDetail.tsx shell
 
-- **Status**: pending
+- **Status**: done
+- **Files**: `src/pages/PartyDetail.tsx`
+- **Result**: Replaced 950-line file with ~280-line shell that imports all 5 party components. Typecheck pass.
 
 ### Step 5: Extract Admin components
 
