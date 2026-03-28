@@ -131,22 +131,27 @@ cp .env.example .env
 # Edit .env: set ANTHROPIC_API_KEY, XAI_API_KEY
 
 npm install
-npm run build
 npm run migrate   # initialize DB schema
 npm run seed      # seed initial data (first deploy only)
+
+# Build only the web frontend (API + engine run from source via tsx)
+npx turbo run build --filter=@ki-bundestag/web
 ```
+
+> **Why no full build?** Engine and types export `./src/index.ts` (not `dist/`).
+> The API imports engine source directly, so everything must run via `tsx`.
+> `tsc` output is only used for typechecking, not runtime. Only the web
+> frontend needs a real build (Vite → static HTML/JS/CSS).
 
 ### 3. Process Management (PM2)
 
 ```bash
-# Start API server
-pm2 start packages/api/dist/index.js --name ki-api \
-  --env production \
+# Start API server (must use tsx — engine exports point to src/, not dist/)
+pm2 start npx --name ki-api -- tsx packages/api/src/index.ts \
   --max-memory-restart 500M
 
 # Start simulation runner (optional — only if auto-sim desired)
-pm2 start node --name ki-sim -- \
-  --import tsx packages/engine/src/runner-auto.ts
+pm2 start npx --name ki-sim -- tsx packages/engine/src/runner-auto.ts
 
 # Save and enable on boot
 pm2 save
