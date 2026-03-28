@@ -8,7 +8,7 @@ AI-powered simulation of the German parliament. Six political parties, each driv
 
 ```bash
 # Prerequisites: Node.js 22+, npm 11+
-cp .env.example .env        # Add your ANTHROPIC_API_KEY
+cp .env.example .env        # Add ANTHROPIC_API_KEY (required) + XAI_API_KEY (optional)
 npm install
 npm run migrate              # Create DB schema
 npm run seed                 # Populate parties + initial state
@@ -41,9 +41,12 @@ Dependency chain: `types` <- `engine` <- `api`. Web is standalone.
 
 ### AI Models
 
-- **Party agents:** Claude Haiku (SPD, CDU, Grune, FDP, Linke) + Grok (AfD)
-- **Coalition synthesis:** Claude Sonnet
+Uses [Vercel AI SDK](https://sdk.vercel.ai/) with multiple providers:
+
+- **Party agents:** Claude Haiku (SPD, CDU, Grune, FDP, Linke) via Anthropic API + Grok (AfD) via xAI API
+- **Coalition synthesis:** Claude Sonnet via Anthropic API
 - **Per-party/per-role overrides** via env vars
+- **Circuit breaker** with automatic pause on rate limits
 
 ### Database
 
@@ -66,7 +69,15 @@ Dual SQLite setup (WAL mode):
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`. Required: `ANTHROPIC_API_KEY`. See the file for all options.
+Copy `.env.example` to `.env`. See the file for all options.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude models |
+| `XAI_API_KEY` | Optional | xAI API key for Grok (AfD agent) |
+| `API_PORT` | Optional | Express port (default: 3001) |
+| `MODEL_DAILY` | Optional | Override daily simulation model |
+| `MODEL_SYNTHESIS` | Optional | Override coalition synthesis model |
 
 ## Documentation
 
