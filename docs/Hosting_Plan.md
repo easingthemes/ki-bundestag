@@ -211,8 +211,11 @@ Automated via two workflows in `.github/workflows/`:
 - Upload web build artifact (on main push)
 
 **Deploy** (`deploy.yml`) — runs after CI passes on `main`, or manually:
-- SSHes into the VPS
-- Pulls latest code, installs deps, builds, migrates, restarts PM2
+- Builds locally in the runner
+- Rsyncs files to VPS via [`easingthemes/ssh-deploy@v5`](https://github.com/easingthemes/ssh-deploy)
+- Excludes `.env`, `data/*.db`, `node_modules`, `.git`
+- `SCRIPT_BEFORE`: backs up SQLite databases
+- `SCRIPT_AFTER`: `npm ci`, `npm run build`, `npm run migrate`, `pm2 restart`
 
 #### Required GitHub Secrets
 
