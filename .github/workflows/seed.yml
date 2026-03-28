@@ -18,6 +18,8 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd /opt/ki-bundestag
+            echo "==> Running migrations first..."
+            npm run migrate
             echo "==> Seeding database (destructive)..."
             npm run seed
             echo "==> Restarting API..."
