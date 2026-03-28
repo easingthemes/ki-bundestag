@@ -52,12 +52,30 @@ Detailed rules are in `.claude/rules/` (auto-loaded, path-scoped):
 - **`frontend.md`** — Tailwind v4, shadcn/ui, shared components, color maps
 - **`database.md`** — Dual-DB architecture, Drizzle patterns, seed vs migrate
 - **`simulation.md`** — Agent actions, `runDay()` flow, AI call patterns
+- **`api.md`** — Express REST conventions, route structure, mappers, middleware
 
 ## Web Pages (21 total)
 
 Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, Login, About, Admin, AdminCosts.
 
-Routes in `src/main.tsx`, API client in `src/api/`.
+Routes in `packages/web/src/main.tsx`, API client in `packages/web/src/api/`.
+
+## API Routes (10 domain routers)
+
+All under `/api/` prefix, served from `packages/api/src/routes/`:
+
+| Route | Domain |
+|-------|--------|
+| `/api/parties` | Party profiles, approval, coalition |
+| `/api/bills` | Bills, signals, amendments, votes |
+| `/api/elections` | Elections, results, coalitions |
+| `/api/simulation` | Sim status, day triggers, injections |
+| `/api/parliament` | Motions, interpellations, confidence votes, court |
+| `/api/content` | Media, polls, questions, referendums, logs |
+| `/api/users` | Auth, profile, proposals, MdB applications |
+| `/api/seats` | MdB seat management |
+| `/api/budget` | Budget proposals, allocations |
+| `/api/admin` | Model config, costs, analytics |
 
 ## Model Configuration
 
@@ -71,6 +89,15 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 ## Environment
 
 Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
+
+## Debugging Tips
+
+- **Typecheck**: `npm run typecheck` — always run from monorepo root
+- **DB inspection**: `sqlite3 -header -column data/simulation.db "<query>"` (see `/db-query` command)
+- **Simulation state**: `sqlite3 data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"`
+- **Event trace**: `sqlite3 data/simulation.db "SELECT type, actor, title FROM simulation_events WHERE day_number = N"`
+- **Dev servers**: `lsof -i :3001` (API), `lsof -i :5173` (web) — or use `/dev-start`
+- **Kill stuck servers**: `npm run kill`
 
 ## MCP
 
