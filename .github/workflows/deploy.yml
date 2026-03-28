@@ -23,33 +23,51 @@ jobs:
     environment: production
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
-          script_stop: true
-          script: |
-            set -e
+          node-version: 22
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy via ssh-deploy
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.DEPLOY_HOST }}
+          REMOTE_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_PORT: ${{ secrets.DEPLOY_PORT }}
+          SOURCE: ""
+          TARGET: /opt/ki-bundestag/
+          ARGS: -rlgoDzvc -i --delete
+          EXCLUDE: >-
+            .git,
+            .github,
+            .claude,
+            .env,
+            node_modules,
+            data/*.db,
+            data/*.db-wal,
+            data/*.db-shm
+          SCRIPT_BEFORE: |
+            echo "==> Pre-deploy: backing up databases..."
             cd /opt/ki-bundestag
-
-            echo "==> Pulling latest changes..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "==> Installing dependencies..."
+            mkdir -p /opt/backups/ki-bundestag/pre-deploy
+            sqlite3 data/simulation.db ".backup '/opt/backups/ki-bundestag/pre-deploy/simulation.db'" 2>/dev/null || true
+            sqlite3 data/users.db ".backup '/opt/backups/ki-bundestag/pre-deploy/users.db'" 2>/dev/null || true
+          SCRIPT_BEFORE_REQUIRED: "false"
+          SCRIPT_AFTER: |
+            echo "==> Post-deploy: installing deps and restarting..."
+            cd /opt/ki-bundestag
             npm ci --production=false
-
-            echo "==> Building..."
             npm run build
-
-            echo "==> Running migrations..."
             npm run migrate
-
-            echo "==> Restarting API server..."
             pm2 restart ki-api --update-env
-
             echo "==> Deployment complete!"
             pm2 status
+          SCRIPT_AFTER_REQUIRED: "true"
