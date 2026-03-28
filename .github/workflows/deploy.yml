@@ -30,10 +30,12 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install and build
+      # Only build the web frontend — it's the only pure static artifact.
+      # API + engine run from source via tsx (exports point to src/, not dist/).
+      - name: Build web frontend
         run: |
           npm ci
-          npm run build
+          npx turbo run build --filter=@ki-bundestag/web
 
       - name: Deploy via ssh-deploy
         uses: easingthemes/ssh-deploy@v5
@@ -64,8 +66,7 @@ jobs:
           SCRIPT_AFTER: |
             echo "==> Post-deploy: installing deps and restarting..."
             cd /opt/ki-bundestag
-            npm ci --production=false
-            npm run build
+            npm ci
             npm run migrate
             pm2 restart ki-api --update-env
             echo "==> Deployment complete!"
