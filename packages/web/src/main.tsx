@@ -148,7 +148,6 @@ function MobileNav({ user }: { user: User | null }) {
           <Separator className="mx-5 my-2" />
           <MobileLink to="/log">Protokoll</MobileLink>
           <MobileLink to="/about">&Uuml;ber</MobileLink>
-          <MobileLink to="/admin">Admin</MobileLink>
           <Separator className="mx-5 my-2" />
           {user ? (
             <>
@@ -571,7 +570,6 @@ function App() {
             <div className="flex gap-5">
               <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Protokoll</Link>
               <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">&Uuml;ber</Link>
-              <Link to="/admin" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Admin</Link>
             </div>
             <div className="text-[11px] text-muted-foreground">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>
