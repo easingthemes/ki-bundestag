@@ -104,6 +104,11 @@ router.get("/api/polls/:id", (req, res) => {
 // POST /api/polls/:id/vote
 router.post("/api/polls/:id/vote", (req, res) => {
   if (requireParticipatory(req, res, "vote_polls")) return;
+  const token = getUserToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const db = getDb();
   const rows = db.select().from(schema.polls).where(eq(schema.polls.id, req.params.id)).all();
   if (rows.length === 0) {

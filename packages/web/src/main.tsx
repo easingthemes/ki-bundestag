@@ -17,9 +17,6 @@ import { Interpellations } from "./pages/Interpellations";
 import { ConfidenceVotes } from "./pages/ConfidenceVotes";
 import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
-import { Admin } from "./pages/Admin";
-import { AdminCosts } from "./pages/AdminCosts";
-import { AdminAnalytics } from "./pages/AdminAnalytics";
 import { About } from "./pages/About";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
@@ -552,9 +549,6 @@ function App() {
             <Route path="/confidence-votes" element={<ConfidenceVotes />} />
             <Route path="/constitutional-court" element={<ConstitutionalCourt />} />
             <Route path="/budget" element={<Budget />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/costs" element={<AdminCosts />} />
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/referendums" element={<Referendums />} />
             <Route path="/log" element={<SimulationLog />} />
             <Route path="/notifications" element={<Notifications />} />

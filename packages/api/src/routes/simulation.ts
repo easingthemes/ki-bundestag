@@ -397,7 +397,7 @@ router.post("/api/simulate/inject", requireAdmin, (req, res) => {
 });
 
 // GET /api/simulate/injections
-router.get("/api/simulate/injections", (_req, res) => {
+router.get("/api/simulate/injections", requireAdmin, (_req, res) => {
   const db = getDb();
   const rows = db.select().from(schema.pendingInjections).all();
   res.json(rows.map(r => ({
@@ -408,8 +408,8 @@ router.get("/api/simulate/injections", (_req, res) => {
   })));
 });
 
-// GET /api/simulation/queue (admin info: pending queued events)
-router.get("/api/simulation/queue", (_req, res) => {
+// GET /api/simulation/queue
+router.get("/api/simulation/queue", requireAdmin, (_req, res) => {
   const events = getQueuedEvents();
   res.json(events);
 });
