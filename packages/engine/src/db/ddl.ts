@@ -89,7 +89,8 @@ export const SIM_TABLE_DDL = `
     budget_retry_day INTEGER,
     daily_summary TEXT,
     day_started_at TEXT,
-    timing_preset TEXT NOT NULL DEFAULT 'normal'
+    timing_preset TEXT NOT NULL DEFAULT 'normal',
+    start_date TEXT
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
