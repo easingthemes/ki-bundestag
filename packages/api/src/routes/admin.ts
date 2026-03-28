@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { getDb, schema, getSqlite, getUserSqlite } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
+import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
+
+// All admin routes require ADMIN_SECRET header
+router.use("/api/admin", requireAdmin);
+router.use("/api/simulation/preset", requireAdmin);
 
 // POST /api/simulation/preset (admin: change preset)
 router.post("/api/simulation/preset", (req, res) => {

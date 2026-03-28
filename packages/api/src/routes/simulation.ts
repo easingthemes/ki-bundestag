@@ -18,7 +18,7 @@ import {
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { and, inArray, gte } from "drizzle-orm";
 import type { NationalState, SimulationEvent } from "@ki-bundestag/types";
-import { getTimingPreset } from "../middleware/index.js";
+import { getTimingPreset, requireAdmin } from "../middleware/index.js";
 
 const router = Router();
 
@@ -355,7 +355,7 @@ router.get("/api/simulation/events", (req, res) => {
 });
 
 // POST /api/simulate/inject
-router.post("/api/simulate/inject", (req, res) => {
+router.post("/api/simulate/inject", requireAdmin, (req, res) => {
   const db = getDb();
   const { type, data } = req.body;
 
