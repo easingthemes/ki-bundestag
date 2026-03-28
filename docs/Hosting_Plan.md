@@ -105,23 +105,120 @@ A single small VPS is the best fit because:
 
 ## Setup Steps
 
-### 1. Server Provisioning
+### 1. Hetzner Cloud — Step by Step
+
+#### 1a. Create an account
+
+1. Go to [console.hetzner.cloud](https://console.hetzner.cloud)
+2. Sign up with email → verify → add payment method (credit card or PayPal)
+3. Create a new **Project** (e.g., "ki-bundestag")
+
+#### 1b. Generate SSH key (on your local machine)
 
 ```bash
-# On Hetzner Cloud console: create CX22, Ubuntu 24.04, SSH key
-# DNS: point ki-bundestag.de (or subdomain) → server IP
-
-ssh root@<server-ip>
-apt update && apt upgrade -y
-apt install -y caddy sqlite3
-
-# Install Node.js 22 via NodeSource
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt install -y nodejs
-npm install -g pm2
+# Skip if you already have a key
+ssh-keygen -t ed25519 -C "ki-bundestag-deploy" -f ~/.ssh/ki-bundestag
+cat ~/.ssh/ki-bundestag.pub
+# Copy the output — you'll paste it in Hetzner
 ```
 
-### 2. App Deployment
+#### 1c. Create the server
+
+In the Hetzner Cloud Console:
+
+| Step | Setting | Value |
+|------|---------|-------|
+| 1 | **Location** | Falkenstein (fsn1) — cheapest EU |
+| 2 | **Image** | Ubuntu 24.04 |
+| 3 | **Type** | Shared vCPU → **CX22** (2 vCPU, 4 GB RAM, 40 GB disk) |
+| 4 | **Networking** | Public IPv4 + IPv6 (default) |
+| 5 | **SSH Keys** | Click "Add SSH Key" → paste your public key |
+| 6 | **Volumes** | Skip (40 GB disk is enough) |
+| 7 | **Firewalls** | Create new → name "web-server" → add rules below |
+| 8 | **Backups** | Enable (€0.87/mo — worth it) |
+| 9 | **Name** | `ki-bundestag` |
+
+Click **Create & Buy Now** (~€4.35/mo + €0.87 backups = **€5.22/mo**)
+
+#### 1d. Firewall rules
+
+| Direction | Protocol | Port | Source |
+|-----------|----------|------|--------|
+| Inbound | TCP | 22 | Any (SSH) |
+| Inbound | TCP | 80 | Any (HTTP → Caddy redirects to HTTPS) |
+| Inbound | TCP | 443 | Any (HTTPS) |
+
+All other inbound traffic is blocked by default. Outbound is open.
+
+#### 1e. DNS setup
+
+Point your domain to the server IP (shown in Hetzner dashboard):
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | `@` or `ki-bundestag.de` | `<server-ipv4>` | 300 |
+| AAAA | `@` or `ki-bundestag.de` | `<server-ipv6>` | 300 |
+
+Do this at your domain registrar (e.g., Cloudflare, Namecheap, DENIC for .de).
+
+### 2. Server Setup (SSH in)
+
+```bash
+ssh -i ~/.ssh/ki-bundestag root@<server-ip>
+```
+
+#### 2a. System basics
+
+```bash
+apt update && apt upgrade -y
+apt install -y caddy sqlite3 ufw
+
+# Firewall (belt + suspenders with Hetzner firewall)
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+```
+
+#### 2b. Create deploy user (don't run the app as root)
+
+```bash
+adduser --disabled-password --gecos "" deploy
+mkdir -p /home/deploy/.ssh
+cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+
+# Allow deploy user to manage PM2 and read Caddy logs
+usermod -aG www-data deploy
+```
+
+#### 2c. Install Node.js 22 + PM2
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+npm install -g pm2 tsx
+
+# Verify
+node -v   # v22.x
+npm -v    # 11.x
+pm2 -v    # 5.x
+tsx -v    # 4.x
+```
+
+#### 2d. Disable root SSH login (security)
+
+```bash
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+systemctl restart sshd
+```
+
+> From now on, SSH in as: `ssh -i ~/.ssh/ki-bundestag deploy@<server-ip>`
+
+### 3. App Deployment (first time)
 
 ```bash
 # Clone and build
