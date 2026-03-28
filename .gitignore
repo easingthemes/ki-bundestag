@@ -153,5 +153,3 @@ data/
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 
-# MCP config (may contain API keys)
-.mcp.json
