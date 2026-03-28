@@ -329,9 +329,9 @@ Set these in **Settings > Secrets and variables > Actions**:
 
 | Secret | Value |
 |--------|-------|
-| `DEPLOY_HOST` | Server IP or hostname |
+| `DEPLOY_HOST` | Server IP or hostname (e.g., `49.13.230.58`) |
 | `DEPLOY_USER` | SSH user (e.g., `deploy`) |
-| `DEPLOY_SSH_KEY` | Private SSH key (ed25519 recommended) |
+| `SSH_PRIVATE_KEY` | Private SSH key (ed25519 recommended) |
 | `DEPLOY_PORT` | SSH port (optional, defaults to 22) |
 
 #### GitHub Environment
