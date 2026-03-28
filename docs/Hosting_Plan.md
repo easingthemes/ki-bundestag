@@ -13,6 +13,52 @@
 | **File uploads** | None |
 | **Resource usage** | CPU-light, I/O-bound; ~512 MB RAM sufficient |
 
+## Platform Comparison
+
+| | **Hetzner VPS** | **Vercel + Fly.io** | **Railway** | **Render** | **AWS Lightsail** | **Cloudflare Pages + VPS** |
+|---|---|---|---|---|---|---|
+| **Architecture** | All-in-one VPS | Frontend on Vercel, API on Fly.io | All-in-one PaaS | All-in-one PaaS | All-in-one VPS | Frontend CDN + API on VPS |
+| **Frontend hosting** | Caddy static files | Vercel Edge CDN (free) | Built-in static | Built-in static | Caddy/nginx static | Cloudflare CDN (free) |
+| **API hosting** | PM2 + Caddy reverse proxy | Fly.io Machine | Railway container | Render Web Service | PM2 + Caddy | PM2 + Caddy |
+| **SQLite support** | Native local disk | Fly Volumes (LiteFS needed for HA) | Persistent volume (beta) | Persistent disk (on paid) | Native local disk | Native local disk |
+| **Background jobs** | PM2 process | Fly Machine (always-on) | Worker service | Background worker ($) | PM2 process | PM2 process |
+| **Auto-deploy (git push)** | Manual (script) | Yes (Vercel) / flyctl | Yes | Yes | Manual (script) | Partial (CF Pages auto, VPS manual) |
+| **Custom domain + TLS** | Caddy auto-TLS | Vercel auto + Fly auto | Built-in | Built-in | Caddy auto-TLS | Cloudflare auto + Caddy |
+| **EU data residency** | Yes (Falkenstein/Helsinki) | Vercel: edge, Fly: choose region | US-only regions | Frankfurt available | Frankfurt available | Cloudflare: edge, VPS: EU |
+| **Scaling** | Vertical (resize VPS) | Horizontal (Fly autoscale) | Vertical | Vertical | Vertical | Vertical |
+| **Ops complexity** | Medium (you manage server) | High (2 platforms, LiteFS) | Low | Low | Medium (you manage server) | Medium-High (2 platforms) |
+| **Vendor lock-in** | None | Moderate (Vercel framework) | Low | Low | Low (AWS ecosystem) | Low |
+| **Monthly cost (hosting only)** | **~$5** | ~$10-15 | ~$10-20 | ~$15-25 | ~$10 | ~$5-7 |
+| **Monthly cost (with auto-sim AI)** | **~$75-100** | ~$80-110 | ~$80-115 | ~$85-120 | ~$80-105 | ~$75-100 |
+
+### Why each option works or doesn't
+
+| Platform | Verdict | Key issue |
+|----------|---------|-----------|
+| **Hetzner VPS** | **Best fit** | Cheapest, full control, native SQLite, EU-based. Only downside: manual deploys. |
+| **Vercel + Fly.io** | Viable but complex | Vercel can't run Express or SQLite — API must go elsewhere. Fly.io supports SQLite via volumes but needs LiteFS for safe concurrent access. Two platforms to manage. |
+| **Vercel alone** | **Not viable** | No persistent filesystem (SQLite won't work). Serverless functions timeout (simulation runner can't run). Would require migrating to Postgres + external job runner — major rewrite. |
+| **Railway** | Viable | Easy deploys, persistent volumes exist. But volumes are beta, US-only regions, and usage-based pricing makes costs unpredictable with a continuous simulation runner. |
+| **Render** | Viable | Good DX, persistent disk on paid plans. More expensive than Hetzner for equivalent resources. Free tier spins down (kills simulation runner). |
+| **AWS Lightsail** | Viable | Similar to Hetzner but more expensive. Good if already in AWS ecosystem. |
+| **Cloudflare Pages + VPS** | Viable | Best frontend performance (global CDN) but still need a VPS for API + SQLite. Added complexity for marginal frontend speed gains on a low-traffic app. |
+| **Netlify** | **Not viable** | Same issue as Vercel — serverless functions, no persistent disk, no long-running processes. |
+| **AWS Lambda / GCP Cloud Run** | **Not viable** | Serverless — no persistent disk for SQLite, no long-running simulation process. Would need Postgres + separate scheduler. |
+
+### Decision matrix (scored 1-5, higher is better)
+
+| Criteria (weight) | Hetzner VPS | Vercel+Fly | Railway | Render | Lightsail |
+|---|---|---|---|---|---|
+| Cost (25%) | 5 | 3 | 3 | 2 | 4 |
+| SQLite compatibility (25%) | 5 | 3 | 3 | 4 | 5 |
+| Simplicity (20%) | 4 | 2 | 4 | 4 | 4 |
+| Deploy experience (15%) | 2 | 5 | 5 | 5 | 2 |
+| EU data residency (10%) | 5 | 3 | 1 | 4 | 4 |
+| Scalability (5%) | 2 | 5 | 4 | 3 | 3 |
+| **Weighted total** | **4.15** | **3.15** | **3.35** | **3.45** | **3.80** |
+
+---
+
 ## Recommendation: Single VPS (Hetzner Cloud)
 
 A single small VPS is the best fit because:
