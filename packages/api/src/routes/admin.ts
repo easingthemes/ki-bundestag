@@ -5,12 +5,8 @@ import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
-// All admin routes require ADMIN_SECRET header
-router.use("/api/admin", requireAdmin);
-router.use("/api/simulation/preset", requireAdmin);
-
 // POST /api/simulation/preset (admin: change preset)
-router.post("/api/simulation/preset", (req, res) => {
+router.post("/api/simulation/preset", requireAdmin, (req, res) => {
   const { preset } = req.body as { preset?: string };
   const valid: TimingPreset[] = ["ultra-fast", "fast", "normal", "slow"];
   if (!preset || !valid.includes(preset as TimingPreset)) {
@@ -22,8 +18,8 @@ router.post("/api/simulation/preset", (req, res) => {
   res.json({ success: true, preset });
 });
 
-// GET /api/admin/analytics — aggregated user analytics (no auth required)
-router.get("/api/admin/analytics", (_req, res) => {
+// GET /api/admin/analytics
+router.get("/api/admin/analytics", requireAdmin, (_req, res) => {
   try {
     const userRaw = getUserSqlite();
     const simRaw = getSqlite();
