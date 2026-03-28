@@ -74,11 +74,8 @@ Copy `.env.example` to `.env`. Required: `ANTHROPIC_API_KEY`. See the file for a
 |-----|-------------|
 | [Architecture](docs/Current_Architecture.md) | Full technical architecture, DB schema, API map |
 | [AI Engine](docs/AI_Engine.md) | AI infrastructure, model routing, circuit breaker |
-| [Functional Overview](docs/Functional_Overview.md) | Product concept and features |
-| [Engagement](docs/Engagement.md) | User participation and internal democracy |
 | [Bundestag Details](docs/bundestag-details.md) | German parliamentary rules and structure |
 | [Hosting Plan](docs/Hosting_Plan.md) | Deployment, CI/CD, Hetzner setup |
-| [Model Costs](docs/Model_Costs.md) | AI API cost analysis |
 | [Runbook](docs/operations/runbook.md) | Operational commands and troubleshooting |
 
 ## Deployment
