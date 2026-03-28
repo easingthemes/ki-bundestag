@@ -1,0 +1,26 @@
+name: Seed Database
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    name: Seed Database
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Run seed on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            echo "==> Seeding database (destructive)..."
+            npm run seed
+            echo "==> Restarting API..."
+            pm2 restart ki-api --update-env || pm2 start npx --name ki-api -- tsx packages/api/src/index.ts
+            pm2 save
+            echo "==> Done!"

@@ -1,0 +1,53 @@
+name: Server Command
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to run on server"
+        required: true
+        type: choice
+        options:
+          - pm2-start
+          - pm2-restart
+          - pm2-logs
+          - pm2-status
+          - migrate
+
+jobs:
+  run:
+    name: Run on Server
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Execute command
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            case "${{ inputs.command }}" in
+              migrate)
+                echo "==> Running migrations..."
+                npm run migrate
+                ;;
+              pm2-start)
+                echo "==> Starting API server..."
+                pm2 start npx --name ki-api -- tsx packages/api/src/index.ts
+                pm2 save
+                ;;
+              pm2-restart)
+                echo "==> Restarting API server..."
+                pm2 restart ki-api --update-env
+                ;;
+              pm2-logs)
+                echo "==> Last 50 log lines..."
+                pm2 logs ki-api --lines 50 --nostream
+                ;;
+              pm2-status)
+                pm2 status
+                ;;
+            esac
