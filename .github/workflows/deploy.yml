@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build web frontend
+        run: |
+          npm ci
+          npx turbo run build --filter=@ki-bundestag/web
+
+      # Rsync source + pre-built web/dist to server.
+      # API + engine run from source via tsx — no dist/ needed for them.
+      # Server only runs npm ci (for native deps like better-sqlite3).
+      - name: Deploy via ssh-deploy
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.DEPLOY_HOST }}
+          REMOTE_USER: ${{ secrets.DEPLOY_USER }}
+          REMOTE_PORT: ${{ secrets.DEPLOY_PORT }}
+          SOURCE: ""
+          TARGET: /opt/ki-bundestag/
+          ARGS: -rlgoDzvc -i --delete
+          EXCLUDE: >-
+            .git,
+            .github,
+            .claude,
+            .env,
+            node_modules,
+            data/*.db,
+            data/*.db-wal,
+            data/*.db-shm
+          SCRIPT_BEFORE: |
+            echo "==> Pre-deploy: backing up databases..."
+            cd /opt/ki-bundestag
+            mkdir -p /opt/backups/ki-bundestag/pre-deploy
+            sqlite3 data/simulation.db ".backup '/opt/backups/ki-bundestag/pre-deploy/simulation.db'" 2>/dev/null || true
+            sqlite3 data/users.db ".backup '/opt/backups/ki-bundestag/pre-deploy/users.db'" 2>/dev/null || true
+          SCRIPT_BEFORE_REQUIRED: "false"
+          SCRIPT_AFTER: |
+            echo "==> Post-deploy: installing deps and restarting..."
+            cd /opt/ki-bundestag
+            npm ci
+            npm run migrate
+            pm2 restart ki-api --update-env
+            echo "==> Deployment complete!"
+            pm2 status
+          SCRIPT_AFTER_REQUIRED: "true"

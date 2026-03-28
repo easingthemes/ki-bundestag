@@ -1,2 +1,15 @@
 # Screenshots saved by chrome-devtools-mcp — kept as docs, not code context
 .claude/screenshots/
+
+# Build artifacts
+packages/*/dist/
+node_modules/
+
+# Database files (binary, not useful as context)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/backups/
+
+# Large generated docs
+docs/screenshots/

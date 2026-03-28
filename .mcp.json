@@ -12,11 +12,8 @@
       "command": "npx",
       "args": [
         "-y",
-        "@upstash/context7-mcp",
-        "--api-key",
-        "REDACTED"
-      ],
-      "env": {}
+        "@upstash/context7-mcp"
+      ]
     }
   }
 }
