@@ -201,22 +201,56 @@ chmod +x /opt/ki-bundestag/backup.sh
 (crontab -l 2>/dev/null; echo "0 3 * * * /opt/ki-bundestag/backup.sh") | crontab -
 ```
 
-### 6. Deployment Updates
+### 6. GitHub Actions CI/CD
+
+Automated via two workflows in `.github/workflows/`:
+
+**CI** (`ci.yml`) — runs on every push/PR to `main`:
+- Typecheck all packages
+- Build all packages
+- Upload web build artifact (on main push)
+
+**Deploy** (`deploy.yml`) — runs after CI passes on `main`, or manually:
+- SSHes into the VPS
+- Pulls latest code, installs deps, builds, migrates, restarts PM2
+
+#### Required GitHub Secrets
+
+Set these in **Settings > Secrets and variables > Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | Server IP or hostname |
+| `DEPLOY_USER` | SSH user (e.g., `deploy`) |
+| `DEPLOY_SSH_KEY` | Private SSH key (ed25519 recommended) |
+| `DEPLOY_PORT` | SSH port (optional, defaults to 22) |
+
+#### GitHub Environment
+
+Create a **production** environment in **Settings > Environments** with:
+- Required reviewers (optional — adds manual approval gate)
+- Deployment branch rule: `main` only
+
+#### Server-Side SSH Setup
 
 ```bash
-# Simple pull-and-restart deploy script
-cat > /opt/ki-bundestag/deploy.sh << 'SCRIPT'
-#!/bin/bash
-set -e
-cd /opt/ki-bundestag
-git pull origin main
-npm install
-npm run build
-npm run migrate
-pm2 restart ki-api
-# Optionally restart sim: pm2 restart ki-sim
-SCRIPT
-chmod +x /opt/ki-bundestag/deploy.sh
+# On the VPS — create a deploy user with limited access
+adduser --disabled-password deploy
+usermod -aG www-data deploy
+
+# Allow deploy user to restart PM2
+# Add to /etc/sudoers.d/deploy:
+echo "deploy ALL=(ALL) NOPASSWD: /usr/bin/pm2" > /etc/sudoers.d/deploy
+
+# Set up SSH key
+mkdir -p /home/deploy/.ssh
+echo "<public-key>" >> /home/deploy/.ssh/authorized_keys
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+chown -R deploy:deploy /home/deploy/.ssh
+
+# Give deploy user ownership of the app directory
+chown -R deploy:deploy /opt/ki-bundestag
 ```
 
 ---
