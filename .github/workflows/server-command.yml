@@ -8,12 +8,11 @@ on:
         required: true
         type: choice
         options:
-          - seed
-          - migrate
           - pm2-start
           - pm2-restart
           - pm2-logs
           - pm2-status
+          - migrate
 
 jobs:
   run:
@@ -31,10 +30,6 @@ jobs:
           script: |
             cd /opt/ki-bundestag
             case "${{ inputs.command }}" in
-              seed)
-                echo "==> Seeding database..."
-                npm run seed
-                ;;
               migrate)
                 echo "==> Running migrations..."
                 npm run migrate
