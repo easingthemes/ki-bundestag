@@ -71,3 +71,21 @@ export function getUserToken(req: express.Request): string | null {
   const h = req.headers["x-user-token"];
   return typeof h === "string" && h.length > 0 ? h : null;
 }
+
+/**
+ * Middleware: require ADMIN_SECRET header to access admin routes.
+ * If ADMIN_SECRET env var is not set, all admin routes are blocked.
+ */
+export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) {
+    res.status(403).json({ error: "Admin access disabled" });
+    return;
+  }
+  const provided = req.headers["x-admin-secret"];
+  if (provided !== secret) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
