@@ -30,13 +30,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Only build the web frontend — it's the only pure static artifact.
-      # API + engine run from source via tsx (exports point to src/, not dist/).
-      - name: Build web frontend
+      - name: Install and build web frontend
         run: |
           npm ci
           npx turbo run build --filter=@ki-bundestag/web
 
+      # Rsync source + pre-built web/dist to server.
+      # API + engine run from source via tsx — no dist/ needed for them.
+      # Server only runs npm ci (for native deps like better-sqlite3).
       - name: Deploy via ssh-deploy
         uses: easingthemes/ssh-deploy@v5
         with:
