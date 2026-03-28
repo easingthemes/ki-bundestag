@@ -211,16 +211,20 @@ chmod +x /opt/ki-bundestag/backup.sh
 Automated via two workflows in `.github/workflows/`:
 
 **CI** (`ci.yml`) — runs on every push/PR to `main`:
-- Typecheck all packages
-- Build all packages
-- Upload web build artifact (on main push)
+- **Typecheck**: `tsc --noEmit` across all packages (type validation only, no dist output)
+- **Build Web**: `vite build` for the frontend — the only deployable artifact
 
 **Deploy** (`deploy.yml`) — runs after CI passes on `main`, or manually:
-- Builds locally in the runner
-- Rsyncs files to VPS via [`easingthemes/ssh-deploy@v5`](https://github.com/easingthemes/ssh-deploy)
+- Builds web frontend in CI runner (Vite → `packages/web/dist/`)
+- Rsyncs source + pre-built `web/dist/` to VPS via [`easingthemes/ssh-deploy@v5`](https://github.com/easingthemes/ssh-deploy)
 - Excludes `.env`, `data/*.db`, `node_modules`, `.git`
 - `SCRIPT_BEFORE`: backs up SQLite databases
-- `SCRIPT_AFTER`: `npm ci`, `npm run build`, `npm run migrate`, `pm2 restart`
+- `SCRIPT_AFTER`: `npm ci` (native deps), `migrate`, `pm2 restart`
+
+> **Build philosophy**: Only the web frontend needs a build step (Vite → static
+> HTML/JS/CSS). API and engine are Node.js apps that run from TypeScript source
+> via `tsx`. `tsc` is used only for type validation in CI — it produces no
+> runtime artifacts. The server never runs `npm run build`.
 
 #### Required GitHub Secrets
 

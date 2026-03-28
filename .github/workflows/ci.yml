@@ -23,10 +23,12 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # tsc is for type validation only — API + engine run from source via tsx
       - run: npm run typecheck
 
-  build:
-    name: Build
+  build-web:
+    name: Build Web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +39,9 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build
+
+      # Only the web frontend produces a deployable artifact (Vite → static files)
+      - run: npx turbo run build --filter=@ki-bundestag/web
 
       - name: Upload web build artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
