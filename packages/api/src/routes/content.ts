@@ -101,6 +101,7 @@ router.get("/api/polls/:id", (req, res) => {
   res.json(mapPoll(rows[0]));
 });
 
+// TODO: add express-rate-limit here — e.g. 5 votes per user per 10 minutes
 // POST /api/polls/:id/vote
 router.post("/api/polls/:id/vote", (req, res) => {
   if (requireParticipatory(req, res, "vote_polls")) return;
@@ -147,7 +148,12 @@ router.get("/api/media", (req, res) => {
   const db = getDb();
   const allRows = db.select().from(schema.mediaArticles).all();
   const dayFilter = req.query.day as string | undefined;
-  const rows = dayFilter ? allRows.filter((a: any) => a.dayNumber === parseInt(dayFilter, 10)) : allRows;
+  const dayFilterNum = dayFilter !== undefined ? parseInt(dayFilter, 10) : NaN;
+  if (dayFilter !== undefined && isNaN(dayFilterNum)) {
+    res.status(400).json({ error: "day filter must be a valid integer" });
+    return;
+  }
+  const rows = dayFilter !== undefined ? allRows.filter((a: any) => a.dayNumber === dayFilterNum) : allRows;
   const articles: MediaArticle[] = rows.map(mapMediaArticle);
   articles.sort((a, b) => b.dayNumber - a.dayNumber);
   res.json(articles);
@@ -226,6 +232,7 @@ router.get("/api/questions/:id", (req, res) => {
   res.json(mapQuestion(rows[0], score, votes.length, uv ? (uv.vote as 1 | -1) : null));
 });
 
+// TODO: add express-rate-limit here — e.g. 3 questions per user per hour
 // POST /api/questions
 router.post("/api/questions", (req, res) => {
   if (requireParticipatory(req, res, "ask_questions")) return;
@@ -234,6 +241,10 @@ router.post("/api/questions", (req, res) => {
 
   if (!question || typeof question !== "string" || question.trim().length < 5) {
     res.status(400).json({ error: "Question must be at least 5 characters" });
+    return;
+  }
+  if (question.trim().length > 500) {
+    res.status(400).json({ error: "Question must be at most 500 characters" });
     return;
   }
   if (!targetPartyId || typeof targetPartyId !== "string") {

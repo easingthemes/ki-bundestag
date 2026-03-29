@@ -51,11 +51,32 @@ router.post("/api/seats/apply", (req, res) => {
     return;
   }
 
-  const { applicationText, policyFocus } = req.body as { applicationText?: string; policyFocus?: string[] };
+  const { applicationText, policyFocus } = req.body as { applicationText?: string; policyFocus?: unknown };
   if (!applicationText || applicationText.trim().length < 10 || applicationText.trim().length > 500) {
     res.status(400).json({ error: "applicationText must be 10–500 characters" });
     return;
   }
+  if (policyFocus !== undefined && policyFocus !== null) {
+    if (!Array.isArray(policyFocus)) {
+      res.status(400).json({ error: "policyFocus must be an array of strings" });
+      return;
+    }
+    if (policyFocus.length > 5) {
+      res.status(400).json({ error: "policyFocus may have at most 5 items" });
+      return;
+    }
+    for (const item of policyFocus) {
+      if (typeof item !== "string") {
+        res.status(400).json({ error: "Each policyFocus item must be a string" });
+        return;
+      }
+      if (item.length > 100) {
+        res.status(400).json({ error: "Each policyFocus item must be at most 100 characters" });
+        return;
+      }
+    }
+  }
+  const validatedPolicyFocus = policyFocus as string[] | null | undefined;
 
   const appId = randomUUID();
   userDb.insert(schema.mdbApplications).values({
@@ -63,7 +84,7 @@ router.post("/api/seats/apply", (req, res) => {
     userId: token,
     partyId: user.partyId,
     applicationText: applicationText.trim(),
-    policyFocus: policyFocus ?? null,
+    policyFocus: validatedPolicyFocus ?? null,
     status: "pending",
     createdOnDay: currentDay,
   }).run();
@@ -74,7 +95,7 @@ router.post("/api/seats/apply", (req, res) => {
     userId: token,
     partyId: user.partyId,
     applicationText: applicationText.trim(),
-    policyFocus: policyFocus ?? null,
+    policyFocus: validatedPolicyFocus ?? null,
     status: "pending",
     createdOnDay: currentDay,
   });
