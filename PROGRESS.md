@@ -16,6 +16,6 @@ Ref: docs/todo/009-global-error-handler.md, docs/todo/019-inconsistent-error-for
 
 ### Step 2: Scan and standardize error responses across all route files
 
-- **Status**: pending
-
-Scan all route files in packages/api/src/routes/ for inconsistent error response shapes (e.g., `{ success: false }`, plain status codes, `{ message: string }`) and standardize them to `{ error: string }`.
+- **Status**: done
+- **Files**: none (no changes required)
+- **Result**: Scanned all 10 route files; all error responses already use `{ error: string }` format consistently. No `{ success: false }`, bare `.send()`, or `{ message: string }` error shapes found.
