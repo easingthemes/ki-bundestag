@@ -287,7 +287,7 @@ export function Elections() {
             <h2 className="section-title">Ergebnistabelle</h2>
             <Card>
               <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full border-collapse text-sm min-w-[400px]">
                   <thead>
                     <tr>
                       <th className="text-left px-3 py-2 border-b-2 border-primary bg-muted/50 text-primary text-xs font-semibold tracking-wider">Partei</th>

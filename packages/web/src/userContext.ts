@@ -6,6 +6,7 @@ export interface UserCtx {
   token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 export const UserContext = createContext<UserCtx>({
@@ -13,6 +14,7 @@ export const UserContext = createContext<UserCtx>({
   token: null,
   login: () => {},
   logout: () => {},
+  updateUser: () => {},
 });
 
 export function useUser(): UserCtx {
