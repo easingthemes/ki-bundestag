@@ -3,7 +3,7 @@ import { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../simulation/fraktionen.j
 import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/government.js";
 import { getHumanSeatRatio } from "../simulation/timing.js";
 import { PARTIES, INITIAL_NATIONAL_STATE } from "./seed-data.js";
-import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS } from "./ddl.js";
+import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS, SIM_INDEX_MIGRATIONS, USER_INDEX_MIGRATIONS } from "./ddl.js";
 
 /**
  * Ensure all tables and columns exist without touching data.
@@ -26,6 +26,11 @@ export function migrateDatabase() {
         throw err;
       }
     }
+  }
+
+  // Apply index migrations
+  for (const m of SIM_INDEX_MIGRATIONS) {
+    sqlite.exec(m.sql);
   }
 
   // Backfill start_date for existing DBs
@@ -147,6 +152,11 @@ export function migrateDatabase() {
         throw err;
       }
     }
+  }
+
+  // Apply user DB index migrations
+  for (const m of USER_INDEX_MIGRATIONS) {
+    userSqlite.exec(m.sql);
   }
 }
 
