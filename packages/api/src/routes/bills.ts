@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import type { Bill } from "@ki-bundestag/types";
 import { mapBill } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { LIMITS } from "../validation.js";
 
 const router = Router();
 
@@ -91,22 +92,22 @@ router.post("/api/bills/:id/amendment", (req, res) => {
   const { title, description, impactChange } = req.body as {
     title?: string; description?: string; impactChange?: Record<string, number>;
   };
-  if (!title || title.trim().length < 5 || title.trim().length > 100) {
-    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  if (!title || title.trim().length < LIMITS.TEXT_SHORT_MIN || title.trim().length > LIMITS.POLICY_FOCUS_ITEM_MAX) {
+    res.status(400).json({ error: `title must be ${LIMITS.TEXT_SHORT_MIN}–${LIMITS.POLICY_FOCUS_ITEM_MAX} characters` }); return;
   }
-  if (!description || description.trim().length < 10 || description.trim().length > 300) {
-    res.status(400).json({ error: "description must be 10–300 characters" }); return;
+  if (!description || description.trim().length < LIMITS.TEXT_MEDIUM_MIN || description.trim().length > LIMITS.TEXT_MEDIUM_MAX) {
+    res.status(400).json({ error: `description must be ${LIMITS.TEXT_MEDIUM_MIN}–${LIMITS.TEXT_MEDIUM_MAX} characters` }); return;
   }
   if (!impactChange || typeof impactChange !== "object") {
     res.status(400).json({ error: "impactChange must be an object" }); return;
   }
-  // Validate impact bounds (±0.3)
+  // Validate impact bounds (±AMENDMENT_IMPACT_MAX)
   for (const [key, val] of Object.entries(impactChange)) {
     if (!["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"].includes(key)) {
       res.status(400).json({ error: `Invalid impact key: ${key}` }); return;
     }
-    if (typeof val !== "number" || val < -0.3 || val > 0.3) {
-      res.status(400).json({ error: `${key} must be between -0.3 and 0.3` }); return;
+    if (typeof val !== "number" || val < LIMITS.AMENDMENT_IMPACT_MIN || val > LIMITS.AMENDMENT_IMPACT_MAX) {
+      res.status(400).json({ error: `${key} must be between ${LIMITS.AMENDMENT_IMPACT_MIN} and ${LIMITS.AMENDMENT_IMPACT_MAX}` }); return;
     }
   }
 
@@ -162,8 +163,8 @@ router.post("/api/bills/:id/speech", (req, res) => {
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
 
   const { content, reading } = req.body as { content?: string; reading?: number };
-  if (!content || content.trim().length < 20 || content.trim().length > 500) {
-    res.status(400).json({ error: "content must be 20–500 characters" });
+  if (!content || content.trim().length < LIMITS.SPEECH_MIN || content.trim().length > LIMITS.SPEECH_MAX) {
+    res.status(400).json({ error: `content must be ${LIMITS.SPEECH_MIN}–${LIMITS.SPEECH_MAX} characters` });
     return;
   }
   if (!reading || ![1, 2, 3].includes(reading)) {
