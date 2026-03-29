@@ -54,9 +54,10 @@ Each item links to a detail file with full description, affected files, and impl
 | 020 | [React hook dependency warnings suppressed](./020-react-hook-deps.md) | done | Web | #19 |
 | 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
 | 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
+| 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | open | API / Web | — |
 
 ## Summary
 
-- **Done**: 19 of 22
+- **Done**: 19 of 23
 - **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 2 remaining (#005, #022)
+- **Open**: 3 remaining (#005, #022, #023)
