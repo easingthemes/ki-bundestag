@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { closeDb } from "@ki-bundestag/engine";
 
@@ -33,6 +33,12 @@ app.use(usersRouter);
 app.use(seatsRouter);
 app.use(budgetRouter);
 app.use(adminRouter);
+
+// Global error handler — must be last middleware, after all routes
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+  res.status(500).json({ error: "Internal server error" });
+});
 
 const server = app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
