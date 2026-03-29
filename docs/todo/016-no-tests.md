@@ -13,7 +13,7 @@ No tests exist anywhere in the project. No test runner configured.
 - **Unit tests**: Vitest (fast, Vite-native, ESM-compatible)
 - **API tests**: Supertest + Vitest for route testing
 - **Frontend tests**: @testing-library/react + Vitest
-- **E2E**: Playwright (already in devDependencies)
+- **E2E**: Playwright v1.58.2 (already in root devDependencies, no test files yet)
 
 ## Priority Test Targets
 
