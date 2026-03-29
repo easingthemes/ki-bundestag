@@ -306,8 +306,8 @@ export function ActionsReference() {
       />
 
       <Card>
-        <CardContent className="p-0 overflow-hidden">
-          <table className="w-full border-collapse text-sm">
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full border-collapse text-sm min-w-[600px]">
             <thead>
               <tr>
                 <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Action</th>

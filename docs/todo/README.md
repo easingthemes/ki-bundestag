@@ -26,7 +26,7 @@ Each item links to a detail file with full description, affected files, and impl
 | # | Title | Status | Area | PR |
 |---|-------|--------|------|----|
 | 004 | [All content must be German](./004-german-content.md) | done | Web | #25 |
-| 005 | [Mobile view broken on some pages](./005-mobile-view-fixes.md) | open | Web | — |
+| 005 | [Mobile view broken on some pages](./005-mobile-view-fixes.md) | done | Web | — |
 | 006 | [/me endpoint issues](./006-me-endpoint-issues.md) | done | API / Web | #20 |
 | 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
 | 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
@@ -59,6 +59,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 19 of 24
+- **Done**: 20 of 24
 - **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 4 remaining (#005, #022, #023, #024)
+- **Open**: 3 remaining (#022, #023, #024)

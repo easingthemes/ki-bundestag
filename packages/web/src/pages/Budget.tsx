@@ -150,13 +150,14 @@ export function Budget() {
                       const share = (amount / budget.totalAmount) * 100;
                       const color = MINISTRY_COLORS[k] || "#999";
                       return (
-                        <div key={k} className="flex items-center gap-2 mb-1">
-                          <div className="min-w-36 text-xs">{MINISTRY_LABELS[k]}</div>
-                          <div className="min-w-18 text-xs text-right text-muted-foreground">{amount.toFixed(1)}B</div>
-                          <div className="min-w-11 text-xs text-right text-muted-foreground">{share.toFixed(1)}%</div>
+                        <div key={k} className="flex items-center gap-2 mb-1 flex-wrap sm:flex-nowrap">
+                          <div className="w-full sm:w-auto sm:min-w-36 text-xs">{MINISTRY_LABELS[k]}</div>
+                          <div className="hidden sm:block min-w-18 text-xs text-right text-muted-foreground">{amount.toFixed(1)}B</div>
+                          <div className="hidden sm:block min-w-11 text-xs text-right text-muted-foreground">{share.toFixed(1)}%</div>
                           <div className="flex-1 bg-muted rounded h-3 overflow-hidden min-w-15">
                             <div className="h-full rounded min-w-0.5" style={{ width: `${share}%`, background: color }} />
                           </div>
+                          <div className="sm:hidden text-xs text-muted-foreground shrink-0">{share.toFixed(1)}%</div>
                         </div>
                       );
                     })}
