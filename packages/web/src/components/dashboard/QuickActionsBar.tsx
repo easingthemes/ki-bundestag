@@ -15,23 +15,23 @@ export function QuickActionsBar({ user, mySeat, bills, polls }: QuickActionsBarP
   const actions: { label: string; to: string; primary?: boolean }[] = [];
 
   if (!user.partyId) {
-    actions.push({ label: "Join a Party", to: "/parties", primary: true });
+    actions.push({ label: "Partei beitreten", to: "/parties", primary: true });
   } else {
     if (!mySeat) {
-      actions.push({ label: "Propose a Bill", to: `/parties/${user.partyId}#proposals` });
-      actions.push({ label: "Ask a Question", to: `/parties/${user.partyId}#ask-question` });
-      actions.push({ label: "Apply for MdB Seat", to: `/parties/${user.partyId}#mdb-seats` });
+      actions.push({ label: "Gesetzentwurf vorschlagen", to: `/parties/${user.partyId}#proposals` });
+      actions.push({ label: "Frage stellen", to: `/parties/${user.partyId}#ask-question` });
+      actions.push({ label: "MdB-Sitz beantragen", to: `/parties/${user.partyId}#mdb-seats` });
     } else {
       const thirdReading = bills.filter(b => b.status === "third_reading");
       if (thirdReading.length > 0) {
-        actions.push({ label: `Vote on ${thirdReading.length} Bill${thirdReading.length !== 1 ? "s" : ""}`, to: "/bills?status=third_reading", primary: true });
+        actions.push({ label: `Über ${thirdReading.length} Gesetz${thirdReading.length !== 1 ? "e" : ""} abstimmen`, to: "/bills?status=third_reading", primary: true });
       }
-      actions.push({ label: "Submit Speech", to: "/bills" });
+      actions.push({ label: "Rede einreichen", to: "/bills" });
     }
   }
 
-  if (polls.length > 0) actions.push({ label: "Vote on Polls", to: "/polls#active-polls" });
-  actions.push({ label: "Referendums", to: "/referendums" });
+  if (polls.length > 0) actions.push({ label: "Umfragen abstimmen", to: "/polls#active-polls" });
+  actions.push({ label: "Volksabstimmungen", to: "/referendums" });
 
   if (actions.length === 0) return null;
 

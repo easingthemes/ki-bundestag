@@ -69,14 +69,14 @@ export function Polls() {
       {/* Registration prompt */}
       {!user && activePolls.length > 0 && (
         <div className={`${ALERT_STYLES.info} mb-4`}>
-          <Link to="/parties" className="text-primary font-semibold hover:underline">Register and join a party</Link> to participate in the simulation — vote on polls, submit questions, and more.
+          <Link to="/parties" className="text-primary font-semibold hover:underline">Registrieren und einer Partei beitreten</Link> um an der Simulation teilzunehmen — Umfragen abstimmen, Fragen einreichen und mehr.
         </div>
       )}
 
       {/* Unvoted nudge */}
       {unvotedCount > 0 && (
         <div className={`${ALERT_STYLES.warning} mb-4`}>
-          {unvotedCount} active poll{unvotedCount !== 1 ? "s" : ""} awaiting your vote.
+          {unvotedCount} aktive Umfrage{unvotedCount !== 1 ? "n" : ""} warten auf deine Stimme.
         </div>
       )}
 
@@ -155,18 +155,18 @@ function PollCard({
           <div>
             <div className="font-semibold text-[1.05rem]">{poll.question}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Created Day {poll.createdOnDay}
-              {poll.expiresOnDay && ` · Expires Day ${poll.expiresOnDay}`}
-              {totalVotes > 0 && ` · ${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`}
+              Tag {poll.createdOnDay}
+              {poll.expiresOnDay && ` · Endet Tag ${poll.expiresOnDay}`}
+              {totalVotes > 0 && ` · ${totalVotes} Stimme${totalVotes !== 1 ? "n" : ""}`}
             </div>
           </div>
           <span className="flex gap-1.5 items-center">
-            {poll.active && !hasVoted && <UserActionIcon title="Cast your vote" />}
+            {poll.active && !hasVoted && <UserActionIcon title="Jetzt abstimmen" />}
             <Badge variant="outline" className={poll.active
               ? STATUS_BADGE.active
               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
             }>
-              {poll.active ? "Active" : "Closed"}
+              {poll.active ? "Aktiv" : "Abgeschlossen"}
             </Badge>
           </span>
         </div>
