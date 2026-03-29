@@ -1,0 +1,63 @@
+name: Update Env
+
+on:
+  workflow_dispatch:
+    inputs:
+      env_vars:
+        description: "Env vars to add/update (KEY=VALUE, one per line)"
+        required: true
+        type: string
+      restart:
+        description: "Restart API after update"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  update:
+    name: Update .env on Server
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Update .env and optionally restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            echo "==> Current .env keys (values hidden):"
+            grep -oP '^[A-Z_]+=' .env 2>/dev/null || echo "(no .env found)"
+            echo ""
+
+            # Process each line of input
+            echo '${{ inputs.env_vars }}' | while IFS= read -r line; do
+              # Skip empty lines
+              [ -z "$line" ] && continue
+              KEY=$(echo "$line" | cut -d= -f1)
+              VALUE=$(echo "$line" | cut -d= -f2-)
+
+              if grep -q "^${KEY}=" .env 2>/dev/null; then
+                # Update existing key
+                sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" .env
+                echo "Updated: ${KEY}"
+              else
+                # Append new key
+                echo "${KEY}=${VALUE}" >> .env
+                echo "Added: ${KEY}"
+              fi
+            done
+
+            echo ""
+            echo "==> Updated .env keys:"
+            grep -oP '^[A-Z_]+=' .env
+
+            if [ "${{ inputs.restart }}" = "true" ]; then
+              echo ""
+              echo "==> Restarting ki-api..."
+              pm2 restart ki-api --update-env
+              sleep 2
+              pm2 status
+            fi
