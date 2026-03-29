@@ -12,7 +12,10 @@ router.get("/api/auth/google", passport.authenticate("google", { scope: ["profil
 
 router.get("/api/auth/google/callback",
   passport.authenticate("google", { failureRedirect: `${FRONTEND_URL}/login?error=google` }),
-  (_req, res) => { res.redirect(FRONTEND_URL); },
+  (req, res) => {
+    // Ensure session is persisted before redirecting — prevents blank-state on first login
+    req.session.save(() => { res.redirect(`${FRONTEND_URL}/?auth=success`); });
+  },
 );
 
 // ── GitHub OAuth ────────────────────────────────────────────────────────────
@@ -21,7 +24,10 @@ router.get("/api/auth/github", passport.authenticate("github", { scope: ["user:e
 
 router.get("/api/auth/github/callback",
   passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}/login?error=github` }),
-  (_req, res) => { res.redirect(FRONTEND_URL); },
+  (req, res) => {
+    // Ensure session is persisted before redirecting — prevents blank-state on first login
+    req.session.save(() => { res.redirect(`${FRONTEND_URL}/?auth=success`); });
+  },
 );
 
 // ── Session endpoints ───────────────────────────────────────────────────────
