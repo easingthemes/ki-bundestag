@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ConfidenceVote, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ export function ConfidenceVotes() {
   usePolling(refresh);
   useEffect(() => { setVisibleCount(5); }, [statusFilter, typeFilter]);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
+  if (parties.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 

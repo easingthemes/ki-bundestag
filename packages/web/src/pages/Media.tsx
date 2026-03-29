@@ -4,6 +4,7 @@ import { usePolling } from "../usePolling";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BIAS_BADGE as SHARED_BIAS_BADGE } from "@/lib/colors";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 
 const CATEGORY_COLORS: Record<string, string> = {
   policy: "#1d4ed8",
@@ -63,7 +64,7 @@ export function Media() {
   const latestDayArticles = dayGroups[0]?.articles ?? [];
   const frontPageMap = new Map(latestDayArticles.map(a => [a.outlet, a]));
 
-  if (loading && articles.length === 0) return <p className="text-center py-8 text-muted-foreground">Medien laden...</p>;
+  if (loading && articles.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   return (
     <div>
