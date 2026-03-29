@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { EmptyState } from "../components/EmptyState";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
@@ -144,11 +145,7 @@ export function Questions() {
       </div>
 
       {questions.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Noch keine Fragen. Besuche eine Parteiseite, um eine Frage zu stellen.
-          </CardContent>
-        </Card>
+        <EmptyState message="Noch keine Fragen. Besuche eine Parteiseite, um eine Frage zu stellen." icon="❓" />
       ) : (
         <>
           {showPending && pending.length > 0 && (
