@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_COLORS, SEMANTIC_HEX, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { usePolling } from "../usePolling";
 import { VoteBar } from "@/components/VoteBar";
 import { BillImpactDisplay } from "@/components/bills/BillImpactDisplay";
@@ -84,7 +85,7 @@ export function BillDetail() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (!bill || parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
+  if (!bill || parties.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
   const proposer = partyMap.get(bill.proposedBy);

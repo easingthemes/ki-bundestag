@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_HEX, FRAKTION_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { ApprovalChart } from "@/components/party/ApprovalChart";
 import { PartyBillsList } from "@/components/party/PartyBillsList";
 import { MdbRosterTable } from "@/components/party/MdbRosterTable";
@@ -72,7 +73,7 @@ export function PartyDetail() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (!party) return <p className="text-center py-8 text-muted-foreground">Loading...</p>;
+  if (!party) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   const displayColor = party.color === "#FFED00" ? "#c4a900" : party.color;
   const isMyParty = user?.partyId === id;

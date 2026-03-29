@@ -9,6 +9,7 @@ interface UseApiDataOptions {
 interface UseApiDataResult<T> {
   data: T | null;
   loading: boolean;
+  error: string | null;
   refresh: () => void;
 }
 
@@ -27,6 +28,7 @@ export function useApiData<T>(
   const { interval = 5000, deps = [] } = options;
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Keep a ref to the latest fetcher so the effect/callback doesn't need
   // fetcher in its dependency array (avoids re-running on every render when
@@ -40,8 +42,9 @@ export function useApiData<T>(
     try {
       const result = await fetcherRef.current();
       setData(result);
-    } catch {
-      // Silently ignore errors — caller can check data for null
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -57,5 +60,5 @@ export function useApiData<T>(
 
   usePolling(refresh, interval);
 
-  return { data, loading, refresh };
+  return { data, loading, error, refresh };
 }

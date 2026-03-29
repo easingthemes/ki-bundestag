@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { FRAKTION_BADGE } from "@/lib/colors";
 import { cn, fixColor } from "@/lib/utils";
 import { PartyCard, PartyCardGrid } from "@/components/PartyCard";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) return null;
@@ -116,7 +117,7 @@ export function Parties() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
+  if (parties.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   return (
     <div>
