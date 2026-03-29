@@ -90,6 +90,10 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 
 Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
 
+## Issue Tracker
+
+Open issues, bugs, and planned work are tracked in `docs/todo/README.md`. Each item has a detail file in `docs/todo/NNN-slug.md` with description, affected files, and fix notes. Check there first when asked about open todos, known issues, or what to work on next.
+
 ## Debugging Tips
 
 - **Typecheck**: `npm run typecheck` — always run from monorepo root
