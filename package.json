@@ -22,6 +22,11 @@
     "migrate:timing": "tsx scripts/migrate-timing.ts",
     "kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; echo 'Killed servers on ports 3001 and 5173'"
   },
+  "overrides": {
+    "path-to-regexp@<0.1.13": "0.1.13",
+    "picomatch@>=4.0.0 <4.0.4": "4.0.4",
+    "rollup@>=4.0.0 <4.58.1": "4.60.0"
+  },
   "devDependencies": {
     "playwright": "^1.58.2",
     "tsx": "^4.19.0",
