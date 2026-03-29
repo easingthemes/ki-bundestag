@@ -1,15 +1,16 @@
 # Progress
 
 ## Goal
-Add database indexes to simulation.db and users.db to improve query performance, applied via `npm run migrate` without data loss.
+Fix React hook dependency warnings in packages/web/src/hooks/useApiData.ts by replacing eslint-disable comments with a proper useRef-based pattern.
 
-Ref: docs/todo/002-missing-db-indexes.md (task description from user)
+Ref: docs/todo/020-react-hook-deps.md (inline task)
 
 ---
 
 ## Steps
 
-### Step 1: Add index migration arrays to ddl.ts and apply them in migrateDatabase()
+### Step 1: Fix useApiData.ts hook dependency warnings
 
 - **Status**: in-progress
-- **Files**: packages/engine/src/db/ddl.ts, packages/engine/src/db/seed.ts
+- **Files**: packages/web/src/hooks/useApiData.ts
+- **Plan**: Use a fetcherRef pattern so the effect doesn't depend on fetcher identity. Remove both eslint-disable comments. Keep the deps array option for triggering re-fetch on external dependency changes.
