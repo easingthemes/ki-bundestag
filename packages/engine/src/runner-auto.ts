@@ -22,13 +22,13 @@ function readPreset(): TimingPreset {
 let running = true;
 
 process.on("SIGINT", () => {
-  console.log("\nStopping auto-simulate...");
+  console.log("[Runner] Stopping auto-simulate...");
   running = false;
 });
 
 async function main() {
   const preset = readPreset();
-  console.log(`Auto-simulate: preset="${preset}" (Ctrl+C to stop)`);
+  console.log(`[Runner] Auto-simulate: preset="${preset}" (Ctrl+C to stop)`);
 
   while (running) {
     // Night pause for slow mode: wait until morning
@@ -44,7 +44,7 @@ async function main() {
     try {
       await runDay();
     } catch (err) {
-      console.error("Simulation day failed:", err);
+      console.error("[Runner] Simulation day failed:", err);
     }
 
     if (!running) break;
@@ -73,7 +73,7 @@ async function main() {
   }
 
   closeDb();
-  console.log("Auto-simulate stopped.");
+  console.log("[Runner] Auto-simulate stopped.");
 }
 
 main();

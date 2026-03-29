@@ -199,8 +199,8 @@ export async function callAI(opts: {
         const resetAt = parseResetTime(detected.until);
         providerLimits.set(detected.provider, { until: detected.until, resetAt });
         console.error(
-          `\n  *** ${detected.provider.toUpperCase()} API LIMIT REACHED — access resumes ${detected.until} ***` +
-          `\n  *** ${detected.provider} calls skipped until limit resets ***\n`
+          `[AI] *** ${detected.provider.toUpperCase()} API LIMIT REACHED — access resumes ${detected.until} ***` +
+          `\n[AI] *** ${detected.provider} calls skipped until limit resets ***`
         );
         throw new AIProviderLimitError(detected.provider, detected.until);
       }
