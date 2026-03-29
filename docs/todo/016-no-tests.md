@@ -1,6 +1,6 @@
 # 016 — No Test Suite
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** All
 

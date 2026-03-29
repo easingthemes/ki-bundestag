@@ -20,6 +20,10 @@
     "trigger:election": "tsx packages/engine/src/trigger-election.ts",
     "simulate:visitors": "tsx scripts/simulate-visitors.ts",
     "migrate:timing": "tsx scripts/migrate-timing.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
     "kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; echo 'Killed servers on ports 3001 and 5173'"
   },
   "overrides": {
@@ -28,9 +32,16 @@
     "rollup@>=4.0.0 <4.58.1": "4.60.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "playwright": "^1.58.2",
+    "prettier": "^3.8.1",
     "tsx": "^4.19.0",
     "turbo": "^2.4.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.2"
   }
 }
