@@ -476,6 +476,10 @@ function App() {
     setUser(newUser);
   }, []);
 
+  const updateUser = useCallback((newUser: User) => {
+    setUser(newUser);
+  }, []);
+
   const logout = useCallback(() => {
     // Destroy server session (OAuth) + clear legacy token
     api.authLogout().catch(() => {});
@@ -486,7 +490,7 @@ function App() {
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, token, login, logout }}>
+    <UserContext.Provider value={{ user, token, login, logout, updateUser }}>
     <BrowserRouter>
       <ScrollToHash />
       <div className="min-h-screen flex flex-col">

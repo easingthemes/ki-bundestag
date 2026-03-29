@@ -10,7 +10,7 @@ interface OnboardingOverlayProps {
 }
 
 export function OnboardingOverlay({ externalOpen, onClose, parties }: OnboardingOverlayProps) {
-  const { user, login } = useUser();
+  const { user, updateUser } = useUser();
   const [step, setStep] = useState(0);
   const [show, setShow] = useState(false);
 
@@ -54,7 +54,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
     setJoinStatus("loading");
     try {
       const result = await api.joinParty(selectedPartyId);
-      login(result.id, result);
+      updateUser(result);
       setJoinStatus("success");
     } catch (err) {
       setJoinError(err instanceof Error ? err.message : "Failed to join");

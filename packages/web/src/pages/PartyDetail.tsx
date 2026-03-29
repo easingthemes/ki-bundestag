@@ -17,7 +17,7 @@ import { QuestionForm } from "@/components/party/QuestionForm";
 
 export function PartyDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, login } = useUser();
+  const { user, updateUser } = useUser();
   const [party, setParty] = useState<Party | null>(null);
   const [history, setHistory] = useState<PartyHistory[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -96,7 +96,7 @@ export function PartyDetail() {
     setJoinError("");
     try {
       const result = await api.joinParty(id!);
-      login(result.id, result);
+      updateUser(result);
       setJoinStatus("idle");
       api.getParty(id!).then(setParty).catch(console.error);
     } catch (err) {
@@ -108,7 +108,7 @@ export function PartyDetail() {
   const handleLeave = async () => {
     try {
       const result = await api.leaveParty();
-      login(result.id, result);
+      updateUser(result);
       api.getParty(id!).then(setParty).catch(console.error);
     } catch { /* ignore */ }
   };
