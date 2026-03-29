@@ -12,6 +12,8 @@ KI Bundestag is an AI-powered simulation of the German parliament. Six political
 npm run seed              # Fresh start: wipe DB, seed 6 parties + initial state (backs up first)
 npm run migrate           # Apply schema changes without clearing data (safe to run repeatedly)
 npm run simulate          # Run simulation days (e.g., npm run simulate 5)
+npm run simulate:3        # Run 3 simulation days
+npm run simulate:6        # Run 6 simulation days
 npm run simulate:auto     # Continuous simulation loop (preset-aware delays)
 npm run migrate:timing    # Add timing preset support to existing DBs
 npm run simulate:visitors # Launch 5 Chrome visitors with random actions (needs dev servers)
@@ -20,10 +22,12 @@ npm run dev:api           # Express API on port 3001
 npm run dev:web           # Vite dev server on port 5173 (proxies /api → :3001)
 npm run build             # Build all packages via turbo
 npm run typecheck         # Typecheck all packages via turbo
+npm run lint              # ESLint all packages
+npm run format            # Prettier format all packages
+npm run format:check      # Prettier check formatting
+npm run test              # Run test suite (Vitest)
 npm run kill              # Kill dev servers on ports 3001 and 5173
 ```
-
-No test or lint scripts exist yet.
 
 ## Architecture
 
@@ -31,7 +35,7 @@ Monorepo with npm workspaces + Turborepo. Four packages:
 
 - **`types`** — Pure TypeScript type definitions (`emitDeclarationOnly`), no runtime code
 - **`engine`** — Core simulation: AI agent calls, DB access (Drizzle + better-sqlite3), simulation loop
-- **`api`** — Express REST server (10 domain routers in `src/routes/`), imports from engine + types
+- **`api`** — Express REST server (11 domain routers in `src/routes/`), imports from engine + types
 - **`web`** — React 19 SPA (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui), has its own local type copies in `src/api/`
 
 Dependency chain: `types` ← `engine` ← `api`. Web is standalone (no workspace deps).
@@ -54,25 +58,26 @@ Detailed rules are in `.claude/rules/` (auto-loaded, path-scoped):
 - **`simulation.md`** — Agent actions, `runDay()` flow, AI call patterns
 - **`api.md`** — Express REST conventions, route structure, mappers, middleware
 
-## Web Pages (21 total)
+## Web Pages (23 routes)
 
-Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, Login, About, Admin, AdminCosts.
+Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo.
 
 Routes in `packages/web/src/main.tsx`, API client in `packages/web/src/api/`.
 
-## API Routes (10 domain routers)
+## API Routes (11 domain routers)
 
 All under `/api/` prefix, served from `packages/api/src/routes/`:
 
 | Route | Domain |
 |-------|--------|
+| `/api/auth` | OAuth login (Google, GitHub), session, logout, providers |
 | `/api/parties` | Party profiles, approval, coalition |
 | `/api/bills` | Bills, signals, amendments, votes |
 | `/api/elections` | Elections, results, coalitions |
 | `/api/simulation` | Sim status, day triggers, injections |
 | `/api/parliament` | Motions, interpellations, confidence votes, court |
 | `/api/content` | Media, polls, questions, referendums, logs |
-| `/api/users` | Auth, profile, proposals, MdB applications |
+| `/api/users` | Profile, display name, party join/leave, proposals, MdB |
 | `/api/seats` | MdB seat management |
 | `/api/budget` | Budget proposals, allocations |
 | `/api/admin` | Model config, costs, analytics |
@@ -88,7 +93,7 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 
 ## Environment
 
-Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `XAI_API_KEY`, `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
 
 ## Issue Tracker
 
