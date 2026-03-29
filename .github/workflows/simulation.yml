@@ -1,0 +1,75 @@
+name: Simulation
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Simulation action"
+        required: true
+        type: choice
+        options:
+          - start-auto
+          - stop-auto
+          - run-1-day
+          - run-3-days
+          - run-6-days
+          - trigger-election
+          - set-preset-ultra-fast
+          - set-preset-fast
+          - set-preset-normal
+          - set-preset-slow
+
+jobs:
+  run:
+    name: "Simulation: ${{ inputs.action }}"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Execute simulation action
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            ACTION="${{ inputs.action }}"
+
+            case "$ACTION" in
+              start-auto)
+                echo "==> Starting simulate:auto via PM2..."
+                pm2 start npx --name ki-simulate -- tsx packages/engine/src/runner-auto.ts
+                pm2 save
+                pm2 status
+                ;;
+              stop-auto)
+                echo "==> Stopping simulate:auto..."
+                pm2 stop ki-simulate 2>/dev/null || echo "ki-simulate not running"
+                pm2 save
+                pm2 status
+                ;;
+              run-1-day)
+                echo "==> Running 1 simulation day..."
+                npx tsx packages/engine/src/runner.ts
+                ;;
+              run-3-days)
+                echo "==> Running 3 simulation days..."
+                npx tsx packages/engine/src/runner.ts 3
+                ;;
+              run-6-days)
+                echo "==> Running 6 simulation days..."
+                npx tsx packages/engine/src/runner.ts 6
+                ;;
+              trigger-election)
+                echo "==> Triggering election on next sim day..."
+                npx tsx packages/engine/src/trigger-election.ts
+                ;;
+              set-preset-*)
+                PRESET="${ACTION#set-preset-}"
+                echo "==> Setting timing preset to: $PRESET"
+                sqlite3 data/simulation.db "UPDATE simulation_meta SET timing_preset = '$PRESET'"
+                echo "Current preset:"
+                sqlite3 -header -column data/simulation.db "SELECT timing_preset FROM simulation_meta LIMIT 1"
+                ;;
+            esac
