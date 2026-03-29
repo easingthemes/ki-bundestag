@@ -24,6 +24,9 @@ const app = express();
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
+// Trust reverse proxy (Caddy) so secure cookies work behind HTTPS termination
+app.set("trust proxy", 1);
+
 // CORS — allow credentials (cookies) from frontend origin
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
