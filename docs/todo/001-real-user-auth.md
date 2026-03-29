@@ -1,6 +1,6 @@
 # 001 — Real User Authentication
 
-**Status:** open
+**Status:** done
 **Severity:** critical
 **Area:** API / Web
 

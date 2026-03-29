@@ -249,11 +249,13 @@ function UserMenu({ user }: { user: User }) {
       onMouseLeave={onLeave}
     >
       <button
-        className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white cursor-pointer hover:bg-white/30 transition-all"
+        className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white cursor-pointer hover:bg-white/30 transition-all overflow-hidden"
         onClick={() => setOpen(o => !o)}
         aria-label="User menu"
       >
-        {initials}
+        {user.avatarUrl ? (
+          <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
+        ) : initials}
       </button>
       {open && (
         <div className="absolute top-[calc(100%+4px)] right-0 min-w-[200px] bg-[#0d1b2e] border border-white/10 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] py-1 z-[200] animate-in fade-in slide-in-from-top-1 duration-100">
@@ -430,16 +432,37 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const stored = loadStoredToken();
-    if (stored) {
-      setUserToken(stored);
-      setToken(stored);
-      api.getMe().then(u => setUser(u)).catch(() => {
-        clearToken();
-        setUserToken(null);
-        setToken(null);
-      });
-    }
+    // Try session-based auth first (OAuth), then fall back to legacy token
+    api.getAuthMe().then(u => {
+      if (u) {
+        setUser(u);
+        setToken(u.id);
+      } else {
+        // Legacy fallback: try stored token
+        const stored = loadStoredToken();
+        if (stored) {
+          setUserToken(stored);
+          setToken(stored);
+          api.getMe().then(lu => setUser(lu)).catch(() => {
+            clearToken();
+            setUserToken(null);
+            setToken(null);
+          });
+        }
+      }
+    }).catch(() => {
+      // Session check failed, try legacy
+      const stored = loadStoredToken();
+      if (stored) {
+        setUserToken(stored);
+        setToken(stored);
+        api.getMe().then(lu => setUser(lu)).catch(() => {
+          clearToken();
+          setUserToken(null);
+          setToken(null);
+        });
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -454,6 +477,8 @@ function App() {
   }, []);
 
   const logout = useCallback(() => {
+    // Destroy server session (OAuth) + clear legacy token
+    api.authLogout().catch(() => {});
     clearToken();
     setUserToken(null);
     setToken(null);
