@@ -426,3 +426,23 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
 export const USER_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
   { table: "users", column: "display_name_unique", sql: "DELETE FROM users WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY display_name ORDER BY last_active DESC) as rn FROM users) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name ON users(display_name)" },
 ];
+
+/**
+ * Index migrations for simulation DB — each entry creates an index if it doesn't already exist.
+ * All statements use CREATE INDEX IF NOT EXISTS so they are idempotent.
+ */
+export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
+  { name: "idx_bills_proposed_by", sql: "CREATE INDEX IF NOT EXISTS idx_bills_proposed_by ON bills(proposed_by)" },
+  { name: "idx_bills_status", sql: "CREATE INDEX IF NOT EXISTS idx_bills_status ON bills(status)" },
+  { name: "idx_party_history_party_day", sql: "CREATE INDEX IF NOT EXISTS idx_party_history_party_day ON party_history(party_id, day_number)" },
+  { name: "idx_simulation_events_day", sql: "CREATE INDEX IF NOT EXISTS idx_simulation_events_day ON simulation_events(day_number)" },
+  { name: "idx_simulation_events_type", sql: "CREATE INDEX IF NOT EXISTS idx_simulation_events_type ON simulation_events(type)" },
+  { name: "idx_bundestag_seats_party", sql: "CREATE INDEX IF NOT EXISTS idx_bundestag_seats_party ON bundestag_seats(party_id, controller)" },
+];
+
+/** Index migrations for user DB */
+export const USER_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
+  { name: "idx_member_signals_bill_user", sql: "CREATE INDEX IF NOT EXISTS idx_member_signals_bill_user ON member_signals(bill_id, user_id)" },
+  { name: "idx_notifications_user", sql: "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)" },
+  { name: "idx_user_actions_user_type", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_type ON user_actions(user_id, action_type)" },
+];
