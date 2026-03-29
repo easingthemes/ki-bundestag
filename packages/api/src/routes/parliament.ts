@@ -13,6 +13,7 @@ import type {
   Motion,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { LIMITS } from "../validation.js";
 
 const router = Router();
 
@@ -285,11 +286,11 @@ router.post("/api/motions/submit", (req, res) => {
   if (!motionType || !["motion", "resolution"].includes(motionType)) {
     res.status(400).json({ error: "motionType must be 'motion' or 'resolution'" }); return;
   }
-  if (!title || title.trim().length < 5 || title.trim().length > 100) {
-    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  if (!title || title.trim().length < LIMITS.TEXT_SHORT_MIN || title.trim().length > LIMITS.POLICY_FOCUS_ITEM_MAX) {
+    res.status(400).json({ error: `title must be ${LIMITS.TEXT_SHORT_MIN}–${LIMITS.POLICY_FOCUS_ITEM_MAX} characters` }); return;
   }
-  if (!description || description.trim().length < 10 || description.trim().length > 300) {
-    res.status(400).json({ error: "description must be 10–300 characters" }); return;
+  if (!description || description.trim().length < LIMITS.TEXT_MEDIUM_MIN || description.trim().length > LIMITS.TEXT_MEDIUM_MAX) {
+    res.status(400).json({ error: `description must be ${LIMITS.TEXT_MEDIUM_MIN}–${LIMITS.TEXT_MEDIUM_MAX} characters` }); return;
   }
 
   // Cooldown: max 1 pending motion at a time per user
@@ -357,11 +358,11 @@ router.post("/api/interpellations/submit", (req, res) => {
   if (!interpellationType || !["kleine", "große"].includes(interpellationType)) {
     res.status(400).json({ error: "interpellationType must be 'kleine' or 'große'" }); return;
   }
-  if (!title || title.trim().length < 5 || title.trim().length > 100) {
-    res.status(400).json({ error: "title must be 5–100 characters" }); return;
+  if (!title || title.trim().length < LIMITS.TEXT_SHORT_MIN || title.trim().length > LIMITS.POLICY_FOCUS_ITEM_MAX) {
+    res.status(400).json({ error: `title must be ${LIMITS.TEXT_SHORT_MIN}–${LIMITS.POLICY_FOCUS_ITEM_MAX} characters` }); return;
   }
-  if (!question || question.trim().length < 10 || question.trim().length > 500) {
-    res.status(400).json({ error: "question must be 10–500 characters" }); return;
+  if (!question || question.trim().length < LIMITS.TEXT_MEDIUM_MIN || question.trim().length > LIMITS.TEXT_MEDIUM_MAX) {
+    res.status(400).json({ error: `question must be ${LIMITS.TEXT_MEDIUM_MIN}–${LIMITS.TEXT_MEDIUM_MAX} characters` }); return;
   }
   const validMinistries = ["finance", "labour", "environment", "interior", "defence", "education", "health", "infrastructure"];
   if (!targetMinistry || !validMinistries.includes(targetMinistry)) {

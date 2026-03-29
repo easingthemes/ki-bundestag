@@ -3,14 +3,15 @@ import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, count } from "drizzle-orm";
 import { getUserToken } from "../middleware/index.js";
+import { LIMITS } from "../validation.js";
 
 const router = Router();
 
 // POST /api/users/login
 router.post("/api/users/login", (req, res) => {
   const { displayName } = req.body as { displayName?: string };
-  if (!displayName || displayName.trim().length < 2) {
-    res.status(400).json({ error: "displayName must be at least 2 characters" });
+  if (!displayName || displayName.trim().length < LIMITS.NICKNAME_MIN) {
+    res.status(400).json({ error: `displayName must be at least ${LIMITS.NICKNAME_MIN} characters` });
     return;
   }
   const userDb = getUserDb();
@@ -25,8 +26,8 @@ router.post("/api/users/login", (req, res) => {
 // POST /api/users/register
 router.post("/api/users/register", (req, res) => {
   const { displayName, partyId } = req.body as { displayName?: string; partyId?: string };
-  if (!displayName || displayName.trim().length < 2 || displayName.trim().length > 30) {
-    res.status(400).json({ error: "displayName must be 2\u201330 characters" });
+  if (!displayName || displayName.trim().length < LIMITS.NICKNAME_MIN || displayName.trim().length > LIMITS.NICKNAME_MAX) {
+    res.status(400).json({ error: `displayName must be ${LIMITS.NICKNAME_MIN}\u2013${LIMITS.NICKNAME_MAX} characters` });
     return;
   }
   if (partyId) {

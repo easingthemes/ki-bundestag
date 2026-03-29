@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { eq, and } from "drizzle-orm";
 import { getDb, getUserDb, schema, getUserSeat, getActiveSeats, getOpenSeatCounts, getSqlite, logUserAction } from "@ki-bundestag/engine";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { LIMITS } from "../validation.js";
 
 const router = Router();
 
@@ -52,8 +53,8 @@ router.post("/api/seats/apply", (req, res) => {
   }
 
   const { applicationText, policyFocus } = req.body as { applicationText?: string; policyFocus?: unknown };
-  if (!applicationText || applicationText.trim().length < 10 || applicationText.trim().length > 500) {
-    res.status(400).json({ error: "applicationText must be 10–500 characters" });
+  if (!applicationText || applicationText.trim().length < LIMITS.TEXT_MEDIUM_MIN || applicationText.trim().length > LIMITS.TEXT_MEDIUM_MAX) {
+    res.status(400).json({ error: `applicationText must be ${LIMITS.TEXT_MEDIUM_MIN}–${LIMITS.TEXT_MEDIUM_MAX} characters` });
     return;
   }
   if (policyFocus !== undefined && policyFocus !== null) {
