@@ -17,7 +17,7 @@ Each item links to a detail file with full description, affected files, and impl
 
 | # | Title | Status | Area | PR |
 |---|-------|--------|------|----|
-| 001 | [Real user authentication](./001-real-user-auth.md) | open | API / Web | — |
+| 001 | [Real user authentication](./001-real-user-auth.md) | done | API / Web | — |
 | 002 | [Missing database indexes](./002-missing-db-indexes.md) | done | Engine / DB | #15 |
 | 003 | [Silent error handling (empty catch blocks)](./003-silent-error-handling.md) | done | API | #13 |
 
@@ -53,9 +53,10 @@ Each item links to a detail file with full description, affected files, and impl
 | 019 | [Inconsistent API error response format](./019-inconsistent-error-format.md) | done | API | #14 |
 | 020 | [React hook dependency warnings suppressed](./020-react-hook-deps.md) | done | Web | #19 |
 | 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
+| 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
 
 ## Summary
 
-- **Done**: 18 of 21
-- **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies deferred to #001)
-- **Open**: 2 remaining (#001, #005)
+- **Done**: 19 of 22
+- **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
+- **Open**: 2 remaining (#005, #022)

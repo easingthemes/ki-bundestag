@@ -22,9 +22,11 @@ export interface InternalProposal {
 }
 
 export interface User {
-  id: string;        // UUID = auth token
+  id: string;
   displayName: string;
   partyId: string | null;
+  avatarUrl: string | null;
+  provider: string | null;       // "google" | "github" | null (legacy)
   createdAt: number;
   lastActive: number;
   switchCooldownUntil: number | null; // sim day
