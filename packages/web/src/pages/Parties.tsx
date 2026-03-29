@@ -33,7 +33,7 @@ function JoinModal({ party, onClose, onJoined }: {
   onClose: () => void;
   onJoined: () => void;
 }) {
-  const { user, login } = useUser();
+  const { user, updateUser } = useUser();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
@@ -51,7 +51,7 @@ function JoinModal({ party, onClose, onJoined }: {
     setStatus("loading");
     try {
       const result = await api.joinParty(party.id);
-      login(result.id, result);
+      updateUser(result);
       onJoined();
       onClose();
     } catch (err) {
