@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { EmptyState } from "../components/EmptyState";
 
 const STATUS_OPTIONS = ["all", "pending", "ruled"] as const;
 const DECISION_OPTIONS = ["all", "struck_down", "upheld"] as const;
@@ -66,7 +67,7 @@ export function ConstitutionalCourt() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground">Keine Verfassungsbeschwerden entsprechen den aktuellen Filtern.</p>
+        <EmptyState message="Keine Verfassungsbeschwerden entsprechen den aktuellen Filtern." icon="⚖️" />
       ) : (
         <div className="flex flex-col gap-3">
           {visibleFiltered.map(c => {

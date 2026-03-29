@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { NOTIFICATION_TYPE_BADGE } from "@/lib/colors";
 import { ShowMoreButton } from "../components/shared";
+import { EmptyState } from "../components/EmptyState";
 import { FilterPills } from "@/components/FilterPills";
 
 const TYPE_FILTERS = [
@@ -97,7 +98,7 @@ export function Notifications() {
       />
 
       {filtered.length === 0 && (
-        <p className="text-sm text-muted-foreground">Keine Benachrichtigungen.</p>
+        <EmptyState message="Keine Benachrichtigungen." icon="🔔" />
       )}
 
       <div className="space-y-3">
