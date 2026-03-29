@@ -3,10 +3,15 @@
 const BASE = "/api";
 
 let _onError: ((msg: string) => void) | null = null;
+let _onUnauthorized: (() => void) | null = null;
 let _userToken: string | null = null;
 
 export function setErrorHandler(handler: (msg: string) => void) {
   _onError = handler;
+}
+
+export function setUnauthorizedHandler(handler: () => void) {
+  _onUnauthorized = handler;
 }
 
 export function setUserToken(token: string | null) {
@@ -29,6 +34,10 @@ export async function fetchJson<T>(path: string): Promise<T> {
   try {
     const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
     if (!res.ok) {
+      if (res.status === 401) {
+        _onUnauthorized?.();
+        throw new Error(`Unauthorized: ${path}`);
+      }
       const msg = `API error: ${res.status} on ${path}`;
       _onError?.(msg);
       throw new Error(msg);
@@ -51,6 +60,10 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        _onUnauthorized?.();
+        throw new Error(`Unauthorized: POST ${path}`);
+      }
       const text = await res.text();
       let msg = `API error: ${res.status} on POST ${path}`;
       try { msg = (JSON.parse(text) as { error?: string }).error ?? msg; } catch { /* ignore */ }
@@ -74,6 +87,10 @@ export async function deleteJson<T>(path: string): Promise<T> {
       headers: authHeaders(),
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        _onUnauthorized?.();
+        throw new Error(`Unauthorized: DELETE ${path}`);
+      }
       const msg = `API error: ${res.status} on DELETE ${path}`;
       _onError?.(msg);
       throw new Error(msg);
@@ -96,6 +113,10 @@ export async function patchJson<T>(path: string, body: unknown): Promise<T> {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        _onUnauthorized?.();
+        throw new Error(`Unauthorized: PATCH ${path}`);
+      }
       const text = await res.text();
       let msg = `API error: ${res.status} on PATCH ${path}`;
       try { msg = (JSON.parse(text) as { error?: string }).error ?? msg; } catch { /* ignore */ }

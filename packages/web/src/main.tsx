@@ -22,7 +22,7 @@ import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
 import { MyActivity } from "./pages/MyActivity";
-import { api, setErrorHandler, setUserToken, type User, type SimulationStatus, type BundestagSeat } from "./api";
+import { api, setErrorHandler, setUnauthorizedHandler, setUserToken, type User, type SimulationStatus, type BundestagSeat } from "./api";
 import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -432,11 +432,12 @@ function App() {
     const stored = loadStoredToken();
     if (stored) {
       setUserToken(stored);
-      setToken(stored);
-      api.getMe().then(u => setUser(u)).catch(() => {
+      api.getMe().then(u => {
+        setToken(stored);
+        setUser(u);
+      }).catch(() => {
         clearToken();
         setUserToken(null);
-        setToken(null);
       });
     }
   }, []);
@@ -444,6 +445,15 @@ function App() {
   useEffect(() => {
     setErrorHandler(handleError);
   }, [handleError]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearToken();
+      setUserToken(null);
+      setToken(null);
+      setUser(null);
+    });
+  }, []);
 
   const login = useCallback((newToken: string, newUser: User) => {
     saveToken(newToken);

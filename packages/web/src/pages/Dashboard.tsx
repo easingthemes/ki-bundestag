@@ -51,8 +51,10 @@ export function Dashboard() {
     api.getEvents(5).then(r => setEvents(r.events)).catch(console.error);
     api.getSimulationStatus().then(setSimStatus).catch(console.error);
     api.getPolls(true).then(setPolls).catch(console.error);
-    api.getMySeat().then(r => { setMySeat(r.seat); setMyApplications(r.applications); }).catch(() => {});
-  }, []);
+    if (user) {
+      api.getMySeat().then(r => { setMySeat(r.seat); setMyApplications(r.applications); }).catch(() => {});
+    }
+  }, [user]);
 
   const refreshSlow = useCallback(() => {
     api.getCrises(true).then(setCrises).catch(console.error);
