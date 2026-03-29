@@ -432,26 +432,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Try session-based auth first (OAuth), then fall back to legacy token
-    api.getAuthMe().then(u => {
-      if (u) {
-        setUser(u);
-        setToken(u.id);
-      } else {
-        // Legacy fallback: try stored token
-        const stored = loadStoredToken();
-        if (stored) {
-          setUserToken(stored);
-          setToken(stored);
-          api.getMe().then(lu => setUser(lu)).catch(() => {
-            clearToken();
-            setUserToken(null);
-            setToken(null);
-          });
-        }
-      }
-    }).catch(() => {
-      // Session check failed, try legacy
+    const tryLegacy = () => {
       const stored = loadStoredToken();
       if (stored) {
         setUserToken(stored);
@@ -461,6 +442,43 @@ function App() {
           setUserToken(null);
           setToken(null);
         });
+      }
+    };
+
+    // Check if we just came back from an OAuth redirect
+    const params = new URLSearchParams(window.location.search);
+    const isOAuthReturn = params.get("auth") === "success";
+    if (isOAuthReturn) {
+      // Clean the URL param without triggering a navigation
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    // Try session-based auth first (OAuth), then fall back to legacy token
+    api.getAuthMe().then(u => {
+      if (u) {
+        setUser(u);
+        setToken(u.id);
+      } else if (isOAuthReturn) {
+        // Session may not be ready yet on first OAuth login — retry once
+        setTimeout(() => {
+          api.getAuthMe().then(u2 => {
+            if (u2) { setUser(u2); setToken(u2.id); }
+            else tryLegacy();
+          }).catch(() => tryLegacy());
+        }, 500);
+      } else {
+        tryLegacy();
+      }
+    }).catch(() => {
+      if (isOAuthReturn) {
+        setTimeout(() => {
+          api.getAuthMe().then(u2 => {
+            if (u2) { setUser(u2); setToken(u2.id); }
+            else tryLegacy();
+          }).catch(() => tryLegacy());
+        }, 500);
+      } else {
+        tryLegacy();
       }
     });
   }, []);
