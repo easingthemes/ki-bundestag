@@ -68,7 +68,7 @@ router.post("/api/seats/apply", (req, res) => {
     createdOnDay: currentDay,
   }).run();
 
-  try { logUserAction(token, "apply_mdb", currentDay, appId, "application", { partyId: user.partyId }); } catch {}
+  try { logUserAction(token, "apply_mdb", currentDay, appId, "application", { partyId: user.partyId }); } catch (err) { console.error("[seats] Failed to log action:", err); }
   res.json({
     id: appId,
     userId: token,

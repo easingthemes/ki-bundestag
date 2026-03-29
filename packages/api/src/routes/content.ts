@@ -136,7 +136,7 @@ router.post("/api/polls/:id/vote", (req, res) => {
     .where(eq(schema.polls.id, poll.id))
     .run();
 
-  try { const token = getUserToken(req); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; if (token) logUserAction(token, "vote_poll", md?.day ?? 0, req.params.id, "poll", { option }); } catch {}
+  try { const token = getUserToken(req); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; if (token) logUserAction(token, "vote_poll", md?.day ?? 0, req.params.id, "poll", { option }); } catch (err) { console.error("[content] Failed to log action:", err); }
   res.json({ ...poll, votes });
 });
 
@@ -274,7 +274,7 @@ router.post("/api/questions", (req, res) => {
   }).run();
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
-  try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch {}
+  try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch (err) { console.error("[content] Failed to log action:", err); }
   res.status(201).json(mapQuestion(created, 0, 0, null));
 });
 
@@ -314,7 +314,7 @@ router.post("/api/questions/:id/vote", (req, res) => {
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
 
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_question", md?.day ?? 0, req.params.id, "question", { vote }); } catch {}
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_question", md?.day ?? 0, req.params.id, "question", { vote }); } catch (err) { console.error("[content] Failed to log action:", err); }
 
   // Recompute scores
   const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
@@ -437,7 +437,7 @@ router.post("/api/referendums/:id/vote", (req, res) => {
     .where(eq(schema.referendums.id, referendum.id))
     .run();
 
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_referendum", md?.day ?? 0, req.params.id, "referendum", { option }); } catch {}
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_referendum", md?.day ?? 0, req.params.id, "referendum", { option }); } catch (err) { console.error("[content] Failed to log action:", err); }
   res.json({ ...referendum, votes, userVoted: true });
 });
 
