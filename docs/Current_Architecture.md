@@ -3,7 +3,7 @@
 > **Doc Status**: Canonical (source of truth)
 > **Use for**: Current schema, simulation flow, endpoints, constants
 
-Last updated: 2026-02-22 (synced to code)
+Last updated: 2026-03-29 (synced to code)
 
 ## Project Policy
 
@@ -59,14 +59,13 @@ Both are accessed via engine helpers (`getDb()/getSqlite()` and `getUserDb()/get
 | `constitutional_challenges` | Court challenges | bill, filing party, decision/reasoning, status, sentiment_impact |
 | `budgets` | Budget cycles | cycle_number, allocations, votes, yes/no seats, economic_effect, revision_attempt |
 | `event_queue` | Night-mode queued events | event_type, event_data, scheduled_for_day, status |
-| `notifications` | User notifications | type, title/message, read, day_number |
 | `bundestag_seats` | Seat allocation map | seat_number, party_id, controller (`human/ai`), user_id, discipline/proxy fields |
 
 ### `users.db` tables
 
 | Table | Purpose | Key fields |
 |---|---|---|
-| `users` | Auth/profile | id (token), display_name, party_id, activity/cooldown fields |
+| `users` | Auth/profile (OAuth) | id (UUID), display_name, party_id, provider, provider_id, avatar_url, activity/cooldown fields |
 | `internal_proposals` | Member proposals | score/votes, review deadlines, accepted/declined/expired states |
 | `internal_votes` | Votes on proposals | proposal_id, user_id, vote (+1/-1) |
 | `question_votes` | Question prioritization votes | question_id, user_id, vote (+1/-1) |
@@ -74,6 +73,8 @@ Both are accessed via engine helpers (`getDb()/getSqlite()` and `getUserDb()/get
 | `mdb_applications` | Seat applications | status, ai_reasoning, priority_score, cooldown |
 | `mdb_votes` | Seat-level bill votes | seat_id, bill_id, user_id, vote |
 | `mdb_speeches` | Submitted speeches | bill_id, reading, content, AI score fields |
+| `notifications` | User notifications | type, title, message, read, day_number |
+| `user_actions` | Analytics logging | action_type, entity_id/type, metadata, sim_day |
 
 ## AI Usage Map
 
@@ -221,7 +222,7 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## API Surface (current)
 
-`packages/api/src/` uses 10 domain routers in `src/routes/` (parties, bills, elections, simulation, parliament, content, users, seats, budget, admin) with shared middleware in `src/middleware/` and mappers in `src/mappers/`. `src/index.ts` is a ~45-line bootstrap. 88 REST routes (including health), grouped as:
+`packages/api/src/` uses 11 domain routers in `src/routes/` (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin) with shared middleware in `src/middleware/` and mappers in `src/mappers/`. `src/index.ts` is a ~84-line bootstrap with session, Passport OAuth, and CORS setup. 93+ REST routes (including health), grouped as:
 
 - Health: `/api/health`
 - Parties: `/api/parties`, `/api/parties/alignment`, `/api/parties/:id`, `/api/parties/:id/history`, `/api/parties/:id/bills`, `/api/parties/:id/votes`, `/api/parties/:id/statements`, `/api/parties/:id/proposals`, `POST /api/parties/:id/proposals`
@@ -235,7 +236,8 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 - Government/Budget: `/api/government`, `/api/government/history`, `/api/budgets`, `/api/budgets/:id`
 - Injections/Admin runtime: `POST /api/simulate/inject`, `/api/simulate/injections`
 - Proposals voting: `/api/proposals/:id`, `POST /api/proposals/:id/vote`, `DELETE /api/proposals/:id/vote`
-- Auth/User: `POST /api/users/login`, `POST /api/users/register`, `/api/users/me`, `POST /api/users/me/join/:partyId`, `POST /api/users/me/leave`
+- Auth (OAuth): `GET /api/auth/google`, `GET /api/auth/google/callback`, `GET /api/auth/github`, `GET /api/auth/github/callback`, `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/auth/providers`
+- User: `PATCH /api/users/me`, `POST /api/users/me/join/:partyId`, `POST /api/users/me/leave`
 - User activity: `/api/users/me/activity`, `/api/users/me/impact`, `/api/users/me/catchup`
 - MdB seats: `POST /api/seats/apply`, `/api/seats/my-seat`, `/api/seats/party/:partyId`, `/api/seats/available`
 - Notifications: `/api/notifications`, `/api/notifications/unread-count`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`
@@ -244,7 +246,7 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## Web Routes
 
-`packages/web/src/main.tsx` currently wires 24 routes:
+`packages/web/src/main.tsx` currently wires 23 routes:
 
 - `/` (Dashboard)
 - `/parties`, `/parties/:id`
@@ -259,13 +261,15 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 - `/confidence-votes`
 - `/constitutional-court`
 - `/budget`
-- `/admin`, `/admin/costs`, `/admin/analytics`
 - `/referendums`
 - `/log`
 - `/notifications`
 - `/my-activity`
 - `/login`
 - `/about`
+- `/simulation-info`
+
+Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admin actions are now handled via GitHub Actions workflows.
 
 ## Key Constants (verified)
 
@@ -312,8 +316,10 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 - DDL + migrations: [packages/engine/src/db/ddl.ts](packages/engine/src/db/ddl.ts)
 
 **API**:
-- Bootstrap: [packages/api/src/index.ts](packages/api/src/index.ts) (~45 lines)
-- Domain routers: [packages/api/src/routes/](packages/api/src/routes/) (parties, bills, elections, simulation, parliament, content, users, seats, budget, admin)
+- Bootstrap: [packages/api/src/index.ts](packages/api/src/index.ts) (~84 lines, session + Passport + CORS)
+- OAuth config: [packages/api/src/passport-config.ts](packages/api/src/passport-config.ts) (Google, GitHub strategies)
+- Session store: [packages/api/src/session-store.ts](packages/api/src/session-store.ts) (SQLite-backed sessions)
+- Domain routers: [packages/api/src/routes/](packages/api/src/routes/) (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin)
 - Middleware: [packages/api/src/middleware/](packages/api/src/middleware/) (auth, session, participatory gate)
 - Mappers: [packages/api/src/mappers/](packages/api/src/mappers/) (party, bill)
 
@@ -329,6 +335,7 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## Related Docs
 
-- `docs/Functional_Overview.md`
-- `docs/Engagement.md`
+- `docs/AI_Engine.md`
+- `docs/Hosting_Plan.md`
 - `docs/operations/runbook.md`
+- `docs/todo/README.md` — Issue tracker (25/26 done)
