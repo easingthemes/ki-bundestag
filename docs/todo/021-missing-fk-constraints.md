@@ -1,6 +1,6 @@
 # 021 — Missing Foreign Key Constraints
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** Engine / DB
 

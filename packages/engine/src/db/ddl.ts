@@ -27,7 +27,8 @@ export const SIM_TABLE_DDL = `
     amendments TEXT,
     original_impact TEXT,
     status_changed_on_day INTEGER,
-    vetoed_by_president INTEGER NOT NULL DEFAULT 0
+    vetoed_by_president INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (proposed_by) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS national_state (
@@ -98,7 +99,8 @@ export const SIM_TABLE_DDL = `
     party_id TEXT NOT NULL,
     day_number INTEGER NOT NULL,
     approval_rating REAL NOT NULL,
-    seat_count INTEGER NOT NULL
+    seat_count INTEGER NOT NULL,
+    FOREIGN KEY (party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS polls (
@@ -140,7 +142,8 @@ export const SIM_TABLE_DDL = `
     response TEXT,
     responded_on_day INTEGER,
     created_on_day INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending'
+    status TEXT NOT NULL DEFAULT 'pending',
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS media_articles (
@@ -172,7 +175,8 @@ export const SIM_TABLE_DDL = `
     leader_name TEXT NOT NULL,
     status TEXT NOT NULL,
     formed_on_day INTEGER NOT NULL,
-    dissolved_on_day INTEGER
+    dissolved_on_day INTEGER,
+    FOREIGN KEY (party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS government (
@@ -183,7 +187,9 @@ export const SIM_TABLE_DDL = `
     ministers TEXT NOT NULL,
     formed_on_day INTEGER NOT NULL,
     dissolved_on_day INTEGER,
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (election_id) REFERENCES elections(id),
+    FOREIGN KEY (chancellor_party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS interpellations (
@@ -199,7 +205,9 @@ export const SIM_TABLE_DDL = `
     status TEXT NOT NULL,
     day_number INTEGER NOT NULL,
     responded_on_day INTEGER,
-    sentiment_impact REAL
+    sentiment_impact REAL,
+    FOREIGN KEY (filed_by_party_id) REFERENCES parties(id),
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS confidence_votes (
@@ -215,7 +223,10 @@ export const SIM_TABLE_DDL = `
     status TEXT NOT NULL,
     votes TEXT NOT NULL DEFAULT '[]',
     day_number INTEGER NOT NULL,
-    sentiment_impact REAL
+    sentiment_impact REAL,
+    FOREIGN KEY (government_id) REFERENCES government(id),
+    FOREIGN KEY (initiated_by_party_id) REFERENCES parties(id),
+    FOREIGN KEY (proposed_chancellor_party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS constitutional_challenges (
@@ -229,7 +240,9 @@ export const SIM_TABLE_DDL = `
     status TEXT NOT NULL,
     day_number INTEGER NOT NULL,
     ruled_on_day INTEGER,
-    sentiment_impact REAL
+    sentiment_impact REAL,
+    FOREIGN KEY (bill_id) REFERENCES bills(id),
+    FOREIGN KEY (filed_by_party_id) REFERENCES parties(id)
   );
 
   CREATE TABLE IF NOT EXISTS budgets (
@@ -268,7 +281,9 @@ export const SIM_TABLE_DDL = `
     proxy_default TEXT NOT NULL DEFAULT 'party_line',
     discipline_level INTEGER NOT NULL DEFAULT 0,
     discipline_reason TEXT,
-    allocated_on_day INTEGER NOT NULL
+    allocated_on_day INTEGER NOT NULL,
+    FOREIGN KEY (party_id) REFERENCES parties(id),
+    FOREIGN KEY (election_id) REFERENCES elections(id)
   );
 `;
 
@@ -307,7 +322,9 @@ export const USER_TABLE_DDL = `
     proposal_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     vote INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (proposal_id) REFERENCES internal_proposals(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS member_signals (
@@ -315,7 +332,8 @@ export const USER_TABLE_DDL = `
     bill_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     signal TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS question_votes (
@@ -323,7 +341,8 @@ export const USER_TABLE_DDL = `
     question_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     vote INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS referendum_votes (
@@ -331,7 +350,8 @@ export const USER_TABLE_DDL = `
     referendum_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     option TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS notifications (
@@ -343,7 +363,8 @@ export const USER_TABLE_DDL = `
     data TEXT,
     read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    day_number INTEGER NOT NULL
+    day_number INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS mdb_applications (
@@ -357,7 +378,8 @@ export const USER_TABLE_DDL = `
     priority_score REAL,
     created_on_day INTEGER NOT NULL,
     reviewed_on_day INTEGER,
-    cooldown_until_day INTEGER
+    cooldown_until_day INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS mdb_votes (
@@ -366,7 +388,8 @@ export const USER_TABLE_DDL = `
     bill_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     vote TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS mdb_speeches (
@@ -377,7 +400,8 @@ export const USER_TABLE_DDL = `
     content TEXT NOT NULL,
     sentiment_impact REAL,
     day_number INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS user_actions (
@@ -388,7 +412,8 @@ export const USER_TABLE_DDL = `
     entity_type TEXT,
     metadata TEXT,
     sim_day INTEGER NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `;
 

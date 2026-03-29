@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/seed.ts",
     "simulate": "tsx src/runner.ts",
-    "simulate:auto": "tsx src/runner-auto.ts"
+    "simulate:auto": "tsx src/runner-auto.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.46",
