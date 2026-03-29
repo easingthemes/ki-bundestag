@@ -52,9 +52,12 @@ export const referendumVotes = sqliteTable("referendum_votes", {
 });
 
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),                         // UUID = auth token
+  id: text("id").primaryKey(),                         // UUID
   displayName: text("display_name").notNull().unique(),
   partyId: text("party_id"),                           // null = no party
+  provider: text("provider"),                          // "google" | "github" | null (legacy)
+  providerId: text("provider_id"),                     // OAuth provider user ID
+  avatarUrl: text("avatar_url"),                       // Profile picture URL from OAuth
   createdAt: integer("created_at").notNull(),
   lastActive: integer("last_active").notNull(),
   switchCooldownUntil: integer("switch_cooldown_until"), // sim day
