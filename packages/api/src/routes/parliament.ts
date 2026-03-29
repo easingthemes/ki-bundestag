@@ -270,7 +270,7 @@ router.get("/api/crisis-templates", (_req, res) => {
 router.post("/api/motions/submit", (req, res) => {
   if (requireParticipatory(req, res, "vote_bills")) return;
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
@@ -335,7 +335,7 @@ router.post("/api/motions/submit", (req, res) => {
 router.post("/api/interpellations/submit", (req, res) => {
   if (requireParticipatory(req, res, "vote_bills")) return;
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }

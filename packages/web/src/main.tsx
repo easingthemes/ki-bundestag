@@ -23,8 +23,8 @@ import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
 import { MyActivity } from "./pages/MyActivity";
-import { api, setErrorHandler, setUserToken, type User, type SimulationStatus, type BundestagSeat } from "./api";
-import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
+import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat } from "./api";
+import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Menu, Bell, Pencil, Check, X } from "lucide-react";
@@ -472,7 +472,6 @@ function ScrollToHash() {
 function App() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
 
   const handleError = useCallback((msg: string) => {
     setError(msg);
@@ -480,54 +479,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const tryLegacy = () => {
-      const stored = loadStoredToken();
-      if (stored) {
-        setUserToken(stored);
-        setToken(stored);
-        api.getMe().then(lu => setUser(lu)).catch(() => {
-          clearToken();
-          setUserToken(null);
-          setToken(null);
-        });
-      }
-    };
-
     // Check if we just came back from an OAuth redirect
     const params = new URLSearchParams(window.location.search);
     const isOAuthReturn = params.get("auth") === "success";
     if (isOAuthReturn) {
-      // Clean the URL param without triggering a navigation
       window.history.replaceState({}, "", window.location.pathname);
     }
 
-    // Try session-based auth first (OAuth), then fall back to legacy token
-    api.getAuthMe().then(u => {
-      if (u) {
-        setUser(u);
-        setToken(u.id);
-      } else if (isOAuthReturn) {
-        // Session may not be ready yet on first OAuth login — retry once
-        setTimeout(() => {
-          api.getAuthMe().then(u2 => {
-            if (u2) { setUser(u2); setToken(u2.id); }
-            else tryLegacy();
-          }).catch(() => tryLegacy());
-        }, 500);
-      } else {
-        tryLegacy();
-      }
-    }).catch(() => {
-      if (isOAuthReturn) {
-        setTimeout(() => {
-          api.getAuthMe().then(u2 => {
-            if (u2) { setUser(u2); setToken(u2.id); }
-            else tryLegacy();
-          }).catch(() => tryLegacy());
-        }, 500);
-      } else {
-        tryLegacy();
-      }
+    const tryAuth = () => api.getAuthMe().then(u => { if (u) setUser(u); });
+
+    tryAuth().catch(() => {
+      // On OAuth return, session may not be ready yet — retry once
+      if (isOAuthReturn) setTimeout(() => tryAuth().catch(() => {}), 500);
     });
   }, []);
 
@@ -535,10 +498,7 @@ function App() {
     setErrorHandler(handleError);
   }, [handleError]);
 
-  const login = useCallback((newToken: string, newUser: User) => {
-    saveToken(newToken);
-    setUserToken(newToken);
-    setToken(newToken);
+  const login = useCallback((newUser: User) => {
     setUser(newUser);
   }, []);
 
@@ -547,16 +507,12 @@ function App() {
   }, []);
 
   const logout = useCallback(() => {
-    // Destroy server session (OAuth) + clear legacy token
     api.authLogout().catch(() => {});
-    clearToken();
-    setUserToken(null);
-    setToken(null);
     setUser(null);
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, token, login, logout, updateUser }}>
+    <UserContext.Provider value={{ user, login, logout, updateUser }}>
     <BrowserRouter>
       <ScrollToHash />
       <div className="min-h-screen flex flex-col">

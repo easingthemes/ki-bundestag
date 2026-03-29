@@ -11,7 +11,7 @@ const router = Router();
 router.post("/api/seats/apply", (req, res) => {
   if (requireParticipatory(req, res, "mdb_apply")) return;
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const userDb = getUserDb();
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
