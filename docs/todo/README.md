@@ -26,7 +26,7 @@ Each item links to a detail file with full description, affected files, and impl
 | # | Title | Status | Area | PR |
 |---|-------|--------|------|----|
 | 004 | [All content must be German](./004-german-content.md) | done | Web | #25 |
-| 005 | [Mobile view broken on some pages](./005-mobile-view-fixes.md) | open | Web | — |
+| 005 | [Mobile view broken on some pages](./005-mobile-view-fixes.md) | done | Web | — |
 | 006 | [/me endpoint issues](./006-me-endpoint-issues.md) | done | API / Web | #20 |
 | 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
 | 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
@@ -55,11 +55,11 @@ Each item links to a detail file with full description, affected files, and impl
 | 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
 | 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | open | API / Web | — |
-| 024 | [Blank page after joining party](./024-blank-page-join-party.md) | open | Web | — |
-| 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | open | Web | — |
+| 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
+| 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
 
 ## Summary
 
-- **Done**: 19 of 25
+- **Done**: 22 of 25
 - **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 5 remaining (#005, #022, #023, #024, #025)
+- **Open**: 2 remaining (#022, #023)

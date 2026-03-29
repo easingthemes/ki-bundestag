@@ -1,6 +1,6 @@
 # 024 — Blank Page After Joining Party
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** Web
 

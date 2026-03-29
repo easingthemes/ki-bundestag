@@ -1,6 +1,6 @@
 # 005 — Mobile View Broken on Some Pages
 
-**Status:** open
+**Status:** done
 **Severity:** high
 **Area:** Web
 

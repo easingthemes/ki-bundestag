@@ -17,7 +17,7 @@ import { QuestionForm } from "@/components/party/QuestionForm";
 
 export function PartyDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, login } = useUser();
+  const { user, updateUser } = useUser();
   const [party, setParty] = useState<Party | null>(null);
   const [history, setHistory] = useState<PartyHistory[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -96,7 +96,7 @@ export function PartyDetail() {
     setJoinError("");
     try {
       const result = await api.joinParty(id!);
-      login(result.id, result);
+      updateUser(result);
       setJoinStatus("idle");
       api.getParty(id!).then(setParty).catch(console.error);
     } catch (err) {
@@ -108,7 +108,7 @@ export function PartyDetail() {
   const handleLeave = async () => {
     try {
       const result = await api.leaveParty();
-      login(result.id, result);
+      updateUser(result);
       api.getParty(id!).then(setParty).catch(console.error);
     } catch { /* ignore */ }
   };
@@ -216,7 +216,7 @@ export function PartyDetail() {
         <div id="mdb-seats" className="mb-8">
           <h2 className="section-title">
             Bundestagsabgeordnete
-            <span className="text-sm font-normal text-muted-foreground ml-2">
+            <span className="block sm:inline text-sm font-normal text-muted-foreground sm:ml-2 mt-0.5 sm:mt-0">
               {humanSeats.filter(s => s.userId).length}/{humanSeats.length} besetzt · {seats.length} Sitze gesamt
               {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} frei)</span>}
             </span>
@@ -385,8 +385,8 @@ export function PartyDetail() {
           <p className="text-sm text-muted-foreground">No votes yet.</p>
         ) : (
           <Card>
-            <CardContent className="p-0">
-              <table className="w-full border-collapse text-sm">
+            <CardContent className="p-0 overflow-x-auto">
+              <table className="w-full border-collapse text-sm min-w-[480px]">
                 <thead>
                   <tr>
                     <th className="text-left px-3 py-2 border-b-2 border-border">Bill</th>
@@ -459,8 +459,8 @@ export function PartyDetail() {
                   const otherColor = other.color === "#FFED00" ? "#c4a900" : other.color;
                   const barColor = (pct ?? 0) > 70 ? SEMANTIC_HEX.positive : (pct ?? 0) >= 40 ? SEMANTIC_HEX.neutral : SEMANTIC_HEX.negative;
                   return (
-                    <div key={other.id} className="flex items-center gap-3 mb-2">
-                      <div className="w-36 shrink-0 text-sm">
+                    <div key={other.id} className="flex items-center gap-2 sm:gap-3 mb-2">
+                      <div className="w-20 sm:w-36 shrink-0 text-xs sm:text-sm truncate">
                         <Link to={`/parties/${other.id}`} className="font-semibold no-underline" style={{ color: otherColor }}>
                           {other.name}
                         </Link>
@@ -468,7 +468,7 @@ export function PartyDetail() {
                       <div className="flex-1 bg-muted rounded h-3 overflow-hidden">
                         <div className="h-full rounded" style={{ width: `${pct}%`, background: barColor }} />
                       </div>
-                      <div className="w-20 shrink-0 text-sm text-muted-foreground">
+                      <div className="w-16 sm:w-20 shrink-0 text-xs sm:text-sm text-muted-foreground text-right">
                         <strong className="text-foreground">{pct}%</strong>
                         <span className="ml-1 opacity-60">({count})</span>
                       </div>

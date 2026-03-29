@@ -1,6 +1,6 @@
 # 025 — Missing React Types / SimulationLog TypeScript Errors
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** Web
 
