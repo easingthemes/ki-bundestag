@@ -1,6 +1,6 @@
 # 026 — Remove Legacy Nickname Auth and Backward-Compatibility Shims
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** API / Web
 

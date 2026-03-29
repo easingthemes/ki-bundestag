@@ -203,23 +203,6 @@ export const getBudgets = (status?: string) =>
 export const getBudget = (id: string) => fetchJson<Budget>(`/budgets/${id}`);
 
 // ── Users & auth ──────────────────────────────────────────────────────────────
-
-// Legacy nickname-based auth (kept for backward compatibility)
-export const registerUser = (displayName: string, partyId?: string) =>
-  postJson<User>("/users/register", partyId ? { displayName, partyId } : { displayName });
-export const loginUser = async (displayName: string): Promise<User | null> => {
-  const res = await fetch(`${getBase()}/users/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ displayName }),
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("Login failed");
-  return res.json();
-};
-
-// OAuth session-based auth
 export const getAuthMe = async (): Promise<User | null> => {
   const res = await fetch(`${getBase()}/auth/me`, { credentials: "include" });
   if (res.status === 401) return null;
@@ -331,8 +314,6 @@ export const api = {
   getBillSignals,
   signalBill,
   retractProposalVote,
-  registerUser,
-  loginUser,
   getMe,
   updateDisplayName,
   getAuthMe,
