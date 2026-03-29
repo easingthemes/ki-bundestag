@@ -20,7 +20,7 @@ router.post("/api/users/login", (req, res) => {
   const u = rows[0];
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
   try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(u.id, "login", md?.day ?? 0, u.id, "user"); } catch (err) { console.error("[users] Failed to log action:", err); }
-  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
+  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, avatarUrl: u.avatarUrl ?? null, provider: u.provider ?? null, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
 });
 
 // POST /api/users/register
@@ -55,7 +55,7 @@ router.post("/api/users/register", (req, res) => {
     throw err;
   }
   try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(id, "register", md?.day ?? 0, id, "user"); } catch (err) { console.error("[users] Failed to log action:", err); }
-  res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, createdAt: now, lastActive: now, switchCooldownUntil: null });
+  res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, avatarUrl: null, provider: null, createdAt: now, lastActive: now, switchCooldownUntil: null });
 });
 
 // GET /api/users/me
@@ -66,7 +66,7 @@ router.get("/api/users/me", (req, res) => {
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
-  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
+  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, avatarUrl: u.avatarUrl ?? null, provider: u.provider ?? null, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
 });
 
 // GET /api/users/me/activity
@@ -373,7 +373,7 @@ router.post("/api/users/me/join/:partyId", (req, res) => {
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   try { logUserAction(token, "join_party", currentDay, req.params.partyId, "party"); } catch (err) { console.error("[users] Failed to log action:", err); }
-  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
 // POST /api/users/me/leave
@@ -400,7 +400,7 @@ router.post("/api/users/me/leave", (req, res) => {
     .run();
   try { logUserAction(token, "leave_party", currentDay, user.partyId ?? undefined, "party"); } catch (err) { console.error("[users] Failed to log action:", err); }
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
-  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
 // ── Notifications ────────────────────────────────────────────────────────────

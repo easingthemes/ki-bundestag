@@ -293,10 +293,20 @@ export const USER_TABLE_DDL = `
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL UNIQUE,
     party_id TEXT,
+    provider TEXT,
+    provider_id TEXT,
+    avatar_url TEXT,
     created_at INTEGER NOT NULL,
     last_active INTEGER NOT NULL,
     switch_cooldown_until INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT NOT NULL,
+    expired INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired);
 
   CREATE TABLE IF NOT EXISTS internal_proposals (
     id TEXT PRIMARY KEY,
@@ -452,6 +462,10 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
 /** Column migrations for user DB */
 export const USER_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: string }> = [
   { table: "users", column: "display_name_unique", sql: "DELETE FROM users WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY display_name ORDER BY last_active DESC) as rn FROM users) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name ON users(display_name)" },
+  { table: "users", column: "provider", sql: "ALTER TABLE users ADD COLUMN provider TEXT" },
+  { table: "users", column: "provider_id", sql: "ALTER TABLE users ADD COLUMN provider_id TEXT" },
+  { table: "users", column: "avatar_url", sql: "ALTER TABLE users ADD COLUMN avatar_url TEXT" },
+  { table: "sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired)" },
 ];
 
 /**

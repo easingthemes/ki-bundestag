@@ -19,6 +19,7 @@ export function useUser(): UserCtx {
   return useContext(UserContext);
 }
 
+// Legacy token storage — kept for migration path but OAuth uses session cookies
 const TOKEN_KEY = "ki-bundestag-token";
 const COOKIE_NAME = "ki-bundestag-token";
 
@@ -27,7 +28,6 @@ export function loadStoredToken(): string | null {
     const ls = localStorage.getItem(TOKEN_KEY);
     if (ls) return ls;
   } catch { /* ignore */ }
-  // Fallback: read from cookie
   try {
     const match = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]+)`));
     if (match) return decodeURIComponent(match[1]);
