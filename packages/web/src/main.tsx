@@ -18,6 +18,7 @@ import { ConfidenceVotes } from "./pages/ConfidenceVotes";
 import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
 import { About } from "./pages/About";
+import { SimulationInfo } from "./pages/SimulationInfo";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
@@ -555,6 +556,7 @@ function App() {
             <Route path="/my-activity" element={<MyActivity />} />
             <Route path="/login" element={<Login />} />
             <Route path="/about" element={<About />} />
+            <Route path="/simulation-info" element={<SimulationInfo />} />
           </Routes>
         </main>
 
@@ -564,6 +566,7 @@ function App() {
             <div className="flex gap-5">
               <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Protokoll</Link>
               <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">&Uuml;ber</Link>
+              <Link to="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Simulation</Link>
             </div>
             <div className="text-[11px] text-muted-foreground">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>

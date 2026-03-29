@@ -117,7 +117,7 @@ export function Elections() {
 
         <div className="mt-6 mb-8">
           <p className="text-sm text-muted-foreground mb-4">
-            Anfangssitzverteilung — es wurde noch keine Wahl simuliert. Lösen Sie eine über Admin aus oder warten Sie auf die geplante Wahl (4 Sim-Jahre ≈ {TERM_DURATION[simStatus?.timingPreset ?? "normal"]} Echtzeit im {PRESET_LABEL[simStatus?.timingPreset ?? "normal"]}-Modus).
+            Anfangssitzverteilung — es wurde noch keine Wahl simuliert. Warten Sie auf die geplante Wahl (4 Sim-Jahre ≈ {TERM_DURATION[simStatus?.timingPreset ?? "normal"]} Echtzeit im {PRESET_LABEL[simStatus?.timingPreset ?? "normal"]}-Modus).
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-8 items-start">
             <div className="flex flex-col items-center">

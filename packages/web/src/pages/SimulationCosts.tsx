@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -156,13 +155,10 @@ function ModelBadge({ model }: { model: string }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AdminCosts() {
+export function SimulationCosts() {
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="section-title !mb-0">KI-Modell-Kosten</h2>
-        <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Zurück zu Admin</Link>
-      </div>
+      <h2 className="section-title">KI-Modell-Kosten</h2>
 
       {/* ── Time Scale Reference ─────────────────────────────────── */}
       <div className="mb-8 rounded-lg border border-border bg-muted/30 px-5 py-4">
