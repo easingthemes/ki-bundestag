@@ -10,7 +10,7 @@ export function mapParty(row: typeof schema.parties.$inferSelect, memberCount = 
     ideology: row.ideology,
     seatCount: row.seatCount,
     approvalRating: row.approvalRating,
-    policyPriorities: row.policyPriorities as unknown as PolicyPriorities,
+    policyPriorities: (row.policyPriorities && typeof row.policyPriorities === 'object' ? row.policyPriorities : {}) as PolicyPriorities,
     coalitionRole: row.coalitionRole as Party["coalitionRole"],
     memberCount,
   };
