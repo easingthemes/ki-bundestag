@@ -1,6 +1,6 @@
 # 023 — Allow Users to Change Display Name After OAuth Login
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** API / Web
 

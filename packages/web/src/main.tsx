@@ -27,7 +27,7 @@ import { api, setErrorHandler, setUserToken, type User, type SimulationStatus, t
 import { UserContext, useUser, loadStoredToken, saveToken, clearToken } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import "./styles.css";
 
@@ -210,14 +210,18 @@ function MobileLogout() {
 /* ── User avatar menu ────────────────────────────────────────── */
 
 function UserMenu({ user }: { user: User }) {
-  const { logout } = useUser();
+  const { logout, updateUser } = useUser();
   const [open, setOpen] = useState(false);
   const [seat, setSeat] = useState<BundestagSeat | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(user.displayName);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const location = useLocation();
 
-  useEffect(() => { setOpen(false); }, [location.pathname]);
+  useEffect(() => { setOpen(false); setEditing(false); }, [location.pathname]);
 
   useEffect(() => {
     api.getMySeat().then(r => setSeat(r.seat)).catch(() => {});
@@ -225,14 +229,31 @@ function UserMenu({ user }: { user: User }) {
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setEditing(false); }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   const onEnter = () => { clearTimeout(timeout.current); setOpen(true); };
-  const onLeave = () => { timeout.current = setTimeout(() => setOpen(false), 200); };
+  const onLeave = () => { if (!editing) timeout.current = setTimeout(() => setOpen(false), 200); };
+
+  const startEdit = () => { setEditName(user.displayName); setEditError(null); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setEditError(null); };
+  const saveEdit = async () => {
+    const trimmed = editName.trim();
+    if (trimmed.length < 2 || trimmed.length > 30) { setEditError("2–30 Zeichen erforderlich"); return; }
+    if (trimmed === user.displayName) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      const updated = await api.updateDisplayName(trimmed);
+      updateUser(updated);
+      setEditing(false);
+      setEditError(null);
+    } catch {
+      setEditError("Name bereits vergeben");
+    } finally { setSaving(false); }
+  };
 
   const initials = user.displayName
     .split(" ")
@@ -260,12 +281,39 @@ function UserMenu({ user }: { user: User }) {
       {open && (
         <div className="absolute top-[calc(100%+4px)] right-0 min-w-[200px] bg-[#0d1b2e] border border-white/10 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] py-1 z-[200] animate-in fade-in slide-in-from-top-1 duration-100">
           <div className="px-3 py-2 border-b border-white/10">
-            <div className="text-sm font-semibold text-white flex items-center gap-2">
-              {user.displayName}
-              {seat && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 leading-none">MdB</span>
-              )}
-            </div>
+            {editing ? (
+              <div>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => { setEditName(e.target.value); setEditError(null); }}
+                    onKeyDown={e => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") cancelEdit(); }}
+                    className="w-full bg-white/10 text-white text-sm rounded px-1.5 py-0.5 border border-white/20 outline-none focus:border-white/40"
+                    maxLength={30}
+                    autoFocus
+                    disabled={saving}
+                  />
+                  <button onClick={saveEdit} disabled={saving} className="p-0.5 text-emerald-400 hover:text-emerald-300 bg-transparent border-none cursor-pointer disabled:opacity-50" aria-label="Save">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={cancelEdit} className="p-0.5 text-white/50 hover:text-white bg-transparent border-none cursor-pointer" aria-label="Cancel">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {editError && <div className="text-[11px] text-red-400 mt-0.5">{editError}</div>}
+              </div>
+            ) : (
+              <div className="text-sm font-semibold text-white flex items-center gap-2">
+                {user.displayName}
+                {seat && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 leading-none">MdB</span>
+                )}
+                <button onClick={startEdit} className="p-0.5 text-white/40 hover:text-white bg-transparent border-none cursor-pointer ml-auto" aria-label="Edit name">
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
             {user.partyId && (
               <div className="text-xs text-white/50 mt-0.5">{user.partyId}{seat ? ` · Seat #${seat.seatNumber}` : ""}</div>
             )}

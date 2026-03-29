@@ -40,7 +40,7 @@ import {
   ImpactData,
   CatchupData,
 } from "./types.js";
-import { fetchJson, postJson, deleteJson, getBase } from "./client.js";
+import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js";
 
 // ── Parties & proposals ───────────────────────────────────────────────────────
 
@@ -229,6 +229,7 @@ export const getAuthMe = async (): Promise<User | null> => {
 export const authLogout = () => postJson<{ success: boolean }>("/auth/logout", {});
 export const getAuthProviders = () => fetchJson<{ providers: string[] }>("/auth/providers");
 export const getMe = () => fetchJson<User>("/users/me");
+export const updateDisplayName = (displayName: string) => patchJson<User>("/users/me", { displayName });
 export const getMyActivity = () => fetchJson<{ items: ActivityItem[] }>("/users/me/activity");
 export const joinParty = (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {});
 export const leaveParty = () => postJson<User>("/users/me/leave", {});
@@ -333,6 +334,7 @@ export const api = {
   registerUser,
   loginUser,
   getMe,
+  updateDisplayName,
   getAuthMe,
   authLogout,
   getAuthProviders,
