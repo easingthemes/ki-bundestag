@@ -58,6 +58,35 @@ router.post("/api/users/register", (req, res) => {
   res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, avatarUrl: null, provider: null, createdAt: now, lastActive: now, switchCooldownUntil: null });
 });
 
+// PATCH /api/users/me — update display name
+router.patch("/api/users/me", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  const userDb = getUserDb();
+  const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
+  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
+
+  const { displayName } = req.body as { displayName?: string };
+  if (!displayName || displayName.trim().length < LIMITS.NICKNAME_MIN || displayName.trim().length > LIMITS.NICKNAME_MAX) {
+    res.status(400).json({ error: `displayName must be ${LIMITS.NICKNAME_MIN}–${LIMITS.NICKNAME_MAX} characters` });
+    return;
+  }
+
+  const trimmed = displayName.trim();
+  const existing = userDb.select().from(schema.users).where(eq(schema.users.displayName, trimmed)).all();
+  if (existing.length > 0 && existing[0].id !== token) {
+    res.status(409).json({ error: "Nickname already taken" });
+    return;
+  }
+
+  userDb.update(schema.users)
+    .set({ displayName: trimmed, lastActive: Date.now() })
+    .where(eq(schema.users.id, token))
+    .run();
+  const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+});
+
 // GET /api/users/me
 router.get("/api/users/me", (req, res) => {
   const token = getUserToken(req);
