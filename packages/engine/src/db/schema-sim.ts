@@ -16,7 +16,7 @@ export const bills = sqliteTable("bills", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
-  proposedBy: text("proposed_by").notNull(),
+  proposedBy: text("proposed_by").notNull().references(() => parties.id),
   status: text("status").notNull(), // "proposed" | "first_reading" | "committee" | "second_reading" | "third_reading" | "passed" | "rejected"
   impact: text("impact", { mode: "json" }).notNull(),
   votes: text("votes", { mode: "json" }).notNull().default("[]"),
@@ -98,7 +98,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
 
 export const partyHistory = sqliteTable("party_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  partyId: text("party_id").notNull(),
+  partyId: text("party_id").notNull().references(() => parties.id),
   dayNumber: integer("day_number").notNull(),
   approvalRating: real("approval_rating").notNull(),
   seatCount: integer("seat_count").notNull(),
@@ -107,7 +107,7 @@ export const partyHistory = sqliteTable("party_history", {
 export const citizenQuestions = sqliteTable("citizen_questions", {
   id: text("id").primaryKey(),
   question: text("question").notNull(),
-  targetPartyId: text("target_party_id").notNull(),
+  targetPartyId: text("target_party_id").notNull().references(() => parties.id),
   response: text("response"),
   respondedOnDay: integer("responded_on_day"),
   createdOnDay: integer("created_on_day").notNull(),
@@ -149,7 +149,7 @@ export const referendums = sqliteTable("referendums", {
 
 export const fraktionen = sqliteTable("fraktionen", {
   id: text("id").primaryKey(),
-  partyId: text("party_id").notNull(),
+  partyId: text("party_id").notNull().references(() => parties.id),
   leaderName: text("leader_name").notNull(),
   status: text("status").notNull(), // "active" | "dissolved"
   formedOnDay: integer("formed_on_day").notNull(),
@@ -170,9 +170,9 @@ export const motions = sqliteTable("motions", {
 
 export const government = sqliteTable("government", {
   id: text("id").primaryKey(),
-  electionId: text("election_id"),
+  electionId: text("election_id").references(() => elections.id),
   chancellorName: text("chancellor_name").notNull(),
-  chancellorPartyId: text("chancellor_party_id").notNull(),
+  chancellorPartyId: text("chancellor_party_id").notNull().references(() => parties.id),
   ministers: text("ministers", { mode: "json" }).notNull(),
   formedOnDay: integer("formed_on_day").notNull(),
   dissolvedOnDay: integer("dissolved_on_day"),
@@ -184,10 +184,10 @@ export const interpellations = sqliteTable("interpellations", {
   type: text("type").notNull(), // "kleine" | "große"
   title: text("title").notNull(),
   question: text("question").notNull(),
-  filedByPartyId: text("filed_by_party_id").notNull(),
+  filedByPartyId: text("filed_by_party_id").notNull().references(() => parties.id),
   targetMinistry: text("target_ministry").notNull(),
   targetMinisterName: text("target_minister_name").notNull(),
-  targetPartyId: text("target_party_id").notNull(),
+  targetPartyId: text("target_party_id").notNull().references(() => parties.id),
   response: text("response"),
   status: text("status").notNull(), // "pending" | "answered" | "expired"
   dayNumber: integer("day_number").notNull(),
@@ -198,11 +198,11 @@ export const interpellations = sqliteTable("interpellations", {
 export const confidenceVotes = sqliteTable("confidence_votes", {
   id: text("id").primaryKey(),
   type: text("type").notNull(),             // "vertrauensfrage" | "misstrauensvotum"
-  governmentId: text("government_id").notNull(),
-  initiatedByPartyId: text("initiated_by_party_id").notNull(),
+  governmentId: text("government_id").notNull().references(() => government.id),
+  initiatedByPartyId: text("initiated_by_party_id").notNull().references(() => parties.id),
   chancellorName: text("chancellor_name").notNull(),
   proposedChancellor: text("proposed_chancellor"),              // misstrauensvotum only
-  proposedChancellorPartyId: text("proposed_chancellor_party_id"), // misstrauensvotum only
+  proposedChancellorPartyId: text("proposed_chancellor_party_id").references(() => parties.id), // misstrauensvotum only
   title: text("title").notNull(),
   description: text("description").notNull(),
   status: text("status").notNull(),         // "passed" | "failed"
@@ -213,9 +213,9 @@ export const confidenceVotes = sqliteTable("confidence_votes", {
 
 export const constitutionalChallenges = sqliteTable("constitutional_challenges", {
   id: text("id").primaryKey(),
-  billId: text("bill_id").notNull(),
+  billId: text("bill_id").notNull().references(() => bills.id),
   billTitle: text("bill_title").notNull(),
-  filedByPartyId: text("filed_by_party_id").notNull(),
+  filedByPartyId: text("filed_by_party_id").notNull().references(() => parties.id),
   arguments: text("arguments").notNull(),
   decision: text("decision"),           // "struck_down" | "upheld" | null while pending
   reasoning: text("reasoning"),
@@ -264,10 +264,10 @@ export const eventQueue = sqliteTable("event_queue", {
 export const bundestagSeats = sqliteTable("bundestag_seats", {
   id: text("id").primaryKey(),
   seatNumber: integer("seat_number").notNull(),
-  partyId: text("party_id").notNull(),
+  partyId: text("party_id").notNull().references(() => parties.id),
   controller: text("controller").notNull(),         // "human" | "ai"
   userId: text("user_id"),
-  electionId: text("election_id"),
+  electionId: text("election_id").references(() => elections.id),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   proxyDefault: text("proxy_default").notNull().default("party_line"), // "party_line" | "abstain"
   disciplineLevel: integer("discipline_level").notNull().default(0),   // 0-3

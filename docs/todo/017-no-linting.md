@@ -1,6 +1,6 @@
 # 017 — No Linting or Formatting
 
-**Status:** open
+**Status:** done
 **Severity:** low
 **Area:** All
 

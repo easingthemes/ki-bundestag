@@ -47,15 +47,15 @@ Each item links to a detail file with full description, affected files, and impl
 
 | # | Title | Status | Area | PR |
 |---|-------|--------|------|----|
-| 016 | [No test suite](./016-no-tests.md) | open | All | — |
-| 017 | [No linting or formatting](./017-no-linting.md) | open | All | — |
+| 016 | [No test suite](./016-no-tests.md) | done | All | — |
+| 017 | [No linting or formatting](./017-no-linting.md) | done | All | — |
 | 018 | [Console.log in production code](./018-console-logs.md) | done | Engine | #18 |
 | 019 | [Inconsistent API error response format](./019-inconsistent-error-format.md) | done | API | #14 |
 | 020 | [React hook dependency warnings suppressed](./020-react-hook-deps.md) | done | Web | #19 |
-| 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | open | Engine / DB | — |
+| 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
 
 ## Summary
 
-- **Done**: 14 of 21
-- **Open**: 7 remaining (#001, #005, #013, #015, #016, #017, #021)
+- **Done**: 17 of 21
+- **Open**: 4 remaining (#001, #005, #013, #015)
 - **Blocked**: #013 and #015 depend on #001 (real auth)
