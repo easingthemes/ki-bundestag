@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function About() {
@@ -179,7 +180,7 @@ export function About() {
           <h3 className="text-base">Besucher (kein Konto erforderlich)</h3>
           <ul className="my-2 ml-6 list-disc mb-4">
             <li className="mb-1"><strong>Alles einsehen</strong> — Gesetze, Wahlen, Haushalte, Medien, Umfragen und das vollständige Simulationsprotokoll verfolgen.</li>
-            <li className="mb-1"><strong>Ereignisse auslösen</strong> — Krisen, vorgezogene Wahlen, Wirtschaftsschocks oder Haushaltszyklen über das Admin-Panel starten.</li>
+            <li className="mb-1"><strong>Ereignisse auslösen</strong> — Krisen, vorgezogene Wahlen, Wirtschaftsschocks oder Haushaltszyklen werden über GitHub Actions Workflows gesteuert.</li>
             <li className="mb-1"><strong>Koalitionsrechner</strong> — auf der Wahlseite mit Parteikombinationen experimentieren, um Mehrheitsverhältnisse und ideologische Verteilung zu prüfen.</li>
           </ul>
 
@@ -210,6 +211,19 @@ export function About() {
             <li className="mb-1"><strong>Änderungsanträge vorschlagen</strong> — in der 2. Lesung Änderungen an Gesetzentwürfen vorschlagen.</li>
             <li className="mb-1"><strong>Disziplinsystem</strong> — dein Abstimmungsverhalten wird verfolgt; Abweichungen von der Parteilinie beeinflussen deinen Disziplingrad (Verwarnung &rarr; Einschränkung &rarr; Fraktionszwang &rarr; Ausschluss).</li>
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-5">
+        <CardContent className="p-5 leading-[1.7]">
+          <h2 className="section-title">Technische Details</h2>
+          <p>
+            Erfahre mehr über die KI-Modelle, alle Simulationsaktionen und die
+            geschätzten Betriebskosten auf der{" "}
+            <Link to="/simulation-info" className="text-primary hover:underline font-medium">
+              Seite &bdquo;Über die Simulation&ldquo;
+            </Link>.
+          </p>
         </CardContent>
       </Card>
 
