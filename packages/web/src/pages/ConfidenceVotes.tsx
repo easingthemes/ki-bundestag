@@ -52,15 +52,15 @@ export function ConfidenceVotes() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground shrink-0">Status:</span>
           <FilterPills
-            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt.charAt(0).toUpperCase() + opt.slice(1) }))}
+            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "Alle" : opt === "passed" ? "Angenommen" : "Abgelehnt" }))}
             value={statusFilter}
             onChange={setStatusFilter}
           />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Type:</span>
+          <span className="text-xs text-muted-foreground shrink-0">Typ:</span>
           <FilterPills
-            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum" }))}
+            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "Alle" : opt === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum" }))}
             value={typeFilter}
             onChange={setTypeFilter}
           />
@@ -115,12 +115,12 @@ function ConfidenceVoteCard({
   let outcomeText = "";
   if (isVertrauensfrage) {
     outcomeText = vote.status === "passed"
-      ? `Chancellor ${vote.chancellorName}'s government survived.`
-      : `Government fell — snap election triggered.`;
+      ? `Regierung von Bundeskanzler/in ${vote.chancellorName} hat das Vertrauen gewonnen.`
+      : `Regierung gestürzt — Neuwahlen ausgelöst.`;
   } else {
     outcomeText = vote.status === "passed"
-      ? `New Chancellor: ${vote.proposedChancellor ?? "Unknown"} — government transferred without election.`
-      : `Motion failed — ${vote.chancellorName}'s government survived.`;
+      ? `Neue/r Bundeskanzler/in: ${vote.proposedChancellor ?? "Unbekannt"} — Regierungswechsel ohne Wahl.`
+      : `Antrag gescheitert — Regierung von ${vote.chancellorName} überlebt.`;
   }
 
   // Seat tally from votes
@@ -152,26 +152,26 @@ function ConfidenceVoteCard({
               ? STATUS_BADGE.passed
               : STATUS_BADGE.rejected
           )}>
-            {vote.status === "passed" ? "Passed" : "Failed"}
+            {vote.status === "passed" ? "Angenommen" : "Gescheitert"}
           </Badge>
         </div>
 
         <p className="text-sm text-muted-foreground mt-1">
           {isVertrauensfrage ? (
             <>
-              Called by{" "}
+              Gestellt von{" "}
               <span className="font-semibold" style={{ color: initiator?.color ?? "#333" }}>
                 {initiator?.name ?? vote.initiatedByPartyId}
               </span>
-              {" "}· Chancellor: <strong>{vote.chancellorName}</strong>
+              {" "}· Bundeskanzler/in: <strong>{vote.chancellorName}</strong>
             </>
           ) : (
             <>
-              Filed by{" "}
+              Eingereicht von{" "}
               <span className="font-semibold" style={{ color: initiator?.color ?? "#333" }}>
                 {initiator?.name ?? vote.initiatedByPartyId}
               </span>
-              {" "}· Proposed: <strong>{vote.proposedChancellor}</strong>
+              {" "}· Vorgeschlagen: <strong>{vote.proposedChancellor}</strong>
               {proposedParty && (
                 <span style={{ color: proposedParty.color }}> ({proposedParty.name})</span>
               )}
@@ -184,10 +184,10 @@ function ConfidenceVoteCard({
           <div className="my-2">
             <VoteBar yes={totalYes} no={totalNo} abstain={0} total={totalSeats} height="h-2" />
             <p className="text-xs text-muted-foreground mt-0.5">
-              <span style={{ color: SEMANTIC_HEX.positive }}>Yes: {totalYes}</span>
+              <span style={{ color: SEMANTIC_HEX.positive }}>Ja: {totalYes}</span>
               {" · "}
-              <span style={{ color: SEMANTIC_HEX.negative }}>No: {totalNo}</span>
-              {" · "}Threshold: 368
+              <span style={{ color: SEMANTIC_HEX.negative }}>Nein: {totalNo}</span>
+              {" · "}Schwellenwert: 368
               {totalYes >= 368 && <span style={{ color: SEMANTIC_HEX.positive }}> ✓</span>}
             </p>
           </div>
@@ -196,20 +196,20 @@ function ConfidenceVoteCard({
         <p className="text-xs text-muted-foreground italic">{outcomeText}</p>
 
         <p className="text-xs text-muted-foreground mt-0.5">
-          Day {vote.dayNumber}
+          Tag {vote.dayNumber}
           {vote.sentimentImpact != null && vote.sentimentImpact !== 0 && (
             <span style={{ color: vote.sentimentImpact > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-              {" "}· Sentiment: {vote.sentimentImpact > 0 ? "+" : ""}{vote.sentimentImpact}
+              {" "}· Stimmung: {vote.sentimentImpact > 0 ? "+" : ""}{vote.sentimentImpact}
             </span>
           )}
         </p>
 
         {expanded && vote.votes.length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
-            <strong className="text-sm">Description:</strong>
+            <strong className="text-sm">Beschreibung:</strong>
             <p className="text-sm mb-2">{vote.description}</p>
 
-            <strong className="text-sm">Vote Breakdown:</strong>
+            <strong className="text-sm">Abstimmungsergebnis:</strong>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {vote.votes.map(v => {
                 const p = partyMap.get(v.partyId);
@@ -225,7 +225,7 @@ function ConfidenceVoteCard({
                     )}
                     style={{ border: `1px solid ${p?.color ?? "#ccc"}` }}
                   >
-                    {p?.name ?? v.partyId}: {v.vote}
+                    {p?.name ?? v.partyId}: {v.vote === "yes" ? "Ja" : "Nein"}
                   </Badge>
                 );
               })}

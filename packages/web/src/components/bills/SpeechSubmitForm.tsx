@@ -23,10 +23,10 @@ export function SpeechSubmitForm({ billId, billStatus, displayColor, onSubmitted
       const reading = billStatus === "first_reading" ? 1 : billStatus === "second_reading" ? 2 : 3;
       await api.submitSpeech(billId, reading, content.trim());
       setContent("");
-      setMsg("Speech submitted!");
+      setMsg("Rede eingereicht!");
       onSubmitted();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Failed to submit");
+      setMsg(e instanceof Error ? e.message : "Einreichen fehlgeschlagen");
     } finally {
       setSubmitting(false);
       setTimeout(() => setMsg(null), 4000);
@@ -35,11 +35,11 @@ export function SpeechSubmitForm({ billId, billStatus, displayColor, onSubmitted
 
   return (
     <Card className="mb-3"><CardContent className="p-5">
-      <div className="font-semibold text-sm mb-2">Submit a Speech</div>
+      <div className="font-semibold text-sm mb-2">Rede einreichen</div>
       <textarea
         value={content}
         onChange={e => setContent(e.target.value)}
-        placeholder="Your speech (20–500 characters)"
+        placeholder="Ihre Rede (20–500 Zeichen)"
         maxLength={500}
         rows={3}
         className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
@@ -51,9 +51,9 @@ export function SpeechSubmitForm({ billId, billStatus, displayColor, onSubmitted
           className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
           style={{ background: displayColor }}
         >
-          {submitting ? "Submitting…" : "Submit Speech"}
+          {submitting ? "Wird eingereicht…" : "Rede einreichen"}
         </button>
-        {msg && <span className={`text-xs ${msg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{msg}</span>}
+        {msg && <span className={`text-xs ${msg.includes("fehlgeschlagen") ? "text-destructive" : "text-emerald-500"}`}>{msg}</span>}
       </div>
     </CardContent></Card>
   );
