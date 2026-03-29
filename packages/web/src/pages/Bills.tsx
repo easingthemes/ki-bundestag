@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, Bill, Party, type BundestagSeat } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton, UserActionIcon, MdbActionIcon } from "../components/shared";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ export function Bills() {
   // Reset per-group limits when filters change
   useEffect(() => { setGroupLimits({}); }, [filterCategory, filterParty, filterSearch, filterStatus]);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
+  if (parties.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 

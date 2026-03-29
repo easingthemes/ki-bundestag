@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api, Motion, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
+import { EmptyState } from "../components/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -23,7 +25,7 @@ export function Motions() {
   useEffect(() => { refresh(); }, [refresh]);
   usePolling(refresh);
 
-  if (parties.length === 0) return <p className="text-center py-8 text-muted-foreground">Laden...</p>;
+  if (parties.length === 0) return <div className="py-8"><LoadingSkeleton lines={4} /></div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
 
@@ -38,7 +40,7 @@ export function Motions() {
     <div>
       <h2 className="section-title">Anträge & Entschließungen</h2>
       {motions.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Anträge. Starte die Simulation, um Anträge zu sehen.</p>
+        <EmptyState message="Noch keine Anträge. Starte die Simulation, um Anträge zu sehen." icon="📋" />
       )}
       {grouped.map(group => (
         <div key={group.status} className="mb-8">
