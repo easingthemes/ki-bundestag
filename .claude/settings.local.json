@@ -20,8 +20,9 @@
       "Bash(xargs kill:*)",
       "Bash(wait)",
       "Bash(cd:*)",
-      "Bash(claude mcp:*)"
+      "Bash(claude mcp:*)",
+      "mcp__chrome-devtools-mcp__navigate_page",
+      "mcp__chrome-devtools-mcp__new_page"
     ]
   }
 }
-
