@@ -57,9 +57,10 @@ Each item links to a detail file with full description, affected files, and impl
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
+| 026 | [Remove legacy nickname auth and backward-compatibility shims](./026-legacy-auth-cleanup.md) | open | API / Web | — |
 
 ## Summary
 
-- **Done**: 23 of 25
+- **Done**: 23 of 26
 - **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 1 remaining (#022)
+- **Open**: 2 remaining (#022, #026)
