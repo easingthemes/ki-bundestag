@@ -20,8 +20,8 @@ export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
 
   return (
     <Card>
-      <CardContent className="p-0">
-        <table className="w-full border-collapse text-sm">
+      <CardContent className="p-0 overflow-x-auto">
+        <table className="w-full border-collapse text-sm min-w-[500px]">
           <thead>
             <tr>
               <th className="text-left px-3 py-2 border-b-2 border-border">Sitz</th>

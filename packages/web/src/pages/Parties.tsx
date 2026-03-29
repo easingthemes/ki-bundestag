@@ -67,7 +67,7 @@ function JoinModal({ party, onClose, onJoined }: {
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45"
       onClick={onClose}
     >
-      <Card className="w-[340px] shadow-lg" onClick={e => e.stopPropagation()}>
+      <Card className="w-[calc(100vw-2rem)] max-w-[340px] shadow-lg" onClick={e => e.stopPropagation()}>
         <CardContent className="p-7">
           <h3 className="text-lg font-semibold mb-4">{party.name} beitreten</h3>
           <p className="text-sm text-muted-foreground mb-4">
