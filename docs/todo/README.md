@@ -41,7 +41,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 012 | [Hardcoded validation limits and polling intervals](./012-hardcoded-config.md) | done | API / Web | #21 |
 | 013 | [Admin pages unreachable (routes removed)](./013-admin-pages-unreachable.md) | done | Web | — |
 | 014 | [Seat allocation race condition](./014-seat-race-condition.md) | done | API / Engine | #24 |
-| 015 | [localStorage auth vulnerable to XSS](./015-localstorage-xss.md) | wontfix | Web | — |
+| 015 | [localStorage auth vulnerable to XSS](./015-localstorage-xss.md) | done | Web | — |
 
 ## Low
 
@@ -57,10 +57,9 @@ Each item links to a detail file with full description, affected files, and impl
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
-| 026 | [Remove legacy nickname auth and backward-compatibility shims](./026-legacy-auth-cleanup.md) | open | API / Web | — |
+| 026 | [Remove legacy nickname auth and backward-compatibility shims](./026-legacy-auth-cleanup.md) | done | API / Web | — |
 
 ## Summary
 
-- **Done**: 23 of 26
-- **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 2 remaining (#022, #026)
+- **Done**: 25 of 26
+- **Open**: 1 remaining (#022)

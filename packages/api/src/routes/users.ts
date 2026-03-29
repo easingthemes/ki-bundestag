@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, count } from "drizzle-orm";
 import { getUserToken } from "../middleware/index.js";
@@ -7,61 +6,10 @@ import { LIMITS } from "../validation.js";
 
 const router = Router();
 
-// POST /api/users/login
-router.post("/api/users/login", (req, res) => {
-  const { displayName } = req.body as { displayName?: string };
-  if (!displayName || displayName.trim().length < LIMITS.NICKNAME_MIN) {
-    res.status(400).json({ error: `displayName must be at least ${LIMITS.NICKNAME_MIN} characters` });
-    return;
-  }
-  const userDb = getUserDb();
-  const rows = userDb.select().from(schema.users).where(eq(schema.users.displayName, displayName.trim())).all();
-  if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
-  const u = rows[0];
-  userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, u.id)).run();
-  try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(u.id, "login", md?.day ?? 0, u.id, "user"); } catch (err) { console.error("[users] Failed to log action:", err); }
-  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, avatarUrl: u.avatarUrl ?? null, provider: u.provider ?? null, createdAt: u.createdAt, lastActive: Date.now(), switchCooldownUntil: u.switchCooldownUntil });
-});
-
-// POST /api/users/register
-router.post("/api/users/register", (req, res) => {
-  const { displayName, partyId } = req.body as { displayName?: string; partyId?: string };
-  if (!displayName || displayName.trim().length < LIMITS.NICKNAME_MIN || displayName.trim().length > LIMITS.NICKNAME_MAX) {
-    res.status(400).json({ error: `displayName must be ${LIMITS.NICKNAME_MIN}\u2013${LIMITS.NICKNAME_MAX} characters` });
-    return;
-  }
-  if (partyId) {
-    const db = getDb();
-    const party = db.select().from(schema.parties).where(eq(schema.parties.id, partyId)).all();
-    if (party.length === 0) { res.status(400).json({ error: "Party not found" }); return; }
-  }
-  const userDb = getUserDb();
-  const id: string = randomUUID();
-  const now = Date.now();
-  try {
-    userDb.insert(schema.users).values({
-      id,
-      displayName: displayName.trim(),
-      partyId: partyId ?? null,
-      createdAt: now,
-      lastActive: now,
-      switchCooldownUntil: null,
-    }).run();
-  } catch (err: any) {
-    if (err.message?.includes("UNIQUE constraint failed")) {
-      res.status(409).json({ error: "Nickname already taken" });
-      return;
-    }
-    throw err;
-  }
-  try { const db = getDb(); const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(id, "register", md?.day ?? 0, id, "user"); } catch (err) { console.error("[users] Failed to log action:", err); }
-  res.json({ id, displayName: displayName.trim(), partyId: partyId ?? null, avatarUrl: null, provider: null, createdAt: now, lastActive: now, switchCooldownUntil: null });
-});
-
 // PATCH /api/users/me — update display name
 router.patch("/api/users/me", (req, res) => {
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
@@ -90,7 +38,7 @@ router.patch("/api/users/me", (req, res) => {
 // GET /api/users/me
 router.get("/api/users/me", (req, res) => {
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
@@ -370,7 +318,7 @@ router.get("/api/users/me/catchup", (req, res) => {
 // POST /api/users/me/join/:partyId
 router.post("/api/users/me/join/:partyId", (req, res) => {
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
@@ -408,7 +356,7 @@ router.post("/api/users/me/join/:partyId", (req, res) => {
 // POST /api/users/me/leave
 router.post("/api/users/me/leave", (req, res) => {
   const token = getUserToken(req);
-  if (!token) { res.status(401).json({ error: "Missing X-User-Token header" }); return; }
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const userDb = getUserDb();
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }

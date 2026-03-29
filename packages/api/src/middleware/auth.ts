@@ -6,10 +6,7 @@ import { eq } from "drizzle-orm";
 // ── Session tracking middleware ──────────────────────────────────────────────
 export function sessionTracking(req: express.Request, _res: express.Response, next: express.NextFunction): void {
   try {
-    // Get user ID from session (OAuth) or legacy header
-    const sessionUserId = req.user ? (req.user as any).id : null;
-    const headerToken = req.headers["x-user-token"];
-    const token = sessionUserId || (typeof headerToken === "string" && headerToken.length > 0 ? headerToken : null);
+    const token = req.user ? (req.user as any).id : null;
     if (token) {
       const userDb = getUserDb();
       const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
@@ -71,10 +68,8 @@ export function requireParticipatory(_req: express.Request, res: express.Respons
 }
 
 export function getUserToken(req: express.Request): string | null {
-  // Prefer session-based auth (OAuth), fall back to legacy header
   if (req.user && (req.user as any).id) return (req.user as any).id;
-  const h = req.headers["x-user-token"];
-  return typeof h === "string" && h.length > 0 ? h : null;
+  return null;
 }
 
 /**
