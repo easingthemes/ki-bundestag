@@ -7,17 +7,18 @@ paths:
 
 ## Structure
 
-Express server on port 3001 (`API_PORT` env var). 10 domain routers in `src/routes/`:
+Express server on port 3001 (`API_PORT` env var). 11 domain routers in `src/routes/`:
 
 | Router | Prefix | Domain |
 |--------|--------|--------|
+| `auth.ts` | `/api/auth` | OAuth login (Google, GitHub), session, logout, providers |
 | `parties.ts` | `/api/parties` | Party profiles, approval, coalition |
 | `bills.ts` | `/api/bills` | Bill CRUD, signals, amendments, votes |
 | `elections.ts` | `/api/elections` | Elections, results, coalitions |
 | `simulation.ts` | `/api/simulation` | Sim status, day triggers, injections |
 | `parliament.ts` | `/api/parliament` | Motions, interpellations, confidence votes, court |
 | `content.ts` | `/api/content` | Media, polls, questions, referendums, logs |
-| `users.ts` | `/api/users` | Auth, profile, proposals, MdB applications |
+| `users.ts` | `/api/users` | Profile, display name, party join/leave, proposals, MdB |
 | `seats.ts` | `/api/seats` | MdB seat management |
 | `budget.ts` | `/api/budget` | Budget proposals, allocations |
 | `admin.ts` | `/api/admin` | Model config, costs, analytics |
@@ -34,7 +35,7 @@ Express server on port 3001 (`API_PORT` env var). 10 domain routers in `src/rout
 ## Middleware
 
 - **`src/middleware/index.ts`** — Session tracking, global error handler
-- **`src/middleware/auth.ts`** — Token-based user auth (extracts user from headers)
+- **`src/middleware/auth.ts`** — Session-based user auth (OAuth via Passport.js)
 
 ## Mappers
 
