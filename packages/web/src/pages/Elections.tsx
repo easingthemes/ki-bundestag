@@ -41,9 +41,17 @@ function formatPctDelta(current: number, previous: number | undefined): string {
   return `${diff}`;
 }
 
-function avatarUrl(name: string, color: string, size = 32): string {
-  const bg = fixColor(color).replace("#", "");
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${size * 2}&bold=true&background=${bg}&color=fff&rounded=true`;
+function InitialAvatar({ name, color, size = 32 }: { name: string; color: string; size?: number }) {
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const bg = fixColor(color);
+  return (
+    <div
+      className="rounded-full flex items-center justify-center text-white font-bold shrink-0"
+      style={{ width: size, height: size, backgroundColor: bg, fontSize: size * 0.4 }}
+    >
+      {initials}
+    </div>
+  );
 }
 
 export function Elections() {
@@ -398,11 +406,7 @@ export function Elections() {
                         <div key={r.partyId} className="mb-2.5 pl-3" style={{ borderLeft: `3px solid ${color}` }}>
                           <div className="flex items-center gap-2 font-semibold text-sm">
                             {leaderName && party && (
-                              <img
-                                src={avatarUrl(leaderName, party.color, 32)}
-                                alt={leaderName}
-                                className="size-8 rounded-full shrink-0"
-                              />
+                              <InitialAvatar name={leaderName} color={party.color} size={32} />
                             )}
                             <span>{party?.name || r.partyId}{leaderName ? ` — ${leaderName}` : ""}</span>
                           </div>

@@ -14,6 +14,29 @@ const CATEGORY_COLORS: Record<string, string> = {
   economy: "#10b981",
 };
 
+/** Derives a simple numeric hash from a string for deterministic variation. */
+function hashCode(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function ArticleBanner({ id, category }: { id: string; category: string }) {
+  const base = CATEGORY_COLORS[category] || "#888";
+  const hash = hashCode(id);
+  const angle = (hash % 60) + 120; // 120–179 deg for variety
+  const lightness = 25 + (hash % 20); // 25–44%
+  const accent = `hsl(${(hash % 360)}, 60%, ${lightness}%)`;
+  return (
+    <div
+      className="w-full h-40 rounded-t mb-2.5 flex items-center justify-center overflow-hidden"
+      style={{ background: `linear-gradient(${angle}deg, ${base}, ${accent})` }}
+    />
+  );
+}
+
 const BIAS_LABELS: Record<string, string> = {
   left: "Left",
   center: "Center",
@@ -146,12 +169,7 @@ export function Media() {
                     onClick={() => toggleExpand(article.id)}
                   >
                     <CardContent className="p-4">
-                      <img
-                        src={`https://picsum.photos/seed/${article.id}/800/280`}
-                        alt={article.headline}
-                        className="w-full h-40 object-cover rounded-t mb-2.5"
-                        loading="lazy"
-                      />
+                      <ArticleBanner id={article.id} category={article.category} />
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{article.outlet}</span>
                         <Badge variant="outline" className={SHARED_BIAS_BADGE[article.bias] || SHARED_BIAS_BADGE.center}>
