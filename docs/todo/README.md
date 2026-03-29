@@ -56,9 +56,10 @@ Each item links to a detail file with full description, affected files, and impl
 | 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | open | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | open | Web | — |
+| 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | open | Web | — |
 
 ## Summary
 
-- **Done**: 19 of 24
+- **Done**: 19 of 25
 - **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies now used via #001)
-- **Open**: 4 remaining (#005, #022, #023, #024)
+- **Open**: 5 remaining (#005, #022, #023, #024, #025)
