@@ -1,0 +1,92 @@
+name: Server Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: "What to check"
+        required: true
+        type: choice
+        options:
+          - pm2-status
+          - api-logs
+          - simulate-logs
+          - disk-usage
+          - db-stats
+          - full-health
+
+jobs:
+  run:
+    name: "Status: ${{ inputs.check }}"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check server status
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            CHECK="${{ inputs.check }}"
+
+            case "$CHECK" in
+              pm2-status)
+                pm2 status
+                ;;
+              api-logs)
+                echo "==> Last 80 lines of ki-api logs:"
+                pm2 logs ki-api --lines 80 --nostream
+                ;;
+              simulate-logs)
+                echo "==> Last 80 lines of ki-simulate logs:"
+                pm2 logs ki-simulate --lines 80 --nostream 2>/dev/null || echo "ki-simulate not running"
+                ;;
+              disk-usage)
+                echo "==> Disk usage:"
+                df -h /
+                echo ""
+                echo "==> Database sizes:"
+                ls -lh data/*.db 2>/dev/null || echo "No databases found"
+                echo ""
+                echo "==> Backup sizes:"
+                du -sh /opt/backups/ki-bundestag/ 2>/dev/null || echo "No backups found"
+                ;;
+              db-stats)
+                echo "==> Simulation state:"
+                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "==> Event counts by type (last 7 days):"
+                sqlite3 -header -column data/simulation.db "SELECT type, COUNT(*) as count FROM simulation_events WHERE day_number > (SELECT current_day FROM simulation_meta) - 7 GROUP BY type ORDER BY count DESC"
+                echo ""
+                echo "==> Bills summary:"
+                sqlite3 -header -column data/simulation.db "SELECT status, COUNT(*) as count FROM bills GROUP BY status ORDER BY count DESC"
+                echo ""
+                echo "==> Party approvals:"
+                sqlite3 -header -column data/simulation.db "SELECT short_name, approval_rating FROM parties ORDER BY approval_rating DESC"
+                ;;
+              full-health)
+                echo "=== PM2 Processes ==="
+                pm2 status
+                echo ""
+                echo "=== Disk ==="
+                df -h /
+                echo ""
+                echo "=== Memory ==="
+                free -h
+                echo ""
+                echo "=== DB Sizes ==="
+                ls -lh data/*.db 2>/dev/null || echo "No databases"
+                echo ""
+                echo "=== Simulation State ==="
+                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "=== API Health ==="
+                curl -sf http://localhost:3001/api/state | head -c 200 || echo "API not responding"
+                echo ""
+                echo "=== Uptime ==="
+                uptime
+                ;;
+            esac

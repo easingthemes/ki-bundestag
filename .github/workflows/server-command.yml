@@ -1,20 +1,12 @@
-name: Server Command
+name: Custom Command
 
 on:
   workflow_dispatch:
     inputs:
       command:
-        description: "npm script or pm2 command"
+        description: "Shell command to run on server (use other workflows for common tasks)"
         required: true
-        type: choice
-        options:
-          - npm run migrate
-          - npm run simulate
-          - npm run simulate:auto
-          - pm2 start npx --name ki-api -- tsx packages/api/src/index.ts
-          - pm2 restart ki-api --update-env
-          - pm2 logs ki-api --lines 50 --nostream
-          - pm2 status
+        type: string
 
 jobs:
   run:
