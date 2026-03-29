@@ -13,15 +13,15 @@ import { VoteBar } from "@/components/VoteBar";
 const GROUP_INITIAL = 5;
 
 const STATUS_LABELS: Record<string, string> = {
-  third_reading: "Third Reading",
-  second_reading: "Second Reading",
-  committee: "Committee",
-  first_reading: "First Reading",
-  proposed: "Proposed",
-  passed: "Passed",
-  rejected: "Rejected",
-  debate: "Debate",
-  struck_down: "Struck Down",
+  third_reading: "3. Lesung",
+  second_reading: "2. Lesung",
+  committee: "Ausschuss",
+  first_reading: "1. Lesung",
+  proposed: "Eingebracht",
+  passed: "Angenommen",
+  rejected: "Abgelehnt",
+  debate: "Debatte",
+  struck_down: "Verfassungswidrig",
 };
 
 const STATUS_ORDER = ["third_reading", "second_reading", "committee", "first_reading", "proposed", "passed", "rejected", "struck_down", "debate"];
@@ -84,14 +84,14 @@ export function Bills() {
       {/* Registration prompt */}
       {!user && signalReadyCount > 0 && (
         <div className={cn(ALERT_STYLES.info, "mb-4")}>
-          <Link to="/parties" className="text-blue-700 font-semibold hover:underline">Register and join a party</Link> to signal your vote on bills in 2nd and 3rd reading.
+          <Link to="/parties" className="text-blue-700 font-semibold hover:underline">Registrieren und einer Partei beitreten</Link> um deine Position zu Gesetzen in 2. und 3. Lesung zu signalisieren.
         </div>
       )}
 
       {/* Signal-ready nudge for members */}
       {user && user.partyId && signalReadyCount > 0 && (
         <div className={cn(ALERT_STYLES.warning, "mb-4")}>
-          {signalReadyCount} bill{signalReadyCount !== 1 ? "s" : ""} in reading stage — click to signal your position.
+          {signalReadyCount} Gesetz{signalReadyCount !== 1 ? "e" : ""} in der Lesung — klicken, um deine Position zu signalisieren.
         </div>
       )}
 
@@ -113,7 +113,7 @@ export function Bills() {
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
           <option value="">Alle Status</option>
-          {STATUS_ORDER.map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+          {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s] ?? s.replace("_", " ")}</option>)}
         </select>
         {hasFilters && (
           <button
@@ -124,7 +124,7 @@ export function Bills() {
           </button>
         )}
         <span className="text-xs text-muted-foreground ml-1">
-          {filteredBills.length} bill{filteredBills.length !== 1 ? "s" : ""}
+          {filteredBills.length} Gesetz{filteredBills.length !== 1 ? "e" : ""}
         </span>
       </div>
 
@@ -186,19 +186,19 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
           </div>
           <span className="flex gap-1.5 items-center">
             {hasSeat && ["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
-              <MdbActionIcon title={bill.status === "third_reading" ? "Vote & speak as MdB" : "Speak as MdB"} />
+              <MdbActionIcon title={bill.status === "third_reading" ? "Abstimmen & Rede halten als MdB" : "Rede halten als MdB"} />
             )}
             {isMember && !hasSeat && (bill.status === "second_reading" || bill.status === "third_reading") && (
-              <UserActionIcon title="Signal your position" />
+              <UserActionIcon title="Position signalisieren" />
             )}
             {bill.isGovernmentBill && (
-              <Badge variant="outline" className={GOVT_BILL_BADGE}>Govt. Bill</Badge>
+              <Badge variant="outline" className={GOVT_BILL_BADGE}>Regierungsentwurf</Badge>
             )}
             {bill.memberInitiative && (
-              <Badge className={MEMBER_INITIATIVE_BADGE}>Member Initiative</Badge>
+              <Badge className={MEMBER_INITIATIVE_BADGE}>Mitgliederinitiative</Badge>
             )}
             {bill.vetoedByPresident && (
-              <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vetoed by President</Badge>
+              <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vom Präsidenten vetiert</Badge>
             )}
             <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>
               {STATUS_LABELS[bill.status] ?? bill.status}
@@ -207,18 +207,18 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
         </div>
         <p className="text-sm text-muted-foreground mt-1">{bill.description}</p>
         <p className="text-xs text-muted-foreground">
-          Proposed by {bill.memberInitiative && bill.proposerDisplayName
+          Eingebracht von {bill.memberInitiative && bill.proposerDisplayName
             ? <><span className="font-medium text-purple-700">{bill.proposerDisplayName}</span> ({proposer?.name ?? bill.proposedBy})</>
             : proposer?.name ?? bill.proposedBy
-          } on day {bill.proposedOnDay}
+          } am Tag {bill.proposedOnDay}
         </p>
 
         {bill.committeeName && (
           <p className="text-xs text-muted-foreground mt-1">
-            Committee: <strong>{bill.committeeName}</strong>
+            Ausschuss: <strong>{bill.committeeName}</strong>
             {bill.committeeRecommendation && (
               <span className="ml-2">
-                — Recommendation: <span
+                — Empfehlung: <span
                   className="font-semibold"
                   style={{
                     color: bill.committeeRecommendation === "pass" ? "#155724"
@@ -226,7 +226,7 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
                       : "#856404"
                   }}
                 >
-                  {bill.committeeRecommendation}
+                  {bill.committeeRecommendation === "pass" ? "Annahme" : bill.committeeRecommendation === "reject" ? "Ablehnung" : "Änderung"}
                 </span>
               </span>
             )}
@@ -236,7 +236,7 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
         {amendments.length > 0 && (
           <div className="mt-2">
             <p className="text-xs font-semibold text-muted-foreground mb-1">
-              Amendments ({amendments.length}):
+              Änderungsanträge ({amendments.length}):
             </p>
             {amendments.map(a => (
               <div key={a.id} className="text-xs text-muted-foreground py-0.5 flex items-center gap-1.5">
@@ -244,9 +244,9 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
                   "text-xs px-1.5 py-0",
                   a.accepted ? STATUS_BADGE.passed : STATUS_BADGE.rejected
                 )}>
-                  {a.accepted ? "accepted" : "rejected"}
+                  {a.accepted ? "angenommen" : "abgelehnt"}
                 </Badge>
-                <span>"{a.title}" by {partyMap.get(a.proposedBy)?.name ?? a.proposedBy}</span>
+                <span>„{a.title}" von {partyMap.get(a.proposedBy)?.name ?? a.proposedBy}</span>
               </div>
             ))}
           </div>

@@ -45,7 +45,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
             className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
             style={{ borderColor: displayColor, color: displayColor }}
           >
-            + Propose a Bill
+            + Gesetzentwurf vorschlagen
           </button>
         )}
       </div>
@@ -53,19 +53,19 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
       {showForm && (
         <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
           <CardContent className="p-5">
-            <div className="font-semibold mb-2">New Member Proposal</div>
+            <div className="font-semibold mb-2">Neuer Mitgliedervorschlag</div>
             <input
               type="text"
               value={propTitle}
               onChange={e => setPropTitle(e.target.value)}
-              placeholder="Bill title (10–120 chars)"
+              placeholder="Titel des Gesetzentwurfs (10–120 Zeichen)"
               maxLength={120}
               className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
             />
             <textarea
               value={propDesc}
               onChange={e => setPropDesc(e.target.value)}
-              placeholder="Brief description (20–300 chars)"
+              placeholder="Kurze Beschreibung (20–300 Zeichen)"
               maxLength={300}
               rows={3}
               className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
@@ -89,10 +89,10 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                     await api.createProposal(partyId, { title: propTitle.trim(), description: propDesc.trim(), category: propCategory });
                     setPropTitle(""); setPropDesc(""); setPropCategory("economy");
                     setShowForm(false);
-                    setPropMsg("Proposal submitted!");
+                    setPropMsg("Vorschlag eingereicht!");
                     api.getPartyProposals(partyId).then(onProposalsChange).catch(console.error);
                   } catch (e) {
-                    setPropMsg(e instanceof Error ? e.message : "Failed to submit");
+                    setPropMsg(e instanceof Error ? e.message : "Einreichen fehlgeschlagen");
                   } finally {
                     setPropSubmitting(false);
                     setTimeout(() => setPropMsg(null), 4000);
@@ -102,15 +102,15 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                 className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
                 style={{ background: displayColor }}
               >
-                {propSubmitting ? "Submitting…" : "Submit"}
+                {propSubmitting ? "Wird eingereicht…" : "Einreichen"}
               </button>
               <button
                 onClick={() => { setShowForm(false); setPropTitle(""); setPropDesc(""); }}
                 className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
               >
-                Cancel
+                Abbrechen
               </button>
-              {propMsg && <span className={`text-xs ${propMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
+              {propMsg && <span className={`text-xs ${propMsg.includes("fehlgeschlagen") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
             </div>
           </CardContent>
         </Card>
@@ -118,14 +118,14 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
 
       {proposals.length === 0 ? (
         <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-          <span>No proposals yet.{isMyParty ? " Be the first to propose a bill!" : " Join this party to propose bills."}</span>
+          <span>Noch keine Vorschläge.{isMyParty ? " Sei der Erste, der einen Gesetzentwurf vorschlägt!" : " Tritt dieser Partei bei, um Gesetze vorzuschlagen."}</span>
           {!isMyParty && (
             <button
               onClick={onNavigateToLogin}
               className="text-sm px-3 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
               style={{ borderColor: displayColor, color: displayColor }}
             >
-              Join
+              Beitreten
             </button>
           )}
         </div>
@@ -154,9 +154,9 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                       <div className="text-sm text-muted-foreground">{p.description}</div>
                       {p.bundestagBillId && (
                         <div className="text-xs text-emerald-500 mt-1">
-                          Submitted to Bundestag —{" "}
+                          Im Bundestag eingereicht —{" "}
                           <a href={`/bills/${p.bundestagBillId}`} className="text-xs text-blue-600 hover:underline">
-                            View Bill →
+                            Gesetzentwurf ansehen →
                           </a>
                         </div>
                       )}
@@ -198,10 +198,10 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                           {p.voteScore >= 0 ? "+" : ""}{p.voteScore}
                         </div>
                       )}
-                      <div className="text-xs text-muted-foreground">{p.totalVotes} vote{p.totalVotes !== 1 ? "s" : ""}</div>
+                      <div className="text-xs text-muted-foreground">{p.totalVotes} Stimme{p.totalVotes !== 1 ? "n" : ""}</div>
                       {isOpen && daysLeft >= 0 && (
                         <div className="text-xs text-muted-foreground">
-                          {daysLeft === 0 ? "Reviewed today" : `${daysLeft}d left`}
+                          {daysLeft === 0 ? "Heute geprüft" : `Noch ${daysLeft}T`}
                         </div>
                       )}
                     </div>

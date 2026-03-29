@@ -92,7 +92,7 @@ export function Login() {
             value={name}
             onChange={e => { setName(e.target.value); if (status === "not_found" || status === "error") setStatus("idle"); }}
             maxLength={30}
-            placeholder="2–30 characters"
+            placeholder="2–30 Zeichen"
             className="w-full px-3 py-2 rounded border border-input text-sm mb-4"
             onKeyDown={e => {
               if (e.key === "Enter") {

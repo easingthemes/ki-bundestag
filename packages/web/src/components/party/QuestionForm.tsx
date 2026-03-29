@@ -23,9 +23,9 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
     try {
       await api.submitQuestion(questionText.trim(), partyId);
       setQuestionText("");
-      setSubmitMsg("Question submitted!");
+      setSubmitMsg("Frage eingereicht!");
     } catch {
-      setSubmitMsg("Failed to submit question.");
+      setSubmitMsg("Einreichen fehlgeschlagen.");
     } finally {
       setSubmitting(false);
       setTimeout(() => setSubmitMsg(null), 3000);
@@ -42,7 +42,7 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
               type="text"
               value={questionText}
               onChange={e => setQuestionText(e.target.value)}
-              placeholder="Type your question..."
+              placeholder="Ihre Frage eingeben..."
               maxLength={500}
               className="flex-1 px-3 py-2 rounded border border-input text-sm"
               onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
@@ -53,11 +53,11 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
               className="px-4 py-2 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: displayColor }}
             >
-              {submitting ? "..." : "Submit"}
+              {submitting ? "..." : "Absenden"}
             </button>
           </div>
           {submitMsg && (
-            <div className={`text-sm mt-1.5 ${submitMsg.includes("Failed") ? "text-destructive" : "text-emerald-500"}`}>
+            <div className={`text-sm mt-1.5 ${submitMsg.includes("fehlgeschlagen") ? "text-destructive" : "text-emerald-500"}`}>
               {submitMsg}
             </div>
           )}
@@ -74,7 +74,7 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
                   <Badge variant="outline" className={q.status === "pending" ? STATUS_BADGE.pending : STATUS_BADGE.answered}>
                     {q.status}
                   </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">Day {q.createdOnDay}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">Tag {q.createdOnDay}</span>
                 </div>
                 <p className="text-sm italic mb-1.5">{q.question}</p>
                 {q.response && (

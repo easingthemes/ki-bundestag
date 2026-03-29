@@ -2,11 +2,11 @@ import { type Bill, type BillImpact } from "../../api";
 import { SEMANTIC_HEX } from "@/lib/colors";
 
 const IMPACT_FIELDS: { key: keyof BillImpact; label: string }[] = [
-  { key: "budget", label: "Budget" },
-  { key: "unemployment", label: "Unemployment" },
+  { key: "budget", label: "Haushalt" },
+  { key: "unemployment", label: "Arbeitslosigkeit" },
   { key: "inflation", label: "Inflation" },
-  { key: "gdpGrowth", label: "GDP Growth" },
-  { key: "publicSentiment", label: "Public Sentiment" },
+  { key: "gdpGrowth", label: "BIP-Wachstum" },
+  { key: "publicSentiment", label: "Öffentliche Stimmung" },
 ];
 
 function fmtImpact(val: number | undefined): string {
@@ -47,10 +47,10 @@ export function BillImpactDisplay({ bill }: BillImpactDisplayProps) {
       <thead>
         <tr>
           <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "2px solid #ddd", color: "#666", fontWeight: 600 }}>
-            Indicator
+            Indikator
           </th>
           <th style={{ textAlign: "right", padding: "6px 8px", borderBottom: "2px solid #ddd", color: "#666", fontWeight: 600 }}>
-            {hasOriginalDiff ? "Original → Final" : "Impact"}
+            {hasOriginalDiff ? "Original → Endwert" : "Auswirkung"}
           </th>
         </tr>
       </thead>

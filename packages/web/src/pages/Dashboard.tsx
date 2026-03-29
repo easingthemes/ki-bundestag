@@ -146,13 +146,13 @@ export function Dashboard() {
       {/* Banners */}
       {simStatus.timingPreset && (simStatus.timingPreset === "ultra-fast" || simStatus.timingPreset === "fast") && (
         <div className={cn(ALERT_STYLES.info, "font-medium mb-4 text-sm")}>
-          <strong>Watch-Only Mode</strong> — Simulation running in {simStatus.timingPreset === "ultra-fast" ? "Ultra-Fast" : "Fast"} mode.
+          <strong>Nur-Zuschauen-Modus</strong> — Simulation läuft im {simStatus.timingPreset === "ultra-fast" ? "Ultraschnell" : "Schnell"}-Modus.
         </div>
       )}
       {state.provisionalBudget && (
         <div className={cn(ALERT_STYLES.warning, "font-medium mb-4 text-sm")}>
-          <strong>Provisional Budget Active</strong> — Art. 111 GG.
-          {simStatus.budgetRetryDay != null && <span className="ml-1">Revised vote Day {simStatus.budgetRetryDay}.</span>}
+          <strong>Vorläufige Haushaltsführung aktiv</strong> — Art. 111 GG.
+          {simStatus.budgetRetryDay != null && <span className="ml-1">Neue Abstimmung Tag {simStatus.budgetRetryDay}.</span>}
         </div>
       )}
 
@@ -254,7 +254,7 @@ export function Dashboard() {
             </div>
             <div className="space-y-2">
               {events.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-4">No events yet.</div>
+                <div className="text-sm text-muted-foreground py-4">Noch keine Ereignisse.</div>
               ) : events.map(ev => (
                 <Card key={ev.id}>
                   <CardContent className="p-3.5">
@@ -469,7 +469,7 @@ export function Dashboard() {
             {!user ? (
               <Link to="/login" className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
                 <span className="block font-semibold text-xs text-primary">Anmelden</span>
-                <span className="block text-[11px] text-muted-foreground">Log in to participate</span>
+                <span className="block text-[11px] text-muted-foreground">Anmelden, um mitzumachen</span>
               </Link>
             ) : user.partyId ? (
               <Link to={`/parties/${user.partyId}`} className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
