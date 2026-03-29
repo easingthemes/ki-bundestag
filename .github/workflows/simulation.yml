@@ -18,6 +18,18 @@ on:
           - set-preset-fast
           - set-preset-normal
           - set-preset-slow
+          - inject-crisis-energiekrise
+          - inject-crisis-fluechtlingswelle
+          - inject-crisis-industrieskandal
+          - inject-crisis-hochwasser
+          - inject-crisis-krankenhausnotstand
+          - inject-crisis-cyberangriff
+          - inject-crisis-handelsstreit
+          - inject-crisis-protestwelle
+          - inject-economic-shock
+          - inject-budget-cycle
+          - inject-invalidate-election
+          - analytics-report
 
 jobs:
   run:
@@ -71,5 +83,51 @@ jobs:
                 sqlite3 data/simulation.db "UPDATE simulation_meta SET timing_preset = '$PRESET'"
                 echo "Current preset:"
                 sqlite3 -header -column data/simulation.db "SELECT timing_preset FROM simulation_meta LIMIT 1"
+                ;;
+              inject-crisis-*)
+                TEMPLATE="${ACTION#inject-crisis-}"
+                echo "==> Injecting crisis: $TEMPLATE"
+                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'crisis', json_object('templateId', '$TEMPLATE'), 0)"
+                echo "Crisis '$TEMPLATE' queued for next simulation day"
+                ;;
+              inject-economic-shock)
+                echo "==> Injecting economic shock..."
+                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'economic_shock', json_object('impact', json_object('budget', -5.0, 'unemployment', 0.5, 'inflation', 0.3, 'gdpGrowth', -0.5)), 0)"
+                echo "Economic shock queued for next simulation day"
+                ;;
+              inject-budget-cycle)
+                echo "==> Forcing budget cycle..."
+                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'budget', '{}', 0)"
+                echo "Budget cycle queued for next simulation day"
+                ;;
+              inject-invalidate-election)
+                echo "==> Invalidating current election..."
+                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'invalidate_election', '{}', 0)"
+                echo "Election invalidation queued for next simulation day"
+                ;;
+              analytics-report)
+                echo "==> User Analytics Report"
+                echo ""
+                echo "--- Overview ---"
+                sqlite3 -header -column data/users.db "SELECT COUNT(*) as total_users FROM users"
+                sqlite3 -header -column data/users.db "SELECT COUNT(*) as total_actions FROM user_actions"
+                echo ""
+                echo "--- DAU (24h) ---"
+                sqlite3 -header -column data/users.db "SELECT COUNT(DISTINCT user_id) as dau FROM user_actions WHERE created_at >= datetime('now', '-1 day')"
+                echo ""
+                echo "--- WAU (7d) ---"
+                sqlite3 -header -column data/users.db "SELECT COUNT(DISTINCT user_id) as wau FROM user_actions WHERE created_at >= datetime('now', '-7 days')"
+                echo ""
+                echo "--- Action Breakdown ---"
+                sqlite3 -header -column data/users.db "SELECT action_type, COUNT(*) as count FROM user_actions GROUP BY action_type ORDER BY count DESC"
+                echo ""
+                echo "--- Top 10 Users ---"
+                sqlite3 -header -column data/users.db "SELECT ua.user_id, u.displayName, COUNT(*) as actions FROM user_actions ua LEFT JOIN users u ON ua.user_id = u.id GROUP BY ua.user_id ORDER BY actions DESC LIMIT 10"
+                echo ""
+                echo "--- Funnel ---"
+                sqlite3 -header -column data/users.db "SELECT 'registered' as stage, COUNT(*) as count FROM users UNION ALL SELECT 'joined_party', COUNT(*) FROM users WHERE partyId IS NOT NULL UNION ALL SELECT 'first_action', COUNT(DISTINCT user_id) FROM user_actions WHERE action_type != 'register'"
+                echo ""
+                echo "--- Daily Actions (last 14d) ---"
+                sqlite3 -header -column data/users.db "SELECT date(created_at) as date, COUNT(*) as actions FROM user_actions WHERE created_at >= datetime('now', '-14 days') GROUP BY date(created_at) ORDER BY date ASC"
                 ;;
             esac
