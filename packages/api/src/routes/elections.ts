@@ -22,11 +22,11 @@ function mapElection(row: typeof schema.elections.$inferSelect): Election {
     campaignStartDay: row.campaignStartDay,
     electionDay: row.electionDay,
     status: row.status as Election["status"],
-    results: row.results as unknown as ElectionResult[] | null,
-    newCoalition: row.newCoalition as unknown as string[] | null,
-    newOpposition: row.newOpposition as unknown as string[] | null,
-    negotiationRounds: row.negotiationRounds as unknown as NegotiationRound[][] | null,
-    coalitionAgreement: row.coalitionAgreement as unknown as CoalitionAgreement | null,
+    results: (Array.isArray(row.results) ? row.results : null) as ElectionResult[] | null,
+    newCoalition: (Array.isArray(row.newCoalition) ? row.newCoalition : null) as string[] | null,
+    newOpposition: (Array.isArray(row.newOpposition) ? row.newOpposition : null) as string[] | null,
+    negotiationRounds: (Array.isArray(row.negotiationRounds) ? row.negotiationRounds : null) as NegotiationRound[][] | null,
+    coalitionAgreement: (row.coalitionAgreement && typeof row.coalitionAgreement === 'object' && !Array.isArray(row.coalitionAgreement) ? row.coalitionAgreement : null) as CoalitionAgreement | null,
   };
 }
 
