@@ -10,6 +10,7 @@ import type {
   BillImpact,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { LIMITS } from "../validation.js";
 
 const router = Router();
 
@@ -239,8 +240,8 @@ router.post("/api/questions", (req, res) => {
   const db = getDb();
   const { question, targetPartyId } = req.body;
 
-  if (!question || typeof question !== "string" || question.trim().length < 5) {
-    res.status(400).json({ error: "Question must be at least 5 characters" });
+  if (!question || typeof question !== "string" || question.trim().length < LIMITS.QUESTION_MIN) {
+    res.status(400).json({ error: `Question must be at least ${LIMITS.QUESTION_MIN} characters` });
     return;
   }
   if (question.trim().length > 500) {
@@ -275,7 +276,7 @@ router.post("/api/questions", (req, res) => {
   const id = `q-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
   db.insert(schema.citizenQuestions).values({
     id,
-    question: question.trim().substring(0, 500),
+    question: question.trim().substring(0, LIMITS.QUESTION_MAX),
     targetPartyId,
     response: null,
     respondedOnDay: null,
