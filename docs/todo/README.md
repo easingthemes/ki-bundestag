@@ -41,7 +41,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 012 | [Hardcoded validation limits and polling intervals](./012-hardcoded-config.md) | done | API / Web | #21 |
 | 013 | [Admin pages unreachable (routes removed)](./013-admin-pages-unreachable.md) | open | Web | — |
 | 014 | [Seat allocation race condition](./014-seat-race-condition.md) | done | API / Engine | #24 |
-| 015 | [localStorage auth vulnerable to XSS](./015-localstorage-xss.md) | open | Web | — |
+| 015 | [localStorage auth vulnerable to XSS](./015-localstorage-xss.md) | wontfix | Web | — |
 
 ## Low
 
@@ -57,5 +57,6 @@ Each item links to a detail file with full description, affected files, and impl
 ## Summary
 
 - **Done**: 17 of 21
-- **Open**: 4 remaining (#001, #005, #013, #015)
-- **Blocked**: #013 and #015 depend on #001 (real auth)
+- **Wontfix**: 1 (#015 — React escaping prevents XSS; HttpOnly cookies deferred to #001)
+- **Open**: 3 remaining (#001, #005, #013)
+- **Blocked**: #013 depends on #001 (real auth)
