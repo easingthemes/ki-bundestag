@@ -1,6 +1,6 @@
 # 015 — localStorage Auth Vulnerable to XSS
 
-**Status:** wontfix
+**Status:** done
 **Severity:** medium
 **Area:** Web
 
@@ -16,9 +16,7 @@ Auth token stored in `localStorage` is accessible to any JavaScript on the page.
 
 ## Fix
 
-Not needed — React's default JSX escaping prevents XSS across all user content rendering. No `dangerouslySetInnerHTML`, no HTML/markdown rendering, no attribute injection points exist. All user input is validated and length-limited on the API side.
-
-HttpOnly cookie migration belongs under #001 (real auth) if pursued later.
+Resolved by #026 — localStorage token storage removed entirely. Auth now uses OAuth session cookies (HttpOnly) via #001. No client-side token storage exists.
 
 ## Related
 

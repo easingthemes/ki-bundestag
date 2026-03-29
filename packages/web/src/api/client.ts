@@ -8,13 +8,6 @@ export function setErrorHandler(handler: (msg: string) => void) {
   _onError = handler;
 }
 
-// Legacy — kept for backward compatibility but no longer needed with session auth
-export function setUserToken(_token: string | null) { /* no-op: sessions use cookies */ }
-
-export function authHeaders(): Record<string, string> {
-  return {};
-}
-
 export function getBase(): string {
   return BASE;
 }
