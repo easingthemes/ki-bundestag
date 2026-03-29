@@ -238,22 +238,32 @@ Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<
         logAICall({ task: `mdb:${partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "reject" });
 
         if (decision === "approve") {
-          // Find an open seat and assign it
-          const openSeat = db.select().from(schema.bundestagSeats)
-            .where(and(
-              eq(schema.bundestagSeats.partyId, partyId),
-              eq(schema.bundestagSeats.active, true),
-              eq(schema.bundestagSeats.controller, "human"),
-            ))
-            .all()
-            .find(s => s.userId === null);
+          // Assign the seat atomically: re-check availability inside a transaction to prevent race conditions.
+          // The UNIQUE INDEX idx_bundestag_seats_active_user also enforces this at the DB level.
+          const sqlite = getSqlite();
+          const assignSeat = sqlite.transaction(() => {
+            const openSeat = db.select().from(schema.bundestagSeats)
+              .where(and(
+                eq(schema.bundestagSeats.partyId, partyId),
+                eq(schema.bundestagSeats.active, true),
+                eq(schema.bundestagSeats.controller, "human"),
+              ))
+              .all()
+              .find(s => s.userId === null);
 
-          if (openSeat) {
+            if (!openSeat) return null;
+
             db.update(schema.bundestagSeats)
               .set({ userId: app.userId })
               .where(eq(schema.bundestagSeats.id, openSeat.id))
               .run();
 
+            return openSeat;
+          });
+
+          const openSeat = assignSeat();
+
+          if (openSeat) {
             userDb.update(schema.mdbApplications).set({
               status: "approved",
               aiReasoning: reasoning,
