@@ -1,6 +1,6 @@
 # 013 — Admin Pages Unreachable (Routes Removed)
 
-**Status:** open
+**Status:** done
 **Severity:** medium
 **Area:** Web
 
@@ -8,18 +8,21 @@
 
 Admin page components exist but routes were removed from `main.tsx` for security. The pages are now dead code.
 
-## Files
+## Resolution
 
-- `packages/web/src/pages/Admin.tsx` — main admin page, links to /admin/costs and /admin/analytics
-- `packages/web/src/pages/AdminCosts.tsx` — AI cost tracking
-- `packages/web/src/pages/AdminAnalytics.tsx` — user analytics
+Admin functionality replaced with GitHub Actions workflows + public info pages:
 
-## Options
+**Moved to GH Workflows (`simulation.yml`):**
+- Event injection: 8 crisis templates, economic shock, budget cycle, election invalidation
+- Timing preset changes (already existed)
+- User analytics report (new `analytics-report` action)
 
-1. **Delete admin pages entirely** — manage via DB queries and GitHub Actions workflows
-2. **Re-add routes behind auth** — requires real auth (see #001) with admin role
-3. **Keep as-is** — dead code but harmless until auth is implemented
+**Moved to public pages:**
+- Model config → `/simulation-info` (public reference)
+- Actions catalog → `/simulation-info` (public reference)
+- AI cost estimates → `/simulation-info` (public reference)
 
-## Decision
-
-Blocked by #001 (real auth). Once auth exists, re-add routes with admin role check.
+**Deleted:**
+- `Admin.tsx`, `AdminAnalytics.tsx`, `AdminCosts.tsx` (renamed to `SimulationCosts.tsx`)
+- `PresetSelector.tsx`, `InjectForms.tsx` (admin action components)
+- Admin API client functions (`injectEvent`, `setPreset`, `getAnalytics`, `getCrisisTemplates`)

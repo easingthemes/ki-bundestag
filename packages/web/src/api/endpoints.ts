@@ -37,7 +37,6 @@ import {
   MdbApplication,
   MdbSpeech,
   MdbVoteSummary,
-  AnalyticsData,
   ImpactData,
   CatchupData,
 } from "./types.js";
@@ -110,8 +109,6 @@ export const getEvents = (limit = 50, offset = 0, type?: string, actor?: string)
 export const getLatestEvents = (since?: string) =>
   fetchJson<SimulationEvent[]>(`/simulation/events/latest${since ? `?since=${since}` : ""}`);
 
-export const injectEvent = (type: string, data?: Record<string, unknown>) =>
-  postJson<PendingInjection>("/simulate/inject", { type, data });
 export const getInjections = () => fetchJson<PendingInjection[]>("/simulate/injections");
 
 // ── Parliament (motions, interpellations, confidence votes, constitutional court) ──
@@ -198,7 +195,6 @@ export const voteReferendum = (id: string, option: string) =>
 export const getCrises = (activeOnly = false) =>
   fetchJson<Crisis[]>(`/crises${activeOnly ? "?active=true" : ""}`);
 export const getCrisis = (id: string) => fetchJson<Crisis>(`/crises/${id}`);
-export const getCrisisTemplates = () => fetchJson<CrisisTemplate[]>("/crisis-templates");
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
@@ -241,8 +237,6 @@ export const markAllNotificationsRead = () => postJson<{ marked: number }>("/not
 // ── Timing preset ─────────────────────────────────────────────────────────────
 
 export const getPreset = () => fetchJson<PresetInfo>("/simulation/preset");
-export const setPreset = (preset: TimingPreset) =>
-  postJson<{ success: boolean; preset: TimingPreset }>("/simulation/preset", { preset });
 
 // ── Seats ─────────────────────────────────────────────────────────────────────
 
@@ -259,8 +253,6 @@ export const applyForSeat = (applicationText: string, policyFocus?: string) =>
 // (submitMotion, submitInterpellation, submitAmendment already defined above under Parliament)
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-
-export const getAnalytics = () => fetchJson<AnalyticsData>("/admin/analytics");
 
 // ── Impact & Catchup ──────────────────────────────────────────────────────────
 
@@ -302,8 +294,6 @@ export const api = {
   getReferendums,
   getReferendum,
   voteReferendum,
-  getCrisisTemplates,
-  injectEvent,
   getInjections,
   getMotions,
   getMotion,
@@ -335,7 +325,6 @@ export const api = {
   joinParty,
   leaveParty,
   getPreset,
-  setPreset,
   getNotifications,
   getUnreadCount,
   markNotificationRead,
@@ -351,7 +340,6 @@ export const api = {
   submitMotion,
   submitInterpellation,
   submitAmendment,
-  getAnalytics,
   getMyImpact,
   getMyCatchup,
   getLatestEvents,
