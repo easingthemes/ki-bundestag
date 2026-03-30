@@ -584,7 +584,7 @@ function App() {
         {error && <ErrorToast message={error} onDismiss={() => setError(null)} />}
 
         {/* Main content */}
-        <main className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5">
+        <main className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5 overflow-x-hidden">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/parties" element={<Parties />} />
