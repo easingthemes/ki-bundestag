@@ -56,6 +56,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
 | 027 | [Scalability: user load testing & architecture improvements](./027-scalability-user-loads.md) | open | Engine / API / DB | — |
 | 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
+| 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
@@ -63,5 +64,5 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 26 of 28
-- **Open**: 2 remaining (#022, #027)
+- **Done**: 26 of 29
+- **Open**: 3 remaining (#022, #027, #029)
