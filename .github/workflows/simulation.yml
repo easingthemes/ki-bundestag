@@ -4,39 +4,67 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "Simulation action"
+        description: "Action to perform"
         required: true
         type: choice
         options:
-          - start-auto
-          - stop-auto
-          - run-1-day
-          - run-3-days
-          - run-6-days
+          - start
+          - stop
+          - inject
           - trigger-election
-          - set-preset-ultra-fast
-          - set-preset-fast
-          - set-preset-normal
-          - set-preset-slow
-          - inject-crisis-energiekrise
-          - inject-crisis-fluechtlingswelle
-          - inject-crisis-industrieskandal
-          - inject-crisis-hochwasser
-          - inject-crisis-krankenhausnotstand
-          - inject-crisis-cyberangriff
-          - inject-crisis-handelsstreit
-          - inject-crisis-protestwelle
-          - inject-economic-shock
-          - inject-budget-cycle
-          - inject-invalidate-election
           - analytics-report
+      mode:
+        description: "[start] Simulation mode"
+        required: false
+        type: choice
+        default: "auto"
+        options:
+          - auto
+          - 1-day
+          - 3-days
+          - 6-days
+      preset:
+        description: "[start] Timing preset (leave unchanged to keep current)"
+        required: false
+        type: choice
+        default: "(unchanged)"
+        options:
+          - "(unchanged)"
+          - ultra-fast
+          - fast
+          - normal
+          - slow
+      injection:
+        description: "[inject] What to inject"
+        required: false
+        type: choice
+        default: "crisis-energiekrise"
+        options:
+          - crisis-energiekrise
+          - crisis-fluechtlingswelle
+          - crisis-industrieskandal
+          - crisis-hochwasser
+          - crisis-krankenhausnotstand
+          - crisis-cyberangriff
+          - crisis-handelsstreit
+          - crisis-protestwelle
+          - economic-shock
+          - budget-cycle
+          - invalidate-election
 
 jobs:
   run:
-    name: "Simulation: ${{ inputs.action }}"
+    name: "Sim: ${{ inputs.action }}"
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Validate inputs
+        run: |
+          if [[ "${{ inputs.action }}" == "inject" && "${{ inputs.injection }}" == "" ]]; then
+            echo "::error::Injection type is required when action is 'inject'"
+            exit 1
+          fi
+
       - name: Execute simulation action
         uses: appleboy/ssh-action@v1
         with:
@@ -49,62 +77,79 @@ jobs:
             ACTION="${{ inputs.action }}"
 
             case "$ACTION" in
-              start-auto)
-                echo "==> Starting simulate:auto via PM2..."
-                pm2 start npx --name ki-simulate -- tsx packages/engine/src/runner-auto.ts
-                pm2 save
-                pm2 status
+              start)
+                MODE="${{ inputs.mode }}"
+                PRESET="${{ inputs.preset }}"
+
+                # Set timing preset if requested
+                if [[ "$PRESET" != "(unchanged)" ]]; then
+                  echo "==> Setting timing preset to: $PRESET"
+                  sqlite3 data/simulation.db "UPDATE simulation_meta SET timing_preset = '$PRESET'"
+                  sqlite3 -header -column data/simulation.db "SELECT timing_preset FROM simulation_meta LIMIT 1"
+                fi
+
+                case "$MODE" in
+                  auto)
+                    echo "==> Starting simulate:auto via PM2..."
+                    # Stop existing first if running
+                    pm2 stop ki-simulate 2>/dev/null || true
+                    pm2 delete ki-simulate 2>/dev/null || true
+                    pm2 start npx --name ki-simulate -- tsx packages/engine/src/runner-auto.ts
+                    pm2 save
+                    pm2 status
+                    ;;
+                  1-day)
+                    echo "==> Running 1 simulation day..."
+                    npx tsx packages/engine/src/runner.ts
+                    ;;
+                  3-days)
+                    echo "==> Running 3 simulation days..."
+                    npx tsx packages/engine/src/runner.ts 3
+                    ;;
+                  6-days)
+                    echo "==> Running 6 simulation days..."
+                    npx tsx packages/engine/src/runner.ts 6
+                    ;;
+                esac
                 ;;
-              stop-auto)
+
+              stop)
                 echo "==> Stopping simulate:auto..."
                 pm2 stop ki-simulate 2>/dev/null || echo "ki-simulate not running"
                 pm2 save
                 pm2 status
                 ;;
-              run-1-day)
-                echo "==> Running 1 simulation day..."
-                npx tsx packages/engine/src/runner.ts
+
+              inject)
+                INJECTION="${{ inputs.injection }}"
+                echo "==> Injecting: $INJECTION"
+
+                case "$INJECTION" in
+                  crisis-*)
+                    TEMPLATE="${INJECTION#crisis-}"
+                    sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'crisis', json_object('templateId', '$TEMPLATE'), 0)"
+                    echo "Crisis '$TEMPLATE' queued for next simulation day"
+                    ;;
+                  economic-shock)
+                    sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'economic_shock', json_object('impact', json_object('budget', -5.0, 'unemployment', 0.5, 'inflation', 0.3, 'gdpGrowth', -0.5)), 0)"
+                    echo "Economic shock queued for next simulation day"
+                    ;;
+                  budget-cycle)
+                    sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'budget', '{}', 0)"
+                    echo "Budget cycle queued for next simulation day"
+                    ;;
+                  invalidate-election)
+                    sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'invalidate_election', '{}', 0)"
+                    echo "Election invalidation queued for next simulation day"
+                    ;;
+                esac
                 ;;
-              run-3-days)
-                echo "==> Running 3 simulation days..."
-                npx tsx packages/engine/src/runner.ts 3
-                ;;
-              run-6-days)
-                echo "==> Running 6 simulation days..."
-                npx tsx packages/engine/src/runner.ts 6
-                ;;
+
               trigger-election)
                 echo "==> Triggering election on next sim day..."
                 npx tsx packages/engine/src/trigger-election.ts
                 ;;
-              set-preset-*)
-                PRESET="${ACTION#set-preset-}"
-                echo "==> Setting timing preset to: $PRESET"
-                sqlite3 data/simulation.db "UPDATE simulation_meta SET timing_preset = '$PRESET'"
-                echo "Current preset:"
-                sqlite3 -header -column data/simulation.db "SELECT timing_preset FROM simulation_meta LIMIT 1"
-                ;;
-              inject-crisis-*)
-                TEMPLATE="${ACTION#inject-crisis-}"
-                echo "==> Injecting crisis: $TEMPLATE"
-                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'crisis', json_object('templateId', '$TEMPLATE'), 0)"
-                echo "Crisis '$TEMPLATE' queued for next simulation day"
-                ;;
-              inject-economic-shock)
-                echo "==> Injecting economic shock..."
-                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'economic_shock', json_object('impact', json_object('budget', -5.0, 'unemployment', 0.5, 'inflation', 0.3, 'gdpGrowth', -0.5)), 0)"
-                echo "Economic shock queued for next simulation day"
-                ;;
-              inject-budget-cycle)
-                echo "==> Forcing budget cycle..."
-                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'budget', '{}', 0)"
-                echo "Budget cycle queued for next simulation day"
-                ;;
-              inject-invalidate-election)
-                echo "==> Invalidating current election..."
-                sqlite3 data/simulation.db "INSERT INTO pending_injections (id, type, data, consumed) VALUES ('inj-$(date +%s)', 'invalidate_election', '{}', 0)"
-                echo "Election invalidation queued for next simulation day"
-                ;;
+
               analytics-report)
                 echo "==> User Analytics Report"
                 echo ""
