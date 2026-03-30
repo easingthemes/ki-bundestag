@@ -170,6 +170,41 @@ const INPUT_SCALE: InputScaleRow[] = [
   { preset: "Slow", simDaysPerDay: "10", currentPerMonth: "$11", scaled20xPerMonth: "$94", delta: "+$83" },
 ];
 
+// ─── Comprehensive cost matrix: preset × depth × users ─────────────────────
+
+interface CostMatrixRow {
+  preset: string;
+  depth: string;
+  noUsers: string;
+  users1k: string;
+  users10k: string;
+  users100k: string;
+  highlight?: boolean;
+}
+
+// Ultra-fast & Fast have no users (non-participatory)
+// Normal: 48 sim days/real day × 30 = 1,440/month
+// Slow: 10 sim days/real day × 30 = 300/month
+// User-driven per sim day: 1K=$0.024, 10K=$0.06, 100K=$0.235
+const COST_MATRIX: CostMatrixRow[] = [
+  // Ultra-fast: 42,000 sim days/month, no users
+  { preset: "Ultra-fast", depth: "Low", noUsers: "$1,260", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Ultra-fast", depth: "Normal", noUsers: "$2,310", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Ultra-fast", depth: "High", noUsers: "$3,780", users1k: "—", users10k: "—", users100k: "—" },
+  // Fast: 6,270 sim days/month, no users
+  { preset: "Fast", depth: "Low", noUsers: "$188", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Fast", depth: "Normal", noUsers: "$345", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Fast", depth: "High", noUsers: "$564", users1k: "—", users10k: "—", users100k: "—" },
+  // Normal: 1,440 sim days/month
+  { preset: "Normal", depth: "Low", noUsers: "$43", users1k: "$78", users10k: "$130", users100k: "$382" },
+  { preset: "Normal", depth: "Normal", noUsers: "$79", users1k: "$114", users10k: "$166", users100k: "$418", highlight: true },
+  { preset: "Normal", depth: "High", noUsers: "$130", users1k: "$164", users10k: "$216", users100k: "$468" },
+  // Slow: 300 sim days/month
+  { preset: "Slow", depth: "Low", noUsers: "$9", users1k: "$16", users10k: "$27", users100k: "$80" },
+  { preset: "Slow", depth: "Normal", noUsers: "$17", users1k: "$24", users10k: "$35", users100k: "$87", highlight: true },
+  { preset: "Slow", depth: "High", noUsers: "$27", users1k: "$34", users10k: "$45", users100k: "$98" },
+];
+
 // ─── Context depth levels ───────────────────────────────────────────────────
 
 interface DepthRow {
@@ -482,6 +517,57 @@ export function SimulationCosts() {
                 ))}
               </tbody>
             </table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Cost Matrix: Preset × Depth × Users ───────────────────── */}
+      <div className="mb-8">
+        <h2 className="section-title">Kostenmatrix: Modus × Tiefe × Nutzer (pro Realmonat)</h2>
+        <Card>
+          <CardContent className="p-5 overflow-x-auto">
+            <p className="text-xs text-muted-foreground mb-3">
+              All costs per real calendar month (30 days). Ultra-fast/Fast are non-participatory (no user interactions).
+              User-driven costs are depth-independent (same batch calls regardless of context level).
+              Highlighted rows show the default configuration (Normal depth).
+            </p>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={TH}>Preset</th>
+                  <th className={TH}>Depth</th>
+                  <th className={cn(TH, "text-right")}>No Users</th>
+                  <th className={cn(TH, "text-right")}>1K Users</th>
+                  <th className={cn(TH, "text-right")}>10K Users</th>
+                  <th className={cn(TH, "text-right")}>100K Users</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COST_MATRIX.map((r, i) => {
+                  const isGroupStart = i === 0 || COST_MATRIX[i - 1].preset !== r.preset;
+                  return (
+                    <tr key={`${r.preset}-${r.depth}`} className={cn(
+                      TROW,
+                      r.highlight && "bg-muted/40 font-semibold",
+                      isGroupStart && i > 0 && "border-t-2 border-border",
+                    )}>
+                      <td className={cn(TD, "font-medium")}>{isGroupStart ? r.preset : ""}</td>
+                      <td className={TD}>{r.depth}</td>
+                      <td className={cn(TD, "text-right tabular-nums")}>{r.noUsers}</td>
+                      <td className={cn(TD, "text-right tabular-nums")}>{r.users1k}</td>
+                      <td className={cn(TD, "text-right tabular-nums")}>{r.users10k}</td>
+                      <td className={cn(TD, "text-right tabular-nums")}>{r.users100k}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="text-xs text-muted-foreground mt-3">
+              Sim days/month: Ultra-fast ~42,000 | Fast ~6,270 | Normal ~1,440 | Slow ~300.
+              User-driven adds per sim day: 1K +$0.024, 10K +$0.06, 100K +$0.235.
+              Low depth saves ~$0.025/sim day vs Normal by skipping briefing + reducing context.
+              High depth costs ~$0.035/sim day more than Normal (doubled lookbacks + budget).
+            </p>
           </CardContent>
         </Card>
       </div>
