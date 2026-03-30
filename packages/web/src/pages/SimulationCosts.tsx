@@ -28,8 +28,9 @@ interface SimCallRow {
 }
 
 const SIM_CALLS: SimCallRow[] = [
-  { action: "Party Agents (6x, batched)", model: "Haiku/Grok", maxTokens: 2048, estInput: "~3000 each", callsPerDay: "1 batch", note: "Always (Group A)" },
-  { action: "Media + Summary (batched)", model: "Haiku", maxTokens: 2048, estInput: "~2300", callsPerDay: "1 batch", note: "Always (Group C)" },
+  { action: "Daily Briefing (shared)", model: "Haiku", maxTokens: 512, estInput: "~2000", callsPerDay: "1", note: "Always (Pre-A), day 3+" },
+  { action: "Party Agents (6x, batched)", model: "Haiku/Grok", maxTokens: 2048, estInput: "~4000 each", callsPerDay: "1 batch", note: "Always (Group A)" },
+  { action: "Media + Summary (batched)", model: "Haiku", maxTokens: 2048, estInput: "~2800", callsPerDay: "1 batch", note: "Always (Group C)" },
   { action: "Interpellation Answers (batched)", model: "Haiku/Grok", maxTokens: 300, estInput: "~400 each", callsPerDay: "0-1 batch", note: "Group B" },
   { action: "Discipline Reasoning (batched)", model: "Haiku/Grok", maxTokens: 512, estInput: "~300 each", callsPerDay: "0-1 batch", note: "Every 7d (Group B)" },
   { action: "Context Poll + Referendum (batched)", model: "Haiku", maxTokens: 512, estInput: "~600", callsPerDay: "0-1 batch", note: "Weekly/Monthly" },
@@ -58,38 +59,39 @@ interface CostRow {
 }
 
 const QUIET_DAY: CostRow[] = [
-  { label: "5x Party Agent (Haiku)", count: 5, inputTok: "15,000", outputTok: "5,000", cost: "$0.032" },
-  { label: "1x Party Agent (AfD/Grok)", count: 1, inputTok: "3,000", outputTok: "1,000", cost: "$0.0014" },
-  { label: "Daily Summary", count: 1, inputTok: "800", outputTok: "200", cost: "$0.0014" },
-  { label: "Media Articles", count: 1, inputTok: "1,500", outputTok: "1,500", cost: "$0.0072" },
-  { label: "Total", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "~$0.047", highlight: true },
+  { label: "Daily Briefing (Haiku)", count: 1, inputTok: "2,000", outputTok: "512", cost: "$0.002" },
+  { label: "5x Party Agent (Haiku)", count: 5, inputTok: "20,000", outputTok: "5,000", cost: "$0.035" },
+  { label: "1x Party Agent (AfD/Grok)", count: 1, inputTok: "4,000", outputTok: "1,000", cost: "$0.002" },
+  { label: "Daily Summary", count: 1, inputTok: "800", outputTok: "200", cost: "$0.001" },
+  { label: "Media Articles", count: 1, inputTok: "2,500", outputTok: "1,500", cost: "$0.005" },
+  { label: "Total", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "~$0.055", highlight: true },
 ];
 
 const ACTIVE_DAY_1K: CostRow[] = [
-  { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
+  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
   { label: "Q&A batch (6 parties)", count: 6, inputTok: "5,400", outputTok: "2,400", cost: "$0.014" },
   { label: "MdB app select (6 parties)", count: 6, inputTok: "2,000", outputTok: "500", cost: "$0.004" },
   { label: "Speech flag (5 bills)", count: 5, inputTok: "3,250", outputTok: "200", cost: "$0.004" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "1,500", outputTok: "300", cost: "$0.002" },
-  { label: "Total", count: 31, inputTok: "32,450", outputTok: "11,100", cost: "~$0.071", highlight: true },
+  { label: "Total", count: 32, inputTok: "41,450", outputTok: "11,612", cost: "~$0.079", highlight: true },
 ];
 
 const ACTIVE_DAY_100K: CostRow[] = [
-  { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
+  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
   { label: "Q&A batch (6 parties × 50 Qs)", count: 6, inputTok: "54,000", outputTok: "24,000", cost: "$0.140" },
   { label: "MdB app select (6 parties)", count: 6, inputTok: "30,000", outputTok: "1,000", cost: "$0.028" },
   { label: "Speech flag (~10 bills)", count: 10, inputTok: "65,000", outputTok: "500", cost: "$0.054" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "13,200", outputTok: "600", cost: "$0.013" },
-  { label: "Total", count: 36, inputTok: "182,500", outputTok: "33,800", cost: "~$0.28", highlight: true },
+  { label: "Total", count: 37, inputTok: "191,500", outputTok: "34,312", cost: "~$0.29", highlight: true },
 ];
 
 const ACTIVE_DAY_1M: CostRow[] = [
-  { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
+  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
   { label: "Q&A batch (12 chunks)", count: 12, inputTok: "108,000", outputTok: "48,000", cost: "$0.278" },
   { label: "MdB app select (12 chunks)", count: 12, inputTok: "120,000", outputTok: "2,000", cost: "$0.104" },
   { label: "Speech flag (~20 bills)", count: 20, inputTok: "390,000", outputTok: "2,000", cost: "$0.320" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "66,000", outputTok: "1,500", cost: "$0.059" },
-  { label: "Total", count: "~58", inputTok: "704,300", outputTok: "61,200", cost: "~$0.81", highlight: true },
+  { label: "Total", count: "~59", inputTok: "713,300", outputTok: "61,712", cost: "~$0.82", highlight: true },
 ];
 
 const ELECTION_COSTS: CostRow[] = [
@@ -108,11 +110,11 @@ interface AggRow {
 }
 
 const AGG_SIM: AggRow[] = [
-  { scenario: "Quiet (no visitors, no election)", callsDay: "8", costDay: "$0.047", callsMonth: "240", costMonth: "$1.41", costWP: "$5.75" },
-  { scenario: "Active — 1K users (batch)", callsDay: "~31", costDay: "$0.071", callsMonth: "930", costMonth: "$2.13", costWP: "$8.68" },
-  { scenario: "Active — 100K users (batch)", callsDay: "~36", costDay: "$0.28", callsMonth: "1,080", costMonth: "$8.40", costWP: "$34" },
-  { scenario: "Active — 1M users (batch)", callsDay: "~58", costDay: "$0.81", callsMonth: "1,740", costMonth: "$24.30", costWP: "$99" },
-  { scenario: "Election cycle (3 neg. days)", callsDay: "~9", costDay: "$0.051", callsMonth: "259", costMonth: "$1.52", costWP: "$6.23" },
+  { scenario: "Quiet (no visitors, no election)", callsDay: "9", costDay: "$0.055", callsMonth: "270", costMonth: "$1.65", costWP: "$6.72" },
+  { scenario: "Active — 1K users (batch)", callsDay: "~32", costDay: "$0.079", callsMonth: "960", costMonth: "$2.37", costWP: "$9.60" },
+  { scenario: "Active — 100K users (batch)", callsDay: "~37", costDay: "$0.29", callsMonth: "1,110", costMonth: "$8.70", costWP: "$35" },
+  { scenario: "Active — 1M users (batch)", callsDay: "~59", costDay: "$0.82", callsMonth: "1,770", costMonth: "$24.60", costWP: "$100" },
+  { scenario: "Election cycle (3 neg. days)", callsDay: "~10", costDay: "$0.059", callsMonth: "289", costMonth: "$1.77", costWP: "$7.18" },
 ];
 
 interface RealTimeRow {
@@ -124,13 +126,13 @@ interface RealTimeRow {
 }
 
 const AGG_REAL: RealTimeRow[] = [
-  { scenario: "Ultra-fast / Fast (pure sim)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$66", costMonth: "$1,974" },
-  { scenario: "Normal — 1K users", simDays: "48/day", wallClock: "~30 min + 2 min batch", costDay: "$3.41", costMonth: "$102" },
-  { scenario: "Normal — 100K users", simDays: "48/day", wallClock: "~30 min + 5 min batch", costDay: "$13.44", costMonth: "$403" },
-  { scenario: "Normal — 1M users", simDays: "48/day", wallClock: "~30 min + 15 min batch", costDay: "$38.88", costMonth: "$1,166" },
-  { scenario: "Slow — 1K users", simDays: "~10/day", wallClock: "~90 min + 2 min batch", costDay: "$0.71", costMonth: "$21" },
-  { scenario: "Slow — 100K users", simDays: "~10/day", wallClock: "~90 min + 5 min batch", costDay: "$2.80", costMonth: "$84" },
-  { scenario: "Slow — 1M users", simDays: "~10/day", wallClock: "~90 min + 15 min batch", costDay: "$8.10", costMonth: "$243" },
+  { scenario: "Ultra-fast / Fast (pure sim)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$77", costMonth: "$2,310" },
+  { scenario: "Normal — 1K users", simDays: "48/day", wallClock: "~30 min + 2 min batch", costDay: "$3.79", costMonth: "$114" },
+  { scenario: "Normal — 100K users", simDays: "48/day", wallClock: "~30 min + 5 min batch", costDay: "$13.92", costMonth: "$418" },
+  { scenario: "Normal — 1M users", simDays: "48/day", wallClock: "~30 min + 15 min batch", costDay: "$39.36", costMonth: "$1,181" },
+  { scenario: "Slow — 1K users", simDays: "~10/day", wallClock: "~90 min + 2 min batch", costDay: "$0.79", costMonth: "$24" },
+  { scenario: "Slow — 100K users", simDays: "~10/day", wallClock: "~90 min + 5 min batch", costDay: "$2.90", costMonth: "$87" },
+  { scenario: "Slow — 1M users", simDays: "~10/day", wallClock: "~90 min + 15 min batch", costDay: "$8.20", costMonth: "$246" },
 ];
 
 interface AltRow {
@@ -144,7 +146,7 @@ interface AltRow {
 }
 
 const ALTERNATIVES: AltRow[] = [
-  { model: "All Haiku (current default)", priceLabel: "$0.80 / $4.00", perSimDay: "$0.047", perWP: "$5.75", perRealDay: "$66", delta: "baseline", deltaColor: "text-muted-foreground" },
+  { model: "All Haiku (current default)", priceLabel: "$0.80 / $4.00", perSimDay: "$0.055", perWP: "$6.72", perRealDay: "$77", delta: "baseline", deltaColor: "text-muted-foreground" },
   { model: "All Grok-3-mini", priceLabel: "$0.30 / $0.50", perSimDay: "$0.010", perWP: "$1.22", perRealDay: "$14", delta: "-79%", deltaColor: "text-emerald-600" },
   { model: "All Sonnet", priceLabel: "$3.00 / $15.00", perSimDay: "$0.177", perWP: "$21.42", perRealDay: "$248", delta: "+276%", deltaColor: "text-red-600" },
   { model: "GPT-4o-mini (OpenAI)", priceLabel: "$0.15 / $0.60", perSimDay: "$0.008", perWP: "$0.97", perRealDay: "$11", delta: "-83%", deltaColor: "text-emerald-600" },
@@ -495,6 +497,9 @@ export function SimulationCosts() {
               <li><strong>Sim day cycles</strong>: polls every ~2 weeks, economic reports monthly, budgets annually, elections every 4 years. Snap elections possible from confidence votes or budget failures.</li>
               <li><strong>AfD/Grok savings</strong>: Using grok-3-mini for 1/6 of party calls saves ~$0.005/day (~10% of party agent cost)</li>
               <li><strong>Synthesis (Sonnet)</strong> is the most expensive single call but happens only ~3 times per election cycle (~once per 4-year term)</li>
+              <li><strong>Daily Briefing</strong>: 1 shared Haiku call synthesizes a political narrative from 30 days of event history. Output (~800-1200 tokens) is injected into all party agent prompts, question/interpellation answers, and media generation.</li>
+              <li><strong>Party Profiles</strong>: Static per-party personality text (~200-300 tokens) in system prompts — no API cost, but increases input tokens per party agent call.</li>
+              <li><strong>Cross-day Memory</strong>: Each party sees its own recent actions (14-day lookback) from the DB — no extra API calls, just larger input context.</li>
             </ul>
           </CardContent>
         </Card>
