@@ -18,6 +18,7 @@ const QUESTION_EXPIRY_DAYS = 14;
 export async function answerPendingQuestions(
   allParties: Party[],
   currentDay: number,
+  briefing?: string,
 ): Promise<void> {
   const db = getDb();
 
@@ -50,7 +51,7 @@ export async function answerPendingQuestions(
 
   if (pending.length === 0) return;
 
-  await answerQuestionsBatch(pending, allParties, scoreMap, currentDay);
+  await answerQuestionsBatch(pending, allParties, scoreMap, currentDay, briefing);
 }
 
 /**
@@ -61,6 +62,7 @@ async function answerQuestionsBatch(
   allParties: Party[],
   scoreMap: Record<string, number>,
   currentDay: number,
+  briefing?: string,
 ): Promise<void> {
   const db = getDb();
 
@@ -82,7 +84,7 @@ async function answerQuestionsBatch(
     const party = allParties.find(p => p.id === partyId);
     if (!party) continue;
 
-    const partyCtx: PartyContext = { id: partyId, name: party.name, ideology: (party as any).ideology ?? "" };
+    const partyCtx: PartyContext = { id: partyId, name: party.name, ideology: (party as any).ideology ?? "", politicalContext: briefing ?? undefined };
 
     // Pre-filter and limit
     const items: QuestionItem[] = partyQuestions.map(q => ({
