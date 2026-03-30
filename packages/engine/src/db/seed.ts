@@ -193,22 +193,33 @@ export function seedDatabase() {
   // Recreate simulation schema
   sqlite.exec(SIM_TABLE_DDL);
 
-  // User DB: fresh start
+  // User DB: preserve user accounts, clear bundestag-related activity
   const userSqlite = getUserSqlite();
-  userSqlite.exec(`
-    DROP TABLE IF EXISTS user_actions;
-    DROP TABLE IF EXISTS mdb_speeches;
-    DROP TABLE IF EXISTS mdb_votes;
-    DROP TABLE IF EXISTS mdb_applications;
-    DROP TABLE IF EXISTS notifications;
-    DROP TABLE IF EXISTS referendum_votes;
-    DROP TABLE IF EXISTS question_votes;
-    DROP TABLE IF EXISTS member_signals;
-    DROP TABLE IF EXISTS internal_votes;
-    DROP TABLE IF EXISTS internal_proposals;
-    DROP TABLE IF EXISTS users;
-  `);
+
+  // Ensure all user tables exist (safe for fresh DBs)
   userSqlite.exec(USER_TABLE_DDL);
+
+  // Clear bundestag-activity tables (these reference simulation data that was just wiped)
+  userSqlite.exec(`
+    DELETE FROM user_actions;
+    DELETE FROM mdb_speeches;
+    DELETE FROM mdb_votes;
+    DELETE FROM mdb_applications;
+    DELETE FROM notifications;
+    DELETE FROM referendum_votes;
+    DELETE FROM question_votes;
+    DELETE FROM member_signals;
+    DELETE FROM internal_votes;
+    DELETE FROM internal_proposals;
+  `);
+
+  // Reset bundestag-related fields on users without deleting accounts
+  userSqlite.exec(`
+    UPDATE users SET party_id = NULL, switch_cooldown_until = NULL;
+  `);
+
+  const userCount = (userSqlite.prepare("SELECT COUNT(*) as cnt FROM users").get() as { cnt: number }).cnt;
+  console.log(`Preserved ${userCount} user accounts (reset party affiliations, cleared activity data)`);
 
   // Insert parties
   for (const party of PARTIES) {
