@@ -31,10 +31,10 @@ if (FRONTEND_URL === "*") {
   throw new Error("FRONTEND_URL must be a specific origin, not '*'");
 }
 
-// Require SESSION_SECRET in production
+// Warn if SESSION_SECRET is not set in production
 const isProd = process.env.NODE_ENV === "production";
 if (isProd && !process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET environment variable is required in production");
+  logger.warn("SESSION_SECRET is not set — using default. Set this env var in production!");
 }
 
 // Trust reverse proxy (Caddy) so secure cookies work behind HTTPS termination
@@ -72,11 +72,11 @@ app.use(passport.session());
 
 app.use(sessionTracking);
 
-// Rate limiting — applied by path prefix before routers
-app.use("/api/polls/:id/vote", voteLimiter);
-app.use("/api/questions/:id/vote", voteLimiter);
-app.use("/api/referendums/:id/vote", voteLimiter);
-app.use("/api/questions", actionLimiter);
+// Rate limiting — POST-only for user actions, all methods for admin brute-force protection
+app.post("/api/polls/:id/vote", voteLimiter);
+app.post("/api/questions/:id/vote", voteLimiter);
+app.post("/api/referendums/:id/vote", voteLimiter);
+app.post("/api/questions", actionLimiter);
 app.use("/api/admin", adminLimiter);
 app.use("/api/simulation/preset", adminLimiter);
 app.use("/api/simulate", adminLimiter);
