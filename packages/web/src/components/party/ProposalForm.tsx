@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { useUser } from "../../userContext";
+import { useDailyLimit } from "@/hooks/useDailyLimit";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
@@ -26,6 +27,7 @@ interface ProposalFormProps {
 
 export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, onProposalsChange, onNavigateToLogin }: ProposalFormProps) {
   const { user } = useUser();
+  const { info: limitInfo, refresh: refreshLimit, isAtLimit } = useDailyLimit("submit_proposal", user?.id);
   const [showForm, setShowForm] = useState(false);
   const [propTitle, setPropTitle] = useState("");
   const [propDesc, setPropDesc] = useState("");
@@ -40,13 +42,19 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
       <div className="flex justify-between items-center mb-3">
         <h2 className="section-title m-0">Mitgliedervorschläge ({proposals.length})</h2>
         {isMyParty && !showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
-            style={{ borderColor: displayColor, color: displayColor }}
-          >
-            + Gesetzentwurf vorschlagen
-          </button>
+          isAtLimit ? (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1">
+              Tageslimit ({limitInfo?.used}/{limitInfo?.limit} Vorschläge in 24h)
+            </span>
+          ) : (
+            <button
+              onClick={() => setShowForm(true)}
+              className="px-3.5 py-1 rounded border bg-card font-semibold text-sm cursor-pointer hover:opacity-80"
+              style={{ borderColor: displayColor, color: displayColor }}
+            >
+              + Gesetzentwurf vorschlagen
+            </button>
+          )
         )}
       </div>
 
@@ -90,6 +98,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                     setPropTitle(""); setPropDesc(""); setPropCategory("economy");
                     setShowForm(false);
                     setPropMsg("Vorschlag eingereicht!");
+                    refreshLimit();
                     api.getPartyProposals(partyId).then(onProposalsChange).catch(console.error);
                   } catch (e) {
                     setPropMsg(e instanceof Error ? e.message : "Einreichen fehlgeschlagen");

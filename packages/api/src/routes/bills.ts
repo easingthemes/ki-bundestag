@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import type { Bill } from "@ki-bundestag/types";
 import { mapBill } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { checkUserDailyLimit } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -81,6 +82,9 @@ router.post("/api/bills/:id/amendment", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
+  const { allowed, limit, used } = checkUserDailyLimit(token, "submit_amendment");
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} amendments in 24h). Try again later.` }); return; }
+
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
 
@@ -154,6 +158,9 @@ router.post("/api/bills/:id/speech", (req, res) => {
   if (requireParticipatory(req, res, "give_speech")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const { allowed, limit, used } = checkUserDailyLimit(token, "submit_speech");
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} speeches in 24h). Try again later.` }); return; }
 
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }

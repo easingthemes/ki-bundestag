@@ -10,21 +10,34 @@
 
 import { and, eq, gte } from "drizzle-orm";
 import { getDb, getUserDb, schema } from "../db/index.js";
-import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { createNotification } from "./event-queue.js";
+import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 const LEVEL_LABELS = ["Gut", "Verwarnung", "Eingeschränkt", "Fraktionszwang"];
 
+interface DisciplineBatchEntry {
+  party: { id: string; name: string };
+  membersToUpdate: Array<{
+    seat: { id: string; userId: string | null; disciplineLevel: number };
+    newLevel: number;
+    disloyaltyScore: number;
+    votesAgainst: number;
+  }>;
+  request: BatchRequest;
+}
+
 /**
  * Review party discipline for all active human MdBs.
- * Deterministic scoring + AI reasoning text.
+ * Deterministic scoring + batched AI reasoning text.
  */
 export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
   const db = getDb();
   const userDb = getUserDb();
 
   const allParties = db.select().from(schema.parties).all();
+  const disciplineBatchData: DisciplineBatchEntry[] = [];
 
   for (const party of allParties) {
     // Active human seats with assigned users
@@ -84,7 +97,6 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
       }
 
       // Disloyalty score: votesAgainst * 2
-      // (speeches and actions deferred to v2 for content analysis)
       const disloyaltyScore = votesAgainst * 2;
 
       flaggedMembers.push({
@@ -108,16 +120,12 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
       let newLevel = currentLevel;
 
       if (m.disloyaltyScore >= 6) {
-        // Severe: >3 opposing votes → escalate by 2
-        newLevel = Math.min(currentLevel + 2, 4); // 4 = expel
+        newLevel = Math.min(currentLevel + 2, 4);
       } else if (m.disloyaltyScore >= 4) {
-        // Moderate: 2-3 opposing votes → escalate by 1
         newLevel = Math.min(currentLevel + 1, 4);
       } else if (m.disloyaltyScore === 0 && m.totalVotes > 0) {
-        // Loyal with activity → de-escalate by 1
         newLevel = Math.max(currentLevel - 1, 0);
       }
-      // disloyaltyScore 1-3 (1 opposing vote): maintain current level
 
       if (newLevel !== currentLevel) {
         membersToUpdate.push({
@@ -131,27 +139,42 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
 
     if (membersToUpdate.length === 0) continue;
 
-    // AI call for reasoning text (1 call per party, batch all updates)
-    let reasonings: Record<string, string> = {};
-    const t0 = Date.now();
-    try {
-      const memberSummaries = membersToUpdate.map(m => {
-        const user = userDb.select().from(schema.users)
-          .where(eq(schema.users.id, m.seat.userId!)).get();
-        const name = user?.displayName ?? "MdB";
-        const direction = m.newLevel > m.seat.disciplineLevel ? "Verschärfung" : "Verbesserung";
-        return `- ${name} (${m.seat.userId}): ${m.votesAgainst} Gegenstimmen, Stufe ${m.seat.disciplineLevel}→${m.newLevel} (${direction})`;
-      }).join("\n");
+    // Collect this party's AI reasoning request for batching
+    const memberSummaries = membersToUpdate.map(m => {
+      const user = userDb.select().from(schema.users)
+        .where(eq(schema.users.id, m.seat.userId!)).get();
+      const name = user?.displayName ?? "MdB";
+      const direction = m.newLevel > m.seat.disciplineLevel ? "Verschärfung" : "Verbesserung";
+      return `- ${name} (${m.seat.userId}): ${m.votesAgainst} Gegenstimmen, Stufe ${m.seat.disciplineLevel}→${m.newLevel} (${direction})`;
+    }).join("\n");
 
-      const { text: raw, model, provider } = await callAI({
+    disciplineBatchData.push({
+      party,
+      membersToUpdate,
+      request: {
+        customId: `discipline-${party.id}`,
         system: `Du bist die Fraktionsführung der ${party.name}. Gib kurze Begründungen für Disziplinarentscheidungen über Fraktionsmitglieder im Bundestag. Antworte NUR mit validem JSON: {"reasonings": {"<userId>": "<1-2 Sätze Begründung auf Deutsch>"}}`,
         prompt: `Fraktionsdisziplin-Überprüfung:\n${memberSummaries}\n\nStufen: 0=Gut, 1=Verwarnung, 2=Eingeschränkt (kein Rederecht-Priorität), 3=Fraktionszwang (Stimmabgabe wird erzwungen), 4=Ausschluss.\n\nBegründe jede Änderung.`,
         maxTokens: 512,
         partyId: party.id as string,
-      });
+      },
+    });
+  }
 
+  // Submit all discipline reasoning calls as one batch
+  if (disciplineBatchData.length === 0) return;
+
+  const batchRequests = disciplineBatchData.map(d => d.request);
+  console.log(`  [Batch] Submitting ${batchRequests.length} discipline reasoning requests...`);
+  const batchResults = await submitBatch(batchRequests);
+
+  for (const { party, membersToUpdate, request } of disciplineBatchData) {
+    const batchResult = findResult(batchResults, request.customId);
+    let reasonings: Record<string, string> = {};
+
+    if (batchResult && batchResult.text) {
       const parsed = parseAIJson<{ reasonings: Record<string, string> }>(
-        raw,
+        batchResult.text,
         (v: unknown) => {
           const o = v as Record<string, unknown>;
           if (!o.reasonings || typeof o.reasonings !== "object" || Array.isArray(o.reasonings)) return null;
@@ -160,14 +183,9 @@ export async function reviewPartyDiscipline(currentDay: number): Promise<void> {
         "Discipline",
       );
       if (parsed) reasonings = parsed.reasonings;
-      logAICall({ task: `discipline:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "default-reasons" });
-    } catch (err) {
-      if (err instanceof AIProviderLimitError) {
-        console.warn(`  [Discipline] Skipped AI reasoning for ${party.name} (${(err as Error).message})`);
-      } else {
-        console.error(`  [Discipline] AI reasoning error for ${party.name}:`, err);
-      }
-      logAICall({ task: `discipline:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "default-reasons" });
+      logAICall({ task: `discipline:${party.id}`, model: batchResult.model, provider: batchResult.provider as Provider, latencyMs: 0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "default-reasons" });
+    } else {
+      logAICall({ task: `discipline:${party.id}`, model: batchResult?.model ?? "unknown", provider: (batchResult?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "default-reasons" });
     }
 
     // Apply updates

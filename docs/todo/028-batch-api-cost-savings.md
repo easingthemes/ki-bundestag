@@ -1,0 +1,407 @@
+# 028 — Batch API Cost Savings for Scaling Users
+
+**Status**: done
+**Area**: Engine / Agent
+**Priority**: High
+
+## Summary
+
+All AI calls in the simulation are non-real-time — results are consumed on the next simulation day or within the same day loop. Both Anthropic and xAI offer **Batch APIs with 50% cost reduction**. Since no AI call requires an immediate response to a user, every single call can be batched.
+
+## Batch API Overview
+
+### Anthropic Message Batches API
+- **Discount**: 50% off all token costs
+- **Limit**: 100,000 requests or 256 MB per batch
+- **Turnaround**: Most batches complete within 1 hour, max 24 hours
+- **Results**: Poll for status, retrieve when done (available 29 days)
+- **SDK**: `client.messages.batches.create({ requests: [...] })`
+- **Docs**: https://platform.claude.com/docs/en/build-with-claude/batch-processing
+
+### xAI Batch API
+- **Discount**: 50% off all token costs (input, output, cached, reasoning)
+- **Limit**: 25 MB per batch
+- **Turnaround**: Most batches complete within 24 hours
+- **Does not count** toward standard rate limits
+- **SDK**: Upload JSONL or use SDK batch helpers
+- **Docs**: https://docs.x.ai/developers/advanced-api-usage/batch-api
+
+## Current AI Call Inventory (All Batchable)
+
+Every AI call happens during `runDay()` — none are triggered by live HTTP requests. The simulation loop can wait for batch results before proceeding.
+
+| Call Site | File | Calls/Day | Per-What | Current Cost Model |
+|-----------|------|-----------|----------|-------------------|
+| Party agent voting | `party-agent.ts` | ~6 | Per party | Per-party (Haiku/Grok) |
+| Coalition negotiation | `negotiations.ts` | 0–18 | Per party per round | Per-party |
+| Coalition synthesis | `negotiations.ts` | ~0.003 | Per election | Role: synthesis (Sonnet) |
+| Speech evaluation | `speeches.ts` | 0–N | **Per user speech** | Role: daily (Haiku) |
+| Daily media | `media.ts` | 0–1 | Per day | Role: daily (Haiku) |
+| Citizen questions | `questions.ts` | 0–3 | **Per user question** | Per-party |
+| Interpellations | `interpellations.ts` | 0–2 | Per interpellation | Per-party |
+| Context poll | `polls.ts` | 0–1/week | Per week | Role: daily (Haiku) |
+| Referendum | `referendums.ts` | ~0.03 | Per 30 days | Role: daily (Haiku) |
+| Daily summary | `summary.ts` | 1 | Per day | Role: daily (Haiku) |
+| Internal proposals | `internal-proposals.ts` | 0–6 | **Per user proposal** | Per-party |
+| MdB applications | `seats.ts` | 0–18 | **Per user application** | Per-party |
+| Discipline review | `discipline.ts` | ~0.86 | Per party weekly | Per-party |
+
+**Typical day**: 9–12 calls. **Peak day (high user activity)**: 20–30 calls.
+
+### Calls That Scale With Users (Critical for 100K+)
+
+These are the bottleneck — they grow linearly with user count:
+
+| Call | Current | At 100K Users | Problem |
+|------|---------|---------------|---------|
+| Speech evaluation | 1 call per speech | Hundreds/day | Sequential, 1 AI call each |
+| MdB applications | Max 18/day (3/party) | 1000s pending, 18 reviewed | Artificial cap, huge backlog |
+| Internal proposals | 1 per ready proposal/party | Dozens/day | Sequential per party |
+| Citizen questions | Max 3/day | 1000s pending, 3 answered | Artificial cap |
+
+## Input Size Analysis Per User Action
+
+Understanding token sizes is critical for calculating how many items fit in a single prompt.
+
+### Actual Field Limits (from `packages/api/src/validation.ts`)
+
+| Field | Min Chars | Max Chars | ~Max Tokens |
+|-------|-----------|-----------|-------------|
+| Application text | 10 | 500 | ~150 |
+| Policy focus | — | 5 items × 100 chars | ~150 |
+| Speech content | 20 | 2,000 | ~600 |
+| Citizen question | 5 | 500 | ~150 |
+| Proposal title | 5 | 80 | ~25 |
+| Proposal description | 10 | 500 | ~150 |
+| Amendment description | 10 | 500 | ~150 |
+| Display name | 2 | 30 | ~10 |
+
+### Tokens Per User Item in a Grouped Prompt
+
+Each item needs: user identifier + content + metadata. Estimated tokens per item:
+
+| Action Type | Per-Item Tokens (input) | Per-Item Output Tokens |
+|-------------|------------------------|----------------------|
+| MdB application | ~200 (name + text + focus + score) | ~40 (approve/reject + reason) |
+| Speech | ~650 (name + bill context + speech text) | ~5 (positive/neutral/negative) |
+| Citizen question | ~180 (question + voter score) | ~80 (2-3 sentence answer) |
+| Internal proposal | ~220 (title + desc + votes + category) | ~30 (accept/decline + reason) |
+| Interpellation | ~200 (title + question + ministry) | ~100 (government answer) |
+
+### Haiku 4.5 Context Window: 200K tokens
+
+How many items fit in ONE prompt call (leaving ~2K for system prompt + output):
+
+| Action | Items per Call | At 100K Users/Day | Calls Needed |
+|--------|---------------|-------------------|--------------|
+| MdB applications | **~900 per call** | ~500 pending/party | **1 per party** (6 total) |
+| Speeches | **~280 per call** | ~200 total/day | **1 per bill** (~5-10 total) |
+| Citizen questions | **~1,000 per call** | ~500 pending/party | **1 per party** (6 total) |
+| Internal proposals | **~800 per call** | ~50 ready/party | **1 per party** (6 total) |
+| Interpellations | **~600 per call** | ~30 pending | **1 total** |
+
+## Key Insight: Selection-Style Prompts (Not Review-All)
+
+The biggest optimization is changing the TASK itself. Instead of "review each application individually", ask the model to SELECT the best ones from a large pool.
+
+### MdB Applications: "Select Top N" Instead of "Review Each"
+
+```
+CURRENT (1 call per application, max 3/party/day = 18 calls):
+  "Here is 1 application. Approve or reject?"
+  × 18 times
+
+BETTER (1 call per party with all apps = 6 calls):
+  "Here are 50 applications. Approve or reject each one."
+  × 6 parties
+
+BEST (1 call per party, selection mode = 6 calls, MUCH less output):
+  "Here are 500 applications for SPD. You have 3 open seats.
+   Select the top 3 most qualified applicants. Return their IDs
+   and a brief reason for each. All others are implicitly waitlisted."
+```
+
+**Why selection is better than review-all:**
+- Output tokens drop from ~40 × 500 = 20,000 → ~40 × 3 = 120 (99.4% output savings)
+- Model only needs to rank, not justify every rejection
+- Mirrors real-world: party leadership picks the best, doesn't write rejection letters for everyone
+- The `openSeats` count already exists — use it as the selection target
+
+**Token math at 100K users (500 pending apps for SPD):**
+- Input: ~200 tokens × 500 apps + 500 system = ~100,500 tokens (fits in Haiku's 200K window)
+- Output: ~40 tokens × 3 selections = ~120 tokens
+- Cost: 100K × $0.50/MTok + 120 × $2.50/MTok = **$0.05 per party per day** (batch pricing)
+- vs current: 3 calls × 2K tokens × $1/MTok = $0.006/day but only reviews 3 of 500
+
+### Speeches: "Flag Bad Ones" Instead of "Rate Each"
+
+```
+CURRENT (1 call per speech, 32 max tokens each):
+  "Rate this speech: positive/neutral/negative"
+  × 200 speeches
+
+BETTER (1 call per bill, all speeches):
+  "Rate each of these 30 speeches: [{id, rating}]"
+  × 10 bills
+
+BEST (1 call per bill, exception-based):
+  "Here are 30 speeches on bill X. Most parliamentary speeches are
+   substantive. Identify ONLY the ones that are spam, nonsensical,
+   or disruptive (negative). Everything else defaults to positive.
+   Return: {negative: ['id1', 'id2'], notable: ['id3', 'id4']}"
+```
+
+**Why exception-based is better:**
+- Output drops from 30 ratings → typically 0-2 IDs flagged
+- Assumption: most speeches from MdB seat holders are substantive (they applied and got approved)
+- Only spam/troll content needs AI detection
+- "Notable" tag could highlight exceptional speeches for media/events
+
+### Citizen Questions: "Batch Answer by Topic" Instead of "One at a Time"
+
+```
+CURRENT (1 call per question, max 3/day):
+  "Answer this citizen question as SPD spokesperson"
+  × 3 questions
+
+BETTER (1 call per party, all pending):
+  "Answer each of these 50 questions. Return [{id, answer}]"
+
+BEST (1 call per party, topic-grouped with shared context):
+  "You are SPD spokesperson. Here are 50 citizen questions grouped
+   by topic. Write a brief position statement per topic, then
+   answer each question (1-2 sentences). Questions on the same
+   topic can share reasoning.
+   Topics: Economy (Q1,Q4,Q12), Migration (Q2,Q5), Climate (Q3,Q8,Q15)..."
+```
+
+**Why topic-grouping is better:**
+- Shared reasoning across related questions = shorter total output
+- More consistent party messaging (same topic → same framing)
+- Questions often cluster around current events/crises anyway
+
+### Internal Proposals: "Rank and Decide" Instead of "Review One"
+
+```
+CURRENT (1 call per proposal, only top-scored):
+  "Should SPD sponsor this bill proposal?"
+  × 1 per party
+
+BEST (1 call per party, rank all ready proposals):
+  "Here are 12 member proposals for SPD, each with vote scores.
+   You have bandwidth to sponsor 2 bills this period.
+   Select the top 2 that best serve the party's agenda.
+   Decline the rest with a brief shared reason."
+```
+
+**Why rank-and-select is better:**
+- Party can compare proposals against each other (relative merit)
+- Current approach reviews blind (doesn't see competing proposals)
+- Limits output to the selected N, not all proposals
+
+### Party Agent Voting: Already Grouped, But Can Add User Context
+
+```
+CURRENT (1 call per party, already efficient):
+  "Vote on these 5 bills as SPD"
+
+ENHANCED (same 1 call, but include aggregated user signals):
+  "Vote on these 5 bills as SPD.
+   Member signals: Bill A (80% yes, 200 signals), Bill B (45% yes, 150 signals)
+   MdB speeches: Bill A had 3 notable speeches in favor.
+   Consider member sentiment but maintain party discipline."
+```
+
+**Not more calls, but richer input** — user participation data flows into party decisions for free.
+
+## Token Budget Summary: 1 Call Fits How Many Users
+
+| Scenario | Items | Input Tokens | Output Tokens | Total | Fits in 200K? |
+|----------|-------|-------------|---------------|-------|--------------|
+| 500 MdB apps, select top 3 | 500 | ~100K | ~200 | ~100K | Yes |
+| 1000 MdB apps, select top 5 | 1000 | ~200K | ~300 | ~200K | Borderline (chunk at 800) |
+| 200 speeches, flag bad ones | 200 | ~130K | ~500 | ~130K | Yes |
+| 500 questions, topic-grouped | 500 | ~90K | ~15K | ~105K | Yes |
+| 50 proposals, rank top 3 | 50 | ~11K | ~500 | ~12K | Yes, trivially |
+| 30 interpellations, answer all | 30 | ~6K | ~3K | ~9K | Yes, trivially |
+
+**At 1M users**: Chunk into pages of ~800 items per call. 1M users with 5% daily activity = 50K actions → ~60 calls total (vs 50,000 calls without grouping).
+
+## Cost Projection (Revised with Selection-Style Prompts)
+
+### Current Cost (100 users, ~12 calls/day)
+- Haiku 4.5: $1/MTok in, $5/MTok out
+- ~12 calls × ~2K tokens avg = ~24K tokens/day
+- ~$0.12/day = **~$3.60/month**
+
+### At 100K Users
+
+**Without any optimization (1 call per action, uncapped):**
+- ~500 calls/day × ~2K tokens = ~1M tokens/day
+- ~$5/day = **~$150/month**
+
+**With selection-style grouping + batch API (50% discount):**
+- ~20 calls/day (6 app-select + 6 question-batch + 5 speech-flag + 1 summary + 1 media + 1 proposals)
+- Input: ~600K tokens (big grouped prompts)
+- Output: ~5K tokens (selection outputs are tiny)
+- Batch cost: 600K × $0.50/MTok + 5K × $2.50/MTok = **$0.31/day = ~$9.50/month**
+
+**Savings: 94% cost reduction**
+
+### At 1M Users
+
+**Without optimization**: ~$1,500/month
+**With selection-style + batch + chunking**: ~60 calls/day, ~$1.50/day = **~$45/month**
+
+**Savings: 97% cost reduction**
+
+## Implementation (Completed)
+
+### Batch API Client (`packages/engine/src/agent/batch-client.ts`)
+
+Multi-provider batch submission: Anthropic requests use the Message Batches API (50% discount), xAI requests use sequential `callAI()` calls (xAI JSONL batch can be added later).
+
+- `submitBatch(requests)` — splits by provider, submits in parallel
+- `chunkItems(items, tokensPerItem, maxTokens)` — splits large inputs within context window
+- `findResult(results, customId)` — utility to match results back to requests
+- Configurable via `BATCH_POLL_INTERVAL` and `BATCH_TIMEOUT` env vars
+
+### Selection-Style Prompt Builders (`packages/engine/src/agent/group-prompts.ts`)
+
+- `buildApplicationSelectPrompt()` — "Select top N applicants from pool"
+- `buildSpeechFlagPrompt()` — "Flag only bad speeches, default positive"
+- `buildQuestionBatchPrompt()` — "Answer all questions for this party"
+- `buildProposalRankPrompt()` — "Rank and select top N proposals"
+- Pre-filters: `preFilterApplications()`, `preFilterQuestions()`, `preFilterSpeeches()`
+
+### Refactored Simulation Modules — User-Driven
+
+Each module collects prompts and submits as a single batch per domain:
+
+- **`seats.ts`** — MdB applications: 1 batch call per party (was 3/party/day max → unlimited)
+- **`speeches.ts`** — Speech evaluation: 1 call per bill, exception-based flagging
+- **`questions.ts`** — Citizen questions: 1 call per party, up to 50/day (was 3/day max)
+- **`internal-proposals.ts`** — Proposals: 1 call per party, rank-and-select top 2
+
+### Refactored Simulation Modules — Simulation-Driven (All AI Calls Batched)
+
+All remaining `callAI()` sites have been converted to use `submitBatch()`. Each module exports `buildXxxBatchRequest()` and `processXxxBatchResult()` functions. `loop.ts` collects requests from concurrent modules and submits them as single batches:
+
+| Batch Group | Modules | Calls Before | Calls After |
+|-------------|---------|-------------|-------------|
+| **A: Party agents** | `party-agent.ts` | 6 sequential/day | 1 batch/day |
+| **C: Media + Summary** | `media.ts`, `summary.ts` | 2 sequential/day | 1 batch/day |
+| **Negotiations** | `negotiations.ts` | 6 sequential/round | 1 batch/round |
+| **B: Interpellations** | `interpellations.ts` | 0-2 sequential/day | 1 batch/day |
+| **B: Discipline** | `discipline.ts` | 0-6 sequential/week | 1 batch/week |
+| **Mid-cycle: Polls + Referendums** | `polls.ts`, `referendums.ts` | 0-2 conditional | 1 batch (rare) |
+
+**Result**: Zero `callAI()` calls remain in the simulation loop — all AI requests go through `submitBatch()`, getting the 50% Anthropic discount on every token.
+
+### Pre-Filtering
+
+Deterministic filters reduce input tokens by 50-90% before AI:
+
+- Applications: top 10× openSeats by activity score
+- Questions: top 50 by vote score
+- Speeches: <50 char auto-neutral (no AI needed)
+
+## Duration Impact by Timing Preset
+
+Batch API adds polling latency to each sim day. Only affects participatory modes (normal, slow).
+
+### Assumptions
+
+| Users | DAU % | DAU | Questions | Speeches | Proposals | Applications |
+|-------|-------|-----|-----------|----------|-----------|-------------|
+| 1K | 10% | 100 | 30 | 10 | 5 | 2 |
+| 100K | 5% | 5,000 | 1,500 | 500 | 250 | 100 |
+| 1M | 3% | 30,000 | 9,000 | 3,000 | 1,500 | 600 |
+
+### Batch Requests Per Sim Day
+
+| Users | Q&A Calls | Speech Calls | App Calls | Proposal Calls | Total Batch Requests | Est. Batch Time |
+|-------|-----------|-------------|-----------|----------------|---------------------|----------------|
+| 1K | 6 | 5 | 6 | 6 | ~23 | ~2 min |
+| 100K | 6 | 10 | 6 | 6 | ~28 | ~5 min |
+| 1M | 12 (chunked) | 20 | 12 (chunked) | 6 | ~50 | ~15 min |
+
+### Ultra-Fast / Fast (No Users)
+
+Pure AI simulation. 0% human seats, all features disabled.
+- **Unaffected by user scaling** — these modes don't process user content.
+- Wall-clock: ~40-60s/day (sync AI calls, not batch).
+
+### Normal Mode (30 min/day, 30% human seats)
+
+| Users | Inter-day Delay | Batch Execution | Total/Day | Days/Real Day | Term Duration |
+|-------|----------------|-----------------|-----------|---------------|---------------|
+| 1K | 30 min | ~2 min | ~32 min | ~45 | ~1 month |
+| 100K | 30 min | ~5 min | ~35 min | ~41 | ~1.2 months |
+| 1M | 30 min | ~15 min | ~45 min | ~32 | ~1.5 months |
+
+**Verdict**: Batch latency is absorbed within the 30-min delay up to ~100K users. At 1M users the day stretches to ~45 min (50% longer), but remains viable. Could increase `msPerDayDay` to 2,700,000 (45 min) at 1M to keep user interaction time consistent.
+
+### Slow Mode (1.5 hr/day, 70% human seats, night pause)
+
+| Users | Inter-day Delay | Batch Execution | Total/Day | Days/Real Day | Term Duration |
+|-------|----------------|-----------------|-----------|---------------|---------------|
+| 1K | 90 min | ~2 min | ~92 min | ~10 | ~5 months |
+| 100K | 90 min | ~5 min | ~95 min | ~9.5 | ~5.1 months |
+| 1M | 90 min | ~15 min | ~105 min | ~8.2 | ~5.9 months |
+
+**Verdict**: Batch latency is negligible relative to 90-min delay at all scales. Slow mode scales gracefully to 1M users.
+
+### Summary
+
+| Preset | Users | Impact on Day Duration | Term Duration Change |
+|--------|-------|----------------------|---------------------|
+| Ultra-fast | any | None (no users) | ~24 hours |
+| Fast | any | None (no users) | ~1 week |
+| Normal | 1K | +2 min (~7%) | ~1 month |
+| Normal | 100K | +5 min (~17%) | ~1.2 months |
+| Normal | 1M | +15 min (~50%) | ~1.5 months |
+| Slow | 1K | +2 min (~2%) | ~5 months |
+| Slow | 100K | +5 min (~6%) | ~5.1 months |
+| Slow | 1M | +15 min (~17%) | ~5.9 months |
+
+**No timing preset changes are needed** — the existing delays absorb batch overhead at all scales. At 1M users in normal mode, consider increasing the inter-day delay to 45 min to preserve user interaction time.
+
+## Affected Files
+
+### Batch Infrastructure
+- `packages/engine/src/agent/batch-client.ts` — Batch submission + polling
+- `packages/engine/src/agent/group-prompts.ts` — Multi-item prompt builders (user-driven)
+- `packages/engine/src/agent/index.ts` — Updated exports
+
+### User-Driven AI (Selection-Style Prompts)
+- `packages/engine/src/simulation/seats.ts` — Batch application selection
+- `packages/engine/src/simulation/speeches.ts` — Batch exception-based flagging
+- `packages/engine/src/simulation/questions.ts` — Batch question answering
+- `packages/engine/src/simulation/internal-proposals.ts` — Batch proposal ranking
+
+### Simulation-Driven AI (All Calls Batched)
+- `packages/engine/src/agent/party-agent.ts` — `buildPartyAgentRequests()` + `processPartyAgentResult()`
+- `packages/engine/src/simulation/media.ts` — `buildMediaBatchRequest()` + `processMediaBatchResult()`
+- `packages/engine/src/simulation/summary.ts` — `buildSummaryBatchRequest()` + `processSummaryBatchResult()`
+- `packages/engine/src/simulation/negotiations.ts` — Batch all party positions per round
+- `packages/engine/src/simulation/interpellations.ts` — Batch all pending answers
+- `packages/engine/src/simulation/discipline.ts` — Batch all party reasoning calls
+- `packages/engine/src/simulation/polls.ts` — `buildContextPollBatchRequest()` + `processContextPollBatchResult()`
+- `packages/engine/src/simulation/referendums.ts` — `buildReferendumBatchRequest()` + `processReferendumBatchResult()`
+- `packages/engine/src/simulation/loop.ts` — Orchestrates batch groups A/B/C + mid-cycle
+
+### Frontend & Config
+- `packages/web/src/pages/SimulationCosts.tsx` — Updated cost/duration tables for user scaling
+- `packages/web/src/lib/timing.ts` — Updated comments with batch overhead
+
+## Dependencies
+
+- `@anthropic-ai/sdk` — Direct SDK needed for batch API (Vercel AI SDK v6 does not wrap batch endpoints)
+
+## Notes
+
+- Batch API results are available for 29 days (Anthropic) — useful for debugging/auditing
+- Prompt caching with 1-hour TTL works well with batch (shared system prompts across requests)
+- The 3/party/day application cap and 3/day question cap have been removed
+- xAI requests still use sequential `callAI()` — xAI JSONL batch can be added later

@@ -15,4 +15,9 @@ export const LIMITS = {
   AMENDMENT_IMPACT_MAX: 0.3,
   POLICY_FOCUS_MAX_ITEMS: 5,
   POLICY_FOCUS_ITEM_MAX: 100,
+  /** Per-user 24h rolling window caps (content-generating actions) */
+  DAILY_QUESTIONS: 5,
+  DAILY_SPEECHES: 5,
+  DAILY_PROPOSALS: 2,
+  DAILY_AMENDMENTS: 3,
 } as const;
