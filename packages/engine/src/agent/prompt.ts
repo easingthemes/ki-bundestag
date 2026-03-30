@@ -1,5 +1,7 @@
 import type { AgentContext } from "@ki-bundestag/types";
 import { getPartyProfile } from "./party-profiles.js";
+import type { DepthConfig } from "./context-depth.js";
+import { getDepthConfig } from "./context-depth.js";
 
 export function buildSystemPrompt(partyId?: string): string {
   const profile = partyId ? getPartyProfile(partyId) : "";
@@ -117,10 +119,11 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-/** Maximum tokens for optional context sections (Priority 2+3). */
-const CONTEXT_TOKEN_BUDGET = 8000;
+/** Default depth config (normal). Callers can override via depthConfig parameter. */
+const DEFAULT_DEPTH = getDepthConfig("normal");
 
-export function buildUserPrompt(ctx: AgentContext): string {
+export function buildUserPrompt(ctx: AgentContext, depthConfig?: DepthConfig): string {
+  const depth = depthConfig ?? DEFAULT_DEPTH;
   const firstReadingBills = ctx.pendingBills.filter(b => b.status === "first_reading");
   const secondReadingBills = ctx.pendingBills.filter(b => b.status === "second_reading");
   const thirdReadingBills = ctx.pendingBills.filter(b => b.status === "third_reading");
@@ -247,7 +250,7 @@ ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating
   // ── Priority 1.5: Briefing (always included if available) ──────────────
 
   let briefingSection = "";
-  if (ctx.briefing) {
+  if (depth.enableBriefing && ctx.briefing) {
     briefingSection = `\n${ctx.briefing}\n`;
   }
 
@@ -256,18 +259,19 @@ ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating
   // Priority 2: high-value context (events, media, proposals, recently proposed bills, own actions)
   const p2Sections: string[] = [];
 
-  // Own recent actions (cross-day memory)
-  if (ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {
-    p2Sections.push(`YOUR RECENT ACTIONS (last 14 days):\n${ctx.recentOwnActions.map(a => `  [Day ${a.day}] ${a.type}: ${a.title}`).join("\n")}`)
+  // Own recent actions (cross-day memory) — controlled by depth
+  if (depth.ownActionsLookbackDays > 0 && ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {
+    const items = ctx.recentOwnActions.slice(0, depth.ownActionsMaxItems);
+    p2Sections.push(`YOUR RECENT ACTIONS (last ${depth.ownActionsLookbackDays} days):\n${items.map(a => `  [Day ${a.day}] ${a.type}: ${a.title}`).join("\n")}`)
   }
 
   const eventsSection = ctx.recentEvents.length > 0
-    ? `RECENT EVENTS:\n${ctx.recentEvents.slice(-5).map(e => `  [Day ${e.dayNumber}] ${e.title}: ${e.description}`).join("\n")}`
+    ? `RECENT EVENTS:\n${ctx.recentEvents.slice(-depth.recentEventsMax).map(e => `  [Day ${e.dayNumber}] ${e.title}: ${e.description}`).join("\n")}`
     : "RECENT EVENTS:\n  No recent events.";
   p2Sections.push(eventsSection);
 
   if (ctx.recentMedia && ctx.recentMedia.length > 0) {
-    p2Sections.push(`RECENT MEDIA COVERAGE:\n${ctx.recentMedia.slice(0, 3).map(a => `  - [${a.outlet}, ${a.bias}] "${a.headline}" — ${a.summary}`).join("\n")}`);
+    p2Sections.push(`RECENT MEDIA COVERAGE:\n${ctx.recentMedia.slice(0, depth.recentMediaMax).map(a => `  - [${a.outlet}, ${a.bias}] "${a.headline}" — ${a.summary}`).join("\n")}`);
   }
 
   if (proposedBills.length > 0) {
@@ -302,7 +306,7 @@ ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating
   }
 
   // Greedily include sections within token budget
-  let tokenBudget = CONTEXT_TOKEN_BUDGET;
+  let tokenBudget = depth.contextTokenBudget;
   const includedSections: string[] = [];
 
   for (const section of p2Sections) {
@@ -313,15 +317,17 @@ ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating
     }
   }
 
-  for (const section of p3Sections) {
-    const cost = estimateTokens(section);
-    if (cost <= tokenBudget) {
-      includedSections.push(section);
-      tokenBudget -= cost;
+  if (depth.includeP3) {
+    for (const section of p3Sections) {
+      const cost = estimateTokens(section);
+      if (cost <= tokenBudget) {
+        includedSections.push(section);
+        tokenBudget -= cost;
+      }
     }
   }
 
-  if (tokenBudget < CONTEXT_TOKEN_BUDGET && includedSections.length < p2Sections.length + p3Sections.length) {
+  if (tokenBudget < depth.contextTokenBudget && includedSections.length < p2Sections.length + (depth.includeP3 ? p3Sections.length : 0)) {
     includedSections.push("(Some context sections trimmed for token budget.)");
   }
 

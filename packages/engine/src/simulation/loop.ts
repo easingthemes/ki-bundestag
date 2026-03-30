@@ -51,6 +51,8 @@ import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
 import type { TimingPreset } from "./timing.js";
+import type { ContextDepth } from "../agent/context-depth.js";
+import { getDepthConfig, isValidContextDepth } from "../agent/context-depth.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -85,6 +87,11 @@ export async function runDay(): Promise<number> {
   } else {
     console.log(`\n=== DAY ${currentDay} ===`);
   }
+
+  // Read context depth setting
+  const rawDepth = ((meta as any).contextDepth as string) ?? "normal";
+  const contextDepth: ContextDepth = isValidContextDepth(rawDepth) ? rawDepth : "normal";
+  const depthConfig = getDepthConfig(contextDepth);
 
   // Mark day as started (for frontend status), but do NOT commit currentDay yet.
   // currentDay is only committed at the end of a successful day to prevent
@@ -838,7 +845,7 @@ export async function runDay(): Promise<number> {
     }
 
     // Generate daily briefing (cross-day narrative context, shared across all parties)
-    const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties);
+    const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties, depthConfig);
     if (briefingReq) {
       const briefingResults = await submitBatch([briefingReq]);
       briefingText = processBriefingResult(findResult(briefingResults, briefingReq.customId));
@@ -874,12 +881,12 @@ export async function runDay(): Promise<number> {
         memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
         mdbVoteSummary: Object.keys(mdbVoteSummaryByBill).length > 0 ? mdbVoteSummaryByBill : undefined,
         briefing: briefingText ?? undefined,
-        recentOwnActions: getPartyRecentActions(party.id, currentDay),
+        recentOwnActions: getPartyRecentActions(party.id, currentDay, depthConfig),
       });
     }
 
     // Submit all 6 party agent calls as one batch (50% cost savings)
-    const agentRequests = buildPartyAgentRequests(agentContexts, currentDay);
+    const agentRequests = buildPartyAgentRequests(agentContexts, currentDay, depthConfig);
     console.log(`  [Batch] Submitting ${agentRequests.length} party agent requests...`);
     const agentResults = await submitBatch(agentRequests);
 
@@ -1558,7 +1565,7 @@ export async function runDay(): Promise<number> {
   }
 
   // 10b. Answer pending citizen questions
-  await answerPendingQuestions(allParties, currentDay, briefingText ?? undefined);
+  await answerPendingQuestions(allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
 
   // 10c. Review internal party proposals (accept/decline/expire)
   try {
@@ -1585,7 +1592,7 @@ export async function runDay(): Promise<number> {
 
   // 10e. Answer pending interpellations + expire overdue ones
   const govForInterpellations = getActiveGovernment();
-  const interpResult = await answerPendingInterpellations(allParties, govForInterpellations, currentDay, briefingText ?? undefined);
+  const interpResult = await answerPendingInterpellations(allParties, govForInterpellations, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
 
   for (const answered of interpResult.answered) {
     const filingParty = allParties.find(p => p.id === answered.filedByPartyId);
@@ -1914,7 +1921,7 @@ export async function runDay(): Promise<number> {
 
   // 12b+12d. Batch media + summary together (2 calls → 1 batch)
   const endOfDayRequests: BatchRequest[] = [];
-  const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay, briefingText ?? undefined);
+  const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
   if (mediaReq) endOfDayRequests.push(mediaReq);
   const summaryReq = buildSummaryBatchRequest(
     dayEvents, allParties, currentDay,
