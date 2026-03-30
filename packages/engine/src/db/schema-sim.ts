@@ -93,6 +93,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   budgetRetryDay: integer("budget_retry_day"),
   dailySummary: text("daily_summary"),
   timingPreset: text("timing_preset").notNull().default("normal"),
+  contextDepth: text("context_depth").notNull().default("normal"),
   startDate: text("start_date"),
 });
 

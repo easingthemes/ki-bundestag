@@ -13,6 +13,8 @@ import type { BatchRequest } from "./batch-client.js";
 import type { BatchResult } from "./batch-client.js";
 import { parseAIJson, logAICall } from "./ai-json.js";
 import type { Provider } from "./model-config.js";
+import type { DepthConfig } from "./context-depth.js";
+import { getDepthConfig } from "./context-depth.js";
 
 /** Significant event types for the briefing. */
 const BRIEFING_EVENT_TYPES = new Set([
@@ -93,9 +95,11 @@ function buildBriefingContext(
   currentDay: number,
   allParties: Party[],
   coalitionPartyIds: string[],
+  depthConfig?: DepthConfig,
 ): string {
-  const events = getRecentSignificantEvents(currentDay);
-  const trends = getApprovalTrends(currentDay);
+  const depth = depthConfig ?? getDepthConfig("normal");
+  const events = getRecentSignificantEvents(currentDay, depth.briefingEventLookbackDays);
+  const trends = getApprovalTrends(currentDay, depth.briefingTrendDays);
 
   const coalitionNames = allParties
     .filter(p => coalitionPartyIds.includes(p.id))
@@ -159,11 +163,15 @@ export function buildBriefingBatchRequest(
   currentDay: number,
   allParties: Party[],
   coalitionPartyIds: string[],
+  depthConfig?: DepthConfig,
 ): BatchRequest | null {
-  // No briefing needed on the first couple of days — not enough history
+  const depth = depthConfig ?? getDepthConfig("normal");
+
+  // No briefing if depth disables it or not enough history
+  if (!depth.enableBriefing) return null;
   if (currentDay <= 2) return null;
 
-  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds);
+  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds, depth);
 
   return {
     customId: `briefing-day${currentDay}`,
@@ -236,10 +244,13 @@ Outlook: ${parsed.outlook}`;
 export function getPartyRecentActions(
   partyId: string,
   currentDay: number,
-  lookbackDays = 14,
+  depthConfig?: DepthConfig,
 ): Array<{ day: number; type: string; title: string }> {
+  const depth = depthConfig ?? getDepthConfig("normal");
+  if (depth.ownActionsLookbackDays <= 0) return [];
+
   const db = getDb();
-  const minDay = Math.max(1, currentDay - lookbackDays);
+  const minDay = Math.max(1, currentDay - depth.ownActionsLookbackDays);
 
   const rows = db.select().from(schema.simulationEvents)
     .orderBy(desc(schema.simulationEvents.dayNumber))
@@ -248,5 +259,5 @@ export function getPartyRecentActions(
   return rows
     .filter(e => e.dayNumber >= minDay && e.actor === partyId)
     .map(e => ({ day: e.dayNumber, type: e.type, title: e.title }))
-    .slice(0, 15);
+    .slice(0, depth.ownActionsMaxItems);
 }

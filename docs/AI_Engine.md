@@ -183,9 +183,21 @@ A single Haiku call at the start of each day that synthesizes a political briefi
 
 Skipped on days 1-2 (not enough history). On failure, agents run without briefing (same as before this feature).
 
+### Context Depth (configurable)
+
+**Location**: [packages/engine/src/agent/context-depth.ts](packages/engine/src/agent/context-depth.ts)
+
+Three configurable levels control how much context agents receive. Set via GitHub Actions workflow, admin API (`POST /api/simulation/context-depth`), or DB (`context_depth` column in `simulation_meta`). Default: `normal`.
+
+| Setting | Token Budget | Briefing | Own Actions | Events | Media | P3 | Secondary Enrichment | Est. Cost/Day |
+|---------|-------------|----------|-------------|--------|-------|-----|---------------------|---------------|
+| `low` | 3,000 | Off | Off | 5 | 2 | Off | Off | ~$0.030 |
+| `normal` | 8,000 | 30d lookback | 14d (15 items) | 10 | 3 | On | On | ~$0.055 |
+| `high` | 16,000 | 60d lookback | 30d (30 items) | 20 | 5 | On | On | ~$0.09 |
+
 ### Token-budgeted context
 
-`CONTEXT_TOKEN_BUDGET = 8000` estimated tokens (chars / 4 approximation).
+Token budget controlled by context depth (default 8000 for `normal`).
 
 **Priority 1 — always included** (core decision-making):
 - Party info, coalition/opposition roles, national economic state

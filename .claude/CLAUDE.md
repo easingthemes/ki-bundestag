@@ -89,6 +89,7 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 - Per-party: SPD/CDU/Grune/FDP/Linke use `anthropic:claude-haiku-4-5-20251001`; AfD uses `xai:grok-3-mini`
 - Per-role: `MODEL_DAILY`, `MODEL_NEGOTIATION` (both Haiku), `MODEL_SYNTHESIS` (Sonnet)
 - Override via env vars: `MODEL_PARTY_<ID>`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`
+- Context depth: `low` ($0.03/day), `normal` ($0.055/day, default), `high` ($0.09/day) — configurable via GitHub workflow, admin API, or DB
 - API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`
 
 ## Environment

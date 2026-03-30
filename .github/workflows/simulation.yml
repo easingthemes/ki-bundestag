@@ -35,6 +35,16 @@ on:
           - fast
           - normal
           - slow
+      context_depth:
+        description: "[start] AI context depth — low ($), normal ($$), high ($$$)"
+        required: false
+        type: choice
+        default: "(unchanged)"
+        options:
+          - "(unchanged)"
+          - low
+          - normal
+          - high
       injection:
         description: "[inject] What to inject"
         required: false
@@ -87,6 +97,14 @@ jobs:
                   echo "==> Setting timing preset to: $PRESET"
                   sqlite3 data/simulation.db "UPDATE simulation_meta SET timing_preset = '$PRESET'"
                   sqlite3 -header -column data/simulation.db "SELECT timing_preset FROM simulation_meta LIMIT 1"
+                fi
+
+                # Set context depth if requested
+                DEPTH="${{ inputs.context_depth }}"
+                if [[ "$DEPTH" != "(unchanged)" ]]; then
+                  echo "==> Setting context depth to: $DEPTH"
+                  sqlite3 data/simulation.db "UPDATE simulation_meta SET context_depth = '$DEPTH'"
+                  sqlite3 -header -column data/simulation.db "SELECT context_depth FROM simulation_meta LIMIT 1"
                 fi
 
                 case "$MODE" in

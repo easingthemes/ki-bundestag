@@ -170,6 +170,27 @@ const INPUT_SCALE: InputScaleRow[] = [
   { preset: "Slow", simDaysPerDay: "10", currentPerMonth: "$11", scaled20xPerMonth: "$94", delta: "+$83" },
 ];
 
+// ─── Context depth levels ───────────────────────────────────────────────────
+
+interface DepthRow {
+  depth: string;
+  tokenBudget: string;
+  briefing: string;
+  ownActions: string;
+  events: string;
+  media: string;
+  p3: string;
+  secondary: string;
+  estCostDay: string;
+  costBadge: string;
+}
+
+const DEPTH_LEVELS: DepthRow[] = [
+  { depth: "Low", tokenBudget: "3,000", briefing: "Off", ownActions: "Off", events: "5", media: "2", p3: "Off", secondary: "Off", estCostDay: "~$0.030", costBadge: "$" },
+  { depth: "Normal", tokenBudget: "8,000", briefing: "30 days", ownActions: "14 days (15 items)", events: "10", media: "3", p3: "On", secondary: "On", estCostDay: "~$0.055", costBadge: "$$" },
+  { depth: "High", tokenBudget: "16,000", briefing: "60 days", ownActions: "30 days (30 items)", events: "20", media: "5", p3: "On", secondary: "On", estCostDay: "~$0.09", costBadge: "$$$" },
+];
+
 // ─── Shared table helpers ────────────────────────────────────────────────────
 
 const TH = "text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2";
@@ -494,6 +515,53 @@ export function SimulationCosts() {
                 ))}
               </tbody>
             </table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Context Depth Levels ────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="section-title">Kontext-Tiefe (Konfigurierbar)</h2>
+        <Card>
+          <CardContent className="p-5 overflow-x-auto">
+            <p className="text-xs text-muted-foreground mb-3">
+              Controls how much context each AI agent receives. Configurable via GitHub Actions workflow or admin API.
+              Default: <strong>Normal</strong>. Low is cheapest (no briefing, minimal context). High gives richest decisions.
+            </p>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={TH}>Depth</th>
+                  <th className={cn(TH, "text-right")}>Token Budget</th>
+                  <th className={TH}>Briefing</th>
+                  <th className={TH}>Own Actions</th>
+                  <th className={cn(TH, "text-right")}>Events</th>
+                  <th className={cn(TH, "text-right")}>Media</th>
+                  <th className={TH}>P3 Sections</th>
+                  <th className={TH}>Enrich Secondary</th>
+                  <th className={cn(TH, "text-right")}>Est. Cost/Day</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DEPTH_LEVELS.map(d => (
+                  <tr key={d.depth} className={cn(TROW, d.depth === "Normal" && "bg-muted/40")}>
+                    <td className={cn(TD, "font-medium")}>{d.depth} <span className="text-muted-foreground text-xs ml-1">{d.costBadge}</span></td>
+                    <td className={cn(TD, "text-right tabular-nums")}>{d.tokenBudget}</td>
+                    <td className={TD}>{d.briefing}</td>
+                    <td className={TD}>{d.ownActions}</td>
+                    <td className={cn(TD, "text-right tabular-nums")}>{d.events}</td>
+                    <td className={cn(TD, "text-right tabular-nums")}>{d.media}</td>
+                    <td className={TD}>{d.p3}</td>
+                    <td className={TD}>{d.secondary}</td>
+                    <td className={cn(TD, "text-right tabular-nums font-medium")}>{d.estCostDay}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-xs text-muted-foreground mt-3">
+              P3 sections: motions, interpellations, confidence votes, constitutional challenges.
+              Secondary calls: citizen Q&amp;A, interpellation answers, media articles receive the daily briefing for richer context.
+            </p>
           </CardContent>
         </Card>
       </div>
