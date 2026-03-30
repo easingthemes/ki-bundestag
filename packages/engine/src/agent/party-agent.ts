@@ -11,7 +11,7 @@ export async function runPartyAgent(
   votableBills: Bill[],
   secondReadingBills?: Bill[],
 ): Promise<AgentAction[]> {
-  const systemPrompt = buildSystemPrompt();
+  const systemPrompt = buildSystemPrompt(ctx.party.id);
   const userPrompt = buildUserPrompt(ctx);
 
   const t0 = Date.now();
@@ -89,10 +89,9 @@ export function buildPartyAgentRequests(
   contexts: AgentContext[],
   currentDay: number,
 ): BatchRequest[] {
-  const systemPrompt = buildSystemPrompt();
   return contexts.map(ctx => ({
     customId: `agent-${ctx.party.id}-day${currentDay}`,
-    system: systemPrompt,
+    system: buildSystemPrompt(ctx.party.id),
     prompt: buildUserPrompt(ctx),
     maxTokens: 2048,
     partyId: ctx.party.id,

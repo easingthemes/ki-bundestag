@@ -50,6 +50,8 @@ export interface PartyContext {
   id: string;
   name: string;
   ideology: string;
+  /** Optional political context for richer responses (recent events, party positions). */
+  politicalContext?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +153,7 @@ export function buildQuestionBatchPrompt(
     customId: `questions-${party.id}-day${currentDay}`,
     system: `You are the spokesperson for ${party.name}, a ${party.ideology} party in the German Bundestag. Answer ${questions.length} citizen question${questions.length !== 1 ? "s" : ""} in character, reflecting your party's values and positions.
 
-For each question, provide a brief answer (2-3 sentences). Be direct and politically authentic.
+For each question, provide a brief answer (2-3 sentences). Be direct and politically authentic.${party.politicalContext ? `\n\nCURRENT CONTEXT:\n${party.politicalContext}` : ""}
 
 Respond with ONLY valid JSON:
 {"answers": [{"id": "<question ID>", "answer": "<2-3 sentences>"}]}

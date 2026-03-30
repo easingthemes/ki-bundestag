@@ -26,6 +26,8 @@ export interface AgentContext {
   topInternalProposals?: Array<{ title: string; category: string; score: number; totalVotes: number }>;
   memberSignals?: Record<string, { yes: number; no: number }>;  // keyed by billId
   mdbVoteSummary?: Record<string, { yes: number; no: number; abstain: number; total: number }>;  // keyed by billId
+  briefing?: string;
+  recentOwnActions?: Array<{ day: number; type: string; title: string }>;
 }
 
 export interface ProposeBillAction {

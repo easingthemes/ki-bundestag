@@ -1,7 +1,11 @@
 import type { AgentContext } from "@ki-bundestag/types";
+import { getPartyProfile } from "./party-profiles.js";
 
-export function buildSystemPrompt(): string {
-  return `You are an AI agent controlling a political party in the German Bundestag simulation. You must act in character as the party leadership, making decisions that align with your party's ideology and priorities.
+export function buildSystemPrompt(partyId?: string): string {
+  const profile = partyId ? getPartyProfile(partyId) : "";
+  const profileSection = profile ? `${profile}\n\n` : "";
+
+  return `${profileSection}You are an AI agent controlling a political party in the German Bundestag simulation. You must act in character as the party leadership, making decisions that align with your party's ideology and priorities.
 
 RULES:
 1. You must respond with ONLY valid JSON matching the schema below. No other text.
@@ -114,7 +118,7 @@ function estimateTokens(text: string): number {
 }
 
 /** Maximum tokens for optional context sections (Priority 2+3). */
-const CONTEXT_TOKEN_BUDGET = 3000;
+const CONTEXT_TOKEN_BUDGET = 8000;
 
 export function buildUserPrompt(ctx: AgentContext): string {
   const firstReadingBills = ctx.pendingBills.filter(b => b.status === "first_reading");
@@ -240,10 +244,22 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 ALL PARTIES:
 ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}`).join("\n")}`;
 
+  // ── Priority 1.5: Briefing (always included if available) ──────────────
+
+  let briefingSection = "";
+  if (ctx.briefing) {
+    briefingSection = `\n${ctx.briefing}\n`;
+  }
+
   // ── Priority 2+3: Budget-trimmed optional sections ────────────────────
 
-  // Priority 2: high-value context (events, media, proposals, recently proposed bills)
+  // Priority 2: high-value context (events, media, proposals, recently proposed bills, own actions)
   const p2Sections: string[] = [];
+
+  // Own recent actions (cross-day memory)
+  if (ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {
+    p2Sections.push(`YOUR RECENT ACTIONS (last 14 days):\n${ctx.recentOwnActions.map(a => `  [Day ${a.day}] ${a.type}: ${a.title}`).join("\n")}`)
+  }
 
   const eventsSection = ctx.recentEvents.length > 0
     ? `RECENT EVENTS:\n${ctx.recentEvents.slice(-5).map(e => `  [Day ${e.dayNumber}] ${e.title}: ${e.description}`).join("\n")}`
@@ -311,7 +327,7 @@ ${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating
 
   const optionalContext = includedSections.length > 0 ? "\n" + includedSections.join("\n\n") : "";
 
-  return `${coreLines}${optionalContext}
+  return `${coreLines}${briefingSection}${optionalContext}
 
 Respond with your actions as JSON.`;
 }
