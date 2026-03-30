@@ -51,7 +51,7 @@ const MODEL_CONFIG = [
     usedFor: "AfD party agent — daily actions, minister responses",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 10, auth: 80) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
-    notes: "Using xAI grok-3-mini ($0.30/$0.50 per 1M tokens) for cost savings. Falls back to auto-abstain on all bills if API call fails. Also used for AfD minister responses to interpellations.",
+    notes: "Uses xAI grok-3-mini because other models (e.g. Claude) refuse to authentically roleplay as AfD — they respond with disclaimers or third-person descriptions instead of in-character actions. Grok performs genuine role-playing for all parties without political-correctness filtering. This was not a cost-related decision. Falls back to auto-abstain on all bills if API call fails. Also used for AfD minister responses to interpellations.",
   },
   {
     key: "Linke",
