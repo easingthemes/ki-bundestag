@@ -4,6 +4,13 @@ import { closeDb, getSqlite } from "./db/index.js";
 import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
 import { allProvidersLimited, AIProviderLimitError } from "./agent/client.js";
 
+/** Clear dayStartedAt so the frontend stops showing "running" after a failure */
+function clearDayStarted(): void {
+  try {
+    getSqlite().prepare("UPDATE simulation_meta SET day_started_at = NULL").run();
+  } catch { /* best-effort */ }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -45,6 +52,7 @@ async function main() {
       await runDay();
     } catch (err) {
       console.error("[Runner] Simulation day failed:", err);
+      clearDayStarted();
       // If it's a spending limit error, don't keep looping — fall through to the allProvidersLimited() check
       if (err instanceof AIProviderLimitError) {
         console.error(`[Runner] API limit hit (${err.provider}), will pause below.`);
