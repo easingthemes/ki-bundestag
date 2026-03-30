@@ -57,7 +57,7 @@ jobs:
                 ;;
               db-stats)
                 echo "==> Simulation state:"
-                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused FROM simulation_meta LIMIT 1"
+                sqlite3 -header -column data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"
                 echo ""
                 echo "==> Event counts by type (last 7 days):"
                 sqlite3 -header -column data/simulation.db "SELECT type, COUNT(*) as count FROM simulation_events WHERE day_number > (SELECT current_day FROM simulation_meta) - 7 GROUP BY type ORDER BY count DESC"
@@ -70,7 +70,7 @@ jobs:
                 ;;
               db-deep-debug)
                 echo "==> Simulation state:"
-                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused, start_date, last_run_at FROM simulation_meta LIMIT 1"
+                sqlite3 -header -column data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"
                 echo ""
                 echo "==> Table row counts:"
                 for tbl in simulation_events bills media_articles polls elections crises parties motions confidence_votes constitutional_challenges referendums citizen_questions budgets party_history bundestag_seats fraktionen government national_state; do
@@ -85,7 +85,7 @@ jobs:
                 sqlite3 -header -column data/simulation.db "SELECT day_number, COUNT(*) as articles FROM media_articles GROUP BY day_number ORDER BY day_number DESC LIMIT 30"
                 echo ""
                 echo "==> Elections history:"
-                sqlite3 -header -column data/simulation.db "SELECT id, election_day, status, trigger_reason, created_at FROM elections ORDER BY election_day DESC LIMIT 10"
+                sqlite3 -header -column data/simulation.db "SELECT id, election_day, status, trigger_reason FROM elections ORDER BY election_day DESC LIMIT 10"
                 echo ""
                 echo "==> Active crises:"
                 sqlite3 -header -column data/simulation.db "SELECT name, severity, start_day, end_day FROM crises WHERE end_day IS NULL OR end_day >= (SELECT current_day FROM simulation_meta)"
@@ -123,7 +123,7 @@ jobs:
                 ls -lh data/*.db 2>/dev/null || echo "No databases"
                 echo ""
                 echo "=== Simulation State ==="
-                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused FROM simulation_meta LIMIT 1"
+                sqlite3 -header -column data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"
                 echo ""
                 echo "=== API Health ==="
                 curl -sf http://localhost:3001/api/state | head -c 200 || echo "API not responding"
