@@ -10,6 +10,7 @@ import type {
   BillImpact,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { checkUserDailyLimit } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -238,6 +239,16 @@ router.post("/api/questions", (req, res) => {
   const db = getDb();
   const { question, targetPartyId } = req.body;
 
+  // Per-user 24h rolling window cap
+  const token = getUserToken(req);
+  if (token) {
+    const { allowed, limit, used } = checkUserDailyLimit(token, "submit_question");
+    if (!allowed) {
+      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions in 24h). Try again later.` });
+      return;
+    }
+  }
+
   if (!question || typeof question !== "string" || question.trim().length < LIMITS.QUESTION_MIN) {
     res.status(400).json({ error: `Question must be at least ${LIMITS.QUESTION_MIN} characters` });
     return;
@@ -258,19 +269,10 @@ router.post("/api/questions", (req, res) => {
     return;
   }
 
-  // Rate limit: max 5 pending questions total
-  const pendingCount = db.select().from(schema.citizenQuestions).all()
-    .filter((q: any) => q.status === "pending").length;
-  if (pendingCount >= 5) {
-    res.status(429).json({ error: "Too many pending questions. Please wait for some to be answered." });
-    return;
-  }
-
   // Get current day
   const metaRows = db.select().from(schema.simulationMeta).all();
   const currentDay = metaRows[0]?.currentDay ?? 0;
 
-  const token = getUserToken(req);
   const id = `q-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
   db.insert(schema.citizenQuestions).values({
     id,
