@@ -50,6 +50,7 @@ import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
+import { setTrackingDay } from "../agent/cost-tracker.js";
 import type { TimingPreset } from "./timing.js";
 import type { ContextDepth } from "../agent/context-depth.js";
 import { getDepthConfig, isValidContextDepth } from "../agent/context-depth.js";
@@ -77,6 +78,7 @@ export async function runDay(): Promise<number> {
   if (!meta) throw new Error("No simulation meta found. Run seed first.");
 
   const currentDay = meta.currentDay + 1;
+  setTrackingDay(currentDay);
   const startDateStr = (meta as any).startDate as string | null;
   const startDate: Date | undefined = startDateStr ? new Date(startDateStr) : undefined;
 

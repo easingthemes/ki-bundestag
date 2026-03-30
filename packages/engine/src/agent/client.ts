@@ -8,6 +8,7 @@ import {
   type Provider,
   type ModelConfig,
 } from "./model-config.js";
+import { recordAICall, calculateCost, getTrackingDay } from "./cost-tracker.js";
 
 // ---------------------------------------------------------------------------
 // Provider circuit breaker — skip API calls when a provider is known-limited
@@ -154,6 +155,8 @@ export interface AICallResult {
   text: string;
   model: string;
   provider: Provider;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export async function callAI(opts: {
@@ -189,14 +192,31 @@ export async function callAI(opts: {
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      const startMs = Date.now();
       const result = await generateText({
         model,
         system: opts.system,
         prompt: opts.prompt,
         maxOutputTokens: opts.maxTokens,
       });
+      const latencyMs = Date.now() - startMs;
 
-      return { text: result.text, model: config.model, provider: config.provider };
+      const inputTokens = result.usage?.promptTokens ?? 0;
+      const outputTokens = result.usage?.completionTokens ?? 0;
+
+      recordAICall({
+        dayNumber: getTrackingDay(),
+        task: opts.partyId ? `call:${opts.partyId}` : `call:${opts.roleKey ?? "daily"}`,
+        provider: config.provider,
+        model: config.model,
+        inputTokens,
+        outputTokens,
+        costUsd: calculateCost(config.model, inputTokens, outputTokens, false),
+        latencyMs,
+        success: true,
+      });
+
+      return { text: result.text, model: config.model, provider: config.provider, inputTokens, outputTokens };
     } catch (err) {
       const detected = detectLimitError(err);
 

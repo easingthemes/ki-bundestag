@@ -4,6 +4,7 @@ export { runDay, getCrisisTemplates } from "./simulation/index.js";
 export { runPartyAgent, callAI, AIProviderLimitError, allProvidersLimited, clearProviderLimits, PARTY_MODELS, ROLE_MODELS, getPartyModel, getRoleModel, type RoleKey, type Provider, type ModelConfig, type AICallResult } from "./agent/index.js";
 export { DEPTH_CONFIGS, getDepthConfig, isValidContextDepth } from "./agent/context-depth.js";
 export type { ContextDepth, DepthConfig } from "./agent/context-depth.js";
+export { getCostOverview, getCostByDay, getCostByTask, getCostByModel, type CostOverview, type DayCostSummary, type TaskCostSummary, type ModelCostSummary } from "./agent/index.js";
 export { getActiveFraktionen, FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "./simulation/fraktionen.js";
 export { getActiveGovernment, MINISTER_CANDIDATES, MINISTRY_NAMES } from "./simulation/government.js";
 export { answerPendingInterpellations } from "./simulation/interpellations.js";

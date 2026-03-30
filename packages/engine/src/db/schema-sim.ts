@@ -262,6 +262,21 @@ export const eventQueue = sqliteTable("event_queue", {
   status: text("status").notNull().default("queued"),  // "queued" | "processed" | "cancelled"
 });
 
+export const aiCalls = sqliteTable("ai_calls", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  dayNumber: integer("day_number").notNull(),
+  task: text("task").notNull(),           // e.g. "agent:spd", "briefing", "media", "summary"
+  provider: text("provider").notNull(),   // "anthropic" | "xai"
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  costUsd: real("cost_usd").notNull(),
+  latencyMs: integer("latency_ms"),
+  batchId: text("batch_id"),              // Anthropic batch ID, null for sequential calls
+  success: integer("success", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+});
+
 export const bundestagSeats = sqliteTable("bundestag_seats", {
   id: text("id").primaryKey(),
   seatNumber: integer("seat_number").notNull(),
