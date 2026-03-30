@@ -28,12 +28,11 @@ interface SimCallRow {
 }
 
 const SIM_CALLS: SimCallRow[] = [
-  { action: "Party Agent (SPD, CDU, Grüne, FDP, Linke)", model: "Haiku", maxTokens: 2048, estInput: "~3000", callsPerDay: "5", note: "Always" },
-  { action: "Party Agent (AfD)", model: "Grok-3-mini", maxTokens: 2048, estInput: "~3000", callsPerDay: "1", note: "Always" },
-  { action: "Daily Summary", model: "Haiku", maxTokens: 320, estInput: "~800", callsPerDay: "1", note: "Always" },
-  { action: "Media Articles (2-3)", model: "Haiku", maxTokens: 2048, estInput: "~1500", callsPerDay: "0-1", note: "Always" },
-  { action: "Context Poll", model: "Haiku", maxTokens: 512, estInput: "~600", callsPerDay: "0-1", note: "Weekly" },
-  { action: "Referendum", model: "Haiku", maxTokens: 512, estInput: "~600", callsPerDay: "0-1", note: "Every 30d" },
+  { action: "Party Agents (6x, batched)", model: "Haiku/Grok", maxTokens: 2048, estInput: "~3000 each", callsPerDay: "1 batch", note: "Always (Group A)" },
+  { action: "Media + Summary (batched)", model: "Haiku", maxTokens: 2048, estInput: "~2300", callsPerDay: "1 batch", note: "Always (Group C)" },
+  { action: "Interpellation Answers (batched)", model: "Haiku/Grok", maxTokens: 300, estInput: "~400 each", callsPerDay: "0-1 batch", note: "Group B" },
+  { action: "Discipline Reasoning (batched)", model: "Haiku/Grok", maxTokens: 512, estInput: "~300 each", callsPerDay: "0-1 batch", note: "Every 7d (Group B)" },
+  { action: "Context Poll + Referendum (batched)", model: "Haiku", maxTokens: 512, estInput: "~600", callsPerDay: "0-1 batch", note: "Weekly/Monthly" },
 ];
 
 const VISITOR_CALLS: SimCallRow[] = [
@@ -45,7 +44,7 @@ const VISITOR_CALLS: SimCallRow[] = [
 ];
 
 const ELECTION_CALLS: SimCallRow[] = [
-  { action: "Negotiation Round (per party)", model: "Haiku/Grok", maxTokens: 1024, estInput: "~1200", callsPerDay: "5-6", note: "15-18 total (3 rounds)" },
+  { action: "Negotiation Round (6 parties, batched)", model: "Haiku/Grok", maxTokens: 1024, estInput: "~1200 each", callsPerDay: "1 batch/round", note: "3 batches total" },
   { action: "Coalition Synthesis", model: "Sonnet", maxTokens: 4096, estInput: "~2000", callsPerDay: "1", note: "1 total" },
 ];
 
@@ -233,7 +232,7 @@ export function SimulationCosts() {
         <h2 className="section-title">KI-Aufrufe pro Simulationstag</h2>
 
         {/* Simulation-driven */}
-        <h3 className="mt-4">Simulation-Driven (Always Happen)</h3>
+        <h3 className="mt-4">Simulation-Driven (Always Happen — All Batched)</h3>
         <Card className="mb-4">
           <CardContent className="p-5 overflow-x-auto">
             <table className="w-full border-collapse">
@@ -486,7 +485,7 @@ export function SimulationCosts() {
         <Card>
           <CardContent className="p-5">
             <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-4">
-              <li><strong>Batch API (50% discount)</strong>: All user-driven AI calls use the Anthropic Message Batches API. Requests are grouped per party/bill and submitted as a single batch. Polling adds ~2-15 min latency depending on batch size.</li>
+              <li><strong>Batch API (50% discount)</strong>: All AI calls (simulation-driven AND user-driven) use the Anthropic Message Batches API. Zero sequential <code>callAI()</code> calls remain. Requests are grouped into batch groups (A: party agents, B: interpellations+discipline, C: media+summary, mid-cycle: polls+referendums, user: Q&A+speeches+apps+proposals). Polling adds ~2-15 min latency depending on batch size.</li>
               <li><strong>Selection-style prompts</strong>: Instead of reviewing each item individually, the AI selects the top N from a pool (e.g., "pick best 3 of 500 applications"). This reduces output tokens by 95-99%.</li>
               <li><strong>Pre-filtering</strong>: Deterministic scoring (activity, votes) reduces items sent to AI by 50-90% before batch submission.</li>
               <li><strong>Ultra-fast / Fast modes</strong>: No user participation (0% human seats). Pure AI simulation at ~40-60s/day wall-clock.</li>

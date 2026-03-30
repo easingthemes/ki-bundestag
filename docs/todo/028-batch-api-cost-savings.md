@@ -274,7 +274,7 @@ Multi-provider batch submission: Anthropic requests use the Message Batches API 
 - `buildProposalRankPrompt()` — "Rank and select top N proposals"
 - Pre-filters: `preFilterApplications()`, `preFilterQuestions()`, `preFilterSpeeches()`
 
-### Refactored Simulation Modules
+### Refactored Simulation Modules — User-Driven
 
 Each module collects prompts and submits as a single batch per domain:
 
@@ -282,6 +282,21 @@ Each module collects prompts and submits as a single batch per domain:
 - **`speeches.ts`** — Speech evaluation: 1 call per bill, exception-based flagging
 - **`questions.ts`** — Citizen questions: 1 call per party, up to 50/day (was 3/day max)
 - **`internal-proposals.ts`** — Proposals: 1 call per party, rank-and-select top 2
+
+### Refactored Simulation Modules — Simulation-Driven (All AI Calls Batched)
+
+All remaining `callAI()` sites have been converted to use `submitBatch()`. Each module exports `buildXxxBatchRequest()` and `processXxxBatchResult()` functions. `loop.ts` collects requests from concurrent modules and submits them as single batches:
+
+| Batch Group | Modules | Calls Before | Calls After |
+|-------------|---------|-------------|-------------|
+| **A: Party agents** | `party-agent.ts` | 6 sequential/day | 1 batch/day |
+| **C: Media + Summary** | `media.ts`, `summary.ts` | 2 sequential/day | 1 batch/day |
+| **Negotiations** | `negotiations.ts` | 6 sequential/round | 1 batch/round |
+| **B: Interpellations** | `interpellations.ts` | 0-2 sequential/day | 1 batch/day |
+| **B: Discipline** | `discipline.ts` | 0-6 sequential/week | 1 batch/week |
+| **Mid-cycle: Polls + Referendums** | `polls.ts`, `referendums.ts` | 0-2 conditional | 1 batch (rare) |
+
+**Result**: Zero `callAI()` calls remain in the simulation loop — all AI requests go through `submitBatch()`, getting the 50% Anthropic discount on every token.
 
 ### Pre-Filtering
 
@@ -354,13 +369,29 @@ Pure AI simulation. 0% human seats, all features disabled.
 
 ## Affected Files
 
+### Batch Infrastructure
 - `packages/engine/src/agent/batch-client.ts` — Batch submission + polling
-- `packages/engine/src/agent/group-prompts.ts` — Multi-item prompt builders
+- `packages/engine/src/agent/group-prompts.ts` — Multi-item prompt builders (user-driven)
+- `packages/engine/src/agent/index.ts` — Updated exports
+
+### User-Driven AI (Selection-Style Prompts)
 - `packages/engine/src/simulation/seats.ts` — Batch application selection
 - `packages/engine/src/simulation/speeches.ts` — Batch exception-based flagging
 - `packages/engine/src/simulation/questions.ts` — Batch question answering
 - `packages/engine/src/simulation/internal-proposals.ts` — Batch proposal ranking
-- `packages/engine/src/agent/index.ts` — Updated exports
+
+### Simulation-Driven AI (All Calls Batched)
+- `packages/engine/src/agent/party-agent.ts` — `buildPartyAgentRequests()` + `processPartyAgentResult()`
+- `packages/engine/src/simulation/media.ts` — `buildMediaBatchRequest()` + `processMediaBatchResult()`
+- `packages/engine/src/simulation/summary.ts` — `buildSummaryBatchRequest()` + `processSummaryBatchResult()`
+- `packages/engine/src/simulation/negotiations.ts` — Batch all party positions per round
+- `packages/engine/src/simulation/interpellations.ts` — Batch all pending answers
+- `packages/engine/src/simulation/discipline.ts` — Batch all party reasoning calls
+- `packages/engine/src/simulation/polls.ts` — `buildContextPollBatchRequest()` + `processContextPollBatchResult()`
+- `packages/engine/src/simulation/referendums.ts` — `buildReferendumBatchRequest()` + `processReferendumBatchResult()`
+- `packages/engine/src/simulation/loop.ts` — Orchestrates batch groups A/B/C + mid-cycle
+
+### Frontend & Config
 - `packages/web/src/pages/SimulationCosts.tsx` — Updated cost/duration tables for user scaling
 - `packages/web/src/lib/timing.ts` — Updated comments with batch overhead
 

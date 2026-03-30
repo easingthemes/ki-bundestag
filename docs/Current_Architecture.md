@@ -3,7 +3,7 @@
 > **Doc Status**: Canonical (source of truth)
 > **Use for**: Current schema, simulation flow, endpoints, constants
 
-Last updated: 2026-03-29 (synced to code)
+Last updated: 2026-03-30 (synced to code)
 
 ## Project Policy
 
@@ -78,10 +78,11 @@ Both are accessed via engine helpers (`getDb()/getSqlite()` and `getUserDb()/get
 
 ## AI Usage Map
 
-Central call path:
+Central call paths:
 
-- `runDay()` → feature module → `callAI()` (`packages/engine/src/agent/client.ts`)
-- model routing by party or role (`packages/engine/src/agent/model-config.ts`)
+- **Batch (all simulation calls)**: `runDay()` → feature module → `submitBatch()` (`packages/engine/src/agent/batch-client.ts`) — 50% Anthropic discount
+- **Sequential (fallback for xAI)**: `submitBatch()` → `callAI()` (`packages/engine/src/agent/client.ts`) for xAI requests
+- Model routing by party or role (`packages/engine/src/agent/model-config.ts`)
 
 Default model setup:
 
@@ -105,7 +106,9 @@ AI-powered features include:
 
 ### AI Infrastructure
 
-**`callAI()` return type** — returns `AICallResult { text: string; model: string; provider: Provider }`, not a plain string. All 13 callAI sites destructure `.text`; `.model` and `.provider` feed into `logAICall()`.
+**`callAI()` return type** — returns `AICallResult { text: string; model: string; provider: Provider }`, not a plain string. Used internally by `submitBatch()` for xAI sequential calls.
+
+**Batch API (`submitBatch()`)** — all simulation AI calls go through the Anthropic Message Batches API (50% cost discount). Requests are grouped into batch groups: A (party agents), B (interpellations + discipline), C (media + summary), mid-cycle (polls + referendums), and negotiations. Each module exports `buildXxxBatchRequest()` / `processXxxBatchResult()` pairs; `loop.ts` collects and submits them together. User-driven calls (Q&A, speeches, applications, proposals) use selection-style prompts via `group-prompts.ts`.
 
 **Circuit breaker** — per-provider map of `{ until: string; resetAt: number }`. Hard API limit errors (matching "usage limits"/"regain access") write an entry with a parsed `resetAt` timestamp (falls back to now + 10 min). Subsequent calls throw `AIProviderLimitError` immediately without hitting the API. Entries auto-expire: if `Date.now() >= resetAt` the entry is deleted and the call proceeds.
 
@@ -277,7 +280,7 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 - Election threshold: 5%
 - Sentiment bounds: 5–75; baseline: 45; mean reversion: 3%/day
 - Crisis trigger chance: 8% daily / 25% on monthly cycle; max 2 concurrent crises
-- Questions: max 3 answered/day; expiry 14 days; API pending cap enforced
+- Questions: max 50 answered/party/day (batch); expiry 14 days
 - Interpellations: max 2 answered/day; deadline 14 days
 - Polls: generated on poll day (15-day interval), expiry 14 days
 - Referendums: generated every 30 days; close after 14 days; 10-vote quorum for resolution
@@ -304,6 +307,8 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 
 **Engine — AI**:
 - AI routing + circuit breaker + retry: [packages/engine/src/agent/client.ts](packages/engine/src/agent/client.ts)
+- Batch API client + polling: [packages/engine/src/agent/batch-client.ts](packages/engine/src/agent/batch-client.ts)
+- Selection-style prompt builders (user-driven): [packages/engine/src/agent/group-prompts.ts](packages/engine/src/agent/group-prompts.ts)
 - Shared JSON parser + observability: [packages/engine/src/agent/ai-json.ts](packages/engine/src/agent/ai-json.ts)
 - Model config defaults/overrides: [packages/engine/src/agent/model-config.ts](packages/engine/src/agent/model-config.ts)
 - Token-budgeted prompt builder: [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts)
@@ -338,4 +343,4 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 - `docs/AI_Engine.md`
 - `docs/Hosting_Plan.md`
 - `docs/operations/runbook.md`
-- `docs/todo/README.md` — Issue tracker (25/26 done)
+- `docs/todo/README.md` — Issue tracker (26/28 done)
