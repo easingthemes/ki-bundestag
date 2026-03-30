@@ -1,5 +1,6 @@
+import crypto from "crypto";
 import express from "express";
-import { getDb, getUserDb, schema, logUserAction, isParticipatoryPreset, isFeatureEnabled } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, logUserAction, isParticipatoryPreset, isFeatureEnabled, logger } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq } from "drizzle-orm";
 
@@ -83,7 +84,14 @@ export function requireAdmin(req: express.Request, res: express.Response, next: 
     return;
   }
   const provided = req.headers["x-admin-secret"];
-  if (provided !== secret) {
+  if (typeof provided !== "string" || provided.length === 0) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  // Constant-time comparison to prevent timing attacks
+  const a = Buffer.from(provided);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDb, schema, getSqlite, getUserSqlite } from "@ki-bundestag/engine";
+import { getDb, schema, getSqlite, getUserSqlite, logger } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { requireAdmin } from "../middleware/auth.js";
 
@@ -101,7 +101,7 @@ router.get("/api/admin/analytics", requireAdmin, (_req, res) => {
       dailyActions,
     });
   } catch (err) {
-    console.error("Analytics error:", err);
+    logger.error("Analytics error:", err);
     res.status(500).json({ error: "Failed to load analytics" });
   }
 });
