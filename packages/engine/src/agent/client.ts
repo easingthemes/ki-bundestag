@@ -49,6 +49,11 @@ export function clearProviderLimits(): void {
   providerLimits.clear();
 }
 
+/** Mark a provider as limited (used by batch-client when raw SDK calls hit limits). */
+export function markProviderLimited(provider: Provider, until: string, resetAt: number): void {
+  providerLimits.set(provider, { until, resetAt });
+}
+
 type LimitResult =
   | { type: "hard"; provider: Provider; until: string }
   | { type: "transient"; provider: Provider }
@@ -67,7 +72,7 @@ function isNetworkError(err: unknown): boolean {
   return typeof msg === "string" && /fetch failed|network|socket hang up/i.test(msg);
 }
 
-function detectLimitError(err: unknown): LimitResult {
+export function detectLimitError(err: unknown): LimitResult {
   if (!err || typeof err !== "object") return { type: "none" };
   const e = err as Record<string, unknown>;
 
@@ -138,7 +143,7 @@ function getModel(provider: Provider, modelId: string) {
  * @returns Generated text response
  */
 /** Parse a date string into a ms timestamp, or return a default TTL offset. */
-function parseResetTime(until: string): number {
+export function parseResetTime(until: string): number {
   const parsed = Date.parse(until);
   if (!isNaN(parsed) && parsed > Date.now()) return parsed;
   // Default: 10 minutes from now
