@@ -50,7 +50,7 @@ Everything above is 10× worse. Single-process + single-file SQLite cannot serve
 
 - [x] **Batch `lastActive` updates** — In-memory buffer with 5-min flush interval (`middleware/auth.ts`)
 - [x] **Session pruning cron** — Scheduled every 30 min in `api/src/index.ts`, cleaned on shutdown
-- [ ] **WebSocket for notifications** — Replace polling for real-time events (Socket.io or native WS)
+- [x] **WebSocket for real-time updates** — Socket.io server broadcasts sim status, events, and notification signals; clients use WS with automatic polling fallback
 - [x] **Increase MdB review throughput** — 3/party/day cap removed; batch AI review processes all pending apps per party via Anthropic batch API
 
 ### Tier 2: 10K → 100K Users

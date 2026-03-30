@@ -10,6 +10,7 @@ import { sessionTracking, flushLastActive } from "./middleware/index.js";
 import { voteLimiter, actionLimiter, adminLimiter } from "./middleware/rate-limit.js";
 import { SQLiteSessionStore } from "./session-store.js";
 import { configurePassport } from "./passport-config.js";
+import { initSocketServer, cleanupSocket } from "./socket.js";
 import authRouter from "./routes/auth.js";
 import partiesRouter from "./routes/parties.js";
 import billsRouter from "./routes/bills.js";
@@ -108,9 +109,13 @@ const server = app.listen(PORT, () => {
   logger.info(`API server running on http://localhost:${PORT}`);
 });
 
+// Attach Socket.io to the HTTP server
+initSocketServer(server, FRONTEND_URL);
+
 process.on("SIGINT", () => {
   clearInterval(pruneInterval);
   flushLastActive();
+  cleanupSocket();
   server.close();
   closeDb();
   process.exit(0);
