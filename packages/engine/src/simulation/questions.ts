@@ -1,21 +1,19 @@
 import type { Party } from "@ki-bundestag/types";
 import { eq } from "drizzle-orm";
-import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { logAICall, parseAIJson } from "../agent/ai-json.js";
-import { submitBatch, isBatchMode, chunkItems, type BatchResult } from "../agent/batch-client.js";
+import { submitBatch, chunkItems, type BatchResult } from "../agent/batch-client.js";
 import { buildQuestionBatchPrompt, preFilterQuestions, type QuestionItem, type PartyContext } from "../agent/group-prompts.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
 
-const MAX_ANSWERS_PER_DAY_LEGACY = 3;
-const MAX_ANSWERS_PER_DAY_BATCH = 50;
+const MAX_ANSWERS_PER_DAY = 50;
 const QUESTION_EXPIRY_DAYS = 14;
 
 /**
  * Answer pending citizen questions and expire old ones.
  *
- * In batch mode: answers up to 50 questions per party in one AI call (grouped).
- * In legacy mode: answers up to 3 questions per day (sequential calls).
+ * Groups questions by target party and answers up to 50 per party
+ * in a single batch AI call.
  */
 export async function answerPendingQuestions(
   allParties: Party[],
@@ -52,11 +50,7 @@ export async function answerPendingQuestions(
 
   if (pending.length === 0) return;
 
-  if (isBatchMode()) {
-    await answerQuestionsBatch(pending, allParties, scoreMap, currentDay);
-  } else {
-    await answerQuestionsLegacy(pending.slice(0, MAX_ANSWERS_PER_DAY_LEGACY), allParties, currentDay);
-  }
+  await answerQuestionsBatch(pending, allParties, scoreMap, currentDay);
 }
 
 /**
@@ -96,7 +90,7 @@ async function answerQuestionsBatch(
       question: q.question,
       voteScore: scoreMap[q.id] ?? 0,
     }));
-    const filtered = preFilterQuestions(items, MAX_ANSWERS_PER_DAY_BATCH);
+    const filtered = preFilterQuestions(items, MAX_ANSWERS_PER_DAY);
 
     for (const chunk of chunkItems(filtered, 180, 160_000)) {
       const req = buildQuestionBatchPrompt(partyCtx, chunk, currentDay);
@@ -107,15 +101,7 @@ async function answerQuestionsBatch(
   if (batchRequests.length === 0) return;
 
   const t0 = Date.now();
-  let results: BatchResult[];
-  try {
-    results = await submitBatch(batchRequests.map(b => b.req));
-  } catch (err) {
-    console.error(`  [Questions] Batch failed, falling back:`, (err as Error).message);
-    const fallbackPending = pending.slice(0, MAX_ANSWERS_PER_DAY_LEGACY);
-    await answerQuestionsLegacy(fallbackPending, allParties, currentDay);
-    return;
-  }
+  const results = await submitBatch(batchRequests.map(b => b.req));
   logAICall({ task: "questions-batch", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
 
   // Process results
@@ -169,65 +155,6 @@ async function answerQuestionsBatch(
           );
         } catch {}
       }
-    }
-  }
-}
-
-/**
- * Legacy mode: answer questions one at a time (max 3/day).
- */
-async function answerQuestionsLegacy(
-  pending: Array<{ id: string; question: string; targetPartyId: string; createdOnDay: number; userId?: string | null }>,
-  allParties: Party[],
-  currentDay: number,
-): Promise<void> {
-  const db = getDb();
-
-  for (const q of pending) {
-    const party = allParties.find(p => p.id === q.targetPartyId);
-    if (!party) continue;
-
-    const t0 = Date.now();
-    try {
-      const { text, model, provider } = await callAI({
-        system: `You are the spokesperson for ${party.name}, a ${(party as any).ideology ?? ""} party in the German Bundestag. Answer the citizen's question in character, reflecting your party's values and positions. Keep your response to 2-3 sentences. Be direct and politically authentic.`,
-        prompt: `A citizen asks ${party.name}: "${q.question}"`,
-        maxTokens: 512,
-        partyId: party.id,
-      });
-
-      db.update(schema.citizenQuestions)
-        .set({
-          status: "answered",
-          response: text.trim(),
-          respondedOnDay: currentDay,
-        })
-        .where(eq(schema.citizenQuestions.id, q.id))
-        .run();
-
-      const questionUserId = (q as any).userId as string | null;
-      if (questionUserId) {
-        try {
-          createNotification(
-            questionUserId,
-            "question_answered",
-            `${party.name} answered your question`,
-            `Your question "${q.question.substring(0, 80)}..." was answered by ${party.name}.`,
-            { questionId: q.id, partyId: party.id },
-            currentDay,
-          );
-        } catch {}
-      }
-
-      logAICall({ task: `question:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
-    } catch (error) {
-      if (error instanceof AIProviderLimitError) {
-        console.warn(`  [Questions] Skipped (${error.message})`);
-      } else {
-        console.error(`  [Questions] Error answering question for ${party.name}:`, error);
-      }
-      logAICall({ task: `question:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
-      if (error instanceof AIProviderLimitError) break;
     }
   }
 }

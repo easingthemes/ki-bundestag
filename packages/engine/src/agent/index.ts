@@ -1,6 +1,6 @@
 export { runPartyAgent } from "./party-agent.js";
 export { callAI, AIProviderLimitError, allProvidersLimited, clearProviderLimits, type AICallResult } from "./client.js";
-export { submitBatch, isBatchMode, chunkItems, findResult, type BatchRequest, type BatchResult } from "./batch-client.js";
+export { submitBatch, chunkItems, findResult, type BatchRequest, type BatchResult } from "./batch-client.js";
 export {
   buildApplicationSelectPrompt, buildSpeechFlagPrompt, buildQuestionBatchPrompt, buildProposalRankPrompt,
   preFilterApplications, preFilterQuestions, preFilterSpeeches,
