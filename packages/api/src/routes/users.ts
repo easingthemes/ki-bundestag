@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, count } from "drizzle-orm";
 import { getUserToken } from "../middleware/index.js";
 import { LIMITS } from "../validation.js";
@@ -349,7 +349,7 @@ router.post("/api/users/me/join/:partyId", (req, res) => {
     .where(eq(schema.users.id, token))
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
-  try { logUserAction(token, "join_party", currentDay, req.params.partyId, "party"); } catch (err) { console.error("[users] Failed to log action:", err); }
+  try { logUserAction(token, "join_party", currentDay, req.params.partyId, "party"); } catch (err) { logger.error("[users] Failed to log action:", err); }
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
 
@@ -375,7 +375,7 @@ router.post("/api/users/me/leave", (req, res) => {
     .set({ partyId: null, lastActive: Date.now(), switchCooldownUntil: currentDay + 7 })
     .where(eq(schema.users.id, token))
     .run();
-  try { logUserAction(token, "leave_party", currentDay, user.partyId ?? undefined, "party"); } catch (err) { console.error("[users] Failed to log action:", err); }
+  try { logUserAction(token, "leave_party", currentDay, user.partyId ?? undefined, "party"); } catch (err) { logger.error("[users] Failed to log action:", err); }
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
 });
@@ -387,7 +387,8 @@ router.get("/api/notifications", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
   const unreadOnly = req.query.unread === "true";
-  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+  const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+  const limit = rawLimit !== undefined && !isNaN(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : undefined;
   const notifications = getNotifications(token, { unreadOnly, limit });
   res.json(notifications);
 });

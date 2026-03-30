@@ -1,3 +1,4 @@
+export { logger } from "./logger.js";
 export { getDb, getSqlite, closeDb, getDbPath, getUserDb, getUserSqlite, closeUserDb, getUserDbPath, schema, seedDatabase, migrateDatabase } from "./db/index.js";
 export { runDay, getCrisisTemplates } from "./simulation/index.js";
 export { runPartyAgent, callAI, AIProviderLimitError, allProvidersLimited, clearProviderLimits, PARTY_MODELS, ROLE_MODELS, getPartyModel, getRoleModel, type RoleKey, type Provider, type ModelConfig, type AICallResult } from "./agent/index.js";

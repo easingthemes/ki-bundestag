@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { eq, and } from "drizzle-orm";
-import { getDb, getUserDb, schema, getUserSeat, getActiveSeats, getOpenSeatCounts, getSqlite, logUserAction } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, getUserSeat, getActiveSeats, getOpenSeatCounts, getSqlite, logUserAction, logger } from "@ki-bundestag/engine";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
 import { LIMITS } from "../validation.js";
 
@@ -90,7 +90,7 @@ router.post("/api/seats/apply", (req, res) => {
     createdOnDay: currentDay,
   }).run();
 
-  try { logUserAction(token, "apply_mdb", currentDay, appId, "application", { partyId: user.partyId }); } catch (err) { console.error("[seats] Failed to log action:", err); }
+  try { logUserAction(token, "apply_mdb", currentDay, appId, "application", { partyId: user.partyId }); } catch (err) { logger.error("[seats] Failed to log action:", err); }
   res.json({
     id: appId,
     userId: token,
