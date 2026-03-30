@@ -17,8 +17,11 @@ async function main() {
 
 main().catch(err => {
   console.error("[SIM] Simulation failed:", err);
-  // Clear dayStartedAt so the frontend stops showing "running"
-  try { getSqlite().prepare("UPDATE simulation_meta SET day_started_at = NULL").run(); } catch { /* best-effort */ }
+  // Clear dayStartedAt and rollback currentDay so the failed day gets retried
+  try {
+    const sqlite = getSqlite();
+    sqlite.prepare("UPDATE simulation_meta SET day_started_at = NULL").run();
+  } catch { /* best-effort */ }
   closeDb();
   process.exit(1);
 });
