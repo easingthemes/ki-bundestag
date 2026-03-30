@@ -114,6 +114,6 @@ describe("processPartyAgentResult", () => {
 
     const bill2Vote = actions.find(a => a.type === "vote" && a.billId === "bill-2");
     expect(bill2Vote).toBeDefined();
-    expect(bill2Vote!.vote).toBe("abstain");
+    expect(bill2Vote!.type === "vote" && bill2Vote!.vote).toBe("abstain");
   });
 });
