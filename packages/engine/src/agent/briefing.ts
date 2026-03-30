@@ -7,8 +7,8 @@
  */
 
 import { getDb, schema } from "../db/index.js";
-import { desc } from "drizzle-orm";
-import type { Party, SimulationEvent } from "@ki-bundestag/types";
+import { desc, gte, and, eq, inArray } from "drizzle-orm";
+import type { Party } from "@ki-bundestag/types";
 import type { BatchRequest } from "./batch-client.js";
 import type { BatchResult } from "./batch-client.js";
 import { parseAIJson, logAICall } from "./ai-json.js";
@@ -42,14 +42,21 @@ function getRecentSignificantEvents(currentDay: number, lookbackDays = 30): Arra
   const db = getDb();
   const minDay = Math.max(1, currentDay - lookbackDays);
 
-  const rows = db.select().from(schema.simulationEvents)
+  const rows = db.select({
+    dayNumber: schema.simulationEvents.dayNumber,
+    type: schema.simulationEvents.type,
+    actor: schema.simulationEvents.actor,
+    title: schema.simulationEvents.title,
+  }).from(schema.simulationEvents)
+    .where(and(
+      gte(schema.simulationEvents.dayNumber, minDay),
+      inArray(schema.simulationEvents.type, [...BRIEFING_EVENT_TYPES]),
+    ))
     .orderBy(desc(schema.simulationEvents.dayNumber))
-    .all() as unknown as SimulationEvent[];
+    .limit(60)
+    .all();
 
-  return rows
-    .filter(e => e.dayNumber >= minDay && BRIEFING_EVENT_TYPES.has(e.type))
-    .map(e => ({ day: e.dayNumber, type: e.type, actor: e.actor, title: e.title }))
-    .slice(0, 60);
+  return rows.map(e => ({ day: e.dayNumber, type: e.type, actor: e.actor, title: e.title }));
 }
 
 /**
@@ -60,7 +67,15 @@ function getApprovalTrends(currentDay: number, lookbackDays = 14): Map<string, {
   const minDay = Math.max(1, currentDay - lookbackDays);
   const midDay = Math.max(1, currentDay - Math.floor(lookbackDays / 2));
 
-  const rows = db.select().from(schema.partyHistory).all();
+  const rows = db.select({
+    partyId: schema.partyHistory.partyId,
+    dayNumber: schema.partyHistory.dayNumber,
+    approvalRating: schema.partyHistory.approvalRating,
+  }).from(schema.partyHistory)
+    .where(gte(schema.partyHistory.dayNumber, minDay))
+    .orderBy(desc(schema.partyHistory.dayNumber))
+    .all();
+
   const trends = new Map<string, { current: number; previous: number }>();
 
   for (const row of rows) {
@@ -95,10 +110,10 @@ function buildBriefingContext(
   currentDay: number,
   allParties: Party[],
   coalitionPartyIds: string[],
+  events: Array<{ day: number; type: string; actor: string; title: string }>,
   depthConfig?: DepthConfig,
 ): string {
   const depth = depthConfig ?? getDepthConfig("normal");
-  const events = getRecentSignificantEvents(currentDay, depth.briefingEventLookbackDays);
   const trends = getApprovalTrends(currentDay, depth.briefingTrendDays);
 
   const coalitionNames = allParties
@@ -171,7 +186,11 @@ export function buildBriefingBatchRequest(
   if (!depth.enableBriefing) return null;
   if (currentDay <= 2) return null;
 
-  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds, depth);
+  // Skip if no significant events in the lookback window
+  const events = getRecentSignificantEvents(currentDay, depth.briefingEventLookbackDays);
+  if (events.length === 0) return null;
+
+  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds, events, depth);
 
   return {
     customId: `briefing-day${currentDay}`,
@@ -252,12 +271,18 @@ export function getPartyRecentActions(
   const db = getDb();
   const minDay = Math.max(1, currentDay - depth.ownActionsLookbackDays);
 
-  const rows = db.select().from(schema.simulationEvents)
+  const rows = db.select({
+    dayNumber: schema.simulationEvents.dayNumber,
+    type: schema.simulationEvents.type,
+    title: schema.simulationEvents.title,
+  }).from(schema.simulationEvents)
+    .where(and(
+      gte(schema.simulationEvents.dayNumber, minDay),
+      eq(schema.simulationEvents.actor, partyId),
+    ))
     .orderBy(desc(schema.simulationEvents.dayNumber))
-    .all() as unknown as SimulationEvent[];
+    .limit(depth.ownActionsMaxItems)
+    .all();
 
-  return rows
-    .filter(e => e.dayNumber >= minDay && e.actor === partyId)
-    .map(e => ({ day: e.dayNumber, type: e.type, title: e.title }))
-    .slice(0, depth.ownActionsMaxItems);
+  return rows.map(e => ({ day: e.dayNumber, type: e.type, title: e.title }));
 }

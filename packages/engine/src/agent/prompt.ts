@@ -1,117 +1,161 @@
-import type { AgentContext } from "@ki-bundestag/types";
+import type { AgentContext, BillImpact } from "@ki-bundestag/types";
 import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
 
-export function buildSystemPrompt(partyId?: string): string {
+/** Compact impact string: "B:+0.5 U:-0.1 I:+0.02 G:+0.1 S:+1" */
+function formatImpact(impact: BillImpact): string {
+  const fmt = (v: number | undefined) => {
+    if (v == null) return "0";
+    return v >= 0 ? `+${v}` : `${v}`;
+  };
+  return `B:${fmt(impact.budget)} U:${fmt(impact.unemployment)} I:${fmt(impact.inflation)} G:${fmt(impact.gdpGrowth)} S:${fmt(impact.publicSentiment)}`;
+}
+
+/** Capabilities that control which rules and schema entries are included in the system prompt. */
+export interface PartyCapabilities {
+  canVote: boolean;
+  canPropose: boolean;
+  canAmend: boolean;
+  hasFraktion: boolean;
+  isOpposition: boolean;
+  isCoalitionLeader: boolean;
+  hasActiveElection: boolean;
+}
+
+const DEFAULT_CAPABILITIES: PartyCapabilities = {
+  canVote: true,
+  canPropose: true,
+  canAmend: true,
+  hasFraktion: true,
+  isOpposition: false,
+  isCoalitionLeader: false,
+  hasActiveElection: false,
+};
+
+export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabilities): string {
+  const caps = capabilities ?? DEFAULT_CAPABILITIES;
   const profile = partyId ? getPartyProfile(partyId) : "";
   const profileSection = profile ? `${profile}\n\n` : "";
 
-  return `${profileSection}You are an AI agent controlling a political party in the German Bundestag simulation. You must act in character as the party leadership, making decisions that align with your party's ideology and priorities.
+  // Build rules dynamically based on capabilities
+  const rules: string[] = [
+    "You must respond with ONLY valid JSON matching the schema below. No other text.",
+    "You may take 1-3 actions per turn.",
+  ];
+
+  if (caps.canVote) {
+    rules.push(`You MUST submit a vote action for every bill listed under "THIRD READING — MANDATORY VOTES". Missing a vote is an error.`);
+  }
+
+  if (caps.canPropose) {
+    rules.push("You may propose at most 1 new bill per turn.");
+    rules.push("Bill impacts must be small and realistic: budget: -1 to +1 billion, unemployment: -0.1 to +0.1%, inflation: -0.05 to +0.05%, gdpGrowth: -0.1 to +0.1%, publicSentiment: -2 to +2.");
+  }
+
+  rules.push("You may make at most 1 public statement per turn.");
+  rules.push("Your decisions should reflect your party's ideology, coalition role, and political strategy.");
+
+  if (!caps.isOpposition) {
+    rules.push("Coalition partners should generally cooperate but may disagree on specific issues.");
+  } else {
+    rules.push("Opposition parties should scrutinize government bills but may support good policy.");
+  }
+
+  rules.push("Consider active crises when making decisions — propose crisis-related bills, adjust votes, and issue statements responding to ongoing emergencies.");
+
+  if (caps.hasActiveElection) {
+    rules.push("During election campaigns, you may issue a campaign_statement (max 1 per turn) with a campaign promise.");
+  }
+
+  if (caps.canAmend) {
+    rules.push(`You may propose at most 1 amendment per turn, targeting ONLY bills in "second_reading". Amendments should be small adjustments (impact deltas within ±0.3), not rewrites.`);
+  }
+
+  if (caps.hasFraktion) {
+    rules.push("You may submit at most 1 motion or resolution per turn. Motions (Antrag) request government action; resolutions (Entschließung) declare parliament's position.");
+
+    if (caps.isOpposition) {
+      rules.push("You may file at most 1 interpellation per turn. Kleine Anfrage = written question. Große Anfrage = major inquiry (triggers debate). Target a specific ministry. Unanswered questions (14 day deadline) embarrass the minister's party.");
+    }
+
+    if (!caps.hasActiveElection) {
+      rules.push("You may file a constitutional challenge targeting a recently passed bill (last 14 days). 30% chance the law is struck down. Use sparingly — a dismissed challenge harms your approval rating.");
+    }
+  }
+
+  if (caps.isCoalitionLeader && !caps.hasActiveElection) {
+    rules.push(`You may call a Vertrauensfrage (confidence vote). If fewer than 368 seats vote yes, snap election is triggered. Max 1 per turn.`);
+  }
+
+  if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
+    rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires 368 seats. If successful, opposition takes power immediately. Max 1 per turn.`);
+  }
+
+  rules.push("Do NOT wrap your JSON response in markdown code fences (\\`\\`\\`). Respond with raw JSON only.");
+  rules.push("Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).");
+  rules.push("Do NOT include trailing commas in JSON arrays or objects.");
+
+  const numberedRules = rules.map((r, i) => `${i + 1}. ${r}`).join("\n");
+
+  // Build schema dynamically — only include action types the party can use
+  const schemaEntries: string[] = [];
+
+  if (caps.canVote) {
+    schemaEntries.push(`    {"type":"vote","billId":"<bill id>","vote":"yes"|"no"|"abstain","reason":"<brief>"}`);
+  }
+
+  if (caps.canPropose) {
+    schemaEntries.push(`    {"type":"propose_bill","title":"<title>","description":"<1-2 sentences>","category":"economy"|"social"|"environment"|"immigration"|"defense"|"education"|"healthcare"|"infrastructure","impact":{"budget":<num>,"unemployment":<num>,"inflation":<num>,"gdpGrowth":<num>,"publicSentiment":<num>}}`);
+  }
+
+  if (caps.canAmend) {
+    schemaEntries.push(`    {"type":"propose_amendment","billId":"<second_reading bill id>","title":"<title>","description":"<1-2 sentences>","impactChange":{"budget":<num>,"unemployment":<num>,"inflation":<num>,"gdpGrowth":<num>,"publicSentiment":<num>}}`);
+  }
+
+  schemaEntries.push(`    {"type":"statement","title":"<headline>","statement":"<1-2 sentence public statement>"}`);
+
+  if (caps.hasFraktion) {
+    schemaEntries.push(`    {"type":"submit_motion","motionType":"motion"|"resolution","title":"<title>","description":"<1-2 sentences>"}`);
+  }
+
+  if (caps.hasFraktion && caps.isOpposition) {
+    schemaEntries.push(`    {"type":"file_interpellation","interpellationType":"kleine"|"große","title":"<title>","question":"<1-2 sentence question>","targetMinistry":"finance"|"labour"|"environment"|"interior"|"defence"|"education"|"health"|"infrastructure"}`);
+  }
+
+  if (caps.hasActiveElection) {
+    schemaEntries.push(`    {"type":"campaign_statement","title":"<headline>","promise":"<1-2 sentence promise>"}`);
+  }
+
+  if (caps.isCoalitionLeader && !caps.hasActiveElection) {
+    schemaEntries.push(`    {"type":"call_vertrauensfrage","title":"<title>","description":"<1-2 sentences>"}`);
+  }
+
+  if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
+    schemaEntries.push(`    {"type":"file_misstrauensvotum","title":"<title>","description":"<1-2 sentences>","proposedChancellor":"<name>","proposedChancellorPartyId":"<party id>"}`);
+  }
+
+  if (caps.hasFraktion && !caps.hasActiveElection) {
+    schemaEntries.push(`    {"type":"file_constitutional_challenge","billId":"<recently passed bill id>","title":"<title>","arguments":"<1-2 sentence constitutional basis>"}`);
+  }
+
+  schemaEntries.push(`    {"type":"nothing"}`);
+
+  const schema = `{"actions":[\n${schemaEntries.join(",\n")}\n]}`;
+
+  // Compact example showing correct output format
+  const example = `EXAMPLE (2 votes + 1 statement):
+{"actions":[{"type":"vote","billId":"bill-abc","vote":"yes","reason":"Aligns with our social policy goals"},{"type":"vote","billId":"bill-xyz","vote":"no","reason":"Unacceptable fiscal impact"},{"type":"statement","title":"Party responds to crisis","statement":"We call for immediate government action to address the economic downturn."}]}`;
+
+  return `${profileSection}You are an AI agent controlling a political party in the German Bundestag simulation. Act in character as the party leadership.
 
 RULES:
-1. You must respond with ONLY valid JSON matching the schema below. No other text.
-2. You may take 1-3 actions per turn.
-3. You MUST submit a vote action for every bill listed under "THIRD READING — MANDATORY VOTES". Missing a vote is an error.
-4. You may propose at most 1 new bill per turn.
-5. You may make at most 1 public statement per turn.
-6. Bill impacts must be small and realistic: budget: -1 to +1 billion, unemployment: -0.1 to +0.1%, inflation: -0.05 to +0.05%, gdpGrowth: -0.1 to +0.1%, publicSentiment: -2 to +2. Germany's economy changes slowly — no single bill transforms the entire economy.
-7. Your decisions should reflect your party's ideology, coalition role, and political strategy.
-8. Coalition partners should generally cooperate but may disagree on specific issues.
-9. Opposition parties should scrutinize government bills but may support good policy.
-10. Consider active crises when making decisions — propose crisis-related bills, adjust votes, and issue statements responding to ongoing emergencies.
-11. During election campaigns, you may issue a campaign_statement (max 1 per turn) with a campaign promise. Only use this action type when an election is active and in campaign phase.
-12. You may propose at most 1 amendment per turn, targeting ONLY bills in "second_reading". Amendments should be small adjustments (impact deltas within ±0.3), not rewrites. Include the billId of the target bill.
-13. You may submit at most 1 motion or resolution per turn (requires Fraktion). Motions (Antrag) request government action; resolutions (Entschließung) declare parliament's position. They don't create law — use them for political pressure, forcing debates, or signaling priorities. Opposition parties should use these strategically.
-14. You may file at most 1 interpellation per turn (requires Fraktion + opposition role). Interpellations (Anfragen) formally question a government minister. Kleine Anfrage = written question (quiet). Große Anfrage = major inquiry (triggers debate, higher impact). Target a specific ministry. The government must respond within 14 days — unanswered questions embarrass the minister's party.
-15. If you are the coalition leader (coalitionRole "leader"), you may call a Vertrauensfrage (confidence vote) with "call_vertrauensfrage". Parliament votes on whether to maintain your Chancellor's mandate. If the coalition does not hold together (fewer than 368 seats vote yes), the government falls and a snap election is triggered. Use strategically — after a crisis, a controversial bill, or when you want a fresh mandate. Max 1 per turn. Not available during elections.
-16. If you are in opposition (coalitionRole "opposition"), you may file a Konstruktives Misstrauensvotum with "file_misstrauensvotum". You must name a replacement Chancellor and their party. Requires 368 absolute-majority seats to pass. If successful, the opposition takes power immediately without an election. Max 1 per turn. Not available during elections.
-17. You may file a constitutional challenge with "file_constitutional_challenge" (requires Fraktion, not available during elections). Target a recently passed bill (last 14 days). The Bundesverfassungsgericht rules same-day: 30% chance the law is struck down and its economic effects reversed. Max 1 per turn. Use sparingly — only for laws that genuinely violate constitutional principles. A dismissed challenge harms your approval rating.
-18. Do NOT wrap your JSON response in markdown code fences (\`\`\`). Respond with raw JSON only.
-19. Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).
-20. Do NOT include trailing commas in JSON arrays or objects.
+${numberedRules}
 
 RESPONSE SCHEMA:
-{
-  "actions": [
-    {
-      "type": "vote",
-      "billId": "<bill id>",
-      "vote": "yes" | "no" | "abstain",
-      "reason": "<brief explanation>"
-    },
-    {
-      "type": "propose_bill",
-      "title": "<bill title in German or English>",
-      "description": "<1-2 sentence description>",
-      "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
-      "impact": {
-        "budget": <number, change in billions EUR>,
-        "unemployment": <number, change in percentage points>,
-        "inflation": <number, change in percentage points>,
-        "gdpGrowth": <number, change in percentage points>,
-        "publicSentiment": <number, change in sentiment points>
-      }
-    },
-    {
-      "type": "propose_amendment",
-      "billId": "<second_reading bill id>",
-      "title": "<amendment title>",
-      "description": "<1-2 sentence description of the change>",
-      "impactChange": {
-        "budget": <number, delta change>,
-        "unemployment": <number, delta change>,
-        "inflation": <number, delta change>,
-        "gdpGrowth": <number, delta change>,
-        "publicSentiment": <number, delta change>
-      }
-    },
-    {
-      "type": "statement",
-      "title": "<headline>",
-      "statement": "<1-2 sentence public statement>"
-    },
-    {
-      "type": "submit_motion",
-      "motionType": "motion" | "resolution",
-      "title": "<motion title in German or English>",
-      "description": "<1-2 sentence description>"
-    },
-    {
-      "type": "file_interpellation",
-      "interpellationType": "kleine" | "große",
-      "title": "<interpellation title>",
-      "question": "<1-2 sentence formal question to the minister>",
-      "targetMinistry": "finance" | "labour" | "environment" | "interior" | "defence" | "education" | "health" | "infrastructure"
-    },
-    {
-      "type": "campaign_statement",
-      "title": "<campaign headline>",
-      "promise": "<1-2 sentence campaign promise>"
-    },
-    {
-      "type": "call_vertrauensfrage",
-      "title": "<short title for the confidence vote>",
-      "description": "<1-2 sentence explanation of why you are calling this vote>"
-    },
-    {
-      "type": "file_misstrauensvotum",
-      "title": "<short title for the motion>",
-      "description": "<1-2 sentence argument for replacing the government>",
-      "proposedChancellor": "<full name of the proposed replacement Chancellor>",
-      "proposedChancellorPartyId": "<party id of the proposed Chancellor>"
-    },
-    {
-      "type": "file_constitutional_challenge",
-      "billId": "<id of a recently passed bill>",
-      "title": "<short title for the challenge>",
-      "arguments": "<1-2 sentence constitutional basis for the challenge>"
-    },
-    {
-      "type": "nothing"
-    }
-  ]
-}`;
+${schema}
+
+${example}`;
 }
 
 /** Rough token estimate: ~4 chars per token. */
@@ -136,12 +180,10 @@ export function buildUserPrompt(ctx: AgentContext, depthConfig?: DepthConfig): s
   let fraktionNote = "";
   if (ctx.party.seatCount <= 0) {
     fraktionNote = `
-
-IMPORTANT: Your party currently has NO seats in parliament. You CANNOT propose bills, vote, or propose amendments. You may ONLY issue public statements (and campaign statements during elections). Focus on public commentary, criticism, and building support.`;
+  *** NO SEATS — you may ONLY issue statements. ***`;
   } else if (ctx.hasFraktion === false) {
     fraktionNote = `
-
-IMPORTANT: Your party has ${ctx.party.seatCount} seats but no Fraktion (below 5% threshold of 37 seats). You cannot propose bills, vote, or propose amendments. You may only issue statements.`;
+  *** ${ctx.party.seatCount} seats but no Fraktion (below 37 seats) — statements only. ***`;
   }
 
   // Build reading sections
@@ -167,7 +209,7 @@ ${secondReadingBills.map(b => {
     ? `\n    Amendments: ${amendments.map(a => `"${a.title}" by ${a.proposedBy}`).join(", ")}`
     : "";
   return `  - [${b.id}] "${b.title}" (${b.category}) proposed by ${b.proposedBy}${rec}
-    Impact: ${JSON.stringify(b.impact)}${amStr}`;
+    Impact: ${formatImpact(b.impact)}${amStr}`;
 }).join("\n")}\n`;
     } else {
       readingSections += `\nSECOND READING (awareness only — you cannot propose amendments without a Fraktion):
@@ -194,7 +236,7 @@ ${thirdReadingBills.map(b => {
     : "";
   return `  - [${b.id}] "${b.title}" (${b.category}) proposed by ${b.proposedBy}${rec}
     Description: ${b.description}
-    Impact: ${JSON.stringify(b.impact)}${amStr}${sigStr}${mdbStr}`;
+    Impact: ${formatImpact(b.impact)}${amStr}${sigStr}${mdbStr}`;
 }).join("\n")}\n`;
     } else {
       readingSections += `\nTHIRD READING (awareness only — you cannot vote without a Fraktion):
@@ -208,25 +250,26 @@ ${thirdReadingBills.map(b => `  - "${b.title}" (${b.category}) proposed by ${b.p
 
   // ── Priority 1: Always included (core decision-making context) ──────────
 
+  // Consolidated party table: YOUR PARTY marked with *, coalition/opposition roles shown inline
+  const partyTable = ctx.allParties.map(p => {
+    const marker = p.id === ctx.party.id ? " ← YOU" : "";
+    return `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}${marker}`;
+  }).join("\n");
+
   const coreLines = `CURRENT DAY: ${ctx.currentDay}
 
-YOUR PARTY: ${ctx.party.name}
-  Role: ${ctx.party.coalitionRole}
-  Seats: ${ctx.party.seatCount}/735
-  Approval Rating: ${ctx.party.approvalRating}%
+YOUR PARTY: ${ctx.party.name} (${ctx.party.coalitionRole})
+  Seats: ${ctx.party.seatCount}/735 | Approval: ${ctx.party.approvalRating}%
   Ideology: ${ctx.party.ideology}
-  Policy Priorities: ${JSON.stringify(ctx.party.policyPriorities)}${ctx.hasFraktion && ctx.fraktionLeader ? `
+  Priorities: ${JSON.stringify(ctx.party.policyPriorities)}${ctx.hasFraktion && ctx.fraktionLeader ? `
   Fraktion Leader: ${ctx.fraktionLeader}` : ""}${fraktionNote}
 
-COALITION: ${ctx.allParties.filter(p => p.coalitionRole !== "opposition").map(p => p.name).join(", ")}
-OPPOSITION: ${ctx.allParties.filter(p => p.coalitionRole === "opposition").map(p => p.name).join(", ")}
-
 NATIONAL STATE:
-  Budget: ${ctx.nationalState.economy.budget}B EUR
-  Unemployment: ${ctx.nationalState.economy.unemployment}%
-  Inflation: ${ctx.nationalState.economy.inflation}%
-  GDP Growth: ${ctx.nationalState.economy.gdpGrowth}%
-  Public Sentiment: ${ctx.nationalState.publicSentiment}/100
+  Budget: ${ctx.nationalState.economy.budget}B EUR | Unemployment: ${ctx.nationalState.economy.unemployment}% | Inflation: ${ctx.nationalState.economy.inflation}%
+  GDP Growth: ${ctx.nationalState.economy.gdpGrowth}% | Public Sentiment: ${ctx.nationalState.publicSentiment}/100
+
+PARTIES:
+${partyTable}
 ${readingSections}
 ${ctx.activeElection ? `ELECTION STATUS:
   Status: ${ctx.activeElection.status}
@@ -237,21 +280,18 @@ ${ctx.activeElection ? `ELECTION STATUS:
 ${ctx.activeCrises.length > 0 ? `ACTIVE CRISES:
 ${ctx.activeCrises.map(c => `  - [${c.severity.toUpperCase()}] ${c.name} (${c.category}, days ${c.startDay}-${c.endDay})
     ${c.description}
-    Daily impact: ${JSON.stringify(c.dailyImpact)}`).join("\n")}` : "NO ACTIVE CRISES"}
+    Daily impact: ${formatImpact(c.dailyImpact)}`).join("\n")}` : "NO ACTIVE CRISES"}
 
 ${ctx.government ? `FEDERAL GOVERNMENT:
   Chancellor: ${ctx.government.chancellorName} (${ctx.government.chancellorPartyId})
   Ministers:
-${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyId})`).join("\n")}` : "NO ACTIVE GOVERNMENT"}
-
-ALL PARTIES:
-${ctx.allParties.map(p => `  ${p.name}: ${p.seatCount} seats, ${p.approvalRating}% approval, ${p.coalitionRole}`).join("\n")}`;
+${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyId})`).join("\n")}` : "NO ACTIVE GOVERNMENT"}`;
 
   // ── Priority 1.5: Briefing (always included if available) ──────────────
 
   let briefingSection = "";
   if (depth.enableBriefing && ctx.briefing) {
-    briefingSection = `\n${ctx.briefing}\n`;
+    briefingSection = `\nDAILY BRIEFING:\n${ctx.briefing}\n`;
   }
 
   // ── Priority 2+3: Budget-trimmed optional sections ────────────────────
