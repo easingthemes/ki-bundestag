@@ -30,7 +30,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 006 | [/me endpoint issues](./006-me-endpoint-issues.md) | done | API / Web | #20 |
 | 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
 | 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
-| 030 | [Improve AI context quality (briefing + party profiles)](./030-improve-ai-context-quality.md) | open | Engine / Agent | — |
+| 030 | [Improve AI context quality (briefing + party profiles)](./030-improve-ai-context-quality.md) | done | Engine / Agent | #49 |
 
 ## Medium
 
@@ -65,5 +65,5 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 26 of 30
-- **Open**: 4 remaining (#022, #027, #029, #030)
+- **Done**: 27 of 30
+- **Open**: 3 remaining (#022, #027, #029)

@@ -1,6 +1,6 @@
 # 030 — Improve AI Context Quality (Briefing + Party Profiles)
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Agent / Types
 **Priority**: High
 **Plan**: [docs/plans/improve-ai-context-quality.md](../plans/improve-ai-context-quality.md)

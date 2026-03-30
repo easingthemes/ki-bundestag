@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Cost data ───────────────────────────────────────────────────────────────
 
@@ -153,6 +155,7 @@ const ALTERNATIVES: AltRow[] = [
   { model: "Gemini 2.0 Flash (Google)", priceLabel: "$0.10 / $0.40", perSimDay: "$0.005", perWP: "$0.61", perRealDay: "$7", delta: "-89%", deltaColor: "text-emerald-600" },
 ];
 
+<<<<<<< HEAD
 // ─── Input scaling comparison ───────────────────────────────────────────────
 
 interface InputScaleRow {
@@ -226,6 +229,78 @@ const DEPTH_LEVELS: DepthRow[] = [
   { depth: "High", tokenBudget: "16,000", briefing: "60 days", ownActions: "30 days (30 items)", events: "20", media: "5", p3: "On", secondary: "On", estCostDay: "~$0.09", costBadge: "$$$" },
 ];
 
+// ─── Live cost data types ───────────────────────────────────────────────────
+
+interface CostOverviewData {
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  failedCalls: number;
+  firstDay: number | null;
+  lastDay: number | null;
+}
+
+interface DayCost {
+  dayNumber: number;
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  failedCalls: number;
+}
+
+interface TaskCost {
+  task: string;
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+}
+
+interface ModelCost {
+  provider: string;
+  model: string;
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+}
+
+interface LiveCostData {
+  overview: CostOverviewData | null;
+  byDay: DayCost[];
+  byTask: TaskCost[];
+  byModel: ModelCost[];
+}
+
+function useLiveCosts() {
+  const [data, setData] = useState<LiveCostData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/simulation/costs")
+      .then(r => r.json())
+      .then(d => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { data, loading };
+}
+
+function formatUsd(v: number): string {
+  if (v < 0.001) return "<$0.001";
+  if (v < 1) return `$${v.toFixed(4)}`;
+  return `$${v.toFixed(2)}`;
+}
+
+function formatTokens(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  return v.toLocaleString();
+}
+
 // ─── Shared table helpers ────────────────────────────────────────────────────
 
 const TH = "text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2";
@@ -254,9 +329,160 @@ function ModelBadge({ model }: { model: string }) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SimulationCosts() {
+  const { data: liveCosts, loading: costsLoading } = useLiveCosts();
+
   return (
     <div>
       <h2 className="section-title">KI-Modell-Kosten</h2>
+
+      {/* ── Live Cost Tracking ───────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="section-title">Live-Kostenübersicht</h2>
+        {costsLoading ? (
+          <div className="grid md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          </div>
+        ) : liveCosts?.overview && liveCosts.overview.totalCalls > 0 ? (
+          <>
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Calls</p>
+                  <p className="text-2xl font-bold tabular-nums">{liveCosts.overview.totalCalls.toLocaleString()}</p>
+                  {liveCosts.overview.failedCalls > 0 && (
+                    <p className="text-xs text-red-500">{liveCosts.overview.failedCalls} failed</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Cost</p>
+                  <p className="text-2xl font-bold tabular-nums">{formatUsd(liveCosts.overview.totalCostUsd)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Days {liveCosts.overview.firstDay}–{liveCosts.overview.lastDay}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Input Tokens</p>
+                  <p className="text-2xl font-bold tabular-nums">{formatTokens(liveCosts.overview.totalInputTokens)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Output Tokens</p>
+                  <p className="text-2xl font-bold tabular-nums">{formatTokens(liveCosts.overview.totalOutputTokens)}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cost by model */}
+            {liveCosts.byModel.length > 0 && (
+              <Card className="mb-4">
+                <CardContent className="p-5 overflow-x-auto">
+                  <h3 className="text-sm font-semibold mb-3">Cost by Model</h3>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className={TH}>Provider</th>
+                        <th className={TH}>Model</th>
+                        <th className={cn(TH, "text-right")}>Calls</th>
+                        <th className={cn(TH, "text-right")}>Input</th>
+                        <th className={cn(TH, "text-right")}>Output</th>
+                        <th className={cn(TH, "text-right")}>Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveCosts.byModel.map(m => (
+                        <tr key={`${m.provider}-${m.model}`} className={TROW}>
+                          <td className={TD}><ProviderBadge provider={m.provider === "anthropic" ? "Anthropic" : "xAI"} /></td>
+                          <td className={cn(TD, "font-mono text-xs")}>{m.model}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{m.totalCalls.toLocaleString()}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(m.totalInputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(m.totalOutputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums font-medium")}>{formatUsd(m.totalCostUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cost by task (top 10) */}
+            {liveCosts.byTask.length > 0 && (
+              <Card className="mb-4">
+                <CardContent className="p-5 overflow-x-auto">
+                  <h3 className="text-sm font-semibold mb-3">Cost by Task (Top 10)</h3>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className={TH}>Task</th>
+                        <th className={cn(TH, "text-right")}>Calls</th>
+                        <th className={cn(TH, "text-right")}>Input</th>
+                        <th className={cn(TH, "text-right")}>Output</th>
+                        <th className={cn(TH, "text-right")}>Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveCosts.byTask.slice(0, 10).map(t => (
+                        <tr key={t.task} className={TROW}>
+                          <td className={cn(TD, "font-mono text-xs")}>{t.task}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{t.totalCalls.toLocaleString()}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(t.totalInputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(t.totalOutputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums font-medium")}>{formatUsd(t.totalCostUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cost by day (last 20) */}
+            {liveCosts.byDay.length > 0 && (
+              <Card>
+                <CardContent className="p-5 overflow-x-auto">
+                  <h3 className="text-sm font-semibold mb-3">Cost by Day (Recent)</h3>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className={cn(TH, "text-right")}>Day</th>
+                        <th className={cn(TH, "text-right")}>Calls</th>
+                        <th className={cn(TH, "text-right")}>Input</th>
+                        <th className={cn(TH, "text-right")}>Output</th>
+                        <th className={cn(TH, "text-right")}>Cost</th>
+                        <th className={cn(TH, "text-right")}>Failed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveCosts.byDay.slice(0, 20).map(d => (
+                        <tr key={d.dayNumber} className={TROW}>
+                          <td className={cn(TD, "text-right tabular-nums font-medium")}>{d.dayNumber}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{d.totalCalls}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(d.totalInputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums")}>{formatTokens(d.totalOutputTokens)}</td>
+                          <td className={cn(TD, "text-right tabular-nums font-medium")}>{formatUsd(d.totalCostUsd)}</td>
+                          <td className={cn(TD, "text-right tabular-nums", d.failedCalls > 0 ? "text-red-500" : "text-muted-foreground")}>{d.failedCalls}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ) : (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">No cost data recorded yet. Cost tracking starts automatically when the simulation runs.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* ── Time Scale Reference ─────────────────────────────────── */}
       <div className="mb-8 rounded-lg border border-border bg-muted/30 px-5 py-4">

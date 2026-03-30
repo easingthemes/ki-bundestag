@@ -166,6 +166,7 @@ export function seedDatabase() {
 
   // Drop simulation tables for a clean start
   sqlite.exec(`
+    DROP TABLE IF EXISTS ai_calls;
     DROP TABLE IF EXISTS bundestag_seats;
     DROP TABLE IF EXISTS event_queue;
     DROP TABLE IF EXISTS budgets;
