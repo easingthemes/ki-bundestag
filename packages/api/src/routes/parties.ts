@@ -5,6 +5,7 @@ import { eq, gte, asc, and, inArray } from "drizzle-orm";
 import type { Bill, BillVote, PartyHistoryEntry, SimulationEvent } from "@ki-bundestag/types";
 import { mapParty, getMemberCounts, mapBill } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { checkUserDailyLimit } from "../middleware/rate-limit.js";
 
 const router = Router();
 
@@ -196,6 +197,10 @@ router.post("/api/parties/:id/proposals", (req, res) => {
   if (requireParticipatory(req, res, "internal_proposals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const { allowed, limit, used } = checkUserDailyLimit(token, "submit_proposal");
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} proposals in 24h). Try again later.` }); return; }
+
   const userDb = getUserDb();
   const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }

@@ -1,18 +1,21 @@
 import { randomUUID } from "crypto";
 import { eq, and, lte, gte } from "drizzle-orm";
-import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
+import { submitBatch, type BatchResult } from "../agent/batch-client.js";
+import { buildProposalRankPrompt, type ProposalItem, type PartyContext } from "../agent/group-prompts.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
 
+/** Max proposals a party can accept per review cycle in batch mode. */
+const MAX_ACCEPT_PER_PARTY = 2;
+
 /**
  * Review internal party proposals each sim day.
- * - Proposals ready for review: status="open", currentDay >= reviewByDay, totalVotes >= 3
- * - Take the top-scored ready proposal per party
- * - Ask Haiku whether to accept or decline
- * - Accepted → create a bill in the Bundestag pipeline (member_initiative=true)
- * - Declined → mark with decline_reason
- * - Expired proposals (past reviewByDay, < 3 votes) → mark "expired"
+ *
+ * Sends ALL ready proposals per party in one batch prompt,
+ * asking AI to rank and select the top N. Remaining are declined.
+ *
+ * Expired proposals (past reviewByDay, < 3 votes) are always marked "expired".
  */
 export async function reviewInternalProposals(currentDay: number): Promise<void> {
   const db = getDb();
@@ -33,7 +36,6 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
       .where(eq(schema.internalProposals.id, p.id))
       .run();
 
-    // Notify proposer (if human)
     if (p.proposedBy !== "ai") {
       try {
         createNotification(
@@ -48,11 +50,21 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
     }
   }
 
-  // Find all parties that have a ready proposal
+  // Find all parties with ready proposals
   const allParties = db.select().from(schema.parties).all();
 
+  interface PartyBatch {
+    party: PartyContext;
+    proposals: Array<typeof readyProposals[0]>;
+  }
+  // Type reference
+  const readyProposals = userDb.select().from(schema.internalProposals).all();
+  void readyProposals;
+
+  const partyBatches: PartyBatch[] = [];
+
   for (const party of allParties) {
-    const readyProposals = userDb.select().from(schema.internalProposals)
+    const proposals = userDb.select().from(schema.internalProposals)
       .where(and(
         eq(schema.internalProposals.partyId, party.id as string),
         eq(schema.internalProposals.status, "open"),
@@ -62,116 +74,157 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
       .all()
       .sort((a, b) => b.voteScore - a.voteScore);
 
-    if (readyProposals.length === 0) continue;
+    if (proposals.length === 0) continue;
 
-    const top = readyProposals[0];
+    const partyCtx: PartyContext = { id: party.id as string, name: party.name, ideology: party.ideology ?? "" };
+    partyBatches.push({ party: partyCtx, proposals });
+  }
 
-    const t0 = Date.now();
-    try {
-      const { text: raw, model, provider } = await callAI({
-        system: `You are the party leadership of ${party.name} (ideology: ${party.ideology}). A party member has submitted a bill proposal for your consideration. Decide whether to officially sponsor it. Respond with ONLY valid JSON: {"decision": "accept" | "decline", "reason": "<1 sentence>"}`,
-        prompt: `Member proposal: "${top.title}" (${top.category})\n${top.description}\n\nVote score: ${top.voteScore >= 0 ? "+" : ""}${top.voteScore} (${top.totalVotes} votes)\n\nShould ${party.name} sponsor this bill in the Bundestag?`,
-        maxTokens: 256,
-        partyId: party.id as string,
-      });
-      const defaultReason = "Does not align with current party priorities.";
-      const parsed = parseAIJson<{ decision: "accept" | "decline"; reason: string }>(
-        raw,
-        (v: unknown) => {
-          const o = v as Record<string, unknown>;
-          if (o.decision !== "accept" && o.decision !== "decline") return null;
-          return { decision: o.decision, reason: typeof o.reason === "string" ? o.reason.slice(0, 200) : defaultReason };
-        },
-        "InternalProposals",
-      );
-      const decision = parsed?.decision ?? "decline";
-      const reason = parsed?.reason ?? defaultReason;
-      logAICall({ task: `proposals:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "decline" });
+  if (partyBatches.length === 0) return;
 
-      if (decision === "accept") {
-        // Create bill in Bundestag pipeline
-        const billId = `bill-${randomUUID().slice(0, 8)}`;
-        db.insert(schema.bills).values({
-          id: billId,
-          title: top.title,
-          description: top.description,
-          category: top.category,
-          proposedBy: party.id as string,
-          status: "proposed",
-          impact: { budget: 0, unemployment: 0, inflation: 0, gdpGrowth: 0, publicSentiment: 0 },
-          votes: [],
-          proposedOnDay: currentDay,
-          memberInitiative: true,
-          proposerDisplayName: top.proposerName,
-        }).run();
+  await reviewProposalsBatch(partyBatches, currentDay);
+}
 
-        userDb.update(schema.internalProposals).set({
-          status: "accepted",
-          reviewedOnDay: currentDay,
-          bundestag_bill_id: billId,
-        }).where(eq(schema.internalProposals.id, top.id)).run();
+/**
+ * Batch mode: rank-and-select prompts for all parties.
+ */
+async function reviewProposalsBatch(
+  partyBatches: Array<{ party: PartyContext; proposals: any[] }>,
+  currentDay: number,
+): Promise<void> {
+  const db = getDb();
+  const userDb = getUserDb();
 
-        // Emit event
-        db.insert(schema.simulationEvents).values({
-          id: `evt-${randomUUID().slice(0, 8)}`,
-          type: "member_proposal_accepted",
-          title: `${party.name}: Member initiative "${top.title}" submitted to Bundestag`,
-          description: `Party member proposal accepted by ${party.name}: "${top.title}". ${reason}`,
-          dayNumber: currentDay,
-          actor: party.id as string,
-        }).run();
+  const batchRequests = partyBatches.map(b => {
+    const items: ProposalItem[] = b.proposals.map(p => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      category: p.category,
+      voteScore: p.voteScore,
+      totalVotes: p.totalVotes,
+      proposerName: p.proposerName ?? "Unknown",
+    }));
+    return {
+      req: buildProposalRankPrompt(b.party, items, MAX_ACCEPT_PER_PARTY, currentDay),
+      batch: b,
+    };
+  });
 
-        // Notify proposer
-        if (top.proposedBy !== "ai") {
-          try {
-            createNotification(
-              top.proposedBy,
-              "proposal_accepted",
-              `Proposal accepted: "${top.title}"`,
-              `${party.name} has accepted your proposal "${top.title}" and submitted it to the Bundestag as Bill ${billId}.`,
-              { proposalId: top.id, billId, partyId: party.id },
-              currentDay,
-            );
-          } catch {}
-        }
-      } else {
-        userDb.update(schema.internalProposals).set({
-          status: "declined",
-          reviewedOnDay: currentDay,
-          declineReason: reason,
-        }).where(eq(schema.internalProposals.id, top.id)).run();
+  const t0 = Date.now();
+  const results = await submitBatch(batchRequests.map(r => r.req));
+  logAICall({ task: "proposals-batch", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
 
-        db.insert(schema.simulationEvents).values({
-          id: `evt-${randomUUID().slice(0, 8)}`,
-          type: "member_proposal_declined",
-          title: `${party.name}: Member proposal "${top.title}" declined`,
-          description: `${party.name} leadership declined to sponsor "${top.title}". ${reason}`,
-          dayNumber: currentDay,
-          actor: party.id as string,
-        }).run();
+  for (const { req, batch } of batchRequests) {
+    const result = results.find(r => r.customId === req.customId);
+    if (!result || !result.text) {
+      console.warn(`  [InternalProposals] No result for ${batch.party.name}, skipping`);
+      continue;
+    }
 
-        // Notify proposer
-        if (top.proposedBy !== "ai") {
-          try {
-            createNotification(
-              top.proposedBy,
-              "proposal_declined",
-              `Proposal declined: "${top.title}"`,
-              `${party.name} declined your proposal "${top.title}". Reason: ${reason}`,
-              { proposalId: top.id, partyId: party.id },
-              currentDay,
-            );
-          } catch {}
-        }
+    const parsed = parseAIJson<{ accepted: Array<{ id: string; reason: string }>; declineReason: string }>(
+      result.text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (!Array.isArray(o.accepted)) return null;
+        const accepted = (o.accepted as unknown[]).filter((a: unknown) => {
+          const item = a as Record<string, unknown>;
+          return typeof item.id === "string" && typeof item.reason === "string";
+        }) as Array<{ id: string; reason: string }>;
+        const declineReason = typeof o.declineReason === "string" ? o.declineReason : "Does not align with current party priorities.";
+        return { accepted, declineReason };
+      },
+      "ProposalRank",
+    );
+
+    if (!parsed) {
+      console.warn(`  [InternalProposals] Parse failed for ${batch.party.name}, skipping`);
+      continue;
+    }
+
+    const acceptedIds = new Set(parsed.accepted.map(a => a.id));
+    const proposalMap = new Map(batch.proposals.map(p => [p.id, p]));
+
+    // Accept selected proposals
+    for (const selection of parsed.accepted) {
+      const proposal = proposalMap.get(selection.id);
+      if (!proposal) continue;
+
+      const billId = `bill-${randomUUID().slice(0, 8)}`;
+      db.insert(schema.bills).values({
+        id: billId,
+        title: proposal.title,
+        description: proposal.description,
+        category: proposal.category,
+        proposedBy: batch.party.id,
+        status: "proposed",
+        impact: { budget: 0, unemployment: 0, inflation: 0, gdpGrowth: 0, publicSentiment: 0 },
+        votes: [],
+        proposedOnDay: currentDay,
+        memberInitiative: true,
+        proposerDisplayName: proposal.proposerName,
+      }).run();
+
+      userDb.update(schema.internalProposals).set({
+        status: "accepted",
+        reviewedOnDay: currentDay,
+        bundestag_bill_id: billId,
+      }).where(eq(schema.internalProposals.id, proposal.id)).run();
+
+      db.insert(schema.simulationEvents).values({
+        id: `evt-${randomUUID().slice(0, 8)}`,
+        type: "member_proposal_accepted",
+        title: `${batch.party.name}: Member initiative "${proposal.title}" submitted to Bundestag`,
+        description: `Party member proposal accepted by ${batch.party.name}: "${proposal.title}". ${selection.reason}`,
+        dayNumber: currentDay,
+        actor: batch.party.id,
+      }).run();
+
+      if (proposal.proposedBy !== "ai") {
+        try {
+          createNotification(
+            proposal.proposedBy,
+            "proposal_accepted",
+            `Proposal accepted: "${proposal.title}"`,
+            `${batch.party.name} has accepted your proposal "${proposal.title}" and submitted it to the Bundestag as Bill ${billId}.`,
+            { proposalId: proposal.id, billId, partyId: batch.party.id },
+            currentDay,
+          );
+        } catch {}
       }
-    } catch (err) {
-      if (err instanceof AIProviderLimitError) {
-        console.warn(`  [InternalProposals] Skipped (${err.message})`);
-      } else {
-        console.error(`[InternalProposals] Error reviewing proposal ${top.id}:`, err);
+    }
+
+    // Decline non-selected proposals
+    for (const proposal of batch.proposals) {
+      if (acceptedIds.has(proposal.id)) continue;
+
+      userDb.update(schema.internalProposals).set({
+        status: "declined",
+        reviewedOnDay: currentDay,
+        declineReason: parsed.declineReason,
+      }).where(eq(schema.internalProposals.id, proposal.id)).run();
+
+      db.insert(schema.simulationEvents).values({
+        id: `evt-${randomUUID().slice(0, 8)}`,
+        type: "member_proposal_declined",
+        title: `${batch.party.name}: Member proposal "${proposal.title}" declined`,
+        description: `${batch.party.name} leadership declined to sponsor "${proposal.title}". ${parsed.declineReason}`,
+        dayNumber: currentDay,
+        actor: batch.party.id,
+      }).run();
+
+      if (proposal.proposedBy !== "ai") {
+        try {
+          createNotification(
+            proposal.proposedBy,
+            "proposal_declined",
+            `Proposal declined: "${proposal.title}"`,
+            `${batch.party.name} declined your proposal "${proposal.title}". Reason: ${parsed.declineReason}`,
+            { proposalId: proposal.id, partyId: batch.party.id },
+            currentDay,
+          );
+        } catch {}
       }
-      logAICall({ task: `proposals:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "decline" });
-      if (err instanceof AIProviderLimitError) break;
     }
   }
 }

@@ -2,11 +2,14 @@
  * Human-friendly timing estimates for each speed preset
  * Based on 1461-day election cycle (4 sim years including leap year)
  *
- * Calculations:
- * - ultra-fast: ~1 min/day × 1461 = ~24 hours
- * - fast: 7 min/day × 1461 = ~1 week
- * - normal: ~30 min avg/day × 1461 ≈ 30 days
- * - slow: ~1.5 hr/day with night pause ≈ 5 months
+ * Calculations (inter-day delay + batch API execution time):
+ * - ultra-fast: ~1 min/day × 1461 = ~24 hours (no users, no batch)
+ * - fast: 7 min/day × 1461 = ~1 week (no users, no batch)
+ * - normal: ~30 min delay + 2-15 min batch ≈ 32-45 min/day → ~1 month
+ * - slow: ~1.5 hr delay + 2-15 min batch ≈ ~1.5 hr/day → ~5 months
+ *
+ * Batch overhead depends on user count (1K: ~2 min, 100K: ~5 min, 1M: ~15 min).
+ * Normal/slow modes absorb batch latency within their inter-day delay.
  */
 
 import type { TimingPreset } from "../api";
