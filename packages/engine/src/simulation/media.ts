@@ -106,7 +106,7 @@ Rules:
 - Each article MUST be from a different outlet
 - Headlines should be dramatic but realistic German political journalism style
 - Content should reflect the outlet's bias
-- Write in English but use German political terminology where appropriate (Bundestag, Koalition, etc.)
+- Write in German (all headlines, summaries, and article content must be in German)
 - Category should match the primary topic`,
       prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
       maxTokens: 2048,
@@ -210,7 +210,7 @@ Rules:
 - Each article MUST be from a different outlet
 - Headlines should be dramatic but realistic German political journalism style
 - Content should reflect the outlet's bias
-- Write in English but use German political terminology where appropriate (Bundestag, Koalition, etc.)
+- Write in German (all headlines, summaries, and article content must be in German)
 - Category should match the primary topic`;
 
 /**
