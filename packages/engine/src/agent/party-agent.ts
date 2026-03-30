@@ -5,6 +5,7 @@ import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
 import type { Provider } from "./model-config.js";
+import type { DepthConfig } from "./context-depth.js";
 
 export async function runPartyAgent(
   ctx: AgentContext,
@@ -88,11 +89,12 @@ export async function runPartyAgent(
 export function buildPartyAgentRequests(
   contexts: AgentContext[],
   currentDay: number,
+  depthConfig?: DepthConfig,
 ): BatchRequest[] {
   return contexts.map(ctx => ({
     customId: `agent-${ctx.party.id}-day${currentDay}`,
     system: buildSystemPrompt(ctx.party.id),
-    prompt: buildUserPrompt(ctx),
+    prompt: buildUserPrompt(ctx, depthConfig),
     maxTokens: 2048,
     partyId: ctx.party.id,
   }));

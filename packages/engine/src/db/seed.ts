@@ -241,6 +241,7 @@ export function seedDatabase() {
     nextElectionDay: 1461,
     lowSentimentStreak: 0,
     timingPreset: "normal",
+    contextDepth: "normal",
     startDate: new Date().toISOString(),
   }).run();
 

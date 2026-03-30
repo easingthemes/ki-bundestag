@@ -85,7 +85,7 @@ Advancing between tiers is instant once deposit threshold is met.
 | Mid-cycle (polls/ref) | 0-2 | ~2K | ~1K | ~$0.004 |
 | **Daily total** | **~10** | **~25K** | **~9K** | **~$0.04** |
 
-> Party agents now include party profiles (~200-300 tokens), daily briefing (~800-1200 tokens), and recent own actions (14-day lookback). Context budget expanded from 3000 to 8000 tokens.
+> Context depth is configurable: **low** ($0.03/day, no briefing), **normal** ($0.04/day, default), **high** ($0.06/day, 60-day lookback). Numbers above are for "normal". Set via GitHub Actions, admin API, or DB column `context_depth`.
 
 ### Per Term (1461 days)
 
