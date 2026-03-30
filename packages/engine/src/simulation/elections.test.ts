@@ -22,8 +22,8 @@ function makeParty(overrides: Partial<Party> = {}): Party {
 const PARTIES: Party[] = [
   makeParty({ id: "spd", name: "SPD", seatCount: 206, approvalRating: 25, coalitionRole: "leader" }),
   makeParty({ id: "cdu", name: "CDU", seatCount: 196, approvalRating: 24, coalitionRole: "opposition" }),
-  makeParty({ id: "gruene", name: "Grüne", seatCount: 118, approvalRating: 15, coalitionRole: "partner" }),
-  makeParty({ id: "fdp", name: "FDP", seatCount: 92, approvalRating: 11, coalitionRole: "partner" }),
+  makeParty({ id: "gruene", name: "Grüne", seatCount: 118, approvalRating: 15, coalitionRole: "junior" }),
+  makeParty({ id: "fdp", name: "FDP", seatCount: 92, approvalRating: 11, coalitionRole: "junior" }),
   makeParty({ id: "afd", name: "AfD", seatCount: 83, approvalRating: 15, policyPriorities: { economy: 7, social: 2, environment: 2, immigration: 1, spending: 3 } }),
   makeParty({ id: "linke", name: "Linke", seatCount: 40, approvalRating: 8 }),
 ];
