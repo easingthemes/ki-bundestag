@@ -1,6 +1,6 @@
 # 022 — Add Broader OAuth Providers (Apple, Microsoft)
 
-**Status:** open
+**Status:** postponed
 **Severity:** low
 **Area:** API / Web
 
