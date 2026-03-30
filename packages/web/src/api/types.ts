@@ -167,6 +167,25 @@ export interface Election {
 
 export type TimingPreset = "ultra-fast" | "fast" | "normal" | "slow";
 
+export type ContextDepth = "low" | "normal" | "high";
+
+export interface ContextDepthInfo {
+  contextDepth: ContextDepth;
+  label: string;
+  config: {
+    contextTokenBudget: number;
+    briefingEventLookbackDays: number;
+    briefingTrendDays: number;
+    ownActionsLookbackDays: number;
+    ownActionsMaxItems: number;
+    recentEventsMax: number;
+    recentMediaMax: number;
+    includeP3: boolean;
+    enableBriefing: boolean;
+    enrichSecondaryCalls: boolean;
+  };
+}
+
 export interface PresetInfo {
   preset: TimingPreset;
   participatory: boolean;
@@ -195,6 +214,7 @@ export interface SimulationStatus {
   provisionalBudget: boolean;
   dailySummary: string | null;
   timingPreset: TimingPreset;
+  contextDepth: ContextDepth;
   startDate: string | null;
 }
 

@@ -9,7 +9,7 @@
 
 Every AI-powered step in the simulation flows through a single function `callAI()` in `packages/engine/src/agent/client.ts`. It handles model selection, provider-level circuit breaking, and transient retry. All JSON-returning callers share the `parseAIJson()` utility from `packages/engine/src/agent/ai-json.ts`.
 
-There are **13 `callAI` sites** total: 11 return JSON, 2 return free text (citizen question answers, interpellation answers).
+There are **14 `callAI` sites** total: 12 return JSON, 2 return free text (citizen question answers, interpellation answers). The additional call is the **daily briefing** — a shared AI-generated political context document.
 
 ---
 
@@ -160,18 +160,57 @@ Summary prompts include:
 - Explicit mood enum: `"mood must be one of: optimistic, tense, divided, hopeful, turbulent, calm, critical"`
 - `"narrative should be 2-3 sentences."`
 
+### Party Profiles (static)
+
+**Location**: [packages/engine/src/agent/party-profiles.ts](packages/engine/src/agent/party-profiles.ts)
+
+Each party has a hand-written personality profile (~200-300 tokens) injected at the top of its system prompt via `getPartyProfile(partyId)`. Profiles include:
+
+- **Voice & rhetoric style** (e.g., SPD: solidarity-focused, worker-centric language)
+- **Strategic tendencies** (e.g., CDU: pragmatic, compromise-oriented, fiscally cautious)
+- **Red lines** (e.g., Greens: never vote for fossil fuel subsidies)
+- **Relationship dynamics** (e.g., FDP: skeptical of Linke, open to CDU)
+
+### Daily Briefing
+
+**Location**: [packages/engine/src/agent/briefing.ts](packages/engine/src/agent/briefing.ts)
+
+A single Haiku call at the start of each day that synthesizes a political briefing document from DB history. Runs once, output shared across all 6 party agents and secondary calls (questions, interpellations, media).
+
+**Input**: Last 30 days of significant events, 14-day approval trends, coalition party IDs.
+**Output**: ~800-1200 tokens — political narrative arc, key tensions, outlook.
+**Exported**: `buildBriefingBatchRequest()`, `processBriefingResult()`, `getPartyRecentActions()`.
+
+Skipped on days 1-2 (not enough history). On failure, agents run without briefing (same as before this feature).
+
+### Context Depth (configurable)
+
+**Location**: [packages/engine/src/agent/context-depth.ts](packages/engine/src/agent/context-depth.ts)
+
+Three configurable levels control how much context agents receive. Set via GitHub Actions workflow, admin API (`POST /api/simulation/context-depth`), or DB (`context_depth` column in `simulation_meta`). Default: `normal`.
+
+| Setting | Token Budget | Briefing | Own Actions | Events | Media | P3 | Secondary Enrichment | Est. Cost/Day |
+|---------|-------------|----------|-------------|--------|-------|-----|---------------------|---------------|
+| `low` | 3,000 | Off | Off | 5 | 2 | Off | Off | ~$0.030 |
+| `normal` | 8,000 | 30d lookback | 14d (15 items) | 10 | 3 | On | On | ~$0.055 |
+| `high` | 16,000 | 60d lookback | 30d (30 items) | 20 | 5 | On | On | ~$0.09 |
+
 ### Token-budgeted context
 
-`CONTEXT_TOKEN_BUDGET = 3000` estimated tokens (chars / 4 approximation).
+Token budget controlled by context depth (default 8000 for `normal`).
 
 **Priority 1 — always included** (core decision-making):
 - Party info, coalition/opposition roles, national economic state
 - Third-reading and second-reading bills (must vote on third-reading)
 - Active crises, active election phase, government/chancellor
 
+**Priority 1.5 — always included** (shared context):
+- Daily briefing document (political narrative, tensions, outlook)
+
 **Priority 2 — included if under budget**:
 - Recent events (trimmed from 10 → 5 if needed)
 - Media headlines (trimmed to 3 if needed)
+- Party's own recent actions (14-day lookback: bills proposed, votes, statements)
 - Internal member proposals, recently proposed bills
 
 **Priority 3 — dropped if over budget**:
@@ -272,6 +311,7 @@ The simulation loop (`runDay()`) organizes AI calls into batch groups to minimiz
 
 | Group | Requests | When |
 |-------|----------|------|
+| **Pre-A: Briefing** | 1 daily briefing call | Every day (day 3+) |
 | **A: Party agents** | 6 party agent calls | Every day |
 | **B: Interpellations** | 0-2 interpellation answers | Every day |
 | **B: Discipline** | 0-6 discipline reasoning calls | Every 7 days |

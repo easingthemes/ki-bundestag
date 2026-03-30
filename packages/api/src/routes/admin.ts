@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { getDb, schema, getSqlite, getUserSqlite, logger } from "@ki-bundestag/engine";
-import type { TimingPreset } from "@ki-bundestag/engine";
+import { getDb, schema, getSqlite, getUserSqlite, logger, isValidContextDepth } from "@ki-bundestag/engine";
+import type { TimingPreset, ContextDepth } from "@ki-bundestag/engine";
 import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
@@ -16,6 +16,18 @@ router.post("/api/simulation/preset", requireAdmin, (req, res) => {
   const db = getDb();
   db.update(schema.simulationMeta).set({ timingPreset: preset }).run();
   res.json({ success: true, preset });
+});
+
+// POST /api/simulation/context-depth (admin: change context depth)
+router.post("/api/simulation/context-depth", requireAdmin, (req, res) => {
+  const { contextDepth } = req.body as { contextDepth?: string };
+  if (!contextDepth || !isValidContextDepth(contextDepth)) {
+    res.status(400).json({ error: "Invalid context depth. Must be one of: low, normal, high" });
+    return;
+  }
+  const db = getDb();
+  db.update(schema.simulationMeta).set({ contextDepth } as any).run();
+  res.json({ success: true, contextDepth });
 });
 
 // GET /api/admin/analytics

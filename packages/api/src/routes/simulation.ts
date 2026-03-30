@@ -15,7 +15,8 @@ import {
   isBudgetDay,
   snapToNextSunday,
 } from "@ki-bundestag/engine";
-import type { TimingPreset } from "@ki-bundestag/engine";
+import type { TimingPreset, ContextDepth } from "@ki-bundestag/engine";
+import { DEPTH_CONFIGS, isValidContextDepth } from "@ki-bundestag/engine";
 import { and, inArray, gte } from "drizzle-orm";
 import type { NationalState, SimulationEvent } from "@ki-bundestag/types";
 import { getTimingPreset, requireAdmin } from "../middleware/index.js";
@@ -103,6 +104,7 @@ router.get("/api/simulation/status", (_req, res) => {
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,
     dailySummary: (meta as any).dailySummary ?? null,
     timingPreset: (meta as any).timingPreset ?? "normal",
+    contextDepth: (meta as any).contextDepth ?? "normal",
     startDate: (meta as any).startDate ?? null,
   });
 });
@@ -114,6 +116,17 @@ router.get("/api/simulation/preset", (_req, res) => {
   const features = FEATURE_AVAILABILITY[preset] ?? {};
   const labels: Record<TimingPreset, string> = { "ultra-fast": "Ultra-Fast", fast: "Fast", normal: "Normal", slow: "Slow" };
   res.json({ preset, participatory, features, label: labels[preset] });
+});
+
+// GET /api/simulation/context-depth
+router.get("/api/simulation/context-depth", (_req, res) => {
+  const db = getDb();
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  const raw = ((meta as any)?.contextDepth ?? "normal") as string;
+  const depth: ContextDepth = isValidContextDepth(raw) ? raw : "normal";
+  const config = DEPTH_CONFIGS[depth];
+  const labels: Record<ContextDepth, string> = { low: "Low", normal: "Normal", high: "High" };
+  res.json({ contextDepth: depth, label: labels[depth], config });
 });
 
 // GET /api/simulation/days
