@@ -14,6 +14,10 @@ import {
   isMonthlyDay,
   isBudgetDay,
   snapToNextSunday,
+  getCostOverview,
+  getCostByDay,
+  getCostByTask,
+  getCostByModel,
 } from "@ki-bundestag/engine";
 import type { TimingPreset, ContextDepth } from "@ki-bundestag/engine";
 import { DEPTH_CONFIGS, isValidContextDepth } from "@ki-bundestag/engine";
@@ -471,6 +475,19 @@ router.get("/api/simulation/events/latest", (req, res) => {
       data: r.data ? JSON.parse(r.data) : undefined,
     }));
     res.json(events);
+  }
+});
+
+// GET /api/simulation/costs — public AI cost summary
+router.get("/api/simulation/costs", (_req, res) => {
+  try {
+    const overview = getCostOverview();
+    const byDay = getCostByDay();
+    const byTask = getCostByTask();
+    const byModel = getCostByModel();
+    res.json({ overview, byDay, byTask, byModel });
+  } catch {
+    res.json({ overview: null, byDay: [], byTask: [], byModel: [] });
   }
 });
 

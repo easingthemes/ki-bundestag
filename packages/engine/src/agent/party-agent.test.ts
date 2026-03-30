@@ -73,14 +73,14 @@ describe("processPartyAgentResult", () => {
   });
 
   it("returns abstain for all bills when result text is empty", () => {
-    const emptyResult: BatchResult = { customId: "agent-spd-day10", text: "", model: "haiku", provider: "anthropic" };
+    const emptyResult: BatchResult = { customId: "agent-spd-day10", text: "", model: "haiku", provider: "anthropic", inputTokens: 0, outputTokens: 0 };
     const actions = processPartyAgentResult(emptyResult, makeContext(), bills);
     expect(actions).toHaveLength(2);
     expect(actions.every(a => a.type === "vote" && a.vote === "abstain")).toBe(true);
   });
 
   it("returns abstain when JSON is unparseable", () => {
-    const badResult: BatchResult = { customId: "test", text: "not json at all", model: "haiku", provider: "anthropic" };
+    const badResult: BatchResult = { customId: "test", text: "not json at all", model: "haiku", provider: "anthropic", inputTokens: 0, outputTokens: 0 };
     const actions = processPartyAgentResult(badResult, makeContext(), bills);
     expect(actions).toHaveLength(2);
     expect(actions.every(a => a.type === "vote" && a.vote === "abstain")).toBe(true);
@@ -93,7 +93,7 @@ describe("processPartyAgentResult", () => {
         { type: "vote", billId: "bill-2", vote: "no", reason: "Bad bill" },
       ],
     });
-    const result: BatchResult = { customId: "test", text: validResponse, model: "haiku", provider: "anthropic" };
+    const result: BatchResult = { customId: "test", text: validResponse, model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 };
     const actions = processPartyAgentResult(result, makeContext(), bills);
 
     const votes = actions.filter(a => a.type === "vote");
@@ -109,7 +109,7 @@ describe("processPartyAgentResult", () => {
         // bill-2 not mentioned
       ],
     });
-    const result: BatchResult = { customId: "test", text: partialResponse, model: "haiku", provider: "anthropic" };
+    const result: BatchResult = { customId: "test", text: partialResponse, model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 };
     const actions = processPartyAgentResult(result, makeContext(), bills);
 
     const bill2Vote = actions.find(a => a.type === "vote" && a.billId === "bill-2");

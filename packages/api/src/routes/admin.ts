@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDb, schema, getSqlite, getUserSqlite, logger, isValidContextDepth } from "@ki-bundestag/engine";
+import { getDb, schema, getSqlite, getUserSqlite, logger, isValidContextDepth, getCostOverview, getCostByDay, getCostByTask, getCostByModel } from "@ki-bundestag/engine";
 import type { TimingPreset, ContextDepth } from "@ki-bundestag/engine";
 import { requireAdmin } from "../middleware/auth.js";
 
@@ -115,6 +115,36 @@ router.get("/api/admin/analytics", requireAdmin, (_req, res) => {
   } catch (err) {
     logger.error("Analytics error:", err);
     res.status(500).json({ error: "Failed to load analytics" });
+  }
+});
+
+// GET /api/admin/costs — AI call cost overview + breakdowns
+router.get("/api/admin/costs", requireAdmin, (req, res) => {
+  try {
+    const fromDay = req.query.fromDay ? Number(req.query.fromDay) : undefined;
+    const toDay = req.query.toDay ? Number(req.query.toDay) : undefined;
+
+    const overview = getCostOverview();
+    const byDay = getCostByDay(fromDay, toDay);
+    const byTask = getCostByTask();
+    const byModel = getCostByModel();
+
+    res.json({ overview, byDay, byTask, byModel });
+  } catch (err) {
+    logger.error("Cost analytics error:", err);
+    res.status(500).json({ error: "Failed to load cost data" });
+  }
+});
+
+// GET /api/admin/costs/daily — just daily breakdown (for charts)
+router.get("/api/admin/costs/daily", requireAdmin, (req, res) => {
+  try {
+    const fromDay = req.query.fromDay ? Number(req.query.fromDay) : undefined;
+    const toDay = req.query.toDay ? Number(req.query.toDay) : undefined;
+    res.json(getCostByDay(fromDay, toDay));
+  } catch (err) {
+    logger.error("Cost daily error:", err);
+    res.status(500).json({ error: "Failed to load daily costs" });
   }
 });
 
