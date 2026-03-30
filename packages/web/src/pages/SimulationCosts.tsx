@@ -37,9 +37,11 @@ const SIM_CALLS: SimCallRow[] = [
 ];
 
 const VISITOR_CALLS: SimCallRow[] = [
-  { action: "Citizen Q&A", model: "Haiku/Grok", maxTokens: 512, estInput: "~300", callsPerDay: "0-3", note: "User questions" },
+  { action: "Citizen Q&A (batch per party)", model: "Haiku/Grok", maxTokens: 2048, estInput: "varies", callsPerDay: "0-6", note: "Up to 50 Q/party, grouped" },
+  { action: "MdB Application Select (batch per party)", model: "Haiku/Grok", maxTokens: 1024, estInput: "varies", callsPerDay: "0-6", note: "Select top N, grouped" },
+  { action: "Speech Evaluation (batch per bill)", model: "Haiku", maxTokens: 512, estInput: "varies", callsPerDay: "0-10", note: "Flag exceptions only" },
+  { action: "Proposal Ranking (batch per party)", model: "Haiku/Grok", maxTokens: 1024, estInput: "varies", callsPerDay: "0-6", note: "Rank & select top 2" },
   { action: "Interpellation Answer", model: "Haiku/Grok", maxTokens: 300, estInput: "~400", callsPerDay: "0-2", note: "Agent files" },
-  { action: "Proposal Review", model: "Haiku/Grok", maxTokens: 256, estInput: "~400", callsPerDay: "0-6", note: "User proposals" },
 ];
 
 const ELECTION_CALLS: SimCallRow[] = [
@@ -64,12 +66,31 @@ const QUIET_DAY: CostRow[] = [
   { label: "Total", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "~$0.047", highlight: true },
 ];
 
-const ACTIVE_DAY: CostRow[] = [
+const ACTIVE_DAY_1K: CostRow[] = [
   { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
-  { label: "Citizen Q&A", count: 3, inputTok: "900", outputTok: "900", cost: "$0.0043" },
-  { label: "Interpellation Answers", count: 2, inputTok: "800", outputTok: "400", cost: "$0.0022" },
-  { label: "Proposal Reviews", count: 3, inputTok: "1,200", outputTok: "450", cost: "$0.0028" },
-  { label: "Total", count: 16, inputTok: "23,200", outputTok: "9,450", cost: "~$0.056", highlight: true },
+  { label: "Q&A batch (6 parties)", count: 6, inputTok: "5,400", outputTok: "2,400", cost: "$0.014" },
+  { label: "MdB app select (6 parties)", count: 6, inputTok: "2,000", outputTok: "500", cost: "$0.004" },
+  { label: "Speech flag (5 bills)", count: 5, inputTok: "3,250", outputTok: "200", cost: "$0.004" },
+  { label: "Proposal rank (6 parties)", count: 6, inputTok: "1,500", outputTok: "300", cost: "$0.002" },
+  { label: "Total", count: 31, inputTok: "32,450", outputTok: "11,100", cost: "~$0.071", highlight: true },
+];
+
+const ACTIVE_DAY_100K: CostRow[] = [
+  { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
+  { label: "Q&A batch (6 parties × 50 Qs)", count: 6, inputTok: "54,000", outputTok: "24,000", cost: "$0.140" },
+  { label: "MdB app select (6 parties)", count: 6, inputTok: "30,000", outputTok: "1,000", cost: "$0.028" },
+  { label: "Speech flag (~10 bills)", count: 10, inputTok: "65,000", outputTok: "500", cost: "$0.054" },
+  { label: "Proposal rank (6 parties)", count: 6, inputTok: "13,200", outputTok: "600", cost: "$0.013" },
+  { label: "Total", count: 36, inputTok: "182,500", outputTok: "33,800", cost: "~$0.28", highlight: true },
+];
+
+const ACTIVE_DAY_1M: CostRow[] = [
+  { label: "Base (sim-driven)", count: 8, inputTok: "20,300", outputTok: "7,700", cost: "$0.047" },
+  { label: "Q&A batch (12 chunks)", count: 12, inputTok: "108,000", outputTok: "48,000", cost: "$0.278" },
+  { label: "MdB app select (12 chunks)", count: 12, inputTok: "120,000", outputTok: "2,000", cost: "$0.104" },
+  { label: "Speech flag (~20 bills)", count: 20, inputTok: "390,000", outputTok: "2,000", cost: "$0.320" },
+  { label: "Proposal rank (6 parties)", count: 6, inputTok: "66,000", outputTok: "1,500", cost: "$0.059" },
+  { label: "Total", count: "~58", inputTok: "704,300", outputTok: "61,200", cost: "~$0.81", highlight: true },
 ];
 
 const ELECTION_COSTS: CostRow[] = [
@@ -89,9 +110,10 @@ interface AggRow {
 
 const AGG_SIM: AggRow[] = [
   { scenario: "Quiet (no visitors, no election)", callsDay: "8", costDay: "$0.047", callsMonth: "240", costMonth: "$1.41", costWP: "$5.75" },
-  { scenario: "Active (visitors + questions)", callsDay: "16", costDay: "$0.056", callsMonth: "480", costMonth: "$1.68", costWP: "$6.83" },
-  { scenario: "Election month (1 election)", callsDay: "~9", costDay: "$0.051", callsMonth: "259", costMonth: "$1.52", costWP: "$6.23" },
-  { scenario: "Busy month (visitors + election)", callsDay: "~17", costDay: "$0.060", callsMonth: "499", costMonth: "$1.79", costWP: "$7.31" },
+  { scenario: "Active — 1K users (batch)", callsDay: "~31", costDay: "$0.071", callsMonth: "930", costMonth: "$2.13", costWP: "$8.68" },
+  { scenario: "Active — 100K users (batch)", callsDay: "~36", costDay: "$0.28", callsMonth: "1,080", costMonth: "$8.40", costWP: "$34" },
+  { scenario: "Active — 1M users (batch)", callsDay: "~58", costDay: "$0.81", callsMonth: "1,740", costMonth: "$24.30", costWP: "$99" },
+  { scenario: "Election cycle (3 neg. days)", callsDay: "~9", costDay: "$0.051", callsMonth: "259", costMonth: "$1.52", costWP: "$6.23" },
 ];
 
 interface RealTimeRow {
@@ -103,11 +125,13 @@ interface RealTimeRow {
 }
 
 const AGG_REAL: RealTimeRow[] = [
-  { scenario: "Auto-sim (quiet day)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$66", costMonth: "$1,974" },
-  { scenario: "Auto-sim (active day)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$78", costMonth: "$2,352" },
-  { scenario: "Auto-sim (theoretical max)", simDays: "2,880", wallClock: "30s/day", costDay: "$135", costMonth: "$4,050" },
-  { scenario: "Manual (5 days/run, 3 runs/day)", simDays: "15", wallClock: "—", costDay: "$0.71", costMonth: "$21.2" },
-  { scenario: "Manual (10 days/run, 1 run/day)", simDays: "10", wallClock: "—", costDay: "$0.47", costMonth: "$14.1" },
+  { scenario: "Ultra-fast / Fast (pure sim)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$66", costMonth: "$1,974" },
+  { scenario: "Normal — 1K users", simDays: "48/day", wallClock: "~30 min + 2 min batch", costDay: "$3.41", costMonth: "$102" },
+  { scenario: "Normal — 100K users", simDays: "48/day", wallClock: "~30 min + 5 min batch", costDay: "$13.44", costMonth: "$403" },
+  { scenario: "Normal — 1M users", simDays: "48/day", wallClock: "~30 min + 15 min batch", costDay: "$38.88", costMonth: "$1,166" },
+  { scenario: "Slow — 1K users", simDays: "~10/day", wallClock: "~90 min + 2 min batch", costDay: "$0.71", costMonth: "$21" },
+  { scenario: "Slow — 100K users", simDays: "~10/day", wallClock: "~90 min + 5 min batch", costDay: "$2.80", costMonth: "$84" },
+  { scenario: "Slow — 1M users", simDays: "~10/day", wallClock: "~90 min + 15 min batch", costDay: "$8.10", costMonth: "$243" },
 ];
 
 interface AltRow {
@@ -169,7 +193,7 @@ export function SimulationCosts() {
           <span><strong className="text-foreground">~1 year</strong> = budget cycle</span>
           <span><strong className="text-foreground">~4 years</strong> = 1 Wahlperiode</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">Speed varies by preset: Ultra-Fast (~24h/term), Fast (~1 week/term), Normal (~1 month/term), Slow (~5 months/term).</p>
+        <p className="text-xs text-muted-foreground mt-2">Speed varies by preset: Ultra-Fast (~24h/term, no users), Fast (~1 week/term, no users), Normal (~1 month/term, 30% human seats), Slow (~5 months/term, 70% human seats). User-driven AI calls use batch API with 50% cost discount.</p>
       </div>
 
       {/* ── Current Models ────────────────────────────────────────── */}
@@ -239,8 +263,8 @@ export function SimulationCosts() {
           </CardContent>
         </Card>
 
-        {/* Visitor-driven */}
-        <h3>User/Visitor-Driven</h3>
+        {/* Visitor-driven (batch) */}
+        <h3>User-Driven (Batch API — Normal &amp; Slow Modes Only)</h3>
         <Card className="mb-4">
           <CardContent className="p-5 overflow-x-auto">
             <table className="w-full border-collapse">
@@ -317,12 +341,34 @@ export function SimulationCosts() {
             </Card>
           </div>
 
-          {/* Active day */}
+          {/* Active day — 1K */}
           <div>
-            <h3>Active Day (With Visitors)</h3>
+            <h3>Active Day — 1K Users <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200">~100 DAU</Badge></h3>
             <Card>
               <CardContent className="p-5 overflow-x-auto">
-                <CostTable rows={ACTIVE_DAY} />
+                <CostTable rows={ACTIVE_DAY_1K} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          {/* Active day — 100K */}
+          <div>
+            <h3>Active Day — 100K Users <Badge variant="outline" className="ml-1 text-xs bg-amber-50 text-amber-700 border-amber-200">~5K DAU</Badge></h3>
+            <Card>
+              <CardContent className="p-5 overflow-x-auto">
+                <CostTable rows={ACTIVE_DAY_100K} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Active day — 1M */}
+          <div>
+            <h3>Active Day — 1M Users <Badge variant="outline" className="ml-1 text-xs bg-red-50 text-red-700 border-red-200">~30K DAU</Badge></h3>
+            <Card>
+              <CardContent className="p-5 overflow-x-auto">
+                <CostTable rows={ACTIVE_DAY_1M} />
               </CardContent>
             </Card>
           </div>
@@ -373,7 +419,7 @@ export function SimulationCosts() {
         <Card>
           <CardContent className="p-5 overflow-x-auto">
             <p className="text-xs text-muted-foreground mb-3">
-              Auto-sim interval is 30s, but AI calls add 5–30s per day. Realistic throughput is ~1,400 sim days/real day (not the theoretical 2,880).
+              Ultra-fast/fast run without users (~60s/day). Normal/slow are participatory — batch API polling adds 2-15 min per sim day depending on user volume. Sim days/real day reflects inter-day delay + batch execution time.
             </p>
             <table className="w-full border-collapse">
               <thead>
@@ -440,12 +486,14 @@ export function SimulationCosts() {
         <Card>
           <CardContent className="p-5">
             <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-4">
-              <li><strong>Wall-clock time per sim day</strong>: 30s interval + 5–30s AI latency = ~40–60s typical. Election negotiation days can take 60–90s.</li>
-              <li><strong>Realistic auto-sim throughput</strong>: ~1,400 sim days/real day (not 2,880). The 30s interval is the minimum, but AI call latency adds overhead on every tick.</li>
-              <li><strong>Output tokens are estimates</strong> — actual usage is typically 30-60% of maxTokens</li>
-              <li><strong>Input token estimates</strong> based on typical prompt sizes observed in code (system + user prompt)</li>
+              <li><strong>Batch API (50% discount)</strong>: All user-driven AI calls use the Anthropic Message Batches API. Requests are grouped per party/bill and submitted as a single batch. Polling adds ~2-15 min latency depending on batch size.</li>
+              <li><strong>Selection-style prompts</strong>: Instead of reviewing each item individually, the AI selects the top N from a pool (e.g., "pick best 3 of 500 applications"). This reduces output tokens by 95-99%.</li>
+              <li><strong>Pre-filtering</strong>: Deterministic scoring (activity, votes) reduces items sent to AI by 50-90% before batch submission.</li>
+              <li><strong>Ultra-fast / Fast modes</strong>: No user participation (0% human seats). Pure AI simulation at ~40-60s/day wall-clock.</li>
+              <li><strong>Normal mode (30 min/day)</strong>: Batch latency (2-15 min) is absorbed within the 30-minute inter-day delay. At 1M users, total day duration stretches to ~45 min.</li>
+              <li><strong>Slow mode (1.5 hr/day)</strong>: Batch latency is negligible relative to the 90-minute delay. Pauses fully at night (22:00-08:00 CET).</li>
+              <li><strong>DAU estimates</strong>: 1K total → ~10% DAU (100), 100K total → ~5% DAU (5,000), 1M total → ~3% DAU (30,000). Not all DAU submit content — ~30% ask questions, ~10% give speeches, ~5% submit proposals.</li>
               <li><strong>Sim day cycles</strong>: polls every ~2 weeks, economic reports monthly, budgets annually, elections every 4 years. Snap elections possible from confidence votes or budget failures.</li>
-              <li><strong>Visitor simulation</strong> (<code className="text-xs bg-muted px-1 py-0.5 rounded">npm run simulate:visitors</code>) does NOT trigger additional AI calls — it only performs UI actions which the next simulation run processes</li>
               <li><strong>AfD/Grok savings</strong>: Using grok-3-mini for 1/6 of party calls saves ~$0.005/day (~10% of party agent cost)</li>
               <li><strong>Synthesis (Sonnet)</strong> is the most expensive single call but happens only ~3 times per election cycle (~once per 4-year term)</li>
             </ul>
