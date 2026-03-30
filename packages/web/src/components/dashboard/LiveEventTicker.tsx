@@ -1,5 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type SimulationEvent, type SimulationStatus } from "../../api";
+
+const STORAGE_KEY = "liveTickerLastEventId";
+const SEEN_KEY = "liveTickerSeenIds";
+
+function getSeenIds(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch { return new Set(); }
+}
+
+function addSeenIds(ids: string[]) {
+  const seen = getSeenIds();
+  for (const id of ids) seen.add(id);
+  // Keep only last 50 to avoid unbounded growth
+  const arr = [...seen].slice(-50);
+  sessionStorage.setItem(SEEN_KEY, JSON.stringify(arr));
+}
 
 interface LiveEventTickerProps {
   simStatus: SimulationStatus;
@@ -7,31 +25,35 @@ interface LiveEventTickerProps {
 
 export function LiveEventTicker({ simStatus }: LiveEventTickerProps) {
   const [toasts, setToasts] = useState<SimulationEvent[]>([]);
-  const lastEventId = useRef<string | null>(null);
+  const lastEventId = useRef<string | null>(sessionStorage.getItem(STORAGE_KEY));
   const isRunning = simStatus.dayStartedAt && simStatus.lastRunAt &&
     new Date(simStatus.dayStartedAt).getTime() > new Date(simStatus.lastRunAt).getTime();
+
+  const poll = useCallback(() => {
+    api.getLatestEvents(lastEventId.current ?? undefined)
+      .then(newEvents => {
+        if (newEvents.length > 0) {
+          lastEventId.current = newEvents[0].id;
+          sessionStorage.setItem(STORAGE_KEY, newEvents[0].id);
+
+          const seen = getSeenIds();
+          const unseen = newEvents.filter(e => e.type !== "day_start" && !seen.has(e.id));
+          if (unseen.length > 0) {
+            addSeenIds(unseen.map(e => e.id));
+            setToasts(prev => [...unseen, ...prev].slice(0, 3));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isRunning) return;
 
-    const poll = () => {
-      api.getLatestEvents(lastEventId.current ?? undefined)
-        .then(newEvents => {
-          if (newEvents.length > 0) {
-            lastEventId.current = newEvents[0].id;
-            setToasts(prev => {
-              const combined = [...newEvents.filter(e => e.type !== "day_start"), ...prev];
-              return combined.slice(0, 3);
-            });
-          }
-        })
-        .catch(() => {});
-    };
-
     poll();
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, [isRunning]);
+  }, [isRunning, poll]);
 
   useEffect(() => {
     if (toasts.length === 0) return;
