@@ -214,7 +214,13 @@ export const getAuthProviders = () => fetchJson<{ providers: string[] }>("/auth/
 export const getMe = () => fetchJson<User>("/users/me");
 export const updateDisplayName = (displayName: string) => patchJson<User>("/users/me", { displayName });
 export const getMyLimits = () => fetchJson<Record<string, { used: number; limit: number; remaining: number }>>("/users/me/limits");
-export const getMyActivity = () => fetchJson<{ items: ActivityItem[] }>("/users/me/activity");
+export const getMyActivity = (cursor?: string, limit?: number) => {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (limit) params.set("limit", String(limit));
+  const qs = params.toString();
+  return fetchJson<{ items: ActivityItem[]; nextCursor: string | null }>(`/users/me/activity${qs ? `?${qs}` : ""}`);
+};
 export const joinParty = (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {});
 export const leaveParty = () => postJson<User>("/users/me/leave", {});
 
