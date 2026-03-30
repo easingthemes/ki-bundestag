@@ -54,7 +54,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 019 | [Inconsistent API error response format](./019-inconsistent-error-format.md) | done | API | #14 |
 | 020 | [React hook dependency warnings suppressed](./020-react-hook-deps.md) | done | Web | #19 |
 | 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
-| 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | open | API / Web | — |
+| 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | postponed | API / Web | — |
 | 027 | [Scalability: user load testing & architecture improvements](./027-scalability-user-loads.md) | open | Engine / API / DB | — |
 | 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
@@ -66,4 +66,5 @@ Each item links to a detail file with full description, affected files, and impl
 ## Summary
 
 - **Done**: 27 of 30
-- **Open**: 3 remaining (#022, #027, #029)
+- **Postponed**: 1 (#022)
+- **Open**: 2 remaining (#027, #029)

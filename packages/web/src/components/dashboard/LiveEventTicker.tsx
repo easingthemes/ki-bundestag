@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type SimulationEvent, type SimulationStatus } from "../../api";
+import { api, type SimulationEvent, type SimulationStatus, onSimEvents, isSocketConnected } from "../../api";
 
 const STORAGE_KEY = "liveTickerLastEventId";
 const SEEN_KEY = "liveTickerSeenIds";
@@ -29,29 +29,40 @@ export function LiveEventTicker({ simStatus }: LiveEventTickerProps) {
   const isRunning = simStatus.dayStartedAt && simStatus.lastRunAt &&
     new Date(simStatus.dayStartedAt).getTime() > new Date(simStatus.lastRunAt).getTime();
 
+  const handleNewEvents = useCallback((newEvents: SimulationEvent[]) => {
+    if (newEvents.length > 0) {
+      lastEventId.current = newEvents[0].id;
+      sessionStorage.setItem(STORAGE_KEY, newEvents[0].id);
+
+      const seen = getSeenIds();
+      const unseen = newEvents.filter(e => e.type !== "day_start" && !seen.has(e.id));
+      if (unseen.length > 0) {
+        addSeenIds(unseen.map(e => e.id));
+        setToasts(prev => [...unseen, ...prev].slice(0, 3));
+      }
+    }
+  }, []);
+
   const poll = useCallback(() => {
     api.getLatestEvents(lastEventId.current ?? undefined)
-      .then(newEvents => {
-        if (newEvents.length > 0) {
-          lastEventId.current = newEvents[0].id;
-          sessionStorage.setItem(STORAGE_KEY, newEvents[0].id);
-
-          const seen = getSeenIds();
-          const unseen = newEvents.filter(e => e.type !== "day_start" && !seen.has(e.id));
-          if (unseen.length > 0) {
-            addSeenIds(unseen.map(e => e.id));
-            setToasts(prev => [...unseen, ...prev].slice(0, 3));
-          }
-        }
-      })
+      .then(handleNewEvents)
       .catch(() => {});
-  }, []);
+  }, [handleNewEvents]);
+
+  useEffect(() => {
+    // Subscribe to WebSocket event pushes
+    const unsub = onSimEvents(handleNewEvents);
+    return unsub;
+  }, [handleNewEvents]);
 
   useEffect(() => {
     if (!isRunning) return;
 
+    // Fallback polling: only when WS is disconnected
     poll();
-    const id = setInterval(poll, 3000);
+    const id = setInterval(() => {
+      if (!isSocketConnected()) poll();
+    }, 5_000);
     return () => clearInterval(id);
   }, [isRunning, poll]);
 
