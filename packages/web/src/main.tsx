@@ -25,7 +25,7 @@ import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
 import { MyActivity } from "./pages/MyActivity";
-import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat } from "./api";
+import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat, onSimStatus, onNotificationRefresh, isSocketConnected } from "./api";
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -363,10 +363,17 @@ function SimStatus() {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
+    // Subscribe to WebSocket updates
+    const unsub = onSimStatus(setStatus);
+
+    // Fallback polling: fetch once on mount, then poll at 10s only when WS is disconnected
     const load = () => api.getSimulationStatus().then(setStatus).catch(() => {});
     load();
-    const id = setInterval(load, 3_000);
-    return () => clearInterval(id);
+    const id = setInterval(() => {
+      if (!isSocketConnected()) load();
+    }, 10_000);
+
+    return () => { unsub(); clearInterval(id); };
   }, []);
 
   useEffect(() => {
@@ -428,8 +435,13 @@ function NotificationBell() {
     if (!user) { setCount(0); return; }
     const load = () => api.getUnreadCount().then(r => setCount(r.count)).catch(() => {});
     load();
-    const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
+
+    // Refresh immediately when server signals new notifications
+    const unsub = onNotificationRefresh(load);
+
+    // Fallback polling at 60s (reduced from 30s since WS handles most updates)
+    const id = setInterval(load, 60_000);
+    return () => { unsub(); clearInterval(id); };
   }, [user]);
 
   if (!user) return null;
