@@ -13,6 +13,7 @@ on:
           - simulate-logs
           - disk-usage
           - db-stats
+          - db-deep-debug
           - full-health
 
 jobs:
@@ -66,6 +67,47 @@ jobs:
                 echo ""
                 echo "==> Party approvals:"
                 sqlite3 -header -column data/simulation.db "SELECT short_name, approval_rating FROM parties ORDER BY approval_rating DESC"
+                ;;
+              db-deep-debug)
+                echo "==> Simulation state:"
+                sqlite3 -header -column data/simulation.db "SELECT current_day, current_date, timing_preset, is_paused, start_date, last_run_at FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "==> Table row counts:"
+                for tbl in simulation_events bills media_articles polls elections crises parties motions confidence_votes constitutional_challenges referendums citizen_questions budgets party_history bundestag_seats fraktionen government national_state; do
+                  cnt=$(sqlite3 data/simulation.db "SELECT COUNT(*) FROM $tbl" 2>/dev/null || echo "N/A")
+                  printf "  %-30s %s\n" "$tbl" "$cnt"
+                done
+                echo ""
+                echo "==> Event counts by type (ALL time):"
+                sqlite3 -header -column data/simulation.db "SELECT type, COUNT(*) as count, MIN(day_number) as first_day, MAX(day_number) as last_day FROM simulation_events GROUP BY type ORDER BY count DESC"
+                echo ""
+                echo "==> Media articles by day (last 30 days with articles):"
+                sqlite3 -header -column data/simulation.db "SELECT day_number, COUNT(*) as articles FROM media_articles GROUP BY day_number ORDER BY day_number DESC LIMIT 30"
+                echo ""
+                echo "==> Elections history:"
+                sqlite3 -header -column data/simulation.db "SELECT id, election_day, status, trigger_reason, created_at FROM elections ORDER BY election_day DESC LIMIT 10"
+                echo ""
+                echo "==> Active crises:"
+                sqlite3 -header -column data/simulation.db "SELECT name, severity, start_day, end_day FROM crises WHERE end_day IS NULL OR end_day >= (SELECT current_day FROM simulation_meta)"
+                echo ""
+                echo "==> Day range with data:"
+                sqlite3 -header -column data/simulation.db "SELECT MIN(day_number) as earliest_event, MAX(day_number) as latest_event, COUNT(DISTINCT day_number) as days_with_events FROM simulation_events"
+                echo ""
+                echo "==> Last 10 non-negotiation events:"
+                sqlite3 -header -column data/simulation.db "SELECT day_number, type, actor, substr(title, 1, 60) as title FROM simulation_events WHERE type != 'negotiation_round' ORDER BY id DESC LIMIT 10"
+                echo ""
+                echo "==> Coalition / government state:"
+                sqlite3 -header -column data/simulation.db "SELECT * FROM government ORDER BY formed_on_day DESC LIMIT 3"
+                echo ""
+                echo "==> Negotiation status (active elections):"
+                sqlite3 -header -column data/simulation.db "SELECT id, election_day, status, json_array_length(negotiation_rounds) as rounds FROM elections WHERE status IN ('announced','campaigning','voting','negotiation') LIMIT 5"
+                echo ""
+                echo "==> DB file info:"
+                ls -lh data/*.db data/*.db-wal data/*.db-shm 2>/dev/null || true
+                echo ""
+                echo "==> Backup files on server:"
+                ls -lht data/*.backup* 2>/dev/null | head -10 || echo "No seed backups in data/"
+                ls -lht /opt/backups/ki-bundestag/ 2>/dev/null || echo "No backups in /opt/backups/"
                 ;;
               full-health)
                 echo "=== PM2 Processes ==="
