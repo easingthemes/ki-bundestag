@@ -103,7 +103,7 @@ export function About() {
           </p>
           <ol className="my-2 ml-6 list-decimal">
             <li className="mb-1"><strong>Ankündigung</strong> — die Wahl wird ausgerufen.</li>
-            <li className="mb-1"><strong>Wahlkampf</strong> — Parteien machen Wahlversprechen und kämpfen um Unterstützung (3 Tage).</li>
+            <li className="mb-1"><strong>Wahlkampf</strong> — Parteien machen Wahlversprechen und kämpfen um Unterstützung (21 Sim-Tage ab Ankündigung, aktiver Wahlkampf beginnt nach 7 Sim-Tagen).</li>
             <li className="mb-1"><strong>Wahltag</strong> — Ergebnisse werden anhand der Zustimmungswerte mit realistischem Umfagerauschen berechnet. Parteien unter 5 % ziehen nicht in den Bundestag ein (Sperrklausel).</li>
             <li className="mb-1"><strong>Koalitionsverhandlungen</strong> — 3 Runden KI-gesteuerter Verhandlungen, in denen Parteien Positionen darlegen, Zugeständnisse machen und Koalitionspartner suchen. Eine abschließende Synthese ergibt einen Koalitionsvertrag.</li>
             <li className="mb-1"><strong>Regierungsbildung</strong> — Sitze werden neu verteilt, Rollen neu vergeben, und die Regierungsarbeit beginnt.</li>
