@@ -153,6 +153,23 @@ const ALTERNATIVES: AltRow[] = [
   { model: "Gemini 2.0 Flash (Google)", priceLabel: "$0.10 / $0.40", perSimDay: "$0.005", perWP: "$0.61", perRealDay: "$7", delta: "-89%", deltaColor: "text-emerald-600" },
 ];
 
+// ─── Input scaling comparison ───────────────────────────────────────────────
+
+interface InputScaleRow {
+  preset: string;
+  simDaysPerDay: string;
+  currentPerMonth: string;
+  scaled20xPerMonth: string;
+  delta: string;
+}
+
+const INPUT_SCALE: InputScaleRow[] = [
+  { preset: "Ultra-fast", simDaysPerDay: "~1,400", currentPerMonth: "$1,512", scaled20xPerMonth: "$13,188", delta: "+$11,676" },
+  { preset: "Fast", simDaysPerDay: "~209", currentPerMonth: "$226", scaled20xPerMonth: "$1,969", delta: "+$1,743" },
+  { preset: "Normal", simDaysPerDay: "48", currentPerMonth: "$52", scaled20xPerMonth: "$452", delta: "+$400" },
+  { preset: "Slow", simDaysPerDay: "10", currentPerMonth: "$11", scaled20xPerMonth: "$94", delta: "+$83" },
+];
+
 // ─── Shared table helpers ────────────────────────────────────────────────────
 
 const TH = "text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2";
@@ -477,6 +494,59 @@ export function SimulationCosts() {
                 ))}
               </tbody>
             </table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Input Scaling: Current vs 20× ─────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="section-title">Input-Token-Skalierung (aktuell vs. 20×)</h2>
+        <Card>
+          <CardContent className="p-5 overflow-x-auto">
+            <p className="text-xs text-muted-foreground mb-3">
+              What happens if we fill prompts with 20× more context (~80K tokens/agent instead of ~4K)?
+              Output tokens stay the same — only input scales. Haiku&apos;s 200K context window can handle it.
+              At batch pricing ($0.50/MTok input, $2.50/MTok output), input is 5× cheaper than output per token.
+            </p>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Current</p>
+                <p className="text-sm">~29K input/day &middot; Input = 42% of cost</p>
+                <p className="text-lg font-semibold">$0.036/sim day</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">20× Input</p>
+                <p className="text-sm">~586K input/day &middot; Input = 93% of cost</p>
+                <p className="text-lg font-semibold">$0.314/sim day</p>
+              </div>
+            </div>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className={TH}>Preset</th>
+                  <th className={cn(TH, "text-right")}>Sim Days / Real Day</th>
+                  <th className={cn(TH, "text-right")}>Current / Real Month</th>
+                  <th className={cn(TH, "text-right")}>20× Input / Real Month</th>
+                  <th className={cn(TH, "text-right")}>Delta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {INPUT_SCALE.map(r => (
+                  <tr key={r.preset} className={TROW}>
+                    <td className={cn(TD, "font-medium")}>{r.preset}</td>
+                    <td className={cn(TD, "text-right tabular-nums")}>{r.simDaysPerDay}</td>
+                    <td className={cn(TD, "text-right tabular-nums")}>{r.currentPerMonth}</td>
+                    <td className={cn(TD, "text-right tabular-nums font-semibold text-amber-600")}>{r.scaled20xPerMonth}</td>
+                    <td className={cn(TD, "text-right tabular-nums text-red-600")}>{r.delta}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-xs text-muted-foreground mt-3">
+              Quiet day (no visitors, no election). Based on batch pricing: $0.50/MTok input, $2.50/MTok output.
+              At 20× input, each agent call uses ~80K tokens (40% of 200K window). Normal/Slow modes remain affordable.
+              Ultra-fast/Fast are theoretical max-throughput — not intended for production.
+            </p>
           </CardContent>
         </Card>
       </div>
