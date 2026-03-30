@@ -11,6 +11,18 @@ function clearDayStarted(): void {
   } catch { /* best-effort */ }
 }
 
+/** Read current day number from DB */
+function readCurrentDay(): number {
+  try {
+    const row = getSqlite()
+      .prepare("SELECT current_day FROM simulation_meta LIMIT 1")
+      .get() as { current_day: number } | undefined;
+    return row?.current_day ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -48,11 +60,22 @@ async function main() {
       console.log("  [Runner] Morning — resuming simulation");
     }
 
+    const dayBefore = readCurrentDay();
     try {
       await runDay();
     } catch (err) {
       console.error("[Runner] Simulation day failed:", err);
       clearDayStarted();
+
+      // Rollback currentDay if it was advanced during the failed runDay()
+      const dayAfter = readCurrentDay();
+      if (dayAfter > dayBefore) {
+        try {
+          getSqlite().prepare("UPDATE simulation_meta SET current_day = ?").run(dayBefore);
+          console.log(`  [Runner] Rolled back current_day from ${dayAfter} to ${dayBefore}`);
+        } catch { /* best-effort */ }
+      }
+
       // If it's a spending limit error, don't keep looping — fall through to the allProvidersLimited() check
       if (err instanceof AIProviderLimitError) {
         console.error(`[Runner] API limit hit (${err.provider}), will pause below.`);
