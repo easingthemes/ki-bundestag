@@ -42,7 +42,7 @@ export interface BatchResult {
 // Config
 // ---------------------------------------------------------------------------
 
-const BATCH_POLL_INTERVAL_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 30) * 1000;
+const BATCH_POLL_INTERVAL_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 60) * 1000;
 const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 3600) * 1000;
 
 // ---------------------------------------------------------------------------

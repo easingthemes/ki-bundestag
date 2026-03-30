@@ -19,7 +19,8 @@ All Anthropic calls go through **Message Batches API (50% discount)**.
 |----------|----------|---------|-------|----------|
 | `msgbatch_01JwsuLYRVfnghFggtdTeLbe` | 5 (all succeeded) | 22:14 | 22:19 | **5 min** |
 
-> Batch API adds 2-10 min latency per submission (create + poll every 30s).
+> Batch API adds 2-10 min latency per submission (create + poll every 60s per Anthropic docs).
+> See [batch-timing-log.md](./batch-timing-log.md) for detailed observations.
 > Normal/slow presets absorb this within their inter-day delay (30-90 min).
 > Ultra-fast/fast presets are AI-bound, so each day takes ~5-15 min total
 > (multiple batch submissions per day). Ensure the process stays alive
