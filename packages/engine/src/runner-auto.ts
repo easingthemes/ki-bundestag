@@ -2,7 +2,7 @@ import "dotenv/config";
 import { runDay } from "./simulation/index.js";
 import { closeDb, getSqlite } from "./db/index.js";
 import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
-import { allProvidersLimited } from "./agent/client.js";
+import { allProvidersLimited, AIProviderLimitError } from "./agent/client.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -45,6 +45,10 @@ async function main() {
       await runDay();
     } catch (err) {
       console.error("[Runner] Simulation day failed:", err);
+      // If it's a spending limit error, don't keep looping — fall through to the allProvidersLimited() check
+      if (err instanceof AIProviderLimitError) {
+        console.error(`[Runner] API limit hit (${err.provider}), will pause below.`);
+      }
     }
 
     if (!running) break;
