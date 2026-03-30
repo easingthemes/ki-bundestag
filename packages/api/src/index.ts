@@ -1,11 +1,13 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import session from "express-session";
 import passport from "passport";
-import { closeDb } from "@ki-bundestag/engine";
+import { closeDb, logger } from "@ki-bundestag/engine";
 
 import { sessionTracking } from "./middleware/index.js";
+import { voteLimiter, actionLimiter, adminLimiter } from "./middleware/rate-limit.js";
 import { SQLiteSessionStore } from "./session-store.js";
 import { configurePassport } from "./passport-config.js";
 import authRouter from "./routes/auth.js";
@@ -24,8 +26,25 @@ const app = express();
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
+// Validate FRONTEND_URL is a proper origin (not wildcard)
+if (FRONTEND_URL === "*") {
+  throw new Error("FRONTEND_URL must be a specific origin, not '*'");
+}
+
+// Require SESSION_SECRET in production
+const isProd = process.env.NODE_ENV === "production";
+if (isProd && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required in production");
+}
+
 // Trust reverse proxy (Caddy) so secure cookies work behind HTTPS termination
 app.set("trust proxy", 1);
+
+// Security headers via helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // CSP managed separately or by reverse proxy
+  crossOriginEmbedderPolicy: false, // allow loading cross-origin images (OAuth avatars)
+}));
 
 // CORS — allow credentials (cookies) from frontend origin
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
@@ -40,9 +59,9 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProd,
     sameSite: "lax",
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
   },
 }));
 
@@ -52,6 +71,15 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use(sessionTracking);
+
+// Rate limiting — applied by path prefix before routers
+app.use("/api/polls/:id/vote", voteLimiter);
+app.use("/api/questions/:id/vote", voteLimiter);
+app.use("/api/referendums/:id/vote", voteLimiter);
+app.use("/api/questions", actionLimiter);
+app.use("/api/admin", adminLimiter);
+app.use("/api/simulation/preset", adminLimiter);
+app.use("/api/simulate", adminLimiter);
 
 // Mount domain routers
 app.use(authRouter);
@@ -68,12 +96,12 @@ app.use(adminRouter);
 
 // Global error handler — must be last middleware, after all routes
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  console.error(`[ERROR] ${req.method} ${req.path}:`, err);
+  logger.error(`${req.method} ${req.path}:`, err);
   res.status(500).json({ error: "Internal server error" });
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`API server running on http://localhost:${PORT}`);
+  logger.info(`API server running on http://localhost:${PORT}`);
 });
 
 process.on("SIGINT", () => {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, getSqlite, getUserSeat, logUserAction } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, getSqlite, getUserSeat, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, and } from "drizzle-orm";
 import type { Bill } from "@ki-bundestag/types";
 import { mapBill } from "../mappers/index.js";
@@ -70,7 +70,7 @@ router.post("/api/bills/:id/signal", (req, res) => {
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch (err) { console.error("[bills] Failed to log action:", err); }
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
   const allSignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
   res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
 });
@@ -145,7 +145,7 @@ router.post("/api/bills/:id/amendment", (req, res) => {
     consumed: false,
   }).run();
 
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "submit_amendment", md?.day ?? 0, req.params.id, "bill"); } catch (err) { console.error("[bills] Failed to log action:", err); }
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "submit_amendment", md?.day ?? 0, req.params.id, "bill"); } catch (err) { logger.error("[bills] Failed to log action:", err); }
   res.json({ status: "queued", message: "Amendment will be processed on next simulation day" });
 });
 
@@ -207,7 +207,7 @@ router.post("/api/bills/:id/speech", (req, res) => {
     createdAt: Date.now(),
   }).run();
 
-  try { logUserAction(token, "submit_speech", currentDay, req.params.id, "bill", { reading }); } catch (err) { console.error("[bills] Failed to log action:", err); }
+  try { logUserAction(token, "submit_speech", currentDay, req.params.id, "bill", { reading }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
   res.json({ id: speechId, billId: req.params.id, reading, content: content.trim(), dayNumber: currentDay });
 });
 
@@ -294,7 +294,7 @@ router.post("/api/bills/:id/mdb-vote", (req, res) => {
     else summary.abstain++;
   }
 
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "cast_mdb_vote", md?.day ?? 0, req.params.id, "bill", { vote }); } catch (err) { console.error("[bills] Failed to log action:", err); }
+  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "cast_mdb_vote", md?.day ?? 0, req.params.id, "bill", { vote }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
   res.json({ userVote: vote, summary });
 });
 

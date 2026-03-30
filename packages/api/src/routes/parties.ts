@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, logUserAction } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, gte, asc, and, inArray } from "drizzle-orm";
 import type { Bill, BillVote, PartyHistoryEntry, SimulationEvent } from "@ki-bundestag/types";
 import { mapParty, getMemberCounts, mapBill } from "../mappers/index.js";
@@ -242,7 +242,7 @@ router.post("/api/parties/:id/proposals", (req, res) => {
   }).run();
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  try { logUserAction(token, "submit_proposal", currentDay, id, "proposal", { partyId: req.params.id, category }); } catch (err) { console.error("[parties] Failed to log action:", err); }
+  try { logUserAction(token, "submit_proposal", currentDay, id, "proposal", { partyId: req.params.id, category }); } catch (err) { logger.error("[parties] Failed to log action:", err); }
   const row = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
   res.status(201).json(mapProposal(row));
 });
@@ -302,7 +302,7 @@ router.post("/api/proposals/:id/vote", (req, res) => {
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  try { const db2 = getDb(); const md = db2.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_proposal", md?.day ?? 0, req.params.id, "proposal", { vote }); } catch (err) { console.error("[parties] Failed to log action:", err); }
+  try { const db2 = getDb(); const md = db2.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "vote_proposal", md?.day ?? 0, req.params.id, "proposal", { vote }); } catch (err) { logger.error("[parties] Failed to log action:", err); }
   const updated = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, req.params.id)).all()[0];
   res.json(mapProposal(updated, vote as 1 | -1));
 });
