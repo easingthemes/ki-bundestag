@@ -12,15 +12,13 @@ export function Impressum() {
 
           <p className="mb-1"><strong>Verantwortlich:</strong></p>
           <p className="mb-3 text-muted-foreground">
-            [Vorname Nachname]<br />
-            [Stra&szlig;e Hausnummer]<br />
-            [PLZ Ort]<br />
+            Dragan Filipovic<br />
             Deutschland
           </p>
 
           <p className="mb-1"><strong>Kontakt:</strong></p>
           <p className="mb-3 text-muted-foreground">
-            E-Mail: [deine@email.de]<br />
+            E-Mail: info@frontenddot.com<br />
             GitHub:{" "}
             <a
               href="https://github.com/easingthemes/ki-bundestag"
