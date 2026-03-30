@@ -220,17 +220,19 @@ export function buildMediaBatchRequest(
   dayEvents: Array<Omit<SimulationEvent, "id">>,
   allParties: Party[],
   currentDay: number,
+  briefing?: string,
 ): BatchRequest | null {
   const newsworthy = dayEvents.filter(e => NEWSWORTHY_TYPES.has(e.type));
   if (newsworthy.length === 0) return null;
 
   const eventSummaries = newsworthy.map(e => `[${e.type}] ${e.title}: ${e.description}`).join("\n");
   const partyNames = allParties.map(p => `${p.name} (${p.id})`).join(", ");
+  const briefingContext = briefing ? `\n\nPOLITICAL CONTEXT:\n${briefing}` : "";
 
   return {
     customId: `media-day${currentDay}`,
     system: MEDIA_SYSTEM_PROMPT,
-    prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
+    prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}${briefingContext}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
     maxTokens: 2048,
     roleKey: "daily",
   };

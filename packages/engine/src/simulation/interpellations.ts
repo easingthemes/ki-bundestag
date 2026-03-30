@@ -16,6 +16,7 @@ export async function answerPendingInterpellations(
   allParties: Party[],
   government: Government | null,
   currentDay: number,
+  briefing?: string,
 ): Promise<{ answered: Interpellation[]; expired: Interpellation[] }> {
   const db = getDb();
   const result: { answered: Interpellation[]; expired: Interpellation[] } = { answered: [], expired: [] };
@@ -63,7 +64,7 @@ export async function answerPendingInterpellations(
 
     batchRequests.push({
       customId,
-      system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.`,
+      system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.${briefing ? `\n\nCURRENT POLITICAL CONTEXT:\n${briefing}` : ""}`,
       prompt: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
       maxTokens: 300,
       partyId: minister.partyId,

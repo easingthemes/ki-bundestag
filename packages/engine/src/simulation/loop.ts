@@ -49,6 +49,7 @@ import { resetAllSeats, allocateSeats, reviewMdbApplications } from "./seats.js"
 import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
+import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
 import type { TimingPreset } from "./timing.js";
 
 function generateId(): string {
@@ -388,6 +389,7 @@ export async function runDay(): Promise<number> {
 
   // Handle negotiation phase
   let skipPartyAgents = false;
+  let briefingText: string | null = null;
 
   if (activeElection && activeElection.status === "negotiation") {
     skipPartyAgents = true;
@@ -833,6 +835,16 @@ export async function runDay(): Promise<number> {
       } catch { /* table may not exist yet */ }
     }
 
+    // Generate daily briefing (cross-day narrative context, shared across all parties)
+    const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties);
+    if (briefingReq) {
+      const briefingResults = await submitBatch([briefingReq]);
+      briefingText = processBriefingResult(findResult(briefingResults, briefingReq.customId));
+      if (briefingText) {
+        console.log(`  [Briefing] Generated daily political briefing`);
+      }
+    }
+
     // Build agent contexts for all parties
     const agentContexts: AgentContext[] = [];
     for (const party of allParties) {
@@ -859,6 +871,8 @@ export async function runDay(): Promise<number> {
         topInternalProposals: internalProposalsByParty.get(party.id),
         memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
         mdbVoteSummary: Object.keys(mdbVoteSummaryByBill).length > 0 ? mdbVoteSummaryByBill : undefined,
+        briefing: briefingText ?? undefined,
+        recentOwnActions: getPartyRecentActions(party.id, currentDay),
       });
     }
 
@@ -1542,7 +1556,7 @@ export async function runDay(): Promise<number> {
   }
 
   // 10b. Answer pending citizen questions
-  await answerPendingQuestions(allParties, currentDay);
+  await answerPendingQuestions(allParties, currentDay, briefingText ?? undefined);
 
   // 10c. Review internal party proposals (accept/decline/expire)
   try {
@@ -1569,7 +1583,7 @@ export async function runDay(): Promise<number> {
 
   // 10e. Answer pending interpellations + expire overdue ones
   const govForInterpellations = getActiveGovernment();
-  const interpResult = await answerPendingInterpellations(allParties, govForInterpellations, currentDay);
+  const interpResult = await answerPendingInterpellations(allParties, govForInterpellations, currentDay, briefingText ?? undefined);
 
   for (const answered of interpResult.answered) {
     const filingParty = allParties.find(p => p.id === answered.filedByPartyId);
@@ -1898,7 +1912,7 @@ export async function runDay(): Promise<number> {
 
   // 12b+12d. Batch media + summary together (2 calls → 1 batch)
   const endOfDayRequests: BatchRequest[] = [];
-  const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay);
+  const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay, briefingText ?? undefined);
   if (mediaReq) endOfDayRequests.push(mediaReq);
   const summaryReq = buildSummaryBatchRequest(
     dayEvents, allParties, currentDay,
