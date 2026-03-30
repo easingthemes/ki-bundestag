@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import { randomUUID } from "crypto";
-import { getUserDb, schema } from "@ki-bundestag/engine";
+import { getUserDb, schema, logger } from "@ki-bundestag/engine";
 import { eq, and } from "drizzle-orm";
 
 /** Find or create a user from an OAuth profile. */
@@ -81,9 +81,9 @@ export function configurePassport(): void {
         done(null, { id: userId });
       } catch (err) { done(err as Error); }
     }));
-    console.log("[auth] Google OAuth strategy configured");
+    logger.info("[auth] Google OAuth strategy configured");
   } else {
-    console.log("[auth] Google OAuth not configured (missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)");
+    logger.info("[auth] Google OAuth not configured (missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)");
   }
 
   // GitHub OAuth strategy
@@ -100,8 +100,8 @@ export function configurePassport(): void {
         done(null, { id: userId });
       } catch (err) { done(err); }
     }));
-    console.log("[auth] GitHub OAuth strategy configured");
+    logger.info("[auth] GitHub OAuth strategy configured");
   } else {
-    console.log("[auth] GitHub OAuth not configured (missing GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET)");
+    logger.info("[auth] GitHub OAuth not configured (missing GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET)");
   }
 }
