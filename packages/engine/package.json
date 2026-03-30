@@ -23,6 +23,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.46",
     "@ai-sdk/xai": "^3.0.57",
+    "@anthropic-ai/sdk": "^0.80.0",
     "@ki-bundestag/types": "*",
     "ai": "^6.0.97",
     "better-sqlite3": "^11.8.0",

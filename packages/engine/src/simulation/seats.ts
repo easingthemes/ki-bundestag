@@ -10,6 +10,8 @@ import { eq, and } from "drizzle-orm";
 import { getDb, getSqlite, getUserDb, getUserSqlite, schema } from "../db/index.js";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
+import { submitBatch, isBatchMode, chunkItems, type BatchResult } from "../agent/batch-client.js";
+import { buildApplicationSelectPrompt, preFilterApplications, type ApplicationItem, type PartyContext } from "../agent/group-prompts.js";
 import { createNotification } from "./event-queue.js";
 import { getHumanSeatRatio, type TimingPreset } from "./timing.js";
 
@@ -135,181 +137,313 @@ export function deactivateUserSeat(userId: string): boolean {
 }
 
 /**
+ * Calculate activity score for a user's engagement history.
+ */
+function calcActivityScore(userId: string): number {
+  const userSqlite = getUserSqlite();
+  const questionCount = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM question_votes WHERE user_id = ?"
+  ).get(userId) as { cnt: number };
+  const proposalCount = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM internal_proposals WHERE proposed_by = ?"
+  ).get(userId) as { cnt: number };
+  const signalCount = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM member_signals WHERE user_id = ?"
+  ).get(userId) as { cnt: number };
+
+  return Math.min(5, (questionCount.cnt * 0.5) + (proposalCount.cnt * 1) + (signalCount.cnt * 0.3));
+}
+
+/**
  * Review pending MdB applications each sim day.
- * Per party: find pending applications, skip if no open human seats.
- * Calculate priority score, send top applicants to AI for evaluation.
- * Max 3 applications per party per day to limit API calls.
+ *
+ * Uses selection-style AI prompts: one call per party asks the AI to
+ * "select the top N applicants" from the pool, instead of reviewing
+ * each application individually. This scales from 18 calls/day to 6,
+ * and removes the artificial 3/party/day cap.
+ *
+ * When BATCH_MODE=true, all party prompts are submitted as a single
+ * Anthropic batch (50% cost discount).
  */
 export async function reviewMdbApplications(currentDay: number): Promise<void> {
   const db = getDb();
   const userDb = getUserDb();
-  const userSqlite = getUserSqlite();
 
   const allParties = db.select().from(schema.parties).all();
   const openCounts = getOpenSeatCounts();
+
+  // --- Phase 1: Collect all party prompts ---
+
+  interface AppEntry {
+    app: { id: string; userId: string; applicationText: string; policyFocus: unknown; cooldownUntilDay: number | null };
+    score: number;
+    displayName: string;
+  }
+
+  interface PartyBatch {
+    party: PartyContext;
+    partyId: string;
+    openSeats: number;
+    applications: ApplicationItem[];
+    appMap: Map<string, AppEntry>;
+  }
+
+  const batches: PartyBatch[] = [];
 
   for (const party of allParties) {
     const partyId = party.id as string;
     const openSeats = openCounts[partyId] ?? 0;
     if (openSeats === 0) continue;
 
-    // Find pending applications for this party
-    const pending = userDb.select().from(schema.mdbApplications)
+    const pendingApps = userDb.select().from(schema.mdbApplications)
       .where(and(
         eq(schema.mdbApplications.partyId, partyId),
         eq(schema.mdbApplications.status, "pending"),
       ))
       .all();
 
-    if (pending.length === 0) continue;
+    if (pendingApps.length === 0) continue;
 
-    // Calculate priority score for each application
-    const scored = pending.map(app => {
-      // Activity score: questions asked, proposals made, signals given
-      const questionCount = userSqlite.prepare(
-        "SELECT COUNT(*) as cnt FROM question_votes WHERE user_id = ?"
-      ).get(app.userId) as { cnt: number };
-      const proposalCount = userSqlite.prepare(
-        "SELECT COUNT(*) as cnt FROM internal_proposals WHERE proposed_by = ?"
-      ).get(app.userId) as { cnt: number };
-      const signalCount = userSqlite.prepare(
-        "SELECT COUNT(*) as cnt FROM member_signals WHERE user_id = ?"
-      ).get(app.userId) as { cnt: number };
+    // Build ApplicationItems with activity scores and display names
+    const appMap = new Map<string, { app: typeof pendingApps[0]; score: number; displayName: string }>();
+    const items: ApplicationItem[] = [];
 
-      const activityScore = Math.min(5, (questionCount.cnt * 0.5) + (proposalCount.cnt * 1) + (signalCount.cnt * 0.3));
-
-      // Cooldown bonus: hasn't held a seat recently
+    for (const app of pendingApps) {
+      const activityScore = calcActivityScore(app.userId);
       const cooldownBonus = (app.cooldownUntilDay == null || currentDay >= app.cooldownUntilDay) ? 1 : 0;
-
-      // Lottery component for fairness
       const lottery = Math.random();
-
       const score = activityScore + cooldownBonus + lottery;
-      return { app, score };
-    });
 
-    // Sort by score descending, take top N (min of open seats and 3 per day)
-    scored.sort((a, b) => b.score - a.score);
-    const toReview = scored.slice(0, Math.min(openSeats, 3));
+      const user = userDb.select().from(schema.users)
+        .where(eq(schema.users.id, app.userId))
+        .get();
+      const displayName = user?.displayName ?? "Unknown";
 
-    for (const { app, score } of toReview) {
       // Update priority score
       userDb.update(schema.mdbApplications)
         .set({ priorityScore: Math.round(score * 100) / 100 })
         .where(eq(schema.mdbApplications.id, app.id))
         .run();
 
-      // Get user display name
-      const user = userDb.select().from(schema.users)
-        .where(eq(schema.users.id, app.userId))
-        .get();
-      const displayName = user?.displayName ?? "Unknown";
+      appMap.set(app.id, { app, score, displayName });
+      items.push({
+        id: app.id,
+        userId: app.userId,
+        displayName,
+        applicationText: app.applicationText,
+        policyFocus: app.policyFocus as string[] | null,
+        activityScore: score,
+      });
+    }
 
+    const partyCtx: PartyContext = { id: partyId, name: party.name, ideology: (party as any).ideology ?? "" };
+    const filtered = preFilterApplications(items, openSeats);
+
+    batches.push({ party: partyCtx, partyId, openSeats, applications: filtered, appMap });
+  }
+
+  if (batches.length === 0) return;
+
+  // --- Phase 2: Build and submit prompts ---
+
+  const batchRequests = batches.flatMap(b => {
+    const chunks = chunkItems(b.applications, 200, 160_000);
+    return chunks.map((chunk, i) => {
+      const req = buildApplicationSelectPrompt(b.party, chunk, b.openSeats, currentDay);
+      if (chunks.length > 1) req.customId += `-chunk${i}`;
+      return { req, batch: b };
+    });
+  });
+
+  const t0 = Date.now();
+  let results: BatchResult[];
+  try {
+    results = await submitBatch(batchRequests.map(r => r.req));
+  } catch (err) {
+    console.error(`  [MdB] Batch submission failed, falling back to legacy:`, (err as Error).message);
+    await reviewMdbApplicationsLegacy(currentDay, batches);
+    return;
+  }
+  logAICall({ task: "mdb-batch", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
+
+  // --- Phase 3: Process results ---
+
+  for (const { req, batch } of batchRequests) {
+    const result = results.find(r => r.customId === req.customId);
+    if (!result || !result.text) {
+      console.warn(`  [MdB] No result for ${req.customId}, skipping`);
+      continue;
+    }
+
+    const parsed = parseAIJson<{ selected: Array<{ id: string; reasoning: string }> }>(
+      result.text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (!Array.isArray(o.selected)) return null;
+        const selected = (o.selected as unknown[]).filter((s: unknown) => {
+          const item = s as Record<string, unknown>;
+          return typeof item.id === "string" && typeof item.reasoning === "string";
+        }) as Array<{ id: string; reasoning: string }>;
+        return { selected };
+      },
+      "MdB-Select",
+    );
+
+    if (!parsed) {
+      console.warn(`  [MdB] Failed to parse selection for ${batch.party.name}, skipping`);
+      continue;
+    }
+
+    const selectedIds = new Set(parsed.selected.map(s => s.id));
+
+    // Approve selected applicants
+    for (const selection of parsed.selected) {
+      const entry = batch.appMap.get(selection.id);
+      if (!entry) continue;
+
+      const { app, score, displayName } = entry;
+      const reasoning = selection.reasoning.slice(0, 300);
+
+      // Assign seat atomically
+      const sqlite = getSqlite();
+      const assignSeat = sqlite.transaction(() => {
+        const openSeat = db.select().from(schema.bundestagSeats)
+          .where(and(
+            eq(schema.bundestagSeats.partyId, batch.partyId),
+            eq(schema.bundestagSeats.active, true),
+            eq(schema.bundestagSeats.controller, "human"),
+          ))
+          .all()
+          .find(s => s.userId === null);
+
+        if (!openSeat) return null;
+
+        db.update(schema.bundestagSeats)
+          .set({ userId: app.userId })
+          .where(eq(schema.bundestagSeats.id, openSeat.id))
+          .run();
+
+        return openSeat;
+      });
+
+      const openSeat = assignSeat();
+
+      if (openSeat) {
+        userDb.update(schema.mdbApplications).set({
+          status: "approved",
+          aiReasoning: reasoning,
+          priorityScore: Math.round(score * 100) / 100,
+          reviewedOnDay: currentDay,
+        }).where(eq(schema.mdbApplications.id, app.id)).run();
+
+        createNotification(
+          app.userId,
+          "mdb_approved",
+          `MdB-Sitz genehmigt — ${batch.party.name}`,
+          `Ihre Bewerbung für einen Bundestag-Sitz bei ${batch.party.name} wurde genehmigt! Sitz #${openSeat.seatNumber}. ${reasoning}`,
+          { seatId: openSeat.id, partyId: batch.partyId },
+          currentDay,
+        );
+
+        console.log(`  [MdB] ${displayName} approved for ${batch.partyId} seat #${openSeat.seatNumber}`);
+      }
+    }
+
+    // Reject non-selected applicants from the filtered set
+    for (const item of batch.applications) {
+      if (selectedIds.has(item.id)) continue;
+      const entry = batch.appMap.get(item.id);
+      if (!entry) continue;
+
+      const { app, score } = entry;
+      const defaultReasoning = "Stärkere Bewerbungen hatten Vorrang in dieser Runde.";
+
+      userDb.update(schema.mdbApplications).set({
+        status: "rejected",
+        aiReasoning: defaultReasoning,
+        priorityScore: Math.round(score * 100) / 100,
+        reviewedOnDay: currentDay,
+        cooldownUntilDay: currentDay + 7,
+      }).where(eq(schema.mdbApplications.id, app.id)).run();
+
+      createNotification(
+        app.userId,
+        "mdb_rejected",
+        `MdB-Bewerbung abgelehnt — ${batch.party.name}`,
+        `Ihre Bewerbung wurde leider abgelehnt. ${defaultReasoning}\n\nTipps für eine erfolgreiche Bewerbung:\n• Zeigen Sie Verständnis für die Positionen von ${batch.party.name}\n• Nennen Sie konkrete politische Ziele\n• Steigern Sie Ihre Aktivität (Fragen, Vorschläge, Signale)\n\nSie können sich in 7 Tagen erneut bewerben.`,
+        { partyId: batch.partyId },
+        currentDay,
+      );
+    }
+  }
+}
+
+/**
+ * Legacy per-application review (fallback when batch fails).
+ */
+async function reviewMdbApplicationsLegacy(
+  currentDay: number,
+  batches: Array<{ party: PartyContext; partyId: string; openSeats: number; appMap: Map<string, { app: any; score: number; displayName: string }> }>,
+): Promise<void> {
+  const db = getDb();
+  const userDb = getUserDb();
+
+  for (const batch of batches) {
+    const entries = [...batch.appMap.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.min(batch.openSeats, 3));
+
+    for (const { app, score, displayName } of entries) {
       const t0 = Date.now();
       try {
         const { text: raw, model, provider } = await callAI({
-          system: `You are the party leadership of ${party.name} (ideology: ${(party as any).ideology}). A citizen is applying for a Bundestag seat in your party.
-
-Evaluate their application based on these criteria:
-1. Ideological alignment: Does the application show understanding of and alignment with ${party.name}'s core positions?
-2. Policy substance: Does the applicant articulate concrete policy goals (not just generic statements)?
-3. Engagement: The applicant's activity score reflects their prior participation (questions, proposals, signals). Higher scores indicate more engaged members.
-
-Be generous — this is a simulation. Approve applicants who show genuine interest in the party's direction, even if their application is brief. Only reject if the application is clearly off-topic, contradicts the party's core ideology, or shows no effort.
-
-Respond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<1–2 sentences explaining what was good or what was missing>"}`,
-          prompt: `Applicant: ${displayName}\nApplication: "${app.applicationText}"${app.policyFocus ? `\nPolicy focus: ${JSON.stringify(app.policyFocus)}` : ""}\nActivity score: ${score.toFixed(1)}/6\n\nShould ${party.name} grant this member a Bundestag seat?`,
+          system: `You are the party leadership of ${batch.party.name} (ideology: ${batch.party.ideology}). A citizen is applying for a Bundestag seat in your party.\n\nBe generous — this is a simulation. Approve applicants who show genuine interest.\n\nRespond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<1–2 sentences>"}`,
+          prompt: `Applicant: ${displayName}\nApplication: "${app.applicationText}"${app.policyFocus ? `\nPolicy focus: ${JSON.stringify(app.policyFocus)}` : ""}\nActivity score: ${score.toFixed(1)}/6\n\nShould ${batch.party.name} grant this member a Bundestag seat?`,
           maxTokens: 256,
-          partyId,
+          partyId: batch.partyId,
         });
 
-        const defaultReasoning = "Does not meet current requirements.";
         const parsed = parseAIJson<{ decision: "approve" | "reject"; reasoning: string }>(
           raw,
           (v: unknown) => {
             const o = v as Record<string, unknown>;
             if (o.decision !== "approve" && o.decision !== "reject") return null;
-            return { decision: o.decision, reasoning: typeof o.reasoning === "string" ? o.reasoning.slice(0, 300) : defaultReasoning };
+            return { decision: o.decision, reasoning: typeof o.reasoning === "string" ? o.reasoning.slice(0, 300) : "Does not meet current requirements." };
           },
           "MdB",
         );
         const decision = parsed?.decision ?? "reject";
-        const reasoning = parsed?.reasoning ?? defaultReasoning;
-        logAICall({ task: `mdb:${partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "reject" });
+        const reasoning = parsed?.reasoning ?? "Does not meet current requirements.";
+        logAICall({ task: `mdb:${batch.partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "reject" });
 
         if (decision === "approve") {
-          // Assign the seat atomically: re-check availability inside a transaction to prevent race conditions.
-          // The UNIQUE INDEX idx_bundestag_seats_active_user also enforces this at the DB level.
           const sqlite = getSqlite();
           const assignSeat = sqlite.transaction(() => {
             const openSeat = db.select().from(schema.bundestagSeats)
-              .where(and(
-                eq(schema.bundestagSeats.partyId, partyId),
-                eq(schema.bundestagSeats.active, true),
-                eq(schema.bundestagSeats.controller, "human"),
-              ))
-              .all()
-              .find(s => s.userId === null);
-
+              .where(and(eq(schema.bundestagSeats.partyId, batch.partyId), eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "human")))
+              .all().find(s => s.userId === null);
             if (!openSeat) return null;
-
-            db.update(schema.bundestagSeats)
-              .set({ userId: app.userId })
-              .where(eq(schema.bundestagSeats.id, openSeat.id))
-              .run();
-
+            db.update(schema.bundestagSeats).set({ userId: app.userId }).where(eq(schema.bundestagSeats.id, openSeat.id)).run();
             return openSeat;
           });
-
           const openSeat = assignSeat();
-
           if (openSeat) {
-            userDb.update(schema.mdbApplications).set({
-              status: "approved",
-              aiReasoning: reasoning,
-              priorityScore: Math.round(score * 100) / 100,
-              reviewedOnDay: currentDay,
-            }).where(eq(schema.mdbApplications.id, app.id)).run();
-
-            createNotification(
-              app.userId,
-              "mdb_approved",
-              `MdB-Sitz genehmigt — ${party.name}`,
-              `Ihre Bewerbung für einen Bundestag-Sitz bei ${party.name} wurde genehmigt! Sitz #${openSeat.seatNumber}. ${reasoning}`,
-              { seatId: openSeat.id, partyId },
-              currentDay,
-            );
-
-            console.log(`  [MdB] ${displayName} approved for ${partyId} seat #${openSeat.seatNumber}`);
+            userDb.update(schema.mdbApplications).set({ status: "approved", aiReasoning: reasoning, priorityScore: Math.round(score * 100) / 100, reviewedOnDay: currentDay }).where(eq(schema.mdbApplications.id, app.id)).run();
+            createNotification(app.userId, "mdb_approved", `MdB-Sitz genehmigt — ${batch.party.name}`, `Ihre Bewerbung wurde genehmigt! Sitz #${openSeat.seatNumber}. ${reasoning}`, { seatId: openSeat.id, partyId: batch.partyId }, currentDay);
+            console.log(`  [MdB] ${displayName} approved for ${batch.partyId} seat #${openSeat.seatNumber}`);
           }
         } else {
-          userDb.update(schema.mdbApplications).set({
-            status: "rejected",
-            aiReasoning: reasoning,
-            priorityScore: Math.round(score * 100) / 100,
-            reviewedOnDay: currentDay,
-            cooldownUntilDay: currentDay + 7, // 7-day cooldown before re-applying
-          }).where(eq(schema.mdbApplications.id, app.id)).run();
-
-          createNotification(
-            app.userId,
-            "mdb_rejected",
-            `MdB-Bewerbung abgelehnt — ${party.name}`,
-            `Ihre Bewerbung wurde leider abgelehnt. ${reasoning}\n\nTipps für eine erfolgreiche Bewerbung:\n• Zeigen Sie Verständnis für die Positionen von ${party.name}\n• Nennen Sie konkrete politische Ziele\n• Steigern Sie Ihre Aktivität (Fragen, Vorschläge, Signale)\n\nSie können sich in 7 Tagen erneut bewerben.`,
-            { partyId },
-            currentDay,
-          );
-
-          console.log(`  [MdB] ${displayName} rejected for ${partyId}: ${reasoning}`);
+          userDb.update(schema.mdbApplications).set({ status: "rejected", aiReasoning: reasoning, priorityScore: Math.round(score * 100) / 100, reviewedOnDay: currentDay, cooldownUntilDay: currentDay + 7 }).where(eq(schema.mdbApplications.id, app.id)).run();
+          createNotification(app.userId, "mdb_rejected", `MdB-Bewerbung abgelehnt — ${batch.party.name}`, `Ihre Bewerbung wurde abgelehnt. ${reasoning}`, { partyId: batch.partyId }, currentDay);
+          console.log(`  [MdB] ${displayName} rejected for ${batch.partyId}: ${reasoning}`);
         }
       } catch (err) {
         if (err instanceof AIProviderLimitError) {
           console.warn(`  [MdB] Skipped application review (${err.message})`);
-        } else {
-          console.error(`[MdB] Error reviewing application ${app.id}:`, err);
+          break;
         }
-        logAICall({ task: `mdb:${partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "reject" });
-        if (err instanceof AIProviderLimitError) break;
+        console.error(`[MdB] Error reviewing application ${app.id}:`, err);
+        logAICall({ task: `mdb:${batch.partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "reject" });
       }
     }
   }
