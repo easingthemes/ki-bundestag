@@ -58,9 +58,9 @@ Detailed rules are in `.claude/rules/` (auto-loaded, path-scoped):
 - **`simulation.md`** — Agent actions, `runDay()` flow, AI call patterns
 - **`api.md`** — Express REST conventions, route structure, mappers, middleware
 
-## Web Pages (23 routes)
+## Web Pages (24 routes)
 
-Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo.
+Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo, Impressum, Datenschutz.
 
 Routes in `packages/web/src/main.tsx`, API client in `packages/web/src/api/`.
 
@@ -71,16 +71,16 @@ All under `/api/` prefix, served from `packages/api/src/routes/`:
 | Route | Domain |
 |-------|--------|
 | `/api/auth` | OAuth login (Google, GitHub), session, logout, providers |
-| `/api/parties` | Party profiles, approval, coalition |
-| `/api/bills` | Bills, signals, amendments, votes |
-| `/api/elections` | Elections, results, coalitions |
-| `/api/simulation` | Sim status, day triggers, injections |
-| `/api/parliament` | Motions, interpellations, confidence votes, court |
-| `/api/content` | Media, polls, questions, referendums, logs |
-| `/api/users` | Profile, display name, party join/leave, proposals, MdB |
-| `/api/seats` | MdB seat management |
-| `/api/budget` | Budget proposals, allocations |
-| `/api/admin` | Model config, costs, analytics |
+| `/api/parties` | Party profiles, approval, coalition, alignment, proposals |
+| `/api/bills` | Bills, signals, amendments, speeches, MdB votes |
+| `/api/elections` | Elections, results, government, government history |
+| `/api/simulation` | Sim status, calendar, events, costs, state, health, injections |
+| `/api/parliament` | Crises, Fraktionen, motions, interpellations, confidence votes, court |
+| `/api/content` | Media, polls, questions, referendums |
+| `/api/users` | Profile, activity, impact, catchup, notifications, party join/leave, proposals, limits |
+| `/api/seats` | MdB seat applications, roster, availability |
+| `/api/budgets` | Budget listings |
+| `/api/admin` | Timing preset, context depth, analytics, costs |
 
 ## Model Configuration
 
@@ -94,7 +94,7 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 
 ## Environment
 
-Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `XAI_API_KEY`, `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`.
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `XAI_API_KEY`, `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`, `MODEL_PARTY_<ID>` (per-party overrides, format `provider:model-id`), `BATCH_POLL_INTERVAL`, `BATCH_TIMEOUT`.
 
 ## Issue Tracker
 
