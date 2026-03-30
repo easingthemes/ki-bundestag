@@ -506,4 +506,6 @@ export const USER_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_member_signals_bill_user", sql: "CREATE INDEX IF NOT EXISTS idx_member_signals_bill_user ON member_signals(bill_id, user_id)" },
   { name: "idx_notifications_user", sql: "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)" },
   { name: "idx_user_actions_user_type", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_type ON user_actions(user_id, action_type)" },
+  { name: "idx_user_actions_created_at", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at)" },
+  { name: "idx_user_actions_user_day", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_day ON user_actions(user_id, sim_day)" },
 ];

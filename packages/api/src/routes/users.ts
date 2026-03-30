@@ -55,6 +55,10 @@ router.get("/api/users/me/activity", (req, res) => {
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 50);
+  const cursorTs = cursor ? new Date(cursor).getTime() : Infinity;
+
   const items: Array<{ type: string; title: string; description: string; dayNumber: number; createdAt: string; entityId?: string; entityType?: string; outcome?: string }> = [];
 
   // Proposals
@@ -145,10 +149,15 @@ router.get("/api/users/me/activity", (req, res) => {
     });
   }
 
-  // Sort by createdAt descending
+  // Sort by createdAt descending, apply cursor filter
   items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const afterCursor = cursor ? items.filter(i => new Date(i.createdAt).getTime() < cursorTs) : items;
+  const page = afterCursor.slice(0, limit + 1);
+  const hasMore = page.length > limit;
+  const resultItems = hasMore ? page.slice(0, limit) : page;
+  const nextCursor = hasMore ? resultItems[resultItems.length - 1].createdAt : null;
 
-  res.json({ items: items.slice(0, 100) });
+  res.json({ items: resultItems, nextCursor });
 });
 
 // GET /api/users/me/impact (A6)

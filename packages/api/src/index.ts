@@ -6,7 +6,7 @@ import session from "express-session";
 import passport from "passport";
 import { closeDb, logger } from "@ki-bundestag/engine";
 
-import { sessionTracking } from "./middleware/index.js";
+import { sessionTracking, flushLastActive } from "./middleware/index.js";
 import { voteLimiter, actionLimiter, adminLimiter } from "./middleware/rate-limit.js";
 import { SQLiteSessionStore } from "./session-store.js";
 import { configurePassport } from "./passport-config.js";
@@ -52,6 +52,10 @@ app.use(express.json());
 
 // Session middleware — SQLite-backed, HttpOnly cookie
 const sessionStore = new SQLiteSessionStore();
+
+// Prune expired sessions every 30 minutes
+const pruneInterval = setInterval(() => sessionStore.prune(), 30 * 60 * 1000);
+
 app.use(session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET || "ki-bundestag-dev-secret-change-me",
@@ -105,6 +109,8 @@ const server = app.listen(PORT, () => {
 });
 
 process.on("SIGINT", () => {
+  clearInterval(pruneInterval);
+  flushLastActive();
   server.close();
   closeDb();
   process.exit(0);
