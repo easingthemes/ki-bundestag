@@ -27,7 +27,7 @@ if (fs.existsSync(userDbPath)) {
   console.log(`Backed up users.db to ${backupPath}`);
 }
 
-console.log("Seeding database...");
+console.log("Seeding database (user accounts will be preserved)...");
 seedDatabase();
 closeDb();
 console.log("Done!");

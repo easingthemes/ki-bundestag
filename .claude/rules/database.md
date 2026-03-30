@@ -47,5 +47,5 @@ db.insert(schema.bills).values({ id, title, ... }).run();
 
 ## Seed vs Migrate
 
-- `npm run seed` — **Destructive**: drops all tables in both DBs, creates fresh state with parties + govt (backs up both files first)
+- `npm run seed` — **Partially destructive**: drops all simulation.db tables and recreates fresh state with parties + govt. Preserves user accounts in users.db but resets bundestag-related fields (partyId, cooldowns) and clears activity data (votes, speeches, applications, signals, proposals, notifications). Backs up both files first.
 - `npm run migrate` — **Safe**: applies schema changes only to both DBs, safe to run repeatedly
