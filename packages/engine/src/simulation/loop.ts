@@ -16,7 +16,7 @@ import type {
   Party,
   SimulationEvent,
 } from "@ki-bundestag/types";
-import { getDb, getUserDb, schema, migrateDatabase } from "../db/index.js";
+import { getDb, getSqlite, getUserDb, getUserSqlite, schema, migrateDatabase } from "../db/index.js";
 import { runPartyAgent, buildPartyAgentRequests, processPartyAgentResult } from "../agent/index.js";
 import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
@@ -66,6 +66,61 @@ function addEvent(
   events.push(ev);
 }
 
+/**
+ * Clean up leftover data from a previous failed attempt at the same day.
+ * When a day fails mid-way (e.g. API rate limit), events/bills/etc are already
+ * committed but currentDay is never advanced. Retrying would create duplicates.
+ */
+function cleanupPartialDay(dayNumber: number): void {
+  const sqlite = getSqlite();
+  const userSqlite = getUserSqlite();
+
+  // Tables in simulation.db with day_number column
+  const simDayNumberTables = [
+    "simulation_events",
+    "motions",
+    "interpellations",
+    "confidence_votes",
+    "constitutional_challenges",
+    "party_history",
+    "media_articles",
+  ];
+
+  // Tables in simulation.db with other day columns
+  const simOtherDayTables: Array<{ table: string; column: string }> = [
+    { table: "bills", column: "proposed_on_day" },
+    { table: "polls", column: "created_on_day" },
+    { table: "referendums", column: "created_on_day" },
+    { table: "budgets", column: "proposed_on_day" },
+    { table: "crises", column: "start_day" },
+    { table: "elections", column: "announced_on_day" },
+  ];
+
+  let cleaned = 0;
+  for (const table of simDayNumberTables) {
+    try {
+      const result = sqlite.prepare(`DELETE FROM ${table} WHERE day_number = ?`).run(dayNumber);
+      cleaned += result.changes;
+    } catch { /* table may not exist yet */ }
+  }
+  for (const { table, column } of simOtherDayTables) {
+    try {
+      const result = sqlite.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).run(dayNumber);
+      cleaned += result.changes;
+    } catch { /* table may not exist yet */ }
+  }
+
+  // Tables in users.db
+  try {
+    const result = userSqlite.prepare("DELETE FROM internal_proposals WHERE created_on_day = ?").run(dayNumber);
+    cleaned += result.changes;
+  } catch { /* table may not exist yet */ }
+
+  if (cleaned > 0) {
+    console.log(`  [Cleanup] Removed ${cleaned} leftover rows from failed day ${dayNumber}`);
+  }
+}
+
 export async function runDay(): Promise<number> {
   // Ensure schema is up-to-date (idempotent, creates missing tables like fraktionen)
   migrateDatabase();
@@ -78,6 +133,9 @@ export async function runDay(): Promise<number> {
   if (!meta) throw new Error("No simulation meta found. Run seed first.");
 
   const currentDay = meta.currentDay + 1;
+
+  // Clean up any leftover data from a previous failed attempt at this day
+  cleanupPartialDay(currentDay);
   setTrackingDay(currentDay);
   const startDateStr = (meta as any).startDate as string | null;
   const startDate: Date | undefined = startDateStr ? new Date(startDateStr) : undefined;
