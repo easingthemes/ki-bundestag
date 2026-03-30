@@ -381,7 +381,11 @@ function SimStatus() {
 
     if (started > completed) {
       const elapsed = now - started;
-      return { running: true, pct: Math.min(Math.round((elapsed / 30_000) * 95), 95) };
+      // Cap at 5 min — if still "running" after that, the day likely failed
+      if (elapsed < 300_000) {
+        return { running: true, pct: Math.min(Math.round((elapsed / 30_000) * 95), 95) };
+      }
+      return { running: false, pct: 0 };
     }
 
     const sinceCompleted = now - completed;
