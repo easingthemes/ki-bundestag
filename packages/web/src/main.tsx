@@ -19,6 +19,8 @@ import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
 import { Budget } from "./pages/Budget";
 import { About } from "./pages/About";
 import { SimulationInfo } from "./pages/SimulationInfo";
+import { Impressum } from "./pages/Impressum";
+import { Datenschutz } from "./pages/Datenschutz";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
@@ -146,6 +148,8 @@ function MobileNav({ user }: { user: User | null }) {
           <Separator className="mx-5 my-2" />
           <MobileLink to="/log">Protokoll</MobileLink>
           <MobileLink to="/about">&Uuml;ber</MobileLink>
+          <MobileLink to="/impressum">Impressum</MobileLink>
+          <MobileLink to="/datenschutz">Datenschutz</MobileLink>
           <Separator className="mx-5 my-2" />
           {user ? (
             <>
@@ -608,6 +612,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/about" element={<About />} />
             <Route path="/simulation-info" element={<SimulationInfo />} />
+            <Route path="/impressum" element={<Impressum />} />
+            <Route path="/datenschutz" element={<Datenschutz />} />
           </Routes>
         </main>
 
@@ -618,6 +624,8 @@ function App() {
               <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Protokoll</Link>
               <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">&Uuml;ber</Link>
               <Link to="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Simulation</Link>
+              <Link to="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Impressum</Link>
+              <Link to="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Datenschutz</Link>
             </div>
             <div className="text-[11px] text-muted-foreground">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>
