@@ -10,12 +10,13 @@ on:
         default: "view"
         options:
           - view
+          - set-default-parties
           - set-all-parties
           - set-party
           - set-role
           - set-cost-mode
       model:
-        description: "[set-all-parties / set-party / set-role] Model to use"
+        description: "[set-default-parties / set-all-parties / set-party / set-role] Model to use"
         required: false
         type: choice
         default: "(no change)"
@@ -73,7 +74,7 @@ jobs:
         run: |
           ACTION="${{ inputs.action }}"
           MODEL="${{ inputs.model }}"
-          if [[ "$ACTION" == "set-all-parties" || "$ACTION" == "set-party" || "$ACTION" == "set-role" ]]; then
+          if [[ "$ACTION" == "set-default-parties" || "$ACTION" == "set-all-parties" || "$ACTION" == "set-party" || "$ACTION" == "set-role" ]]; then
             if [[ "$MODEL" == "(no change)" ]]; then
               echo "::error::Select a model when using $ACTION"
               exit 1
@@ -160,8 +161,18 @@ jobs:
                 show_config
                 ;;
 
+              set-default-parties)
+                echo "==> Setting default parties (all except AfD) to: ${MODEL}"
+                for P in SPD CDU GRUENE FDP LINKE; do
+                  set_env "MODEL_PARTY_${P}" "${MODEL}"
+                done
+                echo "  AfD: unchanged (uses separate model)"
+                echo ""
+                show_config
+                ;;
+
               set-all-parties)
-                echo "==> Setting ALL party models to: ${MODEL}"
+                echo "==> Setting ALL party models (including AfD) to: ${MODEL}"
                 for P in SPD CDU GRUENE FDP AFD LINKE; do
                   set_env "MODEL_PARTY_${P}" "${MODEL}"
                 done
