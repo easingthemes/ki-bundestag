@@ -114,7 +114,7 @@ export function PartyDetail() {
   };
 
   return (
-    <div>
+    <div className="min-w-0 overflow-hidden">
       {/* Header */}
       <div className="mb-6">
         <Link to="/parties" className="text-sm text-muted-foreground no-underline hover:text-foreground">&larr; Alle Parteien</Link>
