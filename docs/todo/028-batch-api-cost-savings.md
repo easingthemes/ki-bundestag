@@ -356,8 +356,8 @@ Pure AI simulation. 0% human seats, all features disabled.
 
 | Preset | Users | Impact on Day Duration | Term Duration Change |
 |--------|-------|----------------------|---------------------|
-| Ultra-fast | any | None (no users) | ~24 hours |
-| Fast | any | None (no users) | ~1 week |
+| Ultra-fast | any | ~5 min/day (batch polling) | ~3-7 days |
+| Fast | any | ~5 min added to 7 min delay | ~2 weeks |
 | Normal | 1K | +2 min (~7%) | ~1 month |
 | Normal | 100K | +5 min (~17%) | ~1.2 months |
 | Normal | 1M | +15 min (~50%) | ~1.5 months |
