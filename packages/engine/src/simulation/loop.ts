@@ -391,10 +391,100 @@ export async function runDay(): Promise<number> {
 
   if (activeElection && activeElection.status === "negotiation") {
     skipPartyAgents = true;
-    console.log(`  [Negotiation] Day ${currentDay}: Running negotiation round...`);
 
     const previousRounds = (activeElection.negotiationRounds || []) as NegotiationRound[][];
     const roundNumber = previousRounds.length + 1;
+    const daysSinceElection = currentDay - activeElection.electionDay;
+
+    // Safety: if negotiations are stuck for too many days (e.g. API errors preventing
+    // round progression), force-complete with algorithmic coalition
+    const MAX_NEGOTIATION_DAYS = getMaxNegotiationRounds() + 5;
+    if (daysSinceElection > MAX_NEGOTIATION_DAYS && roundNumber <= getMaxNegotiationRounds()) {
+      console.warn(`  [Negotiation] Stuck for ${daysSinceElection} days (still round ${roundNumber}), force-completing...`);
+
+      const govResult = formGovernment(activeElection.results!, allParties);
+      const coalition = govResult.coalition;
+      const opposition = govResult.opposition;
+
+      db.update(schema.elections)
+        .set({
+          status: "completed",
+          negotiationRounds: previousRounds as any,
+          coalitionAgreement: null,
+          newCoalition: coalition as any,
+          newOpposition: opposition as any,
+        })
+        .where(eq(schema.elections.id, activeElection.id))
+        .run();
+
+      for (const result of activeElection.results!) {
+        const role = coalition[0] === result.partyId
+          ? "leader"
+          : coalition.includes(result.partyId)
+            ? "junior"
+            : "opposition";
+        db.update(schema.parties)
+          .set({ seatCount: result.seatsWon, coalitionRole: role })
+          .where(eq(schema.parties.id, result.partyId))
+          .run();
+        const party = allParties.find(p => p.id === result.partyId);
+        if (party) {
+          party.seatCount = result.seatsWon;
+          party.coalitionRole = role;
+        }
+      }
+
+      nationalState.coalitionParties = coalition;
+      nationalState.oppositionParties = opposition;
+
+      lowSentimentStreak = 0;
+      let nextElDay = currentDay + TIME_CONFIG.TERM_DAYS;
+      if (startDate) nextElDay = snapToNextSunday(nextElDay, startDate);
+      db.update(schema.simulationMeta)
+        .set({ nextElectionDay: nextElDay, lowSentimentStreak: 0 })
+        .where(eq(schema.simulationMeta.id, meta.id))
+        .run();
+
+      const coalitionNames = coalition.map(id => allParties.find(p => p.id === id)?.name ?? id).join(", ");
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "government_formed",
+        actor: "system",
+        title: "Government formed (emergency fallback)",
+        description: `Negotiations stalled — coalition formed algorithmically: ${coalitionNames}`,
+        data: { electionId: activeElection.id, coalition, opposition, fallback: true },
+      });
+
+      const fraktionResult = updateFraktionen(currentDay, allParties);
+      for (const ev of fraktionResult.events) addEvent(dayEvents, ev);
+
+      const cabinet = formCabinet(coalition, allParties, activeElection.id, currentDay);
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "government_cabinet_formed",
+        actor: "system",
+        title: `Chancellor ${cabinet.chancellorName} forms cabinet`,
+        description: `Chancellor: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Ministers: ${cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ")}`,
+        data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
+      });
+
+      const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
+      resetAllSeats();
+      for (const result of activeElection.results!) {
+        allocateSeats(result.partyId, result.seatsWon, activeElection.id, currentDay, timingPreset);
+      }
+
+      try {
+        const userSqlite = (await import("../db/index.js")).getUserSqlite();
+        userSqlite.prepare("UPDATE mdb_applications SET status = 'expired' WHERE status = 'pending'").run();
+      } catch { /* table may not exist yet */ }
+
+      console.log(`  [Election] Emergency fallback coalition: ${coalitionNames}`);
+      activeElection = null;
+    }
+
+    if (activeElection && activeElection.status === "negotiation") {
+      console.log(`  [Negotiation] Day ${currentDay}: Running negotiation round ${roundNumber}...`);
 
     const roundResults = await runNegotiationRound(
       activeElection.results!,
@@ -551,6 +641,7 @@ export async function runDay(): Promise<number> {
         .where(eq(schema.elections.id, activeElection.id))
         .run();
     }
+    } // end inner negotiation guard
   }
 
   // Advance election phase (for non-negotiation states)

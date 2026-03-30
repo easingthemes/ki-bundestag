@@ -18,6 +18,7 @@ import { MyImpactCard } from "@/components/dashboard/MyImpactCard";
 import { CatchupCard } from "@/components/dashboard/CatchupCard";
 import { LiveEventTicker } from "@/components/dashboard/LiveEventTicker";
 import { AskPartyWidget } from "@/components/dashboard/AskPartyWidget";
+import { SimStatusPill } from "@/components/dashboard/SimStatusPill";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Berliner Tagesspiegel": { color: "#1d4ed8", label: "Tagesspiegel" },
@@ -131,8 +132,11 @@ export function Dashboard() {
       <OnboardingOverlay parties={parties} externalOpen={showWelcome} onClose={() => setShowWelcome(false)} />
 
       {/* ── Header row ── */}
-      <div className="flex items-baseline justify-between mb-1">
-        <h1 className="!mb-0">Tag {simStatus.currentDay}</h1>
+      <div className="flex items-center justify-between mb-1 gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="!mb-0">Tag {simStatus.currentDay}</h1>
+          <SimStatusPill status={simStatus} />
+        </div>
         {mood && moodBadgeCls && (
           <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full", moodBadgeCls)}>{mood}</span>
         )}
