@@ -160,15 +160,15 @@ EVENTS — DAYS ${Math.max(1, currentDay - 30)} TO ${currentDay - 7}:
 ${olderStr}`;
 }
 
-const BRIEFING_SYSTEM_PROMPT = `You are a senior political analyst at the Bundestag. Write a concise daily briefing for party leaders summarizing the current political landscape.
+const BRIEFING_SYSTEM_PROMPT = `You are a senior political analyst at the Bundestag. Write a concise daily briefing for party leaders summarizing the current political landscape. Write the briefing in German.
 
 Your briefing must be FACTUAL — summarize only what happened, the current state, and emerging dynamics. Do not invent events.
 
-FORMAT (respond with ONLY valid JSON):
+FORMAT (respond with ONLY valid JSON, all text in German):
 {
-  "narrative": "<2-3 sentences: What is the political story right now? What are the key dynamics shaping decisions?>",
-  "tensions": "<1-2 sentences: What are the main points of conflict or open questions between parties?>",
-  "outlook": "<1 sentence: What should party leaders watch for in the coming days?>"
+  "narrative": "<2-3 Sätze: Was ist die politische Geschichte gerade? Welche Dynamiken prägen die Entscheidungen?>",
+  "tensions": "<1-2 Sätze: Was sind die Hauptkonflikte oder offenen Fragen zwischen den Parteien?>",
+  "outlook": "<1 Satz: Worauf sollten Parteivorsitzende in den nächsten Tagen achten?>"
 }`;
 
 /**

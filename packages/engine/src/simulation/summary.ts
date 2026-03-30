@@ -4,8 +4,8 @@ import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
 
 const VALID_MOODS = [
-  "Stable Majority", "Coalition Friction", "Political Pressure",
-  "Crisis Response", "Electoral Campaign", "Budget Dispute", "Government Transition",
+  "Stabile Mehrheit", "Koalitionsreibung", "Politischer Druck",
+  "Krisenreaktion", "Wahlkampf", "Haushaltsstreit", "Regierungswechsel",
 ];
 
 const SIGNIFICANT = new Set([
@@ -38,23 +38,23 @@ export function buildSummaryBatchRequest(
     .filter(p => coalitionIds.includes(p.id))
     .map(p => p.name).join(", ");
 
-  const prompt = `You are a German parliamentary journalist covering the Bundestag. Today is simulation Day ${day}.
+  const prompt = `Du bist ein deutscher Parlamentsjournalist und berichtest über den Bundestag. Heute ist Simulationstag ${day}.
 
-Current coalition: ${coalitionNames}. Public sentiment: ${Math.round(publicSentiment)}/100.
+Aktuelle Koalition: ${coalitionNames}. Öffentliche Stimmung: ${Math.round(publicSentiment)}/100.
 
-Today's significant events:
+Heutige bedeutsame Ereignisse:
 ${eventLines}
 
-Write a concise journalistic summary of today's most politically significant developments. Focus on coalition dynamics, major bills, crises, elections, surprises.
+Schreibe eine prägnante journalistische Zusammenfassung der politisch bedeutsamsten Entwicklungen des Tages auf Deutsch. Konzentriere dich auf Koalitionsdynamiken, wichtige Gesetze, Krisen, Wahlen und Überraschungen.
 
-Respond with ONLY valid JSON (no markdown code fences):
-{"narrative": "<2-3 sentence journalistic summary>", "mood": "<one of: Stable Majority, Coalition Friction, Political Pressure, Crisis Response, Electoral Campaign, Budget Dispute, Government Transition>"}
+Antworte NUR mit validem JSON (ohne Markdown-Codeblöcke):
+{"narrative": "<2-3 Sätze journalistische Zusammenfassung auf Deutsch>", "mood": "<eines von: Stabile Mehrheit, Koalitionsreibung, Politischer Druck, Krisenreaktion, Wahlkampf, Haushaltsstreit, Regierungswechsel>"}
 
-The mood field MUST be exactly one of the 7 values listed above.`;
+Das mood-Feld MUSS exakt einer der 7 oben genannten Werte sein.`;
 
   return {
     customId: `summary-day${day}`,
-    system: "You are a concise German political journalist. Respond with ONLY valid JSON.",
+    system: "Du bist ein prägnanter deutscher Politikjournalist. Antworte NUR mit validem JSON.",
     prompt,
     maxTokens: 320,
     roleKey: "daily",
