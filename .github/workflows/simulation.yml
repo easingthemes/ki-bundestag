@@ -83,6 +83,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 120m
           script: |
             cd /opt/ki-bundestag
             ACTION="${{ inputs.action }}"
@@ -117,17 +118,18 @@ jobs:
                     pm2 save
                     pm2 status
                     ;;
-                  1-day)
-                    echo "==> Running 1 simulation day..."
-                    npx tsx packages/engine/src/runner.ts
-                    ;;
-                  3-days)
-                    echo "==> Running 3 simulation days..."
-                    npx tsx packages/engine/src/runner.ts 3
-                    ;;
-                  6-days)
-                    echo "==> Running 6 simulation days..."
-                    npx tsx packages/engine/src/runner.ts 6
+                  1-day|3-days|6-days)
+                    # Run N-day simulation via PM2 so it survives SSH disconnect.
+                    # Each day takes ~5-10 min (Batch API polling), so 6 days ≈ 30-60 min.
+                    DAYS="${MODE%-days}"
+                    [ "$MODE" = "1-day" ] && DAYS=1
+                    echo "==> Running $DAYS simulation day(s) via PM2 (batch API ~5-10 min/day)..."
+                    pm2 stop ki-simulate 2>/dev/null || true
+                    pm2 delete ki-simulate 2>/dev/null || true
+                    pm2 start npx --name ki-simulate --no-autorestart -- tsx packages/engine/src/runner.ts "$DAYS"
+                    echo "==> Simulation started in background. Check progress with: pm2 logs ki-simulate"
+                    pm2 save
+                    pm2 status
                     ;;
                 esac
                 ;;
