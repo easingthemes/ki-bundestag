@@ -174,56 +174,61 @@ export function Dashboard() {
             <div className="section-title">Bundestag</div>
             <Card>
               <CardContent className="p-5">
-                <div className="flex flex-col md:flex-row gap-5 items-start">
+                <div className="flex flex-col gap-5 items-center">
                   {/* Hemicycle */}
-                  <div className="flex-1 min-w-0">
-                    <Hemicycle seats={hemicycleSeats} coalitionIds={state.coalitionParties} totalSeats={totalSeats} size="md" />
+                  <div className="w-full flex justify-center">
+                    <Hemicycle seats={hemicycleSeats} coalitionIds={state.coalitionParties} totalSeats={totalSeats} size="md" showLegend={false} />
                   </div>
                   {/* Coalition / Opposition info */}
-                  <div className="md:w-52 shrink-0 space-y-3">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-600 mb-1">
+                  <div className="grid grid-cols-2 gap-x-12 w-full max-w-4xl px-4">
+                    <div className="flex flex-col gap-2 items-center">
+                      <div className="text-[13px] font-bold uppercase tracking-wide text-emerald-600">
                         Koalition
                         <span className={cn("ml-1.5", coalitionSeats >= 368 ? "text-emerald-600" : "text-destructive")}>
                           {coalitionSeats} Sitze {coalitionSeats >= 368 ? "✓" : "✗"}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap justify-center gap-2">
                         {coalitionPartyList.map(p => (
-                          <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium" style={{ background: `${fixColor(p.color)}15`, color: fixColor(p.color) }}>
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
+                          <span key={p.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium" style={{ background: `${fixColor(p.color)}15`, color: fixColor(p.color) }}>
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
                             {p.name} {p.seatCount}
                           </span>
                         ))}
                       </div>
+                      {state.coalitionCohesion != null && (
+                        <div className="pt-2 border-t border-border mt-1 w-full max-w-[200px]">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">Kohäsion</span>
+                            <span className="font-bold" style={{ color: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative }}>
+                              {state.coalitionCohesion}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded bg-muted overflow-hidden">
+                            <div className="h-full rounded" style={{
+                              width: `${state.coalitionCohesion}%`,
+                              background: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative,
+                            }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Opposition</div>
-                      <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-col gap-2 items-center">
+                      <div className="text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Opposition
+                        <span className="ml-1.5 text-muted-foreground">
+                          {oppositionPartyList.reduce((s, p) => s + p.seatCount, 0)} Sitze
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap justify-center gap-2">
                         {oppositionPartyList.map(p => (
-                          <span key={p.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground/70">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
+                          <span key={p.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium" style={{ background: `${fixColor(p.color)}15`, color: fixColor(p.color) }}>
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fixColor(p.color) }} />
                             {p.name} {p.seatCount}
                           </span>
                         ))}
                       </div>
                     </div>
-                    {state.coalitionCohesion != null && (
-                      <div className="pt-2 border-t border-border">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">Kohäsion</span>
-                          <span className="font-bold" style={{ color: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative }}>
-                            {state.coalitionCohesion}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 rounded bg-muted overflow-hidden">
-                          <div className="h-full rounded" style={{
-                            width: `${state.coalitionCohesion}%`,
-                            background: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative,
-                          }} />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardContent>
