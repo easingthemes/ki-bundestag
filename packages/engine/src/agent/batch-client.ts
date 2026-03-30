@@ -6,7 +6,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { callAI, AIProviderLimitError } from "./client.js";
+import { callAI, AIProviderLimitError, detectLimitError, parseResetTime, markProviderLimited } from "./client.js";
 import { getPartyModel, getRoleModel, type Provider, type RoleKey, type ModelConfig } from "./model-config.js";
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,20 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   });
 
   console.log(`  [Batch] Submitting ${batchRequests.length} Anthropic requests...`);
-  const batch = await client.messages.batches.create({ requests: batchRequests });
+  let batch;
+  try {
+    batch = await client.messages.batches.create({ requests: batchRequests });
+  } catch (err) {
+    // Detect spending-limit errors and mark the provider so the circuit breaker kicks in
+    const detected = detectLimitError(err);
+    if (detected.type === "hard") {
+      const resetAt = parseResetTime(detected.until);
+      markProviderLimited("anthropic", detected.until, resetAt);
+      console.error(`[Batch] *** ANTHROPIC API LIMIT REACHED — access resumes ${detected.until} ***`);
+      throw new AIProviderLimitError("anthropic", detected.until);
+    }
+    throw err;
+  }
   console.log(`  [Batch] Created batch ${batch.id} (status: ${batch.processing_status})`);
 
   // Poll for completion
