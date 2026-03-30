@@ -213,6 +213,7 @@ export const authLogout = () => postJson<{ success: boolean }>("/auth/logout", {
 export const getAuthProviders = () => fetchJson<{ providers: string[] }>("/auth/providers");
 export const getMe = () => fetchJson<User>("/users/me");
 export const updateDisplayName = (displayName: string) => patchJson<User>("/users/me", { displayName });
+export const getMyLimits = () => fetchJson<Record<string, { used: number; limit: number; remaining: number }>>("/users/me/limits");
 export const getMyActivity = () => fetchJson<{ items: ActivityItem[] }>("/users/me/activity");
 export const joinParty = (partyId: string) => postJson<User>(`/users/me/join/${partyId}`, {});
 export const leaveParty = () => postJson<User>("/users/me/leave", {});
@@ -316,6 +317,7 @@ export const api = {
   retractProposalVote,
   getMe,
   updateDisplayName,
+  getMyLimits,
   getAuthMe,
   authLogout,
   getAuthProviders,
