@@ -1,5 +1,7 @@
 # Plan: Improve AI Context Quality
 
+> **Status**: Implemented (all 8 steps complete)
+
 ## Goal
 
 Make party AI agents smarter by giving them cross-day memory (daily briefing), distinct personalities (party profiles), and richer context (expanded token budget). No real-world news fetching (tracked separately in todo #029).
@@ -113,11 +115,13 @@ Pass relevant party/political context to:
 | `engine/src/simulation/media.ts` | Modify | Pass briefing to journalist prompt |
 | `types/src/types/agent.ts` | Modify | Add briefing + recentOwnActions fields |
 
-## Cost Impact
+## Cost Impact (Actual)
 
-- +1 Haiku call/day for briefing (~$0.005 at batch pricing)
-- ~20% more input tokens per party agent (larger context)
-- Total: ~$0.03-0.05/day increase
+- +1 Haiku call/day for briefing: ~$0.002/day
+- ~33% more input tokens per party agent (profile + briefing + own actions): ~$0.006/day
+- Enriched secondary calls (media, questions, interpellations): ~$0.001/day
+- **Total increase: ~$0.008/day (~17% increase from $0.047 to $0.055)**
+- Per Wahlperiode: ~$58 (was ~$44)
 
 ## Risks
 

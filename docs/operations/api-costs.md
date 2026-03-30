@@ -77,21 +77,24 @@ Advancing between tiers is instant once deposit threshold is met.
 
 | Component | Calls | ~Input Tok | ~Output Tok | Cost |
 |-----------|-------|-----------|-------------|------|
-| Party agents (5 Anthropic) | 5 | ~10K | ~5K | ~$0.018 |
-| AfD agent (xAI) | 1 | ~2K | ~1K | varies |
-| Media articles | 1 | ~2K | ~1K | ~$0.004 |
+| Daily briefing (Haiku) | 1 | ~2K | ~512 | ~$0.002 |
+| Party agents (5 Anthropic) | 5 | ~13K | ~5K | ~$0.021 |
+| AfD agent (xAI) | 1 | ~2.5K | ~1K | varies |
+| Media articles | 1 | ~2.5K | ~1K | ~$0.005 |
 | Daily summary (Sonnet) | 1 | ~3K | ~500 | ~$0.008 |
 | Mid-cycle (polls/ref) | 0-2 | ~2K | ~1K | ~$0.004 |
-| **Daily total** | **~9** | **~19K** | **~8.5K** | **~$0.03** |
+| **Daily total** | **~10** | **~25K** | **~9K** | **~$0.04** |
+
+> Party agents now include party profiles (~200-300 tokens), daily briefing (~800-1200 tokens), and recent own actions (14-day lookback). Context budget expanded from 3000 to 8000 tokens.
 
 ### Per Term (1461 days)
 
 | Preset | Real Duration | Est. Cost |
 |--------|--------------|-----------|
-| ultra-fast | ~24h | ~$44 |
-| fast | ~1 week | ~$44 |
-| normal | ~30 days | ~$44 |
-| slow | ~5 months | ~$44 |
+| ultra-fast | ~24h | ~$58 |
+| fast | ~1 week | ~$58 |
+| normal | ~30 days | ~$58 |
+| slow | ~5 months | ~$58 |
 
 > Cost is the same regardless of preset — same number of sim days.
 > User-driven calls (questions, proposals, MdB) add variable cost.
@@ -100,9 +103,9 @@ Advancing between tiers is instant once deposit threshold is met.
 
 | Spend Limit | Sim Days Possible | ~Terms |
 |-------------|-------------------|--------|
-| $30/month | ~1,000 days | 0.68 terms |
-| $50/month | ~1,667 days | 1.14 terms |
-| $100/month | ~3,333 days | 2.28 terms |
+| $30/month | ~750 days | 0.51 terms |
+| $50/month | ~1,250 days | 0.86 terms |
+| $100/month | ~2,500 days | 1.71 terms |
 
 ---
 
@@ -112,6 +115,9 @@ Advancing between tiers is instant once deposit threshold is met.
 - [x] Batch API (50% discount on all Anthropic calls)
 - [x] Per-party model selection (cheap Haiku for most, xAI for AfD)
 - [x] Sonnet only for synthesis (1 call/day)
+- [x] Shared daily briefing (1 Haiku call shared across all 6 parties)
+- [x] Party profiles (static, no API cost)
+- [x] Cross-day memory via recentOwnActions (14-day lookback, DB query only)
 
 ### Potential Savings
 - [ ] **Prompt caching** — Cache system prompts across parties (up to 90% input savings)
