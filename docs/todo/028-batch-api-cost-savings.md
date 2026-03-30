@@ -291,30 +291,86 @@ Deterministic filters reduce input tokens by 50-90% before AI:
 - Questions: top 50 by vote score
 - Speeches: <50 char auto-neutral (no AI needed)
 
+## Duration Impact by Timing Preset
+
+Batch API adds polling latency to each sim day. Only affects participatory modes (normal, slow).
+
+### Assumptions
+
+| Users | DAU % | DAU | Questions | Speeches | Proposals | Applications |
+|-------|-------|-----|-----------|----------|-----------|-------------|
+| 1K | 10% | 100 | 30 | 10 | 5 | 2 |
+| 100K | 5% | 5,000 | 1,500 | 500 | 250 | 100 |
+| 1M | 3% | 30,000 | 9,000 | 3,000 | 1,500 | 600 |
+
+### Batch Requests Per Sim Day
+
+| Users | Q&A Calls | Speech Calls | App Calls | Proposal Calls | Total Batch Requests | Est. Batch Time |
+|-------|-----------|-------------|-----------|----------------|---------------------|----------------|
+| 1K | 6 | 5 | 6 | 6 | ~23 | ~2 min |
+| 100K | 6 | 10 | 6 | 6 | ~28 | ~5 min |
+| 1M | 12 (chunked) | 20 | 12 (chunked) | 6 | ~50 | ~15 min |
+
+### Ultra-Fast / Fast (No Users)
+
+Pure AI simulation. 0% human seats, all features disabled.
+- **Unaffected by user scaling** — these modes don't process user content.
+- Wall-clock: ~40-60s/day (sync AI calls, not batch).
+
+### Normal Mode (30 min/day, 30% human seats)
+
+| Users | Inter-day Delay | Batch Execution | Total/Day | Days/Real Day | Term Duration |
+|-------|----------------|-----------------|-----------|---------------|---------------|
+| 1K | 30 min | ~2 min | ~32 min | ~45 | ~1 month |
+| 100K | 30 min | ~5 min | ~35 min | ~41 | ~1.2 months |
+| 1M | 30 min | ~15 min | ~45 min | ~32 | ~1.5 months |
+
+**Verdict**: Batch latency is absorbed within the 30-min delay up to ~100K users. At 1M users the day stretches to ~45 min (50% longer), but remains viable. Could increase `msPerDayDay` to 2,700,000 (45 min) at 1M to keep user interaction time consistent.
+
+### Slow Mode (1.5 hr/day, 70% human seats, night pause)
+
+| Users | Inter-day Delay | Batch Execution | Total/Day | Days/Real Day | Term Duration |
+|-------|----------------|-----------------|-----------|---------------|---------------|
+| 1K | 90 min | ~2 min | ~92 min | ~10 | ~5 months |
+| 100K | 90 min | ~5 min | ~95 min | ~9.5 | ~5.1 months |
+| 1M | 90 min | ~15 min | ~105 min | ~8.2 | ~5.9 months |
+
+**Verdict**: Batch latency is negligible relative to 90-min delay at all scales. Slow mode scales gracefully to 1M users.
+
+### Summary
+
+| Preset | Users | Impact on Day Duration | Term Duration Change |
+|--------|-------|----------------------|---------------------|
+| Ultra-fast | any | None (no users) | ~24 hours |
+| Fast | any | None (no users) | ~1 week |
+| Normal | 1K | +2 min (~7%) | ~1 month |
+| Normal | 100K | +5 min (~17%) | ~1.2 months |
+| Normal | 1M | +15 min (~50%) | ~1.5 months |
+| Slow | 1K | +2 min (~2%) | ~5 months |
+| Slow | 100K | +5 min (~6%) | ~5.1 months |
+| Slow | 1M | +15 min (~17%) | ~5.9 months |
+
+**No timing preset changes are needed** — the existing delays absorb batch overhead at all scales. At 1M users in normal mode, consider increasing the inter-day delay to 45 min to preserve user interaction time.
+
 ## Affected Files
 
-- `packages/engine/src/agent/client.ts` — Keep as fallback
-- `packages/engine/src/agent/batch-client.ts` — **NEW**: Batch submission + polling
-- `packages/engine/src/agent/group-prompts.ts` — **NEW**: Multi-item prompt builders
-- `packages/engine/src/agent/model-config.ts` — Add batch model IDs
-- `packages/engine/src/simulation/loop.ts` — Refactor to collect-then-batch
-- `packages/engine/src/simulation/seats.ts` — Extract prompt building from `reviewMdbApplications()`
-- `packages/engine/src/simulation/speeches.ts` — Extract prompt building from `processDaySpeeches()`
-- `packages/engine/src/simulation/internal-proposals.ts` — Extract prompt building
-- `packages/engine/src/simulation/questions.ts` — Extract prompt building
-- `packages/engine/src/simulation/discipline.ts` — Already grouped per party, just batch
-- `packages/engine/src/simulation/negotiations.ts` — Batch all party positions per round
+- `packages/engine/src/agent/batch-client.ts` — Batch submission + polling
+- `packages/engine/src/agent/group-prompts.ts` — Multi-item prompt builders
+- `packages/engine/src/simulation/seats.ts` — Batch application selection
+- `packages/engine/src/simulation/speeches.ts` — Batch exception-based flagging
+- `packages/engine/src/simulation/questions.ts` — Batch question answering
+- `packages/engine/src/simulation/internal-proposals.ts` — Batch proposal ranking
+- `packages/engine/src/agent/index.ts` — Updated exports
+- `packages/web/src/pages/SimulationCosts.tsx` — Updated cost/duration tables for user scaling
+- `packages/web/src/lib/timing.ts` — Updated comments with batch overhead
 
 ## Dependencies
 
 - `@anthropic-ai/sdk` — Direct SDK needed for batch API (Vercel AI SDK v6 does not wrap batch endpoints)
-- xAI SDK or direct REST calls for xAI batch API
-- No changes needed to `api` or `web` packages
 
 ## Notes
 
 - Batch API results are available for 29 days (Anthropic) — useful for debugging/auditing
 - Prompt caching with 1-hour TTL works well with batch (shared system prompts across requests)
-- Group prompts need careful JSON schema design to parse multi-item responses reliably
-- The 3/party/day application cap and 3/day question cap can be REMOVED once batching is implemented
-- xAI batch does not count toward standard rate limits — removes circuit breaker needs for AfD
+- The 3/party/day application cap and 3/day question cap have been removed
+- xAI requests still use sequential `callAI()` — xAI JSONL batch can be added later
