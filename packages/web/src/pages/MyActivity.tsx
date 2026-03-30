@@ -47,15 +47,29 @@ function entityLink(item: ActivityItem): string | null {
 export function MyActivity() {
   const { user } = useUser();
   const [items, setItems] = useState<ActivityItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [visible, setVisible] = useState(20);
 
   const load = useCallback(() => {
     if (!user) return;
-    api.getMyActivity().then(r => setItems(r.items)).catch(console.error);
+    setLoading(true);
+    api.getMyActivity(undefined, 20).then(r => {
+      setItems(r.items);
+      setNextCursor(r.nextCursor);
+    }).catch(console.error).finally(() => setLoading(false));
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (!nextCursor || loading) return;
+    setLoading(true);
+    api.getMyActivity(nextCursor, 20).then(r => {
+      setItems(prev => [...prev, ...r.items]);
+      setNextCursor(r.nextCursor);
+    }).catch(console.error).finally(() => setLoading(false));
+  }, [nextCursor, loading]);
 
   if (!user) {
     return (
@@ -79,15 +93,15 @@ export function MyActivity() {
         className="mb-5"
         options={types.map(t => ({ value: t, label: t === "all" ? "All" : t.replace(/_/g, " ") }))}
         value={filter}
-        onChange={t => { setFilter(t); setVisible(20); }}
+        onChange={t => { setFilter(t); }}
       />
 
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !loading && (
         <p className="text-sm text-muted-foreground">Noch keine Aktivitäten. Fange an mitzumachen!</p>
       )}
 
       <div className="space-y-3">
-        {filtered.slice(0, visible).map((item, i) => {
+        {filtered.map((item, i) => {
           const link = entityLink(item);
           return (
             <Card key={`${item.type}-${item.entityId}-${i}`}>
@@ -123,12 +137,14 @@ export function MyActivity() {
         })}
       </div>
 
-      <ShowMoreButton
-        visible={visible}
-        total={filtered.length}
-        increment={20}
-        onShowMore={() => setVisible(v => v + 20)}
-      />
+      {nextCursor && (
+        <ShowMoreButton
+          visible={filtered.length}
+          total={filtered.length + 1}
+          increment={20}
+          onShowMore={loadMore}
+        />
+      )}
     </div>
   );
 }

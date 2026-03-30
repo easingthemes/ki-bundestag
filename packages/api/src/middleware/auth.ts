@@ -1,8 +1,33 @@
 import crypto from "crypto";
 import express from "express";
-import { getDb, getUserDb, schema, logUserAction, isParticipatoryPreset, isFeatureEnabled, logger } from "@ki-bundestag/engine";
+import { getDb, getUserDb, getUserSqlite, schema, logUserAction, isParticipatoryPreset, isFeatureEnabled, logger } from "@ki-bundestag/engine";
 import type { TimingPreset } from "@ki-bundestag/engine";
 import { eq } from "drizzle-orm";
+
+// ── Buffered lastActive writes ──────────────────────────────────────────────
+const lastActiveBuffer = new Map<string, number>();
+
+/** Flush buffered lastActive timestamps to the database. */
+export function flushLastActive(): void {
+  if (lastActiveBuffer.size === 0) return;
+  try {
+    const userDb = getUserDb();
+    const raw = getUserSqlite();
+    const stmt = raw.prepare("UPDATE users SET last_active = ? WHERE id = ?");
+    const run = raw.transaction(() => {
+      for (const [userId, ts] of lastActiveBuffer) {
+        stmt.run(ts, userId);
+      }
+    });
+    run();
+    lastActiveBuffer.clear();
+  } catch {
+    // Never block the server due to flush errors
+  }
+}
+
+const FLUSH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+setInterval(flushLastActive, FLUSH_INTERVAL);
 
 // ── Session tracking middleware ──────────────────────────────────────────────
 export function sessionTracking(req: express.Request, _res: express.Response, next: express.NextFunction): void {
@@ -13,15 +38,16 @@ export function sessionTracking(req: express.Request, _res: express.Response, ne
       const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
       if (user) {
         const now = Date.now();
-        const gap = now - (user.lastActive ?? 0);
+        const lastKnown = lastActiveBuffer.get(token) ?? user.lastActive ?? 0;
+        const gap = now - lastKnown;
         if (gap > 15 * 60 * 1000) {
           // New session detected
           const db = getDb();
           const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
           logUserAction(token, "session_start", md?.day ?? 0, undefined, undefined, { gap_minutes: Math.round(gap / 60000) });
         }
-        // Update lastActive
-        userDb.update(schema.users).set({ lastActive: now }).where(eq(schema.users.id, token)).run();
+        // Buffer lastActive instead of writing to DB on every request
+        lastActiveBuffer.set(token, now);
       }
     }
   } catch {
