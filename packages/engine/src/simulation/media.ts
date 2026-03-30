@@ -3,6 +3,8 @@ import { desc, eq } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { safeParseJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
+import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -179,4 +181,102 @@ export function applyMediaSentiment(currentDay: number, currentSentiment: number
   console.log(`  [Media] Sentiment impact: ${mediaDelta > 0 ? "+" : ""}${mediaDelta}`);
 
   return newSentiment;
+}
+
+// ---------------------------------------------------------------------------
+// Batch variants
+// ---------------------------------------------------------------------------
+
+const MEDIA_SYSTEM_PROMPT = `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
+
+OUTLETS:
+- "Berliner Tagesspiegel" (center): Balanced, factual reporting with moderate analysis
+- "Volksstimme" (left): Focuses on social justice, workers' rights, inequality angles
+- "Wirtschaftswoche" (right): Focuses on business impact, fiscal responsibility, market effects
+
+RESPONSE SCHEMA (JSON array of 2-3 articles):
+[
+  {
+    "headline": "<newspaper headline, punchy, max 100 chars>",
+    "summary": "<1-2 sentence summary>",
+    "content": "<2-3 paragraph article body>",
+    "outlet": "<exact outlet name from list above>",
+    "category": "policy" | "crisis" | "election" | "opinion" | "economy"
+  }
+]
+
+Rules:
+- Write 2-3 articles covering the most important events of the day
+- Each article MUST be from a different outlet
+- Headlines should be dramatic but realistic German political journalism style
+- Content should reflect the outlet's bias
+- Write in English but use German political terminology where appropriate (Bundestag, Koalition, etc.)
+- Category should match the primary topic`;
+
+/**
+ * Build a BatchRequest for daily media generation, or null if no newsworthy events.
+ */
+export function buildMediaBatchRequest(
+  dayEvents: Array<Omit<SimulationEvent, "id">>,
+  allParties: Party[],
+  currentDay: number,
+): BatchRequest | null {
+  const newsworthy = dayEvents.filter(e => NEWSWORTHY_TYPES.has(e.type));
+  if (newsworthy.length === 0) return null;
+
+  const eventSummaries = newsworthy.map(e => `[${e.type}] ${e.title}: ${e.description}`).join("\n");
+  const partyNames = allParties.map(p => `${p.name} (${p.id})`).join(", ");
+
+  return {
+    customId: `media-day${currentDay}`,
+    system: MEDIA_SYSTEM_PROMPT,
+    prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
+    maxTokens: 2048,
+    roleKey: "daily",
+  };
+}
+
+/**
+ * Process a media batch result — parse articles and insert into DB.
+ */
+export function processMediaBatchResult(
+  result: BatchResult | undefined,
+  currentDay: number,
+): void {
+  if (!result || !result.text) {
+    logAICall({ task: "media", model: result?.model ?? "unknown", provider: (result?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return;
+  }
+
+  const articles = safeParseJson<unknown[]>(result.text);
+
+  if (!Array.isArray(articles) || articles.length === 0) {
+    logAICall({ task: "media", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return;
+  }
+
+  const db = getDb();
+  let inserted = 0;
+
+  for (const article of articles.slice(0, 3)) {
+    const a = article as Record<string, unknown>;
+    if (!a.headline || !a.summary || !a.content || !a.outlet) continue;
+
+    const outlet = OUTLETS.find(o => o.name === a.outlet);
+    const bias = outlet?.bias ?? "center";
+
+    db.insert(schema.mediaArticles).values({
+      id: `media-${generateId()}`,
+      headline: a.headline as string,
+      summary: a.summary as string,
+      content: a.content as string,
+      outlet: a.outlet as string,
+      bias,
+      category: (a.category as string) || "policy",
+      dayNumber: currentDay,
+    }).run();
+    inserted++;
+  }
+
+  logAICall({ task: "media", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: true, validationOk: inserted > 0 });
 }

@@ -4,6 +4,8 @@ import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { TIME_CONFIG } from "./timing.js";
+import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 const VALID_CATEGORIES = [
   "economy", "social", "environment", "immigration",
@@ -213,4 +215,135 @@ export function resolveExpiredReferendums(
       data: { referendumId: row.id, status, result, totalVotes },
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Batch variants
+// ---------------------------------------------------------------------------
+
+const REFERENDUM_SYSTEM = `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
+
+RESPONSE SCHEMA:
+{
+  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
+  "description": "<1-2 sentence context paragraph>",
+  "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
+  "impact": {
+    "budget": <number -2 to 2, optional>,
+    "unemployment": <number -0.5 to 0.5, optional>,
+    "inflation": <number -0.3 to 0.3, optional>,
+    "gdpGrowth": <number -0.3 to 0.3, optional>,
+    "publicSentiment": <number -3 to 3, optional>
+  }
+}
+
+Rules:
+- The referendum should be relevant to the current political context
+- Title should be a yes/no question
+- Impact values represent what happens if the referendum passes
+- Keep it realistic for German politics`;
+
+/**
+ * Build a BatchRequest for referendum generation, or null if not applicable.
+ */
+export function buildReferendumBatchRequest(
+  currentDay: number,
+  allParties: Party[],
+  activeCrises: Crisis[],
+  recentBillTitles: string[],
+): BatchRequest | null {
+  if (currentDay % TIME_CONFIG.ECONOMY_INTERVAL !== 0 || currentDay === 0) return null;
+
+  const db = getDb();
+  const activeRows = db.select().from(schema.referendums).all()
+    .filter((r: any) => r.status === "active");
+  if (activeRows.length > 0) return null;
+
+  const context: string[] = [];
+  if (activeCrises.length > 0) {
+    context.push(`Active crises: ${activeCrises.map(c => `${c.name} (${c.severity})`).join(", ")}`);
+  }
+  if (recentBillTitles.length > 0) {
+    context.push(`Recent bills: ${recentBillTitles.slice(0, 5).join(", ")}`);
+  }
+  const partyContext = allParties.map(p =>
+    `${p.name} (${p.coalitionRole}, ${p.approvalRating}% approval)`,
+  ).join(", ");
+  context.push(`Parties: ${partyContext}`);
+
+  return {
+    customId: `referendum-day${currentDay}`,
+    system: REFERENDUM_SYSTEM,
+    prompt: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
+    maxTokens: 512,
+    roleKey: "daily",
+  };
+}
+
+/**
+ * Process a referendum batch result — parse and insert into DB.
+ */
+export function processReferendumBatchResult(
+  result: BatchResult | undefined,
+  currentDay: number,
+): void {
+  if (!result || !result.text) {
+    logAICall({ task: "referendums", model: result?.model ?? "unknown", provider: (result?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return;
+  }
+
+  const parsed = parseAIJson<{ title: string; description: string; category: string; impact: BillImpact | null }>(
+    result.text,
+    (v: unknown) => {
+      const o = v as Record<string, unknown>;
+      if (typeof o.title !== "string" || typeof o.description !== "string") return null;
+      const category = typeof o.category === "string" && VALID_CATEGORIES.includes(o.category)
+        ? o.category
+        : "economy";
+      return {
+        title: o.title,
+        description: o.description,
+        category,
+        impact: (o.impact && typeof o.impact === "object") ? o.impact as BillImpact : null,
+      };
+    },
+    "Referendums",
+  );
+
+  if (!parsed) {
+    logAICall({ task: "referendums", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return;
+  }
+
+  const db = getDb();
+  const referendum: Referendum = {
+    id: `ref-${generateId()}`,
+    title: parsed.title,
+    description: parsed.description,
+    options: ["Yes", "No"],
+    votes: { Yes: 0, No: 0 },
+    createdOnDay: currentDay,
+    closesOnDay: currentDay + 14,
+    status: "active",
+    result: null,
+    impact: parsed.impact || null,
+    category: parsed.category,
+  };
+
+  db.insert(schema.referendums).values({
+    id: referendum.id,
+    title: referendum.title,
+    description: referendum.description,
+    options: referendum.options as any,
+    votes: referendum.votes as any,
+    createdOnDay: referendum.createdOnDay,
+    closesOnDay: referendum.closesOnDay,
+    status: referendum.status,
+    result: null,
+    impact: referendum.impact as any,
+    category: referendum.category,
+  }).run();
+
+  logAICall({ task: "referendums", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: true, validationOk: true });
+  console.log(`  [Referendums] Created: "${parsed.title}"`);
 }

@@ -3,6 +3,8 @@ import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
+import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -191,4 +193,96 @@ export function resolveExpiredPolls(
   }
 
   return sentimentDelta;
+}
+
+// ---------------------------------------------------------------------------
+// Batch variants
+// ---------------------------------------------------------------------------
+
+const CONTEXT_POLL_SYSTEM = `You create opinion poll questions for a German political simulation. Respond with ONLY valid JSON.
+
+RESPONSE SCHEMA:
+{
+  "question": "<poll question about current political topic>",
+  "options": ["<option 1>", "<option 2>", "<option 3>"],
+  "category": "policy" | "crisis" | "general"
+}
+
+Rules:
+- Question should be relevant to the current political context
+- Provide 3 clear, distinct options
+- Keep it concise and politically neutral`;
+
+/**
+ * Build a BatchRequest for a context poll, or null if no context.
+ */
+export function buildContextPollBatchRequest(
+  parties: Party[],
+  activeCrises: Crisis[],
+  recentBillTitles: string[],
+  currentDay: number,
+): BatchRequest | null {
+  const context = [];
+  if (activeCrises.length > 0) {
+    context.push(`Active crises: ${activeCrises.map(c => `${c.name} (${c.severity})`).join(", ")}`);
+  }
+  if (recentBillTitles.length > 0) {
+    context.push(`Recent bills: ${recentBillTitles.slice(0, 5).join(", ")}`);
+  }
+  if (context.length === 0) return null;
+
+  return {
+    customId: `poll-ctx-day${currentDay}`,
+    system: CONTEXT_POLL_SYSTEM,
+    prompt: `Current political context:\n${context.join("\n")}\n\nGenerate an opinion poll question.`,
+    maxTokens: 512,
+    roleKey: "daily",
+  };
+}
+
+/**
+ * Process a context poll batch result and return a Poll or null.
+ */
+export function processContextPollBatchResult(
+  result: BatchResult | undefined,
+  currentDay: number,
+): Poll | null {
+  if (!result || !result.text) {
+    logAICall({ task: "polls", model: result?.model ?? "unknown", provider: (result?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return null;
+  }
+
+  const parsed = parseAIJson<{ question: string; options: string[]; category: string }>(
+    result.text,
+    (v: unknown) => {
+      const o = v as Record<string, unknown>;
+      if (typeof o.question !== "string") return null;
+      if (!Array.isArray(o.options) || o.options.length < 2) return null;
+      if (!o.options.every((opt: unknown) => typeof opt === "string")) return null;
+      return {
+        question: o.question,
+        options: o.options as string[],
+        category: typeof o.category === "string" ? o.category : "general",
+      };
+    },
+    "Polls",
+  );
+
+  if (!parsed) {
+    logAICall({ task: "polls", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+    return null;
+  }
+
+  logAICall({ task: "polls", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: true, validationOk: true });
+
+  return {
+    id: `poll-ctx-${generateId()}`,
+    question: parsed.question,
+    options: parsed.options,
+    votes: Object.fromEntries(parsed.options.map((o: string) => [o, 0])),
+    createdOnDay: currentDay,
+    expiresOnDay: currentDay + 14,
+    active: true,
+    category: parsed.category,
+  };
 }
