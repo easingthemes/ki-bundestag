@@ -2,17 +2,32 @@ import type { AgentAction, AgentContext, Bill } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "./client.js";
 import { logAICall } from "./ai-json.js";
 import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
+import type { PartyCapabilities } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
 import type { Provider } from "./model-config.js";
 import type { DepthConfig } from "./context-depth.js";
+
+/** Derive capabilities from agent context for conditional system prompt. */
+function deriveCapabilities(ctx: AgentContext): PartyCapabilities {
+  const hasFraktion = ctx.hasFraktion !== false && ctx.party.seatCount > 0;
+  return {
+    canVote: hasFraktion,
+    canPropose: hasFraktion,
+    canAmend: hasFraktion,
+    hasFraktion,
+    isOpposition: ctx.party.coalitionRole === "opposition",
+    isCoalitionLeader: ctx.party.coalitionRole === "leader",
+    hasActiveElection: !!ctx.activeElection,
+  };
+}
 
 export async function runPartyAgent(
   ctx: AgentContext,
   votableBills: Bill[],
   secondReadingBills?: Bill[],
 ): Promise<AgentAction[]> {
-  const systemPrompt = buildSystemPrompt(ctx.party.id);
+  const systemPrompt = buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx));
   const userPrompt = buildUserPrompt(ctx);
 
   const t0 = Date.now();
@@ -20,7 +35,7 @@ export async function runPartyAgent(
     const { text, model, provider } = await callAI({
       system: systemPrompt,
       prompt: userPrompt,
-      maxTokens: 2048,
+      maxTokens: 1024,
       partyId: ctx.party.id,
     });
 
@@ -93,9 +108,9 @@ export function buildPartyAgentRequests(
 ): BatchRequest[] {
   return contexts.map(ctx => ({
     customId: `agent-${ctx.party.id}-day${currentDay}`,
-    system: buildSystemPrompt(ctx.party.id),
+    system: buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx)),
     prompt: buildUserPrompt(ctx, depthConfig),
-    maxTokens: 2048,
+    maxTokens: 1024,
     partyId: ctx.party.id,
   }));
 }

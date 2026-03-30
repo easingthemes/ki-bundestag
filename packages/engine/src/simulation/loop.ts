@@ -29,7 +29,7 @@ import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
-import { generateDailyMedia, getRecentMedia, applyMediaSentiment, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
+import { getRecentMedia, applyMediaSentiment, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
 import { maybeGenerateReferendum, resolveExpiredReferendums, buildReferendumBatchRequest, processReferendumBatchResult } from "./referendums.js";
 import { processInjections } from "./injections.js";
@@ -42,7 +42,7 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
 import { checkPresidentialVeto } from "./veto.js";
-import { generateDailySummary, buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
+import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
 import { createNotification, createNotificationForAll } from "./event-queue.js";
 import { resetAllSeats, allocateSeats, reviewMdbApplications } from "./seats.js";

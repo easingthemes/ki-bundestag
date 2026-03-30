@@ -155,7 +155,6 @@ const ALTERNATIVES: AltRow[] = [
   { model: "Gemini 2.0 Flash (Google)", priceLabel: "$0.10 / $0.40", perSimDay: "$0.005", perWP: "$0.61", perRealDay: "$7", delta: "-89%", deltaColor: "text-emerald-600" },
 ];
 
-<<<<<<< HEAD
 // ─── Input scaling comparison ───────────────────────────────────────────────
 
 interface InputScaleRow {

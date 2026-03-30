@@ -6,7 +6,7 @@ export {
   preFilterApplications, preFilterQuestions, preFilterSpeeches,
   type ApplicationItem, type SpeechItem, type QuestionItem, type ProposalItem, type PartyContext,
 } from "./group-prompts.js";
-export { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
+export { buildSystemPrompt, buildUserPrompt, type PartyCapabilities } from "./prompt.js";
 export { getPartyProfile } from "./party-profiles.js";
 export { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "./briefing.js";
 export { parseAgentResponse, validateActions } from "./action-parser.js";
