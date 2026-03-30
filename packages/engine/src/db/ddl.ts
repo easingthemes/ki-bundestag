@@ -271,6 +271,21 @@ export const SIM_TABLE_DDL = `
     status TEXT NOT NULL DEFAULT 'queued'
   );
 
+  CREATE TABLE IF NOT EXISTS ai_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_number INTEGER NOT NULL,
+    task TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cost_usd REAL NOT NULL,
+    latency_ms INTEGER,
+    batch_id TEXT,
+    success INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS bundestag_seats (
     id TEXT PRIMARY KEY,
     seat_number INTEGER NOT NULL,
@@ -481,6 +496,9 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_simulation_events_day", sql: "CREATE INDEX IF NOT EXISTS idx_simulation_events_day ON simulation_events(day_number)" },
   { name: "idx_simulation_events_type", sql: "CREATE INDEX IF NOT EXISTS idx_simulation_events_type ON simulation_events(type)" },
   { name: "idx_bundestag_seats_party", sql: "CREATE INDEX IF NOT EXISTS idx_bundestag_seats_party ON bundestag_seats(party_id, controller)" },
+  { name: "idx_ai_calls_day", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_day ON ai_calls(day_number)" },
+  { name: "idx_ai_calls_task", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_task ON ai_calls(task)" },
+  { name: "idx_ai_calls_created", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_created ON ai_calls(created_at)" },
 ];
 
 /** Index migrations for user DB */

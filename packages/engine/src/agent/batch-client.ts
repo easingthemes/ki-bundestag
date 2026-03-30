@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { callAI, AIProviderLimitError, detectLimitError, parseResetTime, markProviderLimited } from "./client.js";
 import { getPartyModel, getRoleModel, type Provider, type RoleKey, type ModelConfig } from "./model-config.js";
+import { recordAICall, calculateCost, getTrackingDay } from "./cost-tracker.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +34,8 @@ export interface BatchResult {
   text: string;
   model: string;
   provider: Provider;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +112,7 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   });
 
   console.log(`  [Batch] Submitting ${batchRequests.length} Anthropic requests...`);
+  const batchStartMs = Date.now();
   let batch;
   try {
     batch = await client.messages.batches.create({ requests: batchRequests });
@@ -147,26 +151,63 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   const resultsStream = await client.messages.batches.results(batch.id);
   const results: BatchResult[] = [];
   const configMap = new Map(requests.map(r => [r.customId, resolveModel(r)]));
+  const batchLatencyMs = Date.now() - batchStartMs;
 
   for await (const item of resultsStream) {
     const config = configMap.get(item.custom_id);
+    const modelName = config?.model ?? "unknown";
     if (item.result.type === "succeeded") {
       const textBlocks = item.result.message.content
         .filter(b => b.type === "text")
         .map(b => b.text);
+      const usage = item.result.message.usage;
+      const inputTokens = usage?.input_tokens ?? 0;
+      const outputTokens = usage?.output_tokens ?? 0;
+
+      recordAICall({
+        dayNumber: getTrackingDay(),
+        task: item.custom_id,
+        provider: "anthropic",
+        model: modelName,
+        inputTokens,
+        outputTokens,
+        costUsd: calculateCost(modelName, inputTokens, outputTokens, true),
+        latencyMs: batchLatencyMs,
+        batchId: batch.id,
+        success: true,
+      });
+
       results.push({
         customId: item.custom_id,
         text: textBlocks.join(""),
-        model: config?.model ?? "unknown",
+        model: modelName,
         provider: "anthropic",
+        inputTokens,
+        outputTokens,
       });
     } else {
       console.warn(`  [Batch] Request ${item.custom_id} failed: ${item.result.type}`);
+
+      recordAICall({
+        dayNumber: getTrackingDay(),
+        task: item.custom_id,
+        provider: "anthropic",
+        model: modelName,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        latencyMs: batchLatencyMs,
+        batchId: batch.id,
+        success: false,
+      });
+
       results.push({
         customId: item.custom_id,
         text: "",
-        model: config?.model ?? "unknown",
+        model: modelName,
         provider: "anthropic",
+        inputTokens: 0,
+        outputTokens: 0,
       });
     }
   }
@@ -184,18 +225,18 @@ async function submitXaiBatch(requests: BatchRequest[]): Promise<BatchResult[]> 
 
   for (const req of requests) {
     try {
-      const { text, model, provider } = await callAI({
+      const { text, model, provider, inputTokens, outputTokens } = await callAI({
         system: req.system,
         prompt: req.prompt,
         maxTokens: req.maxTokens,
         partyId: req.partyId,
         roleKey: req.roleKey,
       });
-      results.push({ customId: req.customId, text, model, provider });
+      results.push({ customId: req.customId, text, model, provider, inputTokens, outputTokens });
     } catch (err) {
       console.warn(`  [Batch] xAI call failed for ${req.customId}: ${(err as Error).message}`);
       const config = resolveModel(req);
-      results.push({ customId: req.customId, text: "", model: config.model, provider: config.provider });
+      results.push({ customId: req.customId, text: "", model: config.model, provider: config.provider, inputTokens: 0, outputTokens: 0 });
       if (err instanceof AIProviderLimitError) break;
     }
   }

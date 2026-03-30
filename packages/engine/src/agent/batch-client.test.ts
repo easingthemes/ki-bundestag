@@ -3,9 +3,9 @@ import { findResult, type BatchResult } from "./batch-client.js";
 
 describe("findResult", () => {
   const results: BatchResult[] = [
-    { customId: "agent-spd-day5", text: "SPD response", model: "haiku", provider: "anthropic" },
-    { customId: "agent-cdu-day5", text: "CDU response", model: "haiku", provider: "anthropic" },
-    { customId: "media-day5", text: "", model: "haiku", provider: "anthropic" },
+    { customId: "agent-spd-day5", text: "SPD response", model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 },
+    { customId: "agent-cdu-day5", text: "CDU response", model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 },
+    { customId: "media-day5", text: "", model: "haiku", provider: "anthropic", inputTokens: 0, outputTokens: 0 },
   ];
 
   it("finds result by customId", () => {
