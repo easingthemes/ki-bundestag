@@ -132,14 +132,21 @@ export async function runDay(): Promise<number> {
 
   const dayEvents: Array<Omit<SimulationEvent, "id">> = [];
 
-  // Day start event
-  addEvent(dayEvents, {
+  // Day start event — flush immediately so frontend can see the day is processing
+  const dayStartEvent: Omit<SimulationEvent, "id"> = {
     dayNumber: currentDay,
     type: "day_start",
     actor: "system",
     title: `Day ${currentDay} begins`,
     description: `A new day in the Bundestag. Budget: ${nationalState.economy.budget}B, Unemployment: ${nationalState.economy.unemployment}%, Inflation: ${nationalState.economy.inflation}%, GDP Growth: ${nationalState.economy.gdpGrowth}%`,
-  });
+  };
+  addEvent(dayEvents, dayStartEvent);
+  db.insert(schema.simulationEvents).values({
+    id: generateId(),
+    ...dayStartEvent,
+    data: null,
+    createdAt: new Date().toISOString(),
+  }).run();
 
   // 3. Apply economic drift
   const driftedEconomy = applyEconomicDrift(nationalState.economy);
@@ -1956,9 +1963,14 @@ export async function runDay(): Promise<number> {
     console.warn(`  [WARNING] Day ${currentDay} produced 0 meaningful events — AI calls may have failed silently`);
   }
 
-  // 14. Save all day events
+  // 14. Save all day events (skip day_start — already flushed early for frontend visibility)
   const now = new Date().toISOString();
+  let skippedFirst = false;
   for (const ev of dayEvents) {
+    if (!skippedFirst && ev === dayStartEvent) {
+      skippedFirst = true;
+      continue;
+    }
     db.insert(schema.simulationEvents).values({
       id: generateId(),
       ...ev,
