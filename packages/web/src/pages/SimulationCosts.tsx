@@ -17,7 +17,7 @@ interface ModelRow {
 const MODELS: ModelRow[] = [
   { model: "claude-haiku-4-5-20251001", provider: "Anthropic", priceIn: "$0.80", priceOut: "$4.00", usedFor: "Party agents, media, polls, referendums, summaries, Q&A, interpellations, proposals, negotiations" },
   { model: "claude-sonnet-4-5-20250929", provider: "Anthropic", priceIn: "$3.00", priceOut: "$15.00", usedFor: "Coalition agreement synthesis (rare)" },
-  { model: "grok-3-mini", provider: "xAI", priceIn: "$0.30", priceOut: "$0.50", usedFor: "AfD party agent + AfD-specific calls" },
+  { model: "grok-3-mini", provider: "xAI", priceIn: "$0.30", priceOut: "$0.50", usedFor: "AfD party agent — Grok used because other models refuse to roleplay as AfD" },
 ];
 
 interface SimCallRow {
@@ -945,7 +945,7 @@ export function SimulationCosts() {
               <li><strong>Slow mode (1.5 hr/day)</strong>: Batch latency is negligible relative to the 90-minute delay. Pauses fully at night (22:00-08:00 CET).</li>
               <li><strong>DAU estimates</strong>: 1K total → ~10% DAU (100), 100K total → ~5% DAU (5,000), 1M total → ~3% DAU (30,000). Not all DAU submit content — ~30% ask questions, ~10% give speeches, ~5% submit proposals.</li>
               <li><strong>Sim day cycles</strong>: polls every ~2 weeks, economic reports monthly, budgets annually, elections every 4 years. Snap elections possible from confidence votes or budget failures.</li>
-              <li><strong>AfD/Grok savings</strong>: Using grok-3-mini for 1/6 of party calls saves ~$0.005/day (~10% of party agent cost)</li>
+              <li><strong>AfD/Grok</strong>: Grok is used for AfD because other models (e.g. Claude) refuse to authentically roleplay as AfD — they reply with disclaimers like &ldquo;I can&rsquo;t answer as AfD, but here&rsquo;s info about them&rdquo; instead of in-character actions. Grok performs genuine role-playing without political-correctness filtering. This was not a cost decision. As a side effect, grok-3-mini for 1/6 of party calls saves ~$0.005/day (~10% of party agent cost).</li>
               <li><strong>Synthesis (Sonnet)</strong> is the most expensive single call but happens only ~3 times per election cycle (~once per 4-year term)</li>
               <li><strong>Daily Briefing</strong>: 1 shared Haiku call synthesizes a political narrative from 30 days of event history. Output (~800-1200 tokens) is injected into all party agent prompts, question/interpellation answers, and media generation.</li>
               <li><strong>Party Profiles</strong>: Static per-party personality text (~200-300 tokens) in system prompts — no API cost, but increases input tokens per party agent call.</li>
