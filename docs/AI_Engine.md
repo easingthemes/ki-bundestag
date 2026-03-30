@@ -227,9 +227,83 @@ All observability is console-only. No DB writes or telemetry tables.
 
 ---
 
+## Batch API — `submitBatch()`
+
+**Location**: [packages/engine/src/agent/batch-client.ts](packages/engine/src/agent/batch-client.ts)
+
+All AI calls in the simulation go through `submitBatch()` instead of individual `callAI()` calls. This uses the **Anthropic Message Batches API** for a 50% cost discount on every token. xAI requests fall back to sequential `callAI()` calls (xAI JSONL batch can be added later).
+
+**Signature**:
+
+```typescript
+submitBatch(requests: BatchRequest[]): Promise<BatchResult[]>
+
+interface BatchRequest {
+  customId: string;     // e.g. "agent-spd-day42"
+  system: string;
+  prompt: string;
+  maxTokens: number;
+  partyId?: string;     // per-party model selection
+  roleKey?: RoleKey;    // per-role model selection
+}
+
+interface BatchResult {
+  customId: string;
+  text: string;
+  model: string;
+  provider: Provider;
+}
+```
+
+**How it works**:
+1. Splits requests by provider (Anthropic vs xAI)
+2. Anthropic requests are submitted as a single batch via `client.messages.batches.create()`
+3. Polls for completion every `BATCH_POLL_INTERVAL` seconds (default 30s, configurable)
+4. Times out after `BATCH_TIMEOUT` seconds (default 3600s)
+5. Returns all results matched by `customId`
+
+**Utilities**:
+- `findResult(results, customId)` — Look up a specific result by ID
+- `chunkItems(items, tokensPerItem, maxTokens)` — Split large inputs within context window
+
+### Batch Groups in `loop.ts`
+
+The simulation loop (`runDay()`) organizes AI calls into batch groups to minimize round-trips:
+
+| Group | Requests | When |
+|-------|----------|------|
+| **A: Party agents** | 6 party agent calls | Every day |
+| **B: Interpellations** | 0-2 interpellation answers | Every day |
+| **B: Discipline** | 0-6 discipline reasoning calls | Every 7 days |
+| **Mid-cycle: Polls + Referendums** | 0-2 conditional calls | Weekly / monthly |
+| **C: Media + Summary** | 1-2 end-of-day calls | Every day |
+| **Negotiations** | 6 party positions per round | Election only |
+| **User-driven** | Q&A, speeches, applications, proposals | Per batch per party/bill |
+
+Each simulation module exports `buildXxxBatchRequest()` and `processXxxBatchResult()` functions. `loop.ts` collects requests from concurrent modules and submits them as single batches.
+
+### Selection-Style Prompts (User-Driven)
+
+**Location**: [packages/engine/src/agent/group-prompts.ts](packages/engine/src/agent/group-prompts.ts)
+
+For user-driven calls that scale with user count, "selection-style" prompts replace per-item review:
+
+| Builder | Strategy | Output Savings |
+|---------|----------|---------------|
+| `buildApplicationSelectPrompt()` | Select top N from pool | 99% (review 3 of 500) |
+| `buildSpeechFlagPrompt()` | Flag bad only, default positive | 95% (flag 0-2 of 200) |
+| `buildQuestionBatchPrompt()` | Answer all questions per party | N/A (batch grouping) |
+| `buildProposalRankPrompt()` | Rank and select top 2 | 90% (select 2 of 50) |
+
+Pre-filter utilities (`preFilterApplications()`, `preFilterQuestions()`, `preFilterSpeeches()`) reduce input tokens by 50-90% before AI.
+
+---
+
 ## Source Anchors
 
 - `callAI()` implementation, circuit breaker, retry: [packages/engine/src/agent/client.ts](packages/engine/src/agent/client.ts#L1-L223)
+- Batch API client + polling: [packages/engine/src/agent/batch-client.ts](packages/engine/src/agent/batch-client.ts)
+- Selection-style prompt builders: [packages/engine/src/agent/group-prompts.ts](packages/engine/src/agent/group-prompts.ts)
 - `parseAIJson()`, `logAICall()`, sanitizers: [packages/engine/src/agent/ai-json.ts](packages/engine/src/agent/ai-json.ts#L1-L207)
 - Model routing + env overrides: [packages/engine/src/agent/model-config.ts](packages/engine/src/agent/model-config.ts#L1-L93)
 - Token-budgeted prompt builder: [packages/engine/src/agent/prompt.ts](packages/engine/src/agent/prompt.ts#L116-L320)
