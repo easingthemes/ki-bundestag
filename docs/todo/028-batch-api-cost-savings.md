@@ -1,6 +1,6 @@
 # 028 — Batch API Cost Savings for Scaling Users
 
-**Status**: open
+**Status**: in-progress
 **Area**: Engine / Agent
 **Priority**: High
 
