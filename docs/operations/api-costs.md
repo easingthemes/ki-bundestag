@@ -13,6 +13,18 @@
 
 All Anthropic calls go through **Message Batches API (50% discount)**.
 
+### Batch API Latency (observed 2026-03-30)
+
+| Batch ID | Requests | Created | Ended | Duration |
+|----------|----------|---------|-------|----------|
+| `msgbatch_01JwsuLYRVfnghFggtdTeLbe` | 5 (all succeeded) | 22:14 | 22:19 | **5 min** |
+
+> Batch API adds 2-10 min latency per submission (create + poll every 30s).
+> Normal/slow presets absorb this within their inter-day delay (30-90 min).
+> Ultra-fast/fast presets are AI-bound, so each day takes ~5-15 min total
+> (multiple batch submissions per day). Ensure the process stays alive
+> during polling — PM2 restarts will abandon in-flight batches.
+
 ---
 
 ## Token Pricing (per 1M tokens)
@@ -89,15 +101,16 @@ Advancing between tiers is instant once deposit threshold is met.
 
 ### Per Term (1461 days)
 
-| Preset | Real Duration | Est. Cost |
-|--------|--------------|-----------|
-| ultra-fast | ~24h | ~$58 |
-| fast | ~1 week | ~$58 |
-| normal | ~30 days | ~$58 |
-| slow | ~5 months | ~$58 |
+| Preset | Real Duration | Est. Cost | Notes |
+|--------|--------------|-----------|-------|
+| ultra-fast | ~3-7 days | ~$58 | AI-bound, ~5 min/day (batch polling) |
+| fast | ~2 weeks | ~$58 | 7 min delay + ~5 min batch |
+| normal | ~30 days | ~$58 | 30 min delay absorbs batch |
+| slow | ~5 months | ~$58 | 90 min delay absorbs batch |
 
 > Cost is the same regardless of preset — same number of sim days.
 > User-driven calls (questions, proposals, MdB) add variable cost.
+> Sequential (non-batch) mode would halve the time but double the cost.
 
 ### Monthly Budget Planning
 

@@ -46,18 +46,18 @@ export const TIME_CONFIG = {
   // Presets
   presets: {
     "ultra-fast": {
-      msPerDay: 0,                        // AI-bound, no delay
+      msPerDay: 0,                        // AI-bound, no delay (batch API ~5 min/day)
       participatory: false,
       nightMode: "none",
       label: "Ultra-Fast (Demo)",
-      termRealTime: "~24 hours",
+      termRealTime: "~3-7 days",
     },
     "fast": {
-      msPerDay: 420_000,                  // 7 minutes
+      msPerDay: 420_000,                  // 7 minutes + batch API ~5 min
       participatory: false,
       nightMode: "none",
       label: "Fast (Weekly)",
-      termRealTime: "1 week",
+      termRealTime: "~2 weeks",
     },
     "normal": {
       msPerDayDay: 1_800_000,             // 30 min daytime
