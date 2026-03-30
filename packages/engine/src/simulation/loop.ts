@@ -86,9 +86,11 @@ export async function runDay(): Promise<number> {
     console.log(`\n=== DAY ${currentDay} ===`);
   }
 
-  // Write currentDay + dayStartedAt immediately so the API reflects the new day in real time
+  // Mark day as started (for frontend status), but do NOT commit currentDay yet.
+  // currentDay is only committed at the end of a successful day to prevent
+  // advancing the counter when AI calls fail mid-day.
   db.update(schema.simulationMeta)
-    .set({ currentDay, dayStartedAt: new Date().toISOString() } as any)
+    .set({ dayStartedAt: new Date().toISOString() } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
 
@@ -1938,7 +1940,14 @@ export async function runDay(): Promise<number> {
     console.log(`  [Summary] Generated daily narrative`);
   }
 
-  // 13. Save all day events
+  // 13. Check that the day produced meaningful content (not just system events)
+  const SYSTEM_ONLY_TYPES = new Set(["day_start", "economy_update", "crisis_start", "crisis_end", "crisis_active"]);
+  const meaningfulEvents = dayEvents.filter(e => !SYSTEM_ONLY_TYPES.has(e.type));
+  if (meaningfulEvents.length === 0 && !skipPartyAgents) {
+    console.warn(`  [WARNING] Day ${currentDay} produced 0 meaningful events — AI calls may have failed silently`);
+  }
+
+  // 14. Save all day events
   const now = new Date().toISOString();
   for (const ev of dayEvents) {
     db.insert(schema.simulationEvents).values({
@@ -1949,7 +1958,8 @@ export async function runDay(): Promise<number> {
     }).run();
   }
 
-  // 14. Update simulation meta
+  // 15. Update simulation meta — currentDay is committed HERE (not at the start)
+  // so that failed days don't advance the counter
   db.update(schema.simulationMeta)
     .set({
       currentDay,
