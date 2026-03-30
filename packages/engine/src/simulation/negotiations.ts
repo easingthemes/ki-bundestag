@@ -8,6 +8,8 @@ import type {
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAgentResponse } from "../agent/action-parser.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
+import { submitBatch, findResult, type BatchRequest, type BatchResult } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
 
@@ -91,78 +93,74 @@ export async function runNegotiationRound(
     return result && result.seatsWon > 0;
   });
 
-  const rounds: NegotiationRound[] = [];
-
-  for (const party of partiesWithSeats) {
+  // Build batch requests for all parties in this round
+  const batchRequests: BatchRequest[] = partiesWithSeats.map(party => {
     const { system, user } = buildNegotiationPrompt(
       party, electionResults, allParties, previousRounds, roundNumber,
     );
+    return {
+      customId: `negotiation-${party.id}-round${roundNumber}`,
+      system,
+      prompt: user,
+      maxTokens: 1024,
+      partyId: party.id,
+    };
+  });
 
-    const t0 = Date.now();
+  console.log(`  [Batch] Submitting ${batchRequests.length} negotiation requests (round ${roundNumber})...`);
+  const batchResults = await submitBatch(batchRequests);
 
+  const rounds: NegotiationRound[] = [];
+
+  for (const party of partiesWithSeats) {
+    const result = findResult(batchResults, `negotiation-${party.id}-round${roundNumber}`);
+
+    const openFallback = (): NegotiationRound => ({
+      roundNumber,
+      partyId: party.id,
+      position: "Open to negotiations",
+      concession: "Willing to compromise on minor policy details",
+      acceptablePartners: partiesWithSeats
+        .filter(p => p.id !== party.id)
+        .map(p => p.id),
+    });
+
+    if (!result || !result.text) {
+      logAICall({ task: `negotiation:${party.id}`, model: result?.model ?? "unknown", provider: (result?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "open-to-all" });
+      rounds.push(openFallback());
+      continue;
+    }
+
+    let parseOk = true;
+    let validationOk = true;
+    let fallback: string | undefined;
+
+    let parsed;
     try {
-      const { text, model, provider } = await callAI({
-        system,
-        prompt: user,
-        maxTokens: 1024,
-        partyId: party.id,
-      });
+      parsed = parseAgentResponse(result.text);
+    } catch {
+      parseOk = false;
+    }
 
-      let parseOk = true;
-      let validationOk = true;
-      let fallback: string | undefined;
+    const action = parsed?.actions.find(a => a.type === "negotiation_position");
 
-      let parsed;
-      try {
-        parsed = parseAgentResponse(text);
-      } catch {
-        parseOk = false;
-      }
-
-      const action = parsed?.actions.find(a => a.type === "negotiation_position");
-
-      if (action && action.type === "negotiation_position") {
-        rounds.push({
-          roundNumber,
-          partyId: party.id,
-          position: action.position,
-          concession: action.concession,
-          acceptablePartners: action.acceptablePartners.filter(
-            id => allParties.some(p => p.id === id),
-          ),
-        });
-      } else {
-        validationOk = false;
-        fallback = "open-to-all";
-        rounds.push({
-          roundNumber,
-          partyId: party.id,
-          position: "Open to negotiations",
-          concession: "Willing to compromise on minor policy details",
-          acceptablePartners: partiesWithSeats
-            .filter(p => p.id !== party.id)
-            .map(p => p.id),
-        });
-      }
-
-      logAICall({ task: `negotiation:${party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk, validationOk, fallback });
-    } catch (error) {
-      if (error instanceof AIProviderLimitError) {
-        console.warn(`  [Negotiation] ${party.name}: skipped (${error.message})`);
-      } else {
-        console.error(`  [Negotiation] Error for ${party.name}:`, error);
-      }
-      logAICall({ task: `negotiation:${party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "open-to-all" });
+    if (action && action.type === "negotiation_position") {
       rounds.push({
         roundNumber,
         partyId: party.id,
-        position: "Open to negotiations",
-        concession: "Willing to compromise",
-        acceptablePartners: partiesWithSeats
-          .filter(p => p.id !== party.id)
-          .map(p => p.id),
+        position: action.position,
+        concession: action.concession,
+        acceptablePartners: action.acceptablePartners.filter(
+          id => allParties.some(p => p.id === id),
+        ),
       });
+    } else {
+      validationOk = false;
+      fallback = "open-to-all";
+      rounds.push(openFallback());
     }
+
+    logAICall({ task: `negotiation:${party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback });
   }
 
   return rounds;

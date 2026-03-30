@@ -17,7 +17,8 @@ import type {
   SimulationEvent,
 } from "@ki-bundestag/types";
 import { getDb, getUserDb, schema, migrateDatabase } from "../db/index.js";
-import { runPartyAgent } from "../agent/index.js";
+import { runPartyAgent, buildPartyAgentRequests, processPartyAgentResult } from "../agent/index.js";
+import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
 import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
@@ -27,10 +28,10 @@ import { shouldTriggerElection, announceElection, advanceElectionPhase, calculat
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
-import { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
-import { generateDailyMedia, getRecentMedia, applyMediaSentiment } from "./media.js";
+import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
+import { generateDailyMedia, getRecentMedia, applyMediaSentiment, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
-import { maybeGenerateReferendum, resolveExpiredReferendums } from "./referendums.js";
+import { maybeGenerateReferendum, resolveExpiredReferendums, buildReferendumBatchRequest, processReferendumBatchResult } from "./referendums.js";
 import { processInjections } from "./injections.js";
 import { updateFraktionen, getActiveFraktionen } from "./fraktionen.js";
 import { tallyMotionVotes, motionSentimentImpact } from "./motions.js";
@@ -41,7 +42,7 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
 import { checkPresidentialVeto } from "./veto.js";
-import { generateDailySummary } from "./summary.js";
+import { generateDailySummary, buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
 import { createNotification, createNotificationForAll } from "./event-queue.js";
 import { resetAllSeats, allocateSeats, reviewMdbApplications } from "./seats.js";
@@ -741,10 +742,12 @@ export async function runDay(): Promise<number> {
       } catch { /* table may not exist yet */ }
     }
 
+    // Build agent contexts for all parties
+    const agentContexts: AgentContext[] = [];
     for (const party of allParties) {
       const fraktion = fraktionByParty.get(party.id);
 
-      const ctx: AgentContext = {
+      agentContexts.push({
         party,
         allParties,
         nationalState,
@@ -765,10 +768,18 @@ export async function runDay(): Promise<number> {
         topInternalProposals: internalProposalsByParty.get(party.id),
         memberSignals: Object.keys(memberSignalsByBill).length > 0 ? memberSignalsByBill : undefined,
         mdbVoteSummary: Object.keys(mdbVoteSummaryByBill).length > 0 ? mdbVoteSummaryByBill : undefined,
-      };
+      });
+    }
 
-      const actions = await runPartyAgent(ctx, thirdReadingBills, secondReadingBills);
-      partyActions.set(party.id, actions);
+    // Submit all 6 party agent calls as one batch (50% cost savings)
+    const agentRequests = buildPartyAgentRequests(agentContexts, currentDay);
+    console.log(`  [Batch] Submitting ${agentRequests.length} party agent requests...`);
+    const agentResults = await submitBatch(agentRequests);
+
+    for (const ctx of agentContexts) {
+      const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
+      const actions = processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
+      partyActions.set(ctx.party.id, actions);
     }
 
     // 7. Process all proposals first (create new bills)
@@ -1513,32 +1524,86 @@ export async function runDay(): Promise<number> {
   resolveExpiredPolls(currentDay, allParties, nationalState.publicSentiment);
   resolveExpiredReferendums(currentDay, dayEvents);
 
-  // 11c. Weekly opinion recalculation
-  if (isPollDay(currentDay, startDate)) {
-    weeklyOpinionRecalc(allParties, allBills, nationalState.publicSentiment, currentDay);
-
-    // Generate weekly polls
+  // 11c. Weekly opinion recalculation + batch polls + referendums
+  {
+    const midCycleRequests: BatchRequest[] = [];
+    const isWeekly = isPollDay(currentDay, startDate);
     const recentBillTitles = allBills
       .filter(b => b.proposedOnDay >= currentDay - 7)
       .map(b => b.title);
-    await generateWeeklyPolls(allParties, activeCrises, recentBillTitles, currentDay);
 
-    addEvent(dayEvents, {
-      dayNumber: currentDay,
-      type: "weekly_report",
-      actor: "system",
-      title: `Weekly Report — Day ${currentDay}`,
-      description: `Weekly opinion recalculation complete. Sentiment: ${nationalState.publicSentiment}/100. Active crises: ${activeCrises.length}.`,
-    });
+    if (isWeekly) {
+      weeklyOpinionRecalc(allParties, allBills, nationalState.publicSentiment, currentDay);
 
-    console.log(`  [Cycle] Weekly report — Day ${currentDay}`);
+      // Create party preference poll (deterministic, no AI)
+      const db = getDb();
+      const prefPollId = `poll-pref-${generateId()}`;
+      db.insert(schema.polls).values({
+        id: prefPollId,
+        question: "Which party do you trust most to lead Germany?",
+        options: allParties.map(p => p.name) as any,
+        votes: Object.fromEntries(allParties.map(p => [p.name, 0])) as any,
+        createdOnDay: currentDay,
+        expiresOnDay: currentDay + 14,
+        active: true,
+        category: "party_preference",
+      }).run();
+      console.log(`  [Polls] Created party preference poll`);
+
+      // Build context poll batch request (AI)
+      const pollReq = buildContextPollBatchRequest(allParties, activeCrises, recentBillTitles, currentDay);
+      if (pollReq) midCycleRequests.push(pollReq);
+    }
+
+    // Build referendum batch request (AI, every 30 days)
+    const recentBillsForRef = allBills
+      .filter(b => b.proposedOnDay >= currentDay - TIME_CONFIG.ECONOMY_INTERVAL)
+      .map(b => b.title);
+    const refReq = buildReferendumBatchRequest(currentDay, allParties, activeCrises, recentBillsForRef);
+    if (refReq) midCycleRequests.push(refReq);
+
+    // Submit batched poll + referendum requests
+    if (midCycleRequests.length > 0) {
+      console.log(`  [Batch] Submitting ${midCycleRequests.length} mid-cycle requests (polls+referendums)...`);
+      const midCycleResults = await submitBatch(midCycleRequests);
+
+      // Process context poll result
+      if (isWeekly) {
+        const pollResult = findResult(midCycleResults, `poll-ctx-day${currentDay}`);
+        const ctxPoll = processContextPollBatchResult(pollResult, currentDay);
+        if (ctxPoll) {
+          const db = getDb();
+          db.insert(schema.polls).values({
+            id: ctxPoll.id,
+            question: ctxPoll.question,
+            options: ctxPoll.options as any,
+            votes: ctxPoll.votes as any,
+            createdOnDay: ctxPoll.createdOnDay,
+            expiresOnDay: ctxPoll.expiresOnDay,
+            active: ctxPoll.active,
+            category: ctxPoll.category,
+          }).run();
+          console.log(`  [Polls] Created context poll: "${ctxPoll.question}"`);
+        }
+      }
+
+      // Process referendum result
+      if (refReq) {
+        processReferendumBatchResult(findResult(midCycleResults, refReq.customId), currentDay);
+      }
+    }
+
+    if (isWeekly) {
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "weekly_report",
+        actor: "system",
+        title: `Weekly Report — Day ${currentDay}`,
+        description: `Weekly opinion recalculation complete. Sentiment: ${nationalState.publicSentiment}/100. Active crises: ${activeCrises.length}.`,
+      });
+      console.log(`  [Cycle] Weekly report — Day ${currentDay}`);
+    }
   }
-
-  // 11c2. Maybe generate referendum (every 30 days)
-  const recentBillsForRef = allBills
-    .filter(b => b.proposedOnDay >= currentDay - TIME_CONFIG.ECONOMY_INTERVAL)
-    .map(b => b.title);
-  await maybeGenerateReferendum(currentDay, allParties, activeCrises, recentBillsForRef);
 
   // 11c. Monthly economic report
   if (monthly) {
@@ -1740,20 +1805,29 @@ export async function runDay(): Promise<number> {
     .where(eq(schema.nationalState.id, state.id))
     .run();
 
-  // 12b. Generate media articles from today's events
-  await generateDailyMedia(dayEvents, allParties, currentDay);
+  // 12b+12d. Batch media + summary together (2 calls → 1 batch)
+  const endOfDayRequests: BatchRequest[] = [];
+  const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay);
+  if (mediaReq) endOfDayRequests.push(mediaReq);
+  const summaryReq = buildSummaryBatchRequest(
+    dayEvents, allParties, currentDay,
+    nationalState.publicSentiment, nationalState.coalitionParties,
+  );
+  endOfDayRequests.push(summaryReq);
+
+  console.log(`  [Batch] Submitting ${endOfDayRequests.length} end-of-day requests (media+summary)...`);
+  const endOfDayResults = await submitBatch(endOfDayRequests);
+
+  // Process media results
+  if (mediaReq) {
+    processMediaBatchResult(findResult(endOfDayResults, mediaReq.customId), currentDay);
+  }
 
   // 12c. Apply media sentiment influence
   nationalState.publicSentiment = applyMediaSentiment(currentDay, nationalState.publicSentiment, state.id);
 
-  // 12d. Generate daily narrative summary
-  const summaryResult = await generateDailySummary(
-    dayEvents,
-    allParties,
-    currentDay,
-    nationalState.publicSentiment,
-    nationalState.coalitionParties,
-  );
+  // Process summary results
+  const summaryResult = processSummaryBatchResult(findResult(endOfDayResults, summaryReq.customId));
   const dailySummaryStr = summaryResult ? JSON.stringify(summaryResult) : null;
   if (dailySummaryStr) {
     console.log(`  [Summary] Generated daily narrative`);

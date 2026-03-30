@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
+import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
+import type { Provider } from "../agent/model-config.js";
 
 const MAX_ANSWERS_PER_DAY = 2;
 const INTERPELLATION_DEADLINE_DAYS = 14;
@@ -47,51 +49,61 @@ export async function answerPendingInterpellations(
 
   if (toAnswer.length === 0) return result;
 
+  // Build batch requests for all interpellations to answer
+  const batchRequests: BatchRequest[] = [];
+  const rowMinisterMap = new Map<string, { row: typeof toAnswer[0]; minister: typeof government.ministers[0]; ministerParty: Party | undefined }>();
+
   for (const row of toAnswer) {
     const minister = government.ministers.find(m => m.portfolio === row.targetMinistry);
     if (!minister) continue;
 
     const ministerParty = allParties.find(p => p.id === minister.partyId);
+    const customId = `interpellation-${row.id}`;
+    rowMinisterMap.set(customId, { row, minister, ministerParty });
 
-    const t0 = Date.now();
-    try {
-      const { text, model, provider } = await callAI({
-        system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.`,
-        prompt: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
-        maxTokens: 300,
-        partyId: minister.partyId,
-      });
+    batchRequests.push({
+      customId,
+      system: `You are ${minister.name}, Minister of ${row.targetMinistry} in the German Bundestag, representing ${ministerParty?.name ?? minister.partyId} (${ministerParty?.ideology ?? ""}). You are responding to a formal parliamentary interpellation (${row.type === "große" ? "Große Anfrage — major inquiry" : "Kleine Anfrage — written question"}). Answer in character as the minister: be politically careful, defend government policy, and stay on-message. Keep your response to 2-3 sentences.`,
+      prompt: `Interpellation from the opposition: "${row.title}"\n\nQuestion: ${row.question}`,
+      maxTokens: 300,
+      partyId: minister.partyId,
+    });
+  }
 
-      const impact = row.type === "große" ? 0.3 : 0.1;
+  if (batchRequests.length === 0) return result;
 
-      db.update(schema.interpellations)
-        .set({
-          status: "answered",
-          response: text.trim(),
-          respondedOnDay: currentDay,
-          sentimentImpact: impact,
-        })
-        .where(eq(schema.interpellations.id, row.id))
-        .run();
+  console.log(`  [Batch] Submitting ${batchRequests.length} interpellation answer requests...`);
+  const batchResults = await submitBatch(batchRequests);
 
-      result.answered.push(mapInterpellation({
-        ...row,
+  for (const [customId, { row, minister }] of rowMinisterMap) {
+    const batchResult = findResult(batchResults, customId);
+
+    if (!batchResult || !batchResult.text) {
+      logAICall({ task: `interpellation:${minister.partyId}`, model: batchResult?.model ?? "unknown", provider: (batchResult?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
+      continue;
+    }
+
+    const impact = row.type === "große" ? 0.3 : 0.1;
+
+    db.update(schema.interpellations)
+      .set({
         status: "answered",
-        response: text.trim(),
+        response: batchResult.text.trim(),
         respondedOnDay: currentDay,
         sentimentImpact: impact,
-      }));
+      })
+      .where(eq(schema.interpellations.id, row.id))
+      .run();
 
-      logAICall({ task: `interpellation:${minister.partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
-    } catch (error) {
-      if (error instanceof AIProviderLimitError) {
-        console.warn(`  [Interpellations] Skipped (${error.message})`);
-      } else {
-        console.error(`  [Interpellations] Error answering "${row.title}":`, error);
-      }
-      logAICall({ task: `interpellation:${minister.partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "skip" });
-      if (error instanceof AIProviderLimitError) break;
-    }
+    result.answered.push(mapInterpellation({
+      ...row,
+      status: "answered",
+      response: batchResult.text.trim(),
+      respondedOnDay: currentDay,
+      sentimentImpact: impact,
+    }));
+
+    logAICall({ task: `interpellation:${minister.partyId}`, model: batchResult.model, provider: batchResult.provider as Provider, latencyMs: 0, parseOk: true, validationOk: true });
   }
 
   return result;
