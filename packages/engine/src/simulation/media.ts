@@ -226,13 +226,13 @@ export function buildMediaBatchRequest(
   if (newsworthy.length === 0) return null;
 
   const eventSummaries = newsworthy.map(e => `[${e.type}] ${e.title}: ${e.description}`).join("\n");
-  const partyNames = allParties.map(p => `${p.name} (${p.id})`).join(", ");
+  const partyStandings = allParties.map(p => `${p.name}: ${p.approvalRating}%, ${p.seatCount} seats`).join(" | ");
   const briefingContext = briefing ? `\n\nPOLITICAL CONTEXT:\n${briefing}` : "";
 
   return {
     customId: `media-day${currentDay}`,
     system: MEDIA_SYSTEM_PROMPT,
-    prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}${briefingContext}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
+    prompt: `SIMULATION DAY ${currentDay}\n\nPARTY STANDINGS: ${partyStandings}\n\nTODAY'S EVENTS:\n${eventSummaries}${briefingContext}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
     maxTokens: 2048,
     roleKey: "daily",
   };
