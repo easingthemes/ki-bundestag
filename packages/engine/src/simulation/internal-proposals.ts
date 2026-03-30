@@ -1,8 +1,7 @@
 import { randomUUID } from "crypto";
 import { eq, and, lte, gte } from "drizzle-orm";
-import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
-import { submitBatch, isBatchMode, type BatchResult } from "../agent/batch-client.js";
+import { submitBatch, type BatchResult } from "../agent/batch-client.js";
 import { buildProposalRankPrompt, type ProposalItem, type PartyContext } from "../agent/group-prompts.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
@@ -13,10 +12,8 @@ const MAX_ACCEPT_PER_PARTY = 2;
 /**
  * Review internal party proposals each sim day.
  *
- * In batch mode: sends ALL ready proposals per party in one prompt,
+ * Sends ALL ready proposals per party in one batch prompt,
  * asking AI to rank and select the top N. Remaining are declined.
- *
- * In legacy mode: reviews only the top-scored proposal per party (1 call each).
  *
  * Expired proposals (past reviewByDay, < 3 votes) are always marked "expired".
  */
@@ -85,11 +82,7 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
 
   if (partyBatches.length === 0) return;
 
-  if (isBatchMode()) {
-    await reviewProposalsBatch(partyBatches, currentDay);
-  } else {
-    await reviewProposalsLegacy(partyBatches, currentDay);
-  }
+  await reviewProposalsBatch(partyBatches, currentDay);
 }
 
 /**
@@ -119,14 +112,7 @@ async function reviewProposalsBatch(
   });
 
   const t0 = Date.now();
-  let results: BatchResult[];
-  try {
-    results = await submitBatch(batchRequests.map(r => r.req));
-  } catch (err) {
-    console.error(`  [InternalProposals] Batch failed, falling back:`, (err as Error).message);
-    await reviewProposalsLegacy(partyBatches, currentDay);
-    return;
-  }
+  const results = await submitBatch(batchRequests.map(r => r.req));
   logAICall({ task: "proposals-batch", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
 
   for (const { req, batch } of batchRequests) {
@@ -239,70 +225,6 @@ async function reviewProposalsBatch(
           );
         } catch {}
       }
-    }
-  }
-}
-
-/**
- * Legacy mode: review only the top-scored proposal per party.
- */
-async function reviewProposalsLegacy(
-  partyBatches: Array<{ party: PartyContext; proposals: any[] }>,
-  currentDay: number,
-): Promise<void> {
-  const db = getDb();
-  const userDb = getUserDb();
-
-  for (const batch of partyBatches) {
-    const top = batch.proposals[0];
-    const t0 = Date.now();
-
-    try {
-      const { text: raw, model, provider } = await callAI({
-        system: `You are the party leadership of ${batch.party.name} (ideology: ${batch.party.ideology}). A party member has submitted a bill proposal for your consideration. Decide whether to officially sponsor it. Respond with ONLY valid JSON: {"decision": "accept" | "decline", "reason": "<1 sentence>"}`,
-        prompt: `Member proposal: "${top.title}" (${top.category})\n${top.description}\n\nVote score: ${top.voteScore >= 0 ? "+" : ""}${top.voteScore} (${top.totalVotes} votes)\n\nShould ${batch.party.name} sponsor this bill in the Bundestag?`,
-        maxTokens: 256,
-        partyId: batch.party.id,
-      });
-
-      const defaultReason = "Does not align with current party priorities.";
-      const parsed = parseAIJson<{ decision: "accept" | "decline"; reason: string }>(
-        raw,
-        (v: unknown) => {
-          const o = v as Record<string, unknown>;
-          if (o.decision !== "accept" && o.decision !== "decline") return null;
-          return { decision: o.decision, reason: typeof o.reason === "string" ? o.reason.slice(0, 200) : defaultReason };
-        },
-        "InternalProposals",
-      );
-      const decision = parsed?.decision ?? "decline";
-      const reason = parsed?.reason ?? defaultReason;
-      logAICall({ task: `proposals:${batch.party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "decline" });
-
-      if (decision === "accept") {
-        const billId = `bill-${randomUUID().slice(0, 8)}`;
-        db.insert(schema.bills).values({
-          id: billId, title: top.title, description: top.description, category: top.category,
-          proposedBy: batch.party.id, status: "proposed",
-          impact: { budget: 0, unemployment: 0, inflation: 0, gdpGrowth: 0, publicSentiment: 0 },
-          votes: [], proposedOnDay: currentDay, memberInitiative: true, proposerDisplayName: top.proposerName,
-        }).run();
-        userDb.update(schema.internalProposals).set({ status: "accepted", reviewedOnDay: currentDay, bundestag_bill_id: billId }).where(eq(schema.internalProposals.id, top.id)).run();
-        db.insert(schema.simulationEvents).values({ id: `evt-${randomUUID().slice(0, 8)}`, type: "member_proposal_accepted", title: `${batch.party.name}: Member initiative "${top.title}" submitted to Bundestag`, description: `Accepted: "${top.title}". ${reason}`, dayNumber: currentDay, actor: batch.party.id }).run();
-        if (top.proposedBy !== "ai") { try { createNotification(top.proposedBy, "proposal_accepted", `Proposal accepted: "${top.title}"`, `${batch.party.name} has accepted your proposal "${top.title}" as Bill ${billId}.`, { proposalId: top.id, billId, partyId: batch.party.id }, currentDay); } catch {} }
-      } else {
-        userDb.update(schema.internalProposals).set({ status: "declined", reviewedOnDay: currentDay, declineReason: reason }).where(eq(schema.internalProposals.id, top.id)).run();
-        db.insert(schema.simulationEvents).values({ id: `evt-${randomUUID().slice(0, 8)}`, type: "member_proposal_declined", title: `${batch.party.name}: Member proposal "${top.title}" declined`, description: `Declined: "${top.title}". ${reason}`, dayNumber: currentDay, actor: batch.party.id }).run();
-        if (top.proposedBy !== "ai") { try { createNotification(top.proposedBy, "proposal_declined", `Proposal declined: "${top.title}"`, `${batch.party.name} declined your proposal. Reason: ${reason}`, { proposalId: top.id, partyId: batch.party.id }, currentDay); } catch {} }
-      }
-    } catch (err) {
-      if (err instanceof AIProviderLimitError) {
-        console.warn(`  [InternalProposals] Skipped (${err.message})`);
-      } else {
-        console.error(`[InternalProposals] Error reviewing proposal ${top.id}:`, err);
-      }
-      logAICall({ task: `proposals:${batch.party.id}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "decline" });
-      if (err instanceof AIProviderLimitError) break;
     }
   }
 }

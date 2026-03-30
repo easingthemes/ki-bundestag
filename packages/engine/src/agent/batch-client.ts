@@ -3,9 +3,6 @@
  *
  * Submits multiple AI prompts as a single batch, polls for completion,
  * and returns all results. Saves 50% on token costs vs synchronous calls.
- *
- * Falls back to sequential `callAI()` when BATCH_MODE=false or when
- * the batch API is unavailable.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -36,8 +33,6 @@ export interface BatchResult {
   text: string;
   model: string;
   provider: Provider;
-  /** True if this result came from the batch API; false if fallback. */
-  fromBatch: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,10 +41,6 @@ export interface BatchResult {
 
 const BATCH_POLL_INTERVAL_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 30) * 1000;
 const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 3600) * 1000;
-
-export function isBatchMode(): boolean {
-  return (process.env.BATCH_MODE ?? "true").toLowerCase() === "true";
-}
 
 // ---------------------------------------------------------------------------
 // Chunking helper
@@ -136,8 +127,7 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   }
 
   if (status !== "ended") {
-    console.error(`  [Batch] Batch ${batch.id} timed out after ${BATCH_TIMEOUT_MS / 1000}s, falling back to sync`);
-    return fallbackToSync(requests);
+    throw new Error(`Batch ${batch.id} timed out after ${BATCH_TIMEOUT_MS / 1000}s`);
   }
 
   // Retrieve results
@@ -156,7 +146,6 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
         text: textBlocks.join(""),
         model: config?.model ?? "unknown",
         provider: "anthropic",
-        fromBatch: true,
       });
     } else {
       console.warn(`  [Batch] Request ${item.custom_id} failed: ${item.result.type}`);
@@ -165,7 +154,6 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
         text: "",
         model: config?.model ?? "unknown",
         provider: "anthropic",
-        fromBatch: true,
       });
     }
   }
@@ -175,11 +163,10 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
 }
 
 // ---------------------------------------------------------------------------
-// Fallback: sequential callAI
+// xAI sequential (batch API via JSONL can be added later)
 // ---------------------------------------------------------------------------
 
-async function fallbackToSync(requests: BatchRequest[]): Promise<BatchResult[]> {
-  console.log(`  [Batch] Falling back to sequential callAI for ${requests.length} requests`);
+async function submitXaiBatch(requests: BatchRequest[]): Promise<BatchResult[]> {
   const results: BatchResult[] = [];
 
   for (const req of requests) {
@@ -191,11 +178,11 @@ async function fallbackToSync(requests: BatchRequest[]): Promise<BatchResult[]> 
         partyId: req.partyId,
         roleKey: req.roleKey,
       });
-      results.push({ customId: req.customId, text, model, provider, fromBatch: false });
+      results.push({ customId: req.customId, text, model, provider });
     } catch (err) {
-      console.warn(`  [Batch] Sync fallback failed for ${req.customId}: ${(err as Error).message}`);
+      console.warn(`  [Batch] xAI call failed for ${req.customId}: ${(err as Error).message}`);
       const config = resolveModel(req);
-      results.push({ customId: req.customId, text: "", model: config.model, provider: config.provider, fromBatch: false });
+      results.push({ customId: req.customId, text: "", model: config.model, provider: config.provider });
       if (err instanceof AIProviderLimitError) break;
     }
   }
@@ -211,16 +198,10 @@ async function fallbackToSync(requests: BatchRequest[]): Promise<BatchResult[]> 
  * Submit a batch of AI requests, splitting by provider.
  *
  * - Anthropic requests go via the Message Batches API (50% discount).
- * - xAI requests currently fall back to sequential calls (batch API
- *   support can be added later via JSONL upload).
- * - When BATCH_MODE=false, all requests use sequential callAI().
+ * - xAI requests use sequential calls (xAI JSONL batch can be added later).
  */
 export async function submitBatch(requests: BatchRequest[]): Promise<BatchResult[]> {
   if (requests.length === 0) return [];
-
-  if (!isBatchMode()) {
-    return fallbackToSync(requests);
-  }
 
   // Split by provider
   const anthropicReqs: BatchRequest[] = [];
@@ -238,14 +219,10 @@ export async function submitBatch(requests: BatchRequest[]): Promise<BatchResult
   // Submit in parallel
   const [anthropicResults, xaiResults] = await Promise.all([
     anthropicReqs.length > 0
-      ? submitAnthropicBatch(anthropicReqs).catch(err => {
-          console.error(`  [Batch] Anthropic batch failed, falling back:`, (err as Error).message);
-          return fallbackToSync(anthropicReqs);
-        })
+      ? submitAnthropicBatch(anthropicReqs)
       : Promise.resolve([] as BatchResult[]),
-    // xAI: sequential fallback for now (batch support can be added)
     xaiReqs.length > 0
-      ? fallbackToSync(xaiReqs)
+      ? submitXaiBatch(xaiReqs)
       : Promise.resolve([] as BatchResult[]),
   ]);
 

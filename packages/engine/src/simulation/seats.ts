@@ -8,9 +8,8 @@
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { getDb, getSqlite, getUserDb, getUserSqlite, schema } from "../db/index.js";
-import { callAI, AIProviderLimitError } from "../agent/client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
-import { submitBatch, isBatchMode, chunkItems, type BatchResult } from "../agent/batch-client.js";
+import { submitBatch, chunkItems, type BatchResult } from "../agent/batch-client.js";
 import { buildApplicationSelectPrompt, preFilterApplications, type ApplicationItem, type PartyContext } from "../agent/group-prompts.js";
 import { createNotification } from "./event-queue.js";
 import { getHumanSeatRatio, type TimingPreset } from "./timing.js";
@@ -162,8 +161,8 @@ function calcActivityScore(userId: string): number {
  * each application individually. This scales from 18 calls/day to 6,
  * and removes the artificial 3/party/day cap.
  *
- * When BATCH_MODE=true, all party prompts are submitted as a single
- * Anthropic batch (50% cost discount).
+ * All party prompts are submitted as a single Anthropic batch
+ * (50% cost discount).
  */
 export async function reviewMdbApplications(currentDay: number): Promise<void> {
   const db = getDb();
@@ -256,14 +255,7 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
   });
 
   const t0 = Date.now();
-  let results: BatchResult[];
-  try {
-    results = await submitBatch(batchRequests.map(r => r.req));
-  } catch (err) {
-    console.error(`  [MdB] Batch submission failed, falling back to legacy:`, (err as Error).message);
-    await reviewMdbApplicationsLegacy(currentDay, batches);
-    return;
-  }
+  const results = await submitBatch(batchRequests.map(r => r.req));
   logAICall({ task: "mdb-batch", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
 
   // --- Phase 3: Process results ---
@@ -374,77 +366,6 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
         { partyId: batch.partyId },
         currentDay,
       );
-    }
-  }
-}
-
-/**
- * Legacy per-application review (fallback when batch fails).
- */
-async function reviewMdbApplicationsLegacy(
-  currentDay: number,
-  batches: Array<{ party: PartyContext; partyId: string; openSeats: number; appMap: Map<string, { app: any; score: number; displayName: string }> }>,
-): Promise<void> {
-  const db = getDb();
-  const userDb = getUserDb();
-
-  for (const batch of batches) {
-    const entries = [...batch.appMap.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, Math.min(batch.openSeats, 3));
-
-    for (const { app, score, displayName } of entries) {
-      const t0 = Date.now();
-      try {
-        const { text: raw, model, provider } = await callAI({
-          system: `You are the party leadership of ${batch.party.name} (ideology: ${batch.party.ideology}). A citizen is applying for a Bundestag seat in your party.\n\nBe generous — this is a simulation. Approve applicants who show genuine interest.\n\nRespond with ONLY valid JSON: {"decision": "approve" | "reject", "reasoning": "<1–2 sentences>"}`,
-          prompt: `Applicant: ${displayName}\nApplication: "${app.applicationText}"${app.policyFocus ? `\nPolicy focus: ${JSON.stringify(app.policyFocus)}` : ""}\nActivity score: ${score.toFixed(1)}/6\n\nShould ${batch.party.name} grant this member a Bundestag seat?`,
-          maxTokens: 256,
-          partyId: batch.partyId,
-        });
-
-        const parsed = parseAIJson<{ decision: "approve" | "reject"; reasoning: string }>(
-          raw,
-          (v: unknown) => {
-            const o = v as Record<string, unknown>;
-            if (o.decision !== "approve" && o.decision !== "reject") return null;
-            return { decision: o.decision, reasoning: typeof o.reasoning === "string" ? o.reasoning.slice(0, 300) : "Does not meet current requirements." };
-          },
-          "MdB",
-        );
-        const decision = parsed?.decision ?? "reject";
-        const reasoning = parsed?.reasoning ?? "Does not meet current requirements.";
-        logAICall({ task: `mdb:${batch.partyId}`, model, provider, latencyMs: Date.now() - t0, parseOk: parsed !== null, validationOk: parsed !== null, fallback: parsed ? undefined : "reject" });
-
-        if (decision === "approve") {
-          const sqlite = getSqlite();
-          const assignSeat = sqlite.transaction(() => {
-            const openSeat = db.select().from(schema.bundestagSeats)
-              .where(and(eq(schema.bundestagSeats.partyId, batch.partyId), eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "human")))
-              .all().find(s => s.userId === null);
-            if (!openSeat) return null;
-            db.update(schema.bundestagSeats).set({ userId: app.userId }).where(eq(schema.bundestagSeats.id, openSeat.id)).run();
-            return openSeat;
-          });
-          const openSeat = assignSeat();
-          if (openSeat) {
-            userDb.update(schema.mdbApplications).set({ status: "approved", aiReasoning: reasoning, priorityScore: Math.round(score * 100) / 100, reviewedOnDay: currentDay }).where(eq(schema.mdbApplications.id, app.id)).run();
-            createNotification(app.userId, "mdb_approved", `MdB-Sitz genehmigt — ${batch.party.name}`, `Ihre Bewerbung wurde genehmigt! Sitz #${openSeat.seatNumber}. ${reasoning}`, { seatId: openSeat.id, partyId: batch.partyId }, currentDay);
-            console.log(`  [MdB] ${displayName} approved for ${batch.partyId} seat #${openSeat.seatNumber}`);
-          }
-        } else {
-          userDb.update(schema.mdbApplications).set({ status: "rejected", aiReasoning: reasoning, priorityScore: Math.round(score * 100) / 100, reviewedOnDay: currentDay, cooldownUntilDay: currentDay + 7 }).where(eq(schema.mdbApplications.id, app.id)).run();
-          createNotification(app.userId, "mdb_rejected", `MdB-Bewerbung abgelehnt — ${batch.party.name}`, `Ihre Bewerbung wurde abgelehnt. ${reasoning}`, { partyId: batch.partyId }, currentDay);
-          console.log(`  [MdB] ${displayName} rejected for ${batch.partyId}: ${reasoning}`);
-        }
-      } catch (err) {
-        if (err instanceof AIProviderLimitError) {
-          console.warn(`  [MdB] Skipped application review (${err.message})`);
-          break;
-        }
-        console.error(`[MdB] Error reviewing application ${app.id}:`, err);
-        logAICall({ task: `mdb:${batch.partyId}`, latencyMs: Date.now() - t0, parseOk: false, validationOk: false, fallback: "reject" });
-      }
     }
   }
 }

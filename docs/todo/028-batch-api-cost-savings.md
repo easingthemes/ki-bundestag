@@ -1,6 +1,6 @@
 # 028 — Batch API Cost Savings for Scaling Users
 
-**Status**: in-progress
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: High
 
@@ -255,185 +255,41 @@ ENHANCED (same 1 call, but include aggregated user signals):
 
 **Savings: 97% cost reduction**
 
-## Implementation Plan
+## Implementation (Completed)
 
-### Phase 1: Batch API Client (`packages/engine/src/agent/batch-client.ts`)
+### Batch API Client (`packages/engine/src/agent/batch-client.ts`)
 
-New module alongside `client.ts`:
+Multi-provider batch submission: Anthropic requests use the Message Batches API (50% discount), xAI requests use sequential `callAI()` calls (xAI JSONL batch can be added later).
 
-```typescript
-interface BatchRequest {
-  customId: string;      // e.g. "app-select-spd-day42"
-  system: string;
-  prompt: string;
-  maxTokens: number;
-  partyId?: string;
-  roleKey?: RoleKey;
-}
+- `submitBatch(requests)` — splits by provider, submits in parallel
+- `chunkItems(items, tokensPerItem, maxTokens)` — splits large inputs within context window
+- `findResult(results, customId)` — utility to match results back to requests
+- Configurable via `BATCH_POLL_INTERVAL` and `BATCH_TIMEOUT` env vars
 
-interface BatchResult {
-  customId: string;
-  text: string;
-  model: string;
-  provider: Provider;
-}
+### Selection-Style Prompt Builders (`packages/engine/src/agent/group-prompts.ts`)
 
-// Submit batch to Anthropic/xAI, poll for results
-async function submitBatch(requests: BatchRequest[]): Promise<BatchResult[]>
+- `buildApplicationSelectPrompt()` — "Select top N applicants from pool"
+- `buildSpeechFlagPrompt()` — "Flag only bad speeches, default positive"
+- `buildQuestionBatchPrompt()` — "Answer all questions for this party"
+- `buildProposalRankPrompt()` — "Rank and select top N proposals"
+- Pre-filters: `preFilterApplications()`, `preFilterQuestions()`, `preFilterSpeeches()`
 
-// Split requests by provider (Anthropic vs xAI) and submit separately
-async function submitBatchMultiProvider(requests: BatchRequest[]): Promise<BatchResult[]>
+### Refactored Simulation Modules
 
-// Chunk large item lists into pages that fit within context window
-function chunkItems<T>(items: T[], tokensPerItem: number, maxContextTokens?: number): T[][]
-```
+Each module collects prompts and submits as a single batch per domain:
 
-### Phase 2: Selection-Style Prompt Builders
+- **`seats.ts`** — MdB applications: 1 batch call per party (was 3/party/day max → unlimited)
+- **`speeches.ts`** — Speech evaluation: 1 call per bill, exception-based flagging
+- **`questions.ts`** — Citizen questions: 1 call per party, up to 50/day (was 3/day max)
+- **`internal-proposals.ts`** — Proposals: 1 call per party, rank-and-select top 2
 
-New module `packages/engine/src/agent/group-prompts.ts`:
+### Pre-Filtering
 
-```typescript
-// "Select top N applicants from this pool" — not "review each one"
-function buildApplicationSelectPrompt(
-  party: Party,
-  applications: MdbApplication[],
-  openSeats: number,             // AI selects this many
-): BatchRequest
+Deterministic filters reduce input tokens by 50-90% before AI:
 
-// "Flag only spam/nonsense speeches" — not "rate each one"
-function buildSpeechFlagPrompt(
-  bill: { title: string; description: string },
-  speeches: { id: string; content: string; author: string }[],
-): BatchRequest
-
-// "Answer questions grouped by topic" — shared reasoning across related Qs
-function buildQuestionBatchPrompt(
-  party: Party,
-  questions: { id: string; question: string; voteScore: number }[],
-): BatchRequest
-
-// "Rank and select top N proposals" — compare against each other
-function buildProposalRankPrompt(
-  party: Party,
-  proposals: InternalProposal[],
-  maxAccept: number,             // Party bandwidth limit
-): BatchRequest
-
-// Existing party-agent prompt, but enriched with aggregated user signals
-function buildPartyVotePrompt(
-  party: Party,
-  bills: Bill[],
-  userSignals: Map<string, { yes: number; no: number }>,
-  mdbSpeeches: Map<string, string[]>,  // Notable speeches per bill
-): BatchRequest
-```
-
-### Phase 3: Refactor `runDay()` to Collect-Then-Batch
-
-```typescript
-async function runDay() {
-  // ... steps 1-3 (economic drift, injections, crisis — no AI)
-
-  // Step 4: COLLECT all AI prompts for the day
-  const batch: BatchRequest[] = [];
-
-  // Party voting (6 calls, enriched with user signal aggregates)
-  for (const party of parties) {
-    const signals = aggregateSignalsForBills(votableBills);
-    const speeches = getNotableSpeechesForBills(votableBills);
-    batch.push(buildPartyVotePrompt(party, votableBills, signals, speeches));
-  }
-
-  // MdB applications — select top N per party (6 calls max)
-  for (const party of parties) {
-    const apps = getPendingApplications(party.id);
-    if (apps.length === 0) continue;
-    const openSeats = openCounts[party.id] ?? 0;
-    if (openSeats === 0) continue;
-    // Chunk if >800 apps per party (unlikely but safe)
-    for (const chunk of chunkItems(apps, 200, 160_000)) {
-      batch.push(buildApplicationSelectPrompt(party, chunk, openSeats));
-    }
-  }
-
-  // Speeches — flag bad ones per bill (1 call per bill with speeches)
-  for (const bill of billsWithSpeeches) {
-    const speeches = getUnprocessedSpeeches(bill.id);
-    batch.push(buildSpeechFlagPrompt(bill, speeches));
-  }
-
-  // Citizen questions — batch per party (6 calls max)
-  for (const party of parties) {
-    const questions = getPendingQuestionsForParty(party.id);
-    if (questions.length === 0) continue;
-    for (const chunk of chunkItems(questions, 180, 160_000)) {
-      batch.push(buildQuestionBatchPrompt(party, chunk));
-    }
-  }
-
-  // Proposals — rank per party (6 calls max)
-  for (const party of parties) {
-    const proposals = getReadyProposals(party.id);
-    if (proposals.length === 0) continue;
-    batch.push(buildProposalRankPrompt(party, proposals, 2));
-  }
-
-  // Summary + media (2 calls)
-  batch.push(buildSummaryPrompt(dayEvents));
-  if (hasNewsworthyEvents) batch.push(buildMediaPrompt(dayEvents, parties));
-
-  // Step 5: SUBMIT entire day as one batch, wait for results
-  const results = await submitBatchMultiProvider(batch);
-
-  // Step 6: PROCESS all results and apply to DB
-  applyPartyVoteResults(results);
-  applyApplicationSelectResults(results);   // Approve selected IDs, waitlist rest
-  applySpeechFlagResults(results);          // Default positive, mark flagged as negative
-  applyQuestionAnswerResults(results);
-  applyProposalRankResults(results);
-  applySummaryResult(results);
-  applyMediaResult(results);
-}
-```
-
-### Phase 4: Fallback & Config
-
-Keep `callAI()` as fallback for:
-- Development/testing (instant results)
-- Ultra-fast timing preset where 1-hour batch wait is too long
-- When batch API is unavailable
-
-```bash
-# .env config
-BATCH_MODE=true          # Use batch API (default for production)
-BATCH_POLL_INTERVAL=30   # Seconds between status checks
-BATCH_TIMEOUT=3600       # Max wait before falling back to sync
-```
-
-### Phase 5: Pre-Filter to Reduce Input Tokens Further
-
-Before sending to AI, apply deterministic filters to shrink the pool:
-
-```typescript
-// MdB applications: pre-score and only send top 10× openSeats to AI
-function preFilterApplications(apps: MdbApplication[], openSeats: number) {
-  const scored = apps.map(a => ({ ...a, score: calcActivityScore(a) }));
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, openSeats * 10); // AI picks from top 30, not all 500
-}
-
-// Questions: pre-rank by vote score, send top 50 to AI (not all 500)
-function preFilterQuestions(questions: Question[], limit = 50) {
-  return questions.sort((a, b) => b.voteScore - a.voteScore).slice(0, limit);
-}
-
-// Speeches: skip very short ones (< 50 chars) — auto-neutral, no AI needed
-function preFilterSpeeches(speeches: Speech[]) {
-  return speeches.filter(s => s.content.length >= 50);
-}
-```
-
-**This reduces input tokens by another 50-90%** at high user counts.
+- Applications: top 10× openSeats by activity score
+- Questions: top 50 by vote score
+- Speeches: <50 char auto-neutral (no AI needed)
 
 ## Affected Files
 
