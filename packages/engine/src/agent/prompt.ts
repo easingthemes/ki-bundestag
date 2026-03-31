@@ -202,7 +202,7 @@ ${committeeBills.map(b => `  - "${b.title}" (${b.category}) — ${b.committeeNam
 
   if (secondReadingBills.length > 0) {
     if (canAct) {
-      readingSections += `\nSECOND READING (you may propose 1 amendment):
+      readingSections += `\nSECOND READING (you may propose 1 amendment — do NOT vote on these bills):
 ${secondReadingBills.map(b => {
   const rec = b.committeeRecommendation ? ` | Committee: ${b.committeeRecommendation}` : "";
   const amendments = (b.amendments ?? []);
