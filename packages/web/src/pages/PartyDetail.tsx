@@ -102,7 +102,7 @@ export function PartyDetail() {
       setJoinStatus("idle");
       api.getParty(id!).then(setParty).catch(console.error);
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : "Failed to join");
+      setJoinError(err instanceof Error ? err.message : "Beitritt fehlgeschlagen");
       setJoinStatus("error");
     }
   };

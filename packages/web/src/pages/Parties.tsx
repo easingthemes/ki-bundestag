@@ -57,7 +57,7 @@ function JoinModal({ party, onClose, onJoined }: {
       onJoined();
       onClose();
     } catch (err) {
-      setErrMsg(err instanceof Error ? err.message : "Failed to join");
+      setErrMsg(err instanceof Error ? err.message : "Beitritt fehlgeschlagen");
       setStatus("error");
     }
   };

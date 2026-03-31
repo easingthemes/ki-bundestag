@@ -62,5 +62,6 @@
 
 ### Step 10: Verify — audit for remaining inline strings
 
-- **Status**: in-progress
-- **Plan**: Grep .tsx files for remaining inline English strings, fix stragglers, final typecheck.
+- **Status**: done
+- **Files**: `parties.json` (fixed English: Bill→Gesetz, Day→Tag, Vote→Stimme, Outcome→Ergebnis, Fraktion strings), `admin.json` (fixed English: Model→Modell, Action→Aktion, etc.), `PartyBillsList.tsx`, `CalendarWidget.tsx`, `SimulationCosts.tsx`, `Parties.tsx`, `PartyDetail.tsx`, `OnboardingOverlay.tsx`, `CatchupCard.tsx`, `MyImpactCard.tsx`, `LiveEventTicker.tsx`, `Media.tsx`, `ProposalForm.tsx`
+- **Result**: Full audit complete. Fixed ~30 remaining English strings across locale files and components. Typecheck passes clean.
