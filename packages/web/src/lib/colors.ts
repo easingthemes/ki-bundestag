@@ -46,13 +46,13 @@ export const VOTE_HEX = {
 
 // ── Mood badge for Dashboard ──────────────────────────────────────────────────
 export const MOOD_BADGE: Record<string, string> = {
-  "Stable Majority": "bg-emerald-100 text-emerald-800",
-  "Coalition Friction": "bg-orange-100 text-orange-800",
-  "Political Pressure": "bg-red-100 text-red-800",
-  "Crisis Response": "bg-red-100 text-red-800",
-  "Electoral Campaign": "bg-blue-100 text-blue-800",
-  "Budget Dispute": "bg-amber-100 text-amber-800",
-  "Government Transition": "bg-purple-100 text-purple-800",
+  "Stabile Mehrheit": "bg-emerald-100 text-emerald-800",
+  "Koalitionsreibung": "bg-orange-100 text-orange-800",
+  "Politischer Druck": "bg-red-100 text-red-800",
+  "Krisenreaktion": "bg-red-100 text-red-800",
+  "Wahlkampf": "bg-blue-100 text-blue-800",
+  "Haushaltsstreit": "bg-amber-100 text-amber-800",
+  "Regierungswechsel": "bg-purple-100 text-purple-800",
 };
 
 // ── Alert / nudge banner styles ───────────────────────────────────────────────

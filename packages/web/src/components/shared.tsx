@@ -104,7 +104,7 @@ export function ShowMoreButton({ total, visible, increment = 10, onShowMore, lab
   return (
     <div className="flex justify-center py-2">
       <ShadButton variant="outline" size="sm" onClick={onShowMore}>
-        {label || `Show ${next} more`} ({remaining} remaining)
+        {label || `${next} weitere anzeigen`} (noch {remaining})
       </ShadButton>
     </div>
   );

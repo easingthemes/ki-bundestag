@@ -86,9 +86,9 @@ Select the top ${selectCount} most qualified applicant${selectCount !== 1 ? "s" 
 Be generous — this is a simulation. Approve applicants who show genuine interest, even if brief. Only skip applicants who are clearly off-topic or show no effort.
 
 Respond with ONLY valid JSON:
-{"selected": [{"id": "<application ID>", "reasoning": "<1 sentence>"}]}
+{"selected": [{"id": "<application ID>", "reasoning": "<1 sentence in German>"}]}
 
-Return exactly ${selectCount} selections. Use the exact "id" values from the list.`,
+Return exactly ${selectCount} selections. Use the exact "id" values from the list. Write all reasoning in German.`,
     prompt: `Applications for ${party.name} Bundestag seats:\n\n${applicantList}\n\nSelect the top ${selectCount} applicant${selectCount !== 1 ? "s" : ""}.`,
     maxTokens: Math.max(256, selectCount * 80),
     partyId: party.id,
@@ -153,10 +153,10 @@ export function buildQuestionBatchPrompt(
     customId: `questions-${party.id}-day${currentDay}`,
     system: `You are the spokesperson for ${party.name}, a ${party.ideology} party in the German Bundestag. Answer ${questions.length} citizen question${questions.length !== 1 ? "s" : ""} in character, reflecting your party's values and positions.
 
-For each question, provide a brief answer (2-3 sentences). Be direct and politically authentic.${party.politicalContext ? `\n\nCURRENT CONTEXT:\n${party.politicalContext}` : ""}
+For each question, provide a brief answer (2-3 sentences). Be direct and politically authentic. Write ALL answers in German.${party.politicalContext ? `\n\nCURRENT CONTEXT:\n${party.politicalContext}` : ""}
 
 Respond with ONLY valid JSON:
-{"answers": [{"id": "<question ID>", "answer": "<2-3 sentences>"}]}
+{"answers": [{"id": "<question ID>", "answer": "<2-3 Sätze auf Deutsch>"}]}
 
 Answer ALL questions. Use exact "id" values from the list.`,
     prompt: `Citizen questions for ${party.name}:\n\n${questionList}\n\nAnswer each question:`,
@@ -195,9 +195,9 @@ Consider:
 3. Policy substance and feasibility
 
 Respond with ONLY valid JSON:
-{"accepted": [{"id": "<proposal ID>", "reason": "<1 sentence>"}], "declineReason": "<shared 1-sentence reason for all declined proposals>"}
+{"accepted": [{"id": "<proposal ID>", "reason": "<1 Satz auf Deutsch>"}], "declineReason": "<gemeinsame 1-Satz-Begründung auf Deutsch für alle abgelehnten Vorschläge>"}
 
-Accept exactly ${selectCount} proposal${selectCount !== 1 ? "s" : ""} (or fewer if none qualify). Use exact "id" values.`,
+Accept exactly ${selectCount} proposal${selectCount !== 1 ? "s" : ""} (or fewer if none qualify). Use exact "id" values. Write all reasons in German.`,
     prompt: `Member proposals for ${party.name}:\n\n${proposalList}\n\nSelect the top ${selectCount} to sponsor:`,
     maxTokens: Math.max(256, selectCount * 80 + 60),
     partyId: party.id,

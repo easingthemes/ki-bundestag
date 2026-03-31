@@ -95,6 +95,7 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
   rules.push("Do NOT wrap your JSON response in markdown code fences (\\`\\`\\`). Respond with raw JSON only.");
   rules.push("Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).");
   rules.push("Do NOT include trailing commas in JSON arrays or objects.");
+  rules.push("ALL text content (bill titles, descriptions, statements, reasons, amendment descriptions) MUST be written in German. Do not use English for any user-visible text.");
 
   const numberedRules = rules.map((r, i) => `${i + 1}. ${r}`).join("\n");
 
