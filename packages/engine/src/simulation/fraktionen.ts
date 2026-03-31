@@ -75,8 +75,8 @@ export function updateFraktionen(
         dayNumber: currentDay,
         type: "fraktion_formed",
         actor: party.id,
-        title: `${party.name} forms Fraktion`,
-        description: `${party.name} has formed a parliamentary group (Fraktion) with ${party.seatCount} seats. Fraktion leader: ${leaderName}.`,
+        title: `${party.name} bildet Fraktion`,
+        description: `${party.name} hat eine Fraktion gebildet mit ${party.seatCount} Sitzen. Fraktionsvorsitz: ${leaderName}.`,
         data: { fraktionId: fraktion.id, leaderName, seatCount: party.seatCount },
       });
 
@@ -95,8 +95,8 @@ export function updateFraktionen(
         dayNumber: currentDay,
         type: "fraktion_dissolved",
         actor: party.id,
-        title: `${party.name} loses Fraktion status`,
-        description: `${party.name} has lost its parliamentary group (Fraktion) with only ${party.seatCount} seats (minimum: ${FRAKTION_THRESHOLD}). The party can no longer propose bills or vote.`,
+        title: `${party.name} verliert Fraktionsstatus`,
+        description: `${party.name} hat die Fraktion verloren mit nur ${party.seatCount} Sitzen (Minimum: ${FRAKTION_THRESHOLD}). Die Partei kann keine Gesetzentwürfe mehr einbringen oder abstimmen.`,
         data: { fraktionId: existing.id, seatCount: party.seatCount },
       });
 

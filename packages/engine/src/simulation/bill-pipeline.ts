@@ -53,8 +53,8 @@ export function advanceBillPipeline(
         dayNumber: day,
         type: "bill_committee",
         actor: "system",
-        title: `"${bill.title}" — Fast-tracked to Committee (Govt. Bill)`,
-        description: `Government bill skips first reading. Committee: ${committeeName}, recommendation: ${recommendation}`,
+        title: `"${bill.title}" — Direkt in den Ausschuss (Regierungsentwurf)`,
+        description: `Regierungsentwurf überspringt 1. Lesung. Ausschuss: ${committeeName}, Empfehlung: ${recommendation}`,
         data: { billId: bill.id, committeeName, recommendation, isGovernmentBill: true },
       });
       console.log(`  [Pipeline] "${bill.title}" → committee (Govt. Bill, fast-tracked)`);
@@ -71,8 +71,8 @@ export function advanceBillPipeline(
         dayNumber: day,
         type: "bill_first_reading",
         actor: "system",
-        title: `"${bill.title}" — First Reading`,
-        description: `The bill proposed by ${bill.proposedBy} has been introduced to the Bundestag.`,
+        title: `"${bill.title}" — 1. Lesung`,
+        description: `Der Gesetzentwurf von ${bill.proposedBy} wurde im Bundestag eingebracht.`,
         data: { billId: bill.id },
       });
       console.log(`  [Pipeline] "${bill.title}" → first_reading`);
@@ -106,8 +106,8 @@ export function advanceBillPipeline(
       dayNumber: day,
       type: "bill_committee",
       actor: "system",
-      title: `"${bill.title}" — Committee Review: ${committeeName}`,
-      description: `Committee recommendation: ${recommendation}`,
+      title: `"${bill.title}" — Ausschussprüfung: ${committeeName}`,
+      description: `Ausschussempfehlung: ${recommendation}`,
       data: { billId: bill.id, committeeName, recommendation },
     });
     console.log(`  [Pipeline] "${bill.title}" → committee (${committeeName}: ${recommendation})`);
@@ -136,8 +136,8 @@ export function advanceBillPipeline(
         dayNumber: day,
         type: "bill_committee_rejected",
         actor: "system",
-        title: `"${bill.title}" — Rejected in Committee`,
-        description: `The ${bill.committeeName} committee recommended rejection. The bill will not advance to second reading.`,
+        title: `"${bill.title}" — Im Ausschuss abgelehnt`,
+        description: `Der Ausschuss ${bill.committeeName} hat die Ablehnung empfohlen. Der Entwurf wird nicht zur 2. Lesung zugelassen.`,
         data: { billId: bill.id, committeeName: bill.committeeName },
       });
       console.log(`  [Pipeline] "${bill.title}" → rejected (committee)`);
@@ -158,8 +158,8 @@ export function advanceBillPipeline(
       dayNumber: day,
       type: "bill_second_reading",
       actor: "system",
-      title: `"${bill.title}" — Second Reading`,
-      description: `The bill enters second reading. Parties may propose amendments.`,
+      title: `"${bill.title}" — 2. Lesung`,
+      description: `Der Gesetzentwurf geht in die 2. Lesung. Parteien können Änderungsanträge stellen.`,
       data: { billId: bill.id },
     });
     console.log(`  [Pipeline] "${bill.title}" → second_reading`);
@@ -184,8 +184,8 @@ export function advanceBillPipeline(
         dayNumber: day,
         type: "amendment_voted",
         actor: "system",
-        title: `Amendment "${amendment.title}" ${accepted ? "ACCEPTED" : "REJECTED"}`,
-        description: `Amendment to "${bill.title}" by ${amendment.proposedBy}: ${amendment.description}`,
+        title: `Änderungsantrag "${amendment.title}" ${accepted ? "ANGENOMMEN" : "ABGELEHNT"}`,
+        description: `Änderungsantrag zu "${bill.title}" von ${amendment.proposedBy}: ${amendment.description}`,
         data: { billId: bill.id, amendmentId: amendment.id, accepted },
       });
       console.log(`  [Amendment] "${amendment.title}" on "${bill.title}": ${accepted ? "accepted" : "rejected"}`);
@@ -211,8 +211,8 @@ export function advanceBillPipeline(
       dayNumber: day,
       type: "bill_third_reading",
       actor: "system",
-      title: `"${bill.title}" — Third Reading`,
-      description: `The bill enters final reading and vote.${amendments.filter(a => a.accepted).length > 0 ? ` ${amendments.filter(a => a.accepted).length} amendment(s) were incorporated.` : ""}`,
+      title: `"${bill.title}" — 3. Lesung`,
+      description: `Der Gesetzentwurf geht in die Schlusslesung und Abstimmung.${amendments.filter(a => a.accepted).length > 0 ? ` ${amendments.filter(a => a.accepted).length} Änderungsantrag/Änderungsanträge wurden eingearbeitet.` : ""}`,
       data: { billId: bill.id, acceptedAmendments: amendments.filter(a => a.accepted).length },
     });
 
@@ -226,8 +226,8 @@ export function advanceBillPipeline(
         createNotification(
           seat.userId!,
           "mdb_vote_needed",
-          `Vote needed: "${bill.title}"`,
-          `"${bill.title}" has entered Third Reading. Cast your MdB vote before the day ends.`,
+          `Abstimmung nötig: "${bill.title}"`,
+          `"${bill.title}" ist in der 3. Lesung. Gib deine MdB-Stimme ab, bevor der Tag endet.`,
           { billId: bill.id },
           day,
         );

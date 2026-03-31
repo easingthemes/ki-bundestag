@@ -93,7 +93,7 @@ export function MyActivity() {
       {/* Filter pills */}
       <FilterPills
         className="mb-5"
-        options={types.map(type => ({ value: type, label: type === "all" ? t("activity.filter.all") : type.replace(/_/g, " ") }))}
+        options={types.map(type => ({ value: type, label: type === "all" ? t("activity.filter.all") : t(`activity.activityTypes.${type}`, { defaultValue: type.replace(/_/g, " ") }) }))}
         value={filter}
         onChange={type => { setFilter(type); }}
       />
