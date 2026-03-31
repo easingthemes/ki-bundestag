@@ -31,6 +31,8 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/co
 import { Separator } from "@/components/ui/separator";
 import { Menu, Bell, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
+import "./locales";
 import "./styles.css";
 
 /* ── Navigation dropdown group ──────────────────────────────────── */
@@ -112,44 +114,45 @@ function DropdownLink({ to, children }: { to: string; children: React.ReactNode 
 function MobileNav({ user }: { user: User | null }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { t } = useTranslation();
 
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="md:hidden ml-auto p-1.5 text-white/70 hover:text-white" aria-label="Toggle menu">
+        <button className="md:hidden ml-auto p-1.5 text-white/70 hover:text-white" aria-label={t("aria.toggleMenu")}>
           <Menu className="size-5" />
         </button>
       </SheetTrigger>
       <SheetContent side="right" className="bg-white border-border w-[280px] p-0">
         <SheetHeader className="px-5 pt-4 pb-3 border-b border-border">
-          <SheetTitle className="text-foreground font-bold">Menu</SheetTitle>
+          <SheetTitle className="text-foreground font-bold">{t("nav.menu")}</SheetTitle>
         </SheetHeader>
         <nav className="py-2 overflow-y-auto max-h-[calc(100vh-80px)]">
-          <MobileLink to="/" end>Dashboard</MobileLink>
-          <MobileGroupLabel>Parlament</MobileGroupLabel>
-          <MobileLink to="/bills">Gesetze</MobileLink>
-          <MobileLink to="/motions">Antr&auml;ge</MobileLink>
-          <MobileLink to="/interpellations">Anfragen</MobileLink>
-          <MobileLink to="/confidence-votes">Vertrauensvoten</MobileLink>
-          <MobileLink to="/constitutional-court">Verfassungsgericht</MobileLink>
-          <MobileLink to="/budget">Haushalt</MobileLink>
-          <MobileGroupLabel>Parteien &amp; Wahlen</MobileGroupLabel>
-          <MobileLink to="/parties">Parteien</MobileLink>
-          <MobileLink to="/elections">Wahlen</MobileLink>
-          <MobileLink to="/polls">Umfragen</MobileLink>
-          <MobileGroupLabel>Mitmachen</MobileGroupLabel>
-          <MobileLink to="/questions">B&uuml;rgerfragen</MobileLink>
-          <MobileLink to="/referendums">Volksabstimmungen</MobileLink>
-          <MobileGroupLabel>Nachrichten</MobileGroupLabel>
-          <MobileLink to="/news">Newsticker</MobileLink>
-          <MobileLink to="/media">Presse</MobileLink>
+          <MobileLink to="/" end>{t("nav.dashboard")}</MobileLink>
+          <MobileGroupLabel>{t("nav.parlament")}</MobileGroupLabel>
+          <MobileLink to="/bills">{t("nav.bills")}</MobileLink>
+          <MobileLink to="/motions">{t("nav.motions")}</MobileLink>
+          <MobileLink to="/interpellations">{t("nav.interpellations")}</MobileLink>
+          <MobileLink to="/confidence-votes">{t("nav.confidenceVotes")}</MobileLink>
+          <MobileLink to="/constitutional-court">{t("nav.constitutionalCourt")}</MobileLink>
+          <MobileLink to="/budget">{t("nav.budget")}</MobileLink>
+          <MobileGroupLabel>{t("nav.partiesAndElections")}</MobileGroupLabel>
+          <MobileLink to="/parties">{t("nav.parties")}</MobileLink>
+          <MobileLink to="/elections">{t("nav.elections")}</MobileLink>
+          <MobileLink to="/polls">{t("nav.polls")}</MobileLink>
+          <MobileGroupLabel>{t("nav.participate")}</MobileGroupLabel>
+          <MobileLink to="/questions">{t("nav.citizenQuestions")}</MobileLink>
+          <MobileLink to="/referendums">{t("nav.referendums")}</MobileLink>
+          <MobileGroupLabel>{t("nav.news")}</MobileGroupLabel>
+          <MobileLink to="/news">{t("nav.newsTicker")}</MobileLink>
+          <MobileLink to="/media">{t("nav.press")}</MobileLink>
           <Separator className="mx-5 my-2" />
-          <MobileLink to="/log">Protokoll</MobileLink>
-          <MobileLink to="/about">&Uuml;ber</MobileLink>
-          <MobileLink to="/impressum">Impressum</MobileLink>
-          <MobileLink to="/datenschutz">Datenschutz</MobileLink>
+          <MobileLink to="/log">{t("nav.protocol")}</MobileLink>
+          <MobileLink to="/about">{t("nav.about")}</MobileLink>
+          <MobileLink to="/impressum">{t("nav.impressum")}</MobileLink>
+          <MobileLink to="/datenschutz">{t("nav.datenschutz")}</MobileLink>
           <Separator className="mx-5 my-2" />
           {user ? (
             <>
@@ -159,14 +162,14 @@ function MobileNav({ user }: { user: User | null }) {
                 </div>
                 <span className="text-sm text-foreground font-medium">{user.displayName}</span>
               </div>
-              {user.partyId && <MobileLink to={`/parties/${user.partyId}`}>My Party</MobileLink>}
-              <MobileLink to="/questions">My Questions</MobileLink>
-              <MobileLink to="/my-activity">My Activity</MobileLink>
+              {user.partyId && <MobileLink to={`/parties/${user.partyId}`}>{t("user.myParty")}</MobileLink>}
+              <MobileLink to="/questions">{t("user.myQuestions")}</MobileLink>
+              <MobileLink to="/my-activity">{t("user.myActivity")}</MobileLink>
               <MobileLogout />
             </>
           ) : (
             <NavLink to="/login" className="block px-5 py-2.5 text-sm font-semibold text-primary hover:text-primary/80">
-              Anmelden
+              {t("nav.login")}
             </NavLink>
           )}
         </nav>
@@ -201,12 +204,13 @@ function MobileGroupLabel({ children }: { children: React.ReactNode }) {
 
 function MobileLogout() {
   const { logout } = useUser();
+  const { t } = useTranslation();
   return (
     <button
       onClick={logout}
       className="w-full text-left block px-5 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent border-none cursor-pointer"
     >
-      Logout
+      {t("user.logout")}
     </button>
   );
 }
@@ -215,6 +219,7 @@ function MobileLogout() {
 
 function UserMenu({ user }: { user: User }) {
   const { logout, updateUser } = useUser();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [seat, setSeat] = useState<BundestagSeat | null>(null);
   const [editing, setEditing] = useState(false);
@@ -276,7 +281,7 @@ function UserMenu({ user }: { user: User }) {
       <button
         className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white cursor-pointer hover:bg-white/30 transition-all overflow-hidden"
         onClick={() => setOpen(o => !o)}
-        aria-label="User menu"
+        aria-label={t("aria.userMenu")}
       >
         {user.avatarUrl ? (
           <img src={user.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
@@ -298,10 +303,10 @@ function UserMenu({ user }: { user: User }) {
                     autoFocus
                     disabled={saving}
                   />
-                  <button onClick={saveEdit} disabled={saving} className="p-0.5 text-emerald-400 hover:text-emerald-300 bg-transparent border-none cursor-pointer disabled:opacity-50" aria-label="Save">
+                  <button onClick={saveEdit} disabled={saving} className="p-0.5 text-emerald-400 hover:text-emerald-300 bg-transparent border-none cursor-pointer disabled:opacity-50" aria-label={t("aria.save")}>
                     <Check className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={cancelEdit} className="p-0.5 text-white/50 hover:text-white bg-transparent border-none cursor-pointer" aria-label="Cancel">
+                  <button onClick={cancelEdit} className="p-0.5 text-white/50 hover:text-white bg-transparent border-none cursor-pointer" aria-label={t("aria.cancel")}>
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -313,13 +318,13 @@ function UserMenu({ user }: { user: User }) {
                 {seat && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 leading-none">MdB</span>
                 )}
-                <button onClick={startEdit} className="p-0.5 text-white/40 hover:text-white bg-transparent border-none cursor-pointer ml-auto" aria-label="Edit name">
+                <button onClick={startEdit} className="p-0.5 text-white/40 hover:text-white bg-transparent border-none cursor-pointer ml-auto" aria-label={t("aria.editName")}>
                   <Pencil className="w-3 h-3" />
                 </button>
               </div>
             )}
             {user.partyId && (
-              <div className="text-xs text-white/50 mt-0.5">{user.partyId}{seat ? ` · Seat #${seat.seatNumber}` : ""}</div>
+              <div className="text-xs text-white/50 mt-0.5">{user.partyId}{seat ? ` · ${t("user.seatNumber", { number: seat.seatNumber })}` : ""}</div>
             )}
           </div>
           {user.partyId && (
@@ -327,27 +332,27 @@ function UserMenu({ user }: { user: User }) {
               to={`/parties/${user.partyId}`}
               className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
             >
-              My Party
+              {t("user.myParty")}
             </NavLink>
           )}
           <NavLink
             to="/questions"
             className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
           >
-            My Questions
+            {t("user.myQuestions")}
           </NavLink>
           <NavLink
             to="/my-activity"
             className="block px-3 py-1.5 text-[13px] text-white/70 hover:text-white hover:bg-white/10 no-underline"
           >
-            My Activity
+            {t("user.myActivity")}
           </NavLink>
           <div className="border-t border-white/10 mt-1 pt-1">
             <button
               onClick={() => { logout(); setOpen(false); }}
               className="w-full text-left px-3 py-1.5 text-[13px] text-red-400 hover:text-red-300 hover:bg-white/10 bg-transparent border-none cursor-pointer"
             >
-              Logout
+              {t("user.logout")}
             </button>
           </div>
         </div>
@@ -359,6 +364,7 @@ function UserMenu({ user }: { user: User }) {
 /* ── Simulation status indicator ───────────────────────────────── */
 
 function SimStatus() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<SimulationStatus | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -409,7 +415,7 @@ function SimStatus() {
           "w-[6px] h-[6px] rounded-full shrink-0",
           running ? "bg-emerald-400 shadow-[0_0_4px_#34d399] animate-pulse" : "bg-white/30"
         )} />
-        <span>Tag {status.currentDay}</span>
+        <span>{t("day", { number: status.currentDay })}</span>
       </div>
       <div className="w-full h-[2px] bg-white/15 rounded-sm overflow-hidden">
         <div
@@ -490,6 +496,7 @@ function ScrollToHash() {
 /* ── App ──────────────────────────────────────────────────────────── */
 
 function App() {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
@@ -553,28 +560,28 @@ function App() {
                 isActive && "text-white bg-white/15"
               )}
             >
-              Dashboard
+              {t("nav.dashboard")}
             </NavLink>
-            <NavGroup label="Parlament">
-              <DropdownLink to="/bills">Gesetze</DropdownLink>
-              <DropdownLink to="/motions">Antr&auml;ge</DropdownLink>
-              <DropdownLink to="/interpellations">Anfragen</DropdownLink>
-              <DropdownLink to="/confidence-votes">Vertrauensvoten</DropdownLink>
-              <DropdownLink to="/constitutional-court">Verfassungsgericht</DropdownLink>
-              <DropdownLink to="/budget">Haushalt</DropdownLink>
+            <NavGroup label={t("nav.parlament")}>
+              <DropdownLink to="/bills">{t("nav.bills")}</DropdownLink>
+              <DropdownLink to="/motions">{t("nav.motions")}</DropdownLink>
+              <DropdownLink to="/interpellations">{t("nav.interpellations")}</DropdownLink>
+              <DropdownLink to="/confidence-votes">{t("nav.confidenceVotes")}</DropdownLink>
+              <DropdownLink to="/constitutional-court">{t("nav.constitutionalCourt")}</DropdownLink>
+              <DropdownLink to="/budget">{t("nav.budget")}</DropdownLink>
             </NavGroup>
-            <NavGroup label="Parteien &amp; Wahlen">
-              <DropdownLink to="/parties">Parteien</DropdownLink>
-              <DropdownLink to="/elections">Wahlen</DropdownLink>
-              <DropdownLink to="/polls">Umfragen</DropdownLink>
+            <NavGroup label={t("nav.partiesAndElections")}>
+              <DropdownLink to="/parties">{t("nav.parties")}</DropdownLink>
+              <DropdownLink to="/elections">{t("nav.elections")}</DropdownLink>
+              <DropdownLink to="/polls">{t("nav.polls")}</DropdownLink>
             </NavGroup>
-            <NavGroup label="Mitmachen">
-              <DropdownLink to="/questions">B&uuml;rgerfragen</DropdownLink>
-              <DropdownLink to="/referendums">Volksabstimmungen</DropdownLink>
+            <NavGroup label={t("nav.participate")}>
+              <DropdownLink to="/questions">{t("nav.citizenQuestions")}</DropdownLink>
+              <DropdownLink to="/referendums">{t("nav.referendums")}</DropdownLink>
             </NavGroup>
-            <NavGroup label="Nachrichten">
-              <DropdownLink to="/news">Newsticker</DropdownLink>
-              <DropdownLink to="/media">Presse</DropdownLink>
+            <NavGroup label={t("nav.news")}>
+              <DropdownLink to="/news">{t("nav.newsTicker")}</DropdownLink>
+              <DropdownLink to="/media">{t("nav.press")}</DropdownLink>
             </NavGroup>
           </div>
 
@@ -590,7 +597,7 @@ function App() {
                   to="/login"
                   className="text-xs text-white/70 no-underline px-3 py-1 border border-white/20 rounded-full whitespace-nowrap transition-all duration-100 hover:text-white hover:border-white/40 hover:bg-white/10"
                 >
-                  Anmelden
+                  {t("nav.login")}
                 </NavLink>
               )}
             </div>
@@ -637,13 +644,13 @@ function App() {
         <footer className="border-t border-border bg-card mt-6">
           <div className="max-w-[1280px] mx-auto px-6 py-4 flex justify-between items-center flex-wrap gap-3 max-md:flex-col max-md:text-center">
             <div className="flex gap-5">
-              <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Protokoll</Link>
-              <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">&Uuml;ber</Link>
-              <Link to="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Simulation</Link>
-              <Link to="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Impressum</Link>
-              <Link to="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Datenschutz</Link>
+              <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.protocol")}</Link>
+              <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.about")}</Link>
+              <Link to="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.simulation")}</Link>
+              <Link to="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.impressum")}</Link>
+              <Link to="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.datenschutz")}</Link>
             </div>
-            <div className="text-[11px] text-muted-foreground">KAI Bundestag &mdash; AI-Powered Parliament Simulation</div>
+            <div className="text-[11px] text-muted-foreground">{t("footer.tagline")}</div>
           </div>
         </footer>
       </div>
