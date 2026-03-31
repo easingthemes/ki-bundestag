@@ -67,6 +67,44 @@ Day 1 only (SSH timed out at 10 min default):
 4. **Batch size doesn't affect latency** — 1-request and 5-request batches both take 2-5 min.
 5. **Normal/slow presets absorb batch latency** — 30-90 min inter-day delay makes batch overhead invisible.
 
+### 2026-03-31 — Ultra-fast, 12-day run (days 1–12)
+
+| Run | Preset | Context Depth | Mode |
+|-----|--------|---------------|------|
+| 3 | ultra-fast (days 9+) | low | `runner-auto.ts` (PM2) |
+
+Days 9–12 ran continuously in ultra-fast mode. Per-day wall clock measured from log timestamps:
+
+| Batch Group | Typical Duration | Polls (30s) | Notes |
+|-------------|-----------------|-------------|-------|
+| Pre-A: Briefing | ~2 min | 2–4 | 1 Haiku call, day 3+ |
+| A: Party agents | ~4 min | 4–8 | 5 Haiku (batch) + 1 xAI (sequential) |
+| B: Mid-cycle | ~2 min | 2–4 | Conditional (interpellations, discipline) |
+| C: End-of-day | ~3 min | 3–6 | Media + summary |
+| **Per sim day total** | **~8–12 min** | **~15–20** | **AI-bound, no inter-day delay** |
+
+**Key observations**:
+- Batch completion times are consistent: 2–5 min regardless of batch size (1–5 requests)
+- xAI sequential call for AfD adds ~2–5s (negligible vs batch overhead)
+- No rate limiting observed (Tier 2, 0 blocked requests)
+- Prompt caching confirmed working: one request showed 39,867 cache read tokens vs 1 input token
+- Abandoned batches from PM2 restarts waste tokens but don't affect subsequent runs
+
+**Updated per-day estimate: ~10 min** (was ~10–15 min, now more precisely measured)
+
+### Updated Summary Statistics
+
+| Metric | Value |
+|--------|-------|
+| Avg batch creation to completion | ~2–4 min |
+| Min observed | ~1 min (1 request) |
+| Max observed | ~5 min (5 requests) |
+| Polling interval | 30s (may switch to 60s) |
+| Batches per sim day | 3–4 (briefing, agents, mid-cycle, end-of-day) |
+| **Estimated time per sim day** | **~10 min** |
+| **Estimated term (1461 days, ultra-fast)** | **~10 days** |
+| **Estimated term (fast, 7 min delay)** | **~17 days** |
+
 ## Future Observations
 
 Add new entries below as more data is collected:

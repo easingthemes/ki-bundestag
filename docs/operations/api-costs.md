@@ -13,18 +13,21 @@
 
 All Anthropic calls go through **Message Batches API (50% discount)**.
 
-### Batch API Latency (observed 2026-03-30)
+### Batch API Latency (observed 2026-03-30 to 2026-03-31)
 
-| Batch ID | Requests | Created | Ended | Duration |
-|----------|----------|---------|-------|----------|
-| `msgbatch_01JwsuLYRVfnghFggtdTeLbe` | 5 (all succeeded) | 22:14 | 22:19 | **5 min** |
+| Metric | Observed Value |
+|--------|---------------|
+| Per-batch completion | ~2–5 min (1–5 requests) |
+| Batches per sim day | 3–4 |
+| **Total per sim day** | **~8–12 min** |
+| Rate-limited requests | **0** (Tier 2 sufficient) |
 
-> Batch API adds 2-10 min latency per submission (create + poll every 60s per Anthropic docs).
+> Batch API adds ~2–5 min latency per submission. With 3–4 batches per day,
+> each sim day takes **~10 min** in ultra-fast mode (AI-bound).
 > See [batch-timing-log.md](./batch-timing-log.md) for detailed observations.
+> See [real-cost-analysis.md](./real-cost-analysis.md) for full cost analysis from real runs.
 > Normal/slow presets absorb this within their inter-day delay (30-90 min).
-> Ultra-fast/fast presets are AI-bound, so each day takes ~5-15 min total
-> (multiple batch submissions per day). Ensure the process stays alive
-> during polling — PM2 restarts will abandon in-flight batches.
+> PM2 restarts will abandon in-flight batches — wasting tokens.
 
 ---
 
@@ -88,38 +91,46 @@ Advancing between tiers is instant once deposit threshold is met.
 
 ### Per Simulation Day (Batch pricing, Haiku 4.5)
 
+**Measured** (12-day run, low context depth, 2026-03-31):
+
 | Component | Calls | ~Input Tok | ~Output Tok | Cost |
 |-----------|-------|-----------|-------------|------|
-| Daily briefing (Haiku) | 1 | ~2K | ~512 | ~$0.002 |
-| Party agents (5 Anthropic) | 5 | ~13K | ~5K | ~$0.021 |
-| AfD agent (xAI) | 1 | ~2.5K | ~1K | varies |
-| Media articles | 1 | ~2.5K | ~1K | ~$0.005 |
-| Daily summary (Sonnet) | 1 | ~3K | ~500 | ~$0.008 |
-| Mid-cycle (polls/ref) | 0-2 | ~2K | ~1K | ~$0.004 |
-| **Daily total** | **~10** | **~25K** | **~9K** | **~$0.04** |
+| Daily briefing (Haiku) | 1 | ~2,500 | ~800 | ~$0.003 |
+| Party agents (5 Anthropic) | 5 | ~18,000 | ~2,500 | ~$0.015 |
+| AfD agent (xAI) | 1 | ~3,500 | ~500 | ~$0.002 |
+| Media articles (Haiku) | 1 | ~3,000 | ~1,000 | ~$0.004 |
+| Daily summary (Haiku) | 1 | ~2,000 | ~300 | ~$0.002 |
+| Mid-cycle (polls/ref/interp) | 0-2 | ~1,800 | ~400 | ~$0.002 |
+| **Daily total** | **~11** | **~31K** | **~5K** | **~$0.028** |
 
-> Context depth is configurable: **low** ($0.03/day, no briefing), **normal** ($0.04/day, default), **high** ($0.06/day, 60-day lookback). Numbers above are for "normal". Set via GitHub Actions, admin API, or DB column `context_depth`.
+> Context depth is configurable: **low** (~$0.020/day, projected), **normal** (~$0.028/day, **measured**), **high** (~$0.040/day, projected). Numbers above are for "normal" as measured from a 12-day run. Set via GitHub Actions, admin API, or DB column `context_depth`.
+> Prompt caching is active — up to 99% of input tokens served from cache at $0.10/MTok.
+> See [real-cost-analysis.md](./real-cost-analysis.md) for full analysis.
 
 ### Per Term (1461 days)
 
-| Preset | Real Duration | Est. Cost | Notes |
-|--------|--------------|-----------|-------|
-| ultra-fast | ~3-7 days | ~$58 | AI-bound, ~5 min/day (batch polling) |
-| fast | ~2 weeks | ~$58 | 7 min delay + ~5 min batch |
-| normal | ~30 days | ~$58 | 30 min delay absorbs batch |
-| slow | ~5 months | ~$58 | 90 min delay absorbs batch |
+| Preset | Real Duration | Est. Cost (normal ctx) | Notes |
+|--------|--------------|----------------------|-------|
+| ultra-fast | **~10 days** | **~$41** | AI-bound, ~10 min/day (batch) |
+| fast | **~17 days** | ~$41 | 7 min delay + ~10 min batch |
+| normal | **~41 days** | ~$41 | 30 min delay absorbs batch |
+| slow | **~3.4 months** | ~$41 | 90 min delay absorbs batch |
 
 > Cost is the same regardless of preset — same number of sim days.
+> Based on measured $0.028/day × 1,461 days = ~$41 (normal context, batch pricing).
+> Duration estimates based on measured ~10 min/day batch overhead.
 > User-driven calls (questions, proposals, MdB) add variable cost.
-> Sequential (non-batch) mode would halve the time but double the cost.
 
-### Monthly Budget Planning
+### Monthly Budget Planning (normal context, batch pricing)
 
 | Spend Limit | Sim Days Possible | ~Terms |
 |-------------|-------------------|--------|
-| $30/month | ~750 days | 0.51 terms |
-| $50/month | ~1,250 days | 0.86 terms |
-| $100/month | ~2,500 days | 1.71 terms |
+| $30/month | ~1,070 days | 0.73 terms |
+| $50/month | ~1,785 days | 1.22 terms |
+| $100/month | ~3,570 days | 2.44 terms |
+
+> Based on measured $0.028/day (normal context, Anthropic only).
+> xAI costs for AfD agent not included (~$0.002/day extra).
 
 ---
 

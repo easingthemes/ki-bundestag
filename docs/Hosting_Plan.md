@@ -29,7 +29,7 @@
 | **Ops complexity** | Medium (you manage server) | High (2 platforms, LiteFS) | Low | Low | Medium (you manage server) | Medium-High (2 platforms) |
 | **Vendor lock-in** | None | Moderate (Vercel framework) | Low | Low | Low (AWS ecosystem) | Low |
 | **Monthly cost (hosting only)** | **~$5** | ~$10-15 | ~$10-20 | ~$15-25 | ~$10 | ~$5-7 |
-| **Monthly cost (with auto-sim AI)** | **~$75-100** | ~$80-110 | ~$80-115 | ~$85-120 | ~$80-105 | ~$75-100 |
+| **Monthly cost (with auto-sim AI, normal preset)** | **~$35-60** | ~$40-65 | ~$40-70 | ~$45-75 | ~$40-65 | ~$35-60 |
 
 ### Why each option works or doesn't
 
@@ -399,9 +399,9 @@ Same as Option A but containerized. Would add a `Dockerfile` and `docker-compose
 |------|-------------|
 | Hetzner CX22 | €4.35 (~$5) |
 | Domain (.de) | ~€1/mo amortized |
-| AI API (Anthropic) — active auto-sim | $60-80 |
-| AI API (XAI) — AfD agent | ~$5-10 |
-| **Total (with active sim)** | **~$75-100/mo** |
+| AI API (Anthropic) — active auto-sim | ~$40-55/term |
+| AI API (XAI) — AfD agent | ~$3/term |
+| **Total per term (with active sim)** | **~$50-65** |
 | **Total (manual sim only)** | **~$6-10/mo** |
 
 The AI API costs dominate. The hosting itself is negligible.
