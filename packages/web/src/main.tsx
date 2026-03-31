@@ -539,7 +539,7 @@ function App() {
         {/* ── Top navigation bar ── */}
         <nav className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
           <Link to="/" className="font-extrabold text-base text-white no-underline mr-5 whitespace-nowrap shrink-0 tracking-tight hover:opacity-90">
-            KI Bundestag
+            KAI Bundestag
           </Link>
 
           {/* Desktop links */}
@@ -643,7 +643,7 @@ function App() {
               <Link to="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Impressum</Link>
               <Link to="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">Datenschutz</Link>
             </div>
-            <div className="text-[11px] text-muted-foreground">KI Bundestag &mdash; AI-Powered Parliament Simulation</div>
+            <div className="text-[11px] text-muted-foreground">KAI Bundestag &mdash; AI-Powered Parliament Simulation</div>
           </div>
         </footer>
       </div>

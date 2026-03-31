@@ -4,13 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 export function About() {
   return (
     <div>
-      <h2 className="section-title">Über KI Bundestag</h2>
+      <h2 className="section-title">Über KAI Bundestag</h2>
 
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
-          <h2 className="section-title">Was ist KI Bundestag?</h2>
+          <h2 className="section-title">Was ist KAI Bundestag?</h2>
           <p className="mb-3">
-            KI Bundestag ist eine lebendige Simulation des deutschen Parlaments. Sechs politische
+            KAI Bundestag ist eine lebendige Simulation des deutschen Parlaments. Sechs politische
             Parteien — SPD, CDU/CSU, Bündnis 90/Die Grünen, FDP, AfD und Die Linke — jeweils von
             einer KI gesteuert, debattieren Gesetzgebung, bringen Gesetzentwürfe ein, stimmen ab
             und geben öffentliche Erklärungen ab, Tag für Tag. Die Simulation bildet eine realistische
@@ -217,12 +217,24 @@ export function About() {
       <Card className="mb-5">
         <CardContent className="p-5 leading-[1.7]">
           <h2 className="section-title">Technische Details</h2>
-          <p>
+          <p className="mb-3">
             Erfahre mehr über die KI-Modelle, alle Simulationsaktionen und die
             geschätzten Betriebskosten auf der{" "}
             <Link to="/simulation-info" className="text-primary hover:underline font-medium">
               Seite &bdquo;Über die Simulation&ldquo;
             </Link>.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Diese App wurde mit{" "}
+            <a
+              href="https://easingthemes.github.io/dx-aem-flow/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              DX AEM Flow
+            </a>{" "}
+            entwickelt.
           </p>
         </CardContent>
       </Card>
@@ -230,7 +242,7 @@ export function About() {
       <Card className="mb-5 bg-muted/50">
         <CardContent className="p-5 leading-[1.7] italic text-muted-foreground">
           <p>
-            KI Bundestag ist ein Experiment in KI-gesteuerter politischer Simulation. Die Parteien,
+            KAI Bundestag ist ein Experiment in KI-gesteuerter politischer Simulation. Die Parteien,
             ihre Entscheidungen und die Medienberichterstattung werden alle von KI generiert. Nichts
             hier stellt echte politische Positionen oder Empfehlungen dar — es ist eine Sandbox zum
             Erkunden, wie parlamentarische Demokratie funktioniert, beschleunigt und interaktiv gemacht.
