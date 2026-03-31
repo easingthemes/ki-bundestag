@@ -88,6 +88,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   currentDay: integer("current_day").notNull().default(0),
   lastRunAt: text("last_run_at"),
   dayStartedAt: text("day_started_at"),
+  heartbeatAt: text("heartbeat_at"),
   nextElectionDay: integer("next_election_day").notNull().default(1461),
   lowSentimentStreak: integer("low_sentiment_streak").notNull().default(0),
   budgetRetryDay: integer("budget_retry_day"),

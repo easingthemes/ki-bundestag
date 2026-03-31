@@ -19,20 +19,25 @@ const PRESET_LABEL: Record<string, string> = {
   slow: "Langsam",
 };
 
+/** How long without a heartbeat before we consider the sim dead (2 min) */
+const HEARTBEAT_STALE_MS = 120_000;
+
 function deriveState(status: SimulationStatus, now: number): SimState {
   const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
   const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
+  const heartbeat = status.heartbeatAt ? new Date(status.heartbeatAt).getTime() : 0;
 
-  // Currently running a day — but cap at 15 min to catch crashed/failed runs
-  // (batch API calls can make days take 10+ minutes)
+  // Currently running a day (started > completed)
   if (started > completed) {
-    const sinceStarted = now - started;
-    if (sinceStarted < 900_000) return "running";
-    // Started but never completed after 15 min → treat as stopped/failed
+    // Check heartbeat — if the sim process is alive, heartbeat is recent
+    if (heartbeat > 0 && (now - heartbeat) < HEARTBEAT_STALE_MS) return "running";
+    // No heartbeat data (old server) — fall back to started time check (generous 30 min)
+    if (heartbeat === 0 && (now - started) < 1_800_000) return "running";
+    // Heartbeat stale → process likely crashed
     return completed > 0 ? "paused" : "stopped";
   }
 
-  // Completed recently (within 2 min) — likely running in auto mode
+  // Completed recently (within 2 min) — likely running in auto mode between days
   const sinceCompleted = now - completed;
   if (completed > 0 && sinceCompleted < 120_000) return "running";
 

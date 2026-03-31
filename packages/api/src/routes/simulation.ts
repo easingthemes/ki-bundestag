@@ -103,6 +103,7 @@ router.get("/api/simulation/status", (_req, res) => {
     currentDay: meta.currentDay,
     lastRunAt: meta.lastRunAt,
     dayStartedAt: (meta as any).dayStartedAt ?? null,
+    heartbeatAt: (meta as any).heartbeatAt ?? null,
     nextElectionDay: meta.nextElectionDay,
     budgetRetryDay: (meta as any).budgetRetryDay ?? null,
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,
