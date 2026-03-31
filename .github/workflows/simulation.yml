@@ -24,6 +24,7 @@ on:
           - 1-day
           - 3-days
           - 6-days
+          - full-mandat
       preset:
         description: "[start] Timing preset (leave unchanged to keep current)"
         required: false
@@ -118,6 +119,26 @@ jobs:
                     pm2 save
                     pm2 status
                     ;;
+                  full-mandat)
+                    # Calculate days remaining until next election + 30 days buffer
+                    # for campaign (21d) and coalition negotiations (~8d).
+                    # Term = 1461 sim days (4 years). This runs the entire remaining mandate.
+                    CURRENT_DAY=$(sqlite3 data/simulation.db "SELECT current_day FROM simulation_meta LIMIT 1")
+                    NEXT_ELECTION=$(sqlite3 data/simulation.db "SELECT next_election_day FROM simulation_meta LIMIT 1")
+                    REMAINING=$((NEXT_ELECTION - CURRENT_DAY + 30))
+                    if [ "$REMAINING" -le 0 ]; then
+                      REMAINING=1491  # Full term (1461) + 30 days buffer
+                    fi
+                    echo "==> Full Mandat: current_day=$CURRENT_DAY, next_election=$NEXT_ELECTION"
+                    echo "==> Running $REMAINING simulation days (until election + government formation)"
+                    pm2 stop ki-simulate 2>/dev/null || true
+                    pm2 delete ki-simulate 2>/dev/null || true
+                    pm2 start npx --name ki-simulate --no-autorestart -- tsx packages/engine/src/runner.ts "$REMAINING"
+                    echo "==> Full Mandat simulation started. Check progress with: pm2 logs ki-simulate"
+                    pm2 save
+                    pm2 status
+                    ;;
+
                   1-day|3-days|6-days)
                     # Run N-day simulation via PM2 so it survives SSH disconnect.
                     # Each day takes ~5-10 min (Batch API polling), so 6 days ≈ 30-60 min.
