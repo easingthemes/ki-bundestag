@@ -9,7 +9,7 @@ const MODEL_CONFIG = [
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_SPD",
-    usedFor: "SPD party agent — daily actions, minister responses",
+    usedFor: "SPD-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 70, auth: 40) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Single call per day. Falls back to auto-abstain on all bills if API call fails. Also used for SPD minister responses to interpellations.",
@@ -19,7 +19,7 @@ const MODEL_CONFIG = [
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_CDU",
-    usedFor: "CDU party agent — daily actions, minister responses",
+    usedFor: "CDU-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 30, auth: 60) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Single call per day. Falls back to auto-abstain on all bills if API call fails. Also used for CDU minister responses to interpellations.",
@@ -29,7 +29,7 @@ const MODEL_CONFIG = [
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_GRUENE",
-    usedFor: "Grüne party agent — daily actions, minister responses",
+    usedFor: "Grüne-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 65, auth: 25) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Single call per day. Falls back to auto-abstain on all bills if API call fails. Also used for Grüne minister responses to interpellations.",
@@ -39,7 +39,7 @@ const MODEL_CONFIG = [
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_FDP",
-    usedFor: "FDP party agent — daily actions, minister responses",
+    usedFor: "FDP-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 35, auth: 20) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Single call per day. Falls back to auto-abstain on all bills if API call fails. Also used for FDP minister responses to interpellations.",
@@ -49,7 +49,7 @@ const MODEL_CONFIG = [
     model: "xai:grok-3-mini",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_AFD",
-    usedFor: "AfD party agent — daily actions, minister responses",
+    usedFor: "AfD-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 10, auth: 80) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Uses xAI grok-3-mini because other models (e.g. Claude) refuse to authentically roleplay as AfD — they respond with disclaimers or third-person descriptions instead of in-character actions. Grok performs genuine role-playing for all parties without political-correctness filtering. This was not a cost-related decision. Falls back to auto-abstain on all bills if API call fails. Also used for AfD minister responses to interpellations.",
@@ -59,47 +59,47 @@ const MODEL_CONFIG = [
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_PARTY_LINKE",
-    usedFor: "Linke party agent — daily actions, minister responses",
+    usedFor: "Linke-Parteiagent — tägliche Aktionen, Ministerantworten",
     systemPrompt: "Party profile (voice, strategy, red lines, relationships) + party ideology (left: 85, auth: 35) + 17 behavioral rules, response schema, impact constraints",
     userContext: "Party profile + daily briefing + own recent actions (14d) + party state, all parties, economy, top 20 recent events, active crises, pending bills (third/second reading), recent media (3d), recent motions (3d), recent interpellations (5d), confidence votes (7d), constitutional challenges (7d), active election, government (Chancellor + ministers), hasFraktion, fraktionLeader. Context budget: 8000 tokens.",
     notes: "Single call per day. Falls back to auto-abstain on all bills if API call fails. Also used for Linke minister responses to interpellations.",
   },
   {
-    key: "Coalition Negotiation",
+    key: "Koalitionsverhandlung",
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 1024,
     envVar: "MODEL_NEGOTIATION",
-    usedFor: "Coalition negotiation — 3 rounds post-election (per-party calls)",
+    usedFor: "Koalitionsverhandlung — 3 Runden nach der Wahl (pro Partei)",
     systemPrompt: "Negotiation-specific system prompt: form a viable coalition, be strategic",
     userContext: "Party info, election results, previous round positions from all parties, ideology scores",
     notes: "1 call per party per round × 3 rounds. Normal party agents skipped during negotiation days. Uses per-party models based on PARTY_MODELS.",
   },
   {
-    key: "Coalition Synthesis",
+    key: "Koalitionssynthese",
     model: "anthropic:claude-sonnet-4-5-20250929",
     maxTokens: 4096,
     envVar: "MODEL_SYNTHESIS",
-    usedFor: "Coalition agreement synthesis after all 3 negotiation rounds",
+    usedFor: "Koalitionsvertragssynthese nach allen 3 Verhandlungsrunden",
     systemPrompt: "Synthesize a realistic German coalition agreement",
     userContext: "All 3 rounds of all party positions and concessions, election seat counts",
     notes: "1 call total after round 3. Must produce ≥2 parties with ≥368 seats. Falls back to algorithmic formGovernment() on failure.",
   },
   {
-    key: "Daily Briefing",
+    key: "Tagesbriefing",
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 512,
     envVar: "MODEL_DAILY",
-    usedFor: "Shared political briefing — synthesizes 30-day history into narrative context",
+    usedFor: "Gemeinsames politisches Briefing — fasst 30-Tage-Historie in narrativen Kontext zusammen",
     systemPrompt: "Political analyst: summarize recent events, tensions, outlook in structured format",
     userContext: "Last 30 days of significant events, 14-day approval trends, coalition party IDs",
     notes: "1 call/day (day 3+), output shared across all 6 party agents + secondary calls (questions, interpellations, media). Skipped on days 1-2.",
   },
   {
-    key: "System (daily)",
+    key: "System (täglich)",
     model: "anthropic:claude-haiku-4-5-20251001",
     maxTokens: 2048,
     envVar: "MODEL_DAILY",
-    usedFor: "Citizen Q&A, media articles, polls, referendum topics, daily narrative summaries",
+    usedFor: "Bürgerfragen, Presseartikel, Umfragen, Volksabstimmungen, tägliche Zusammenfassungen",
     systemPrompt: "Various system prompts for non-party AI calls",
     userContext: "Contextual (varies by use case: pending questions, recent events, active crises, daily briefing context)",
     notes: "Fallback model for system-wide AI calls not tied to a specific party. Secondary calls now receive the daily briefing for richer context.",
@@ -121,11 +121,11 @@ export function ModelConfig() {
           <table className="w-full border-collapse text-sm min-w-[500px]">
             <thead>
               <tr>
-                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Key</th>
-                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Model</th>
-                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Tokens</th>
-                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Env Override</th>
-                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">Used For</th>
+                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">{t("modelConfig.spalteKey")}</th>
+                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">{t("modelConfig.spalteModel")}</th>
+                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">{t("modelConfig.spalteTokens")}</th>
+                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">{t("modelConfig.spalteEnvOverride")}</th>
+                <th className="text-left px-3 py-2.5 bg-muted/50 border-b-2 border-border text-xs uppercase text-muted-foreground font-semibold">{t("modelConfig.spalteUsedFor")}</th>
                 <th className="w-8 bg-muted/50 border-b-2 border-border"></th>
               </tr>
             </thead>
@@ -153,15 +153,15 @@ export function ModelConfig() {
                       <td colSpan={6} className="bg-muted/30 p-0">
                         <div className="px-4 py-3 border-l-[3px] border-l-primary/30">
                           <div className="flex gap-3 mb-1.5 text-sm leading-relaxed">
-                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">System prompt</span>
+                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">{t("modelConfig.systemPrompt")}</span>
                             <span>{m.systemPrompt}</span>
                           </div>
                           <div className="flex gap-3 mb-1.5 text-sm leading-relaxed">
-                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">User context</span>
+                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">{t("modelConfig.userContext")}</span>
                             <span>{m.userContext}</span>
                           </div>
                           <div className="flex gap-3 text-sm leading-relaxed">
-                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">Notes</span>
+                            <span className="shrink-0 w-28 font-semibold text-muted-foreground text-xs uppercase pt-px">{t("modelConfig.notes")}</span>
                             <span>{m.notes}</span>
                           </div>
                         </div>
