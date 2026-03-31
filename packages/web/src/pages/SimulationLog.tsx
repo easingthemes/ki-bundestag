@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, DaySummary, SimulationEvent } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -21,6 +22,7 @@ function bundestagDayLabel(dayNumber: number): string {
 }
 
 export function SimulationLog() {
+  const { t } = useTranslation("notifications");
   const [days, setDays] = useState<DaySummary[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayEvents, setDayEvents] = useState<SimulationEvent[]>([]);
@@ -45,9 +47,9 @@ export function SimulationLog() {
 
   return (
     <div>
-      <h2 className="section-title">Simulationsprotokoll</h2>
+      <h2 className="section-title">{t("simulationLog.title")}</h2>
       {days.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Simulationsdaten. Starte die Simulation, um das Protokoll zu sehen.</p>
+        <p className="text-center py-8 text-muted-foreground">{t("simulationLog.empty")}</p>
       )}
       {(() => {
         const reversed = [...days].reverse();
@@ -65,7 +67,7 @@ export function SimulationLog() {
                       {bundestagDayLabel(day.dayNumber)}
                     </span>
                   </span>
-                  <span className="ml-4">{day.eventCount} events</span>
+                  <span className="ml-4">{t("simulationLog.events", { count: day.eventCount })}</span>
                   {day.summary && <span className="text-muted-foreground ml-4">{day.summary}</span>}
                   <span className="float-right flex items-center gap-3">
                     {day.simulatedAt && (

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, type ActivityItem } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +46,7 @@ function entityLink(item: ActivityItem): string | null {
 }
 
 export function MyActivity() {
+  const { t } = useTranslation("notifications");
   const { user } = useUser();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -74,8 +76,8 @@ export function MyActivity() {
   if (!user) {
     return (
       <div>
-        <h2 className="section-title">Meine Aktivitäten</h2>
-        <p className="text-sm text-muted-foreground">Melde dich an, um deine Aktivitäten zu sehen.</p>
+        <h2 className="section-title">{t("activity.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("activity.loginPrompt")}</p>
       </div>
     );
   }
@@ -85,19 +87,19 @@ export function MyActivity() {
 
   return (
     <div>
-      <h2 className="section-title">Meine Aktivitäten</h2>
-      <p className="text-sm text-muted-foreground mb-4">Alles, was du in der Simulation getan hast.</p>
+      <h2 className="section-title">{t("activity.title")}</h2>
+      <p className="text-sm text-muted-foreground mb-4">{t("activity.subtitle")}</p>
 
       {/* Filter pills */}
       <FilterPills
         className="mb-5"
-        options={types.map(t => ({ value: t, label: t === "all" ? "All" : t.replace(/_/g, " ") }))}
+        options={types.map(type => ({ value: type, label: type === "all" ? t("activity.filter.all") : type.replace(/_/g, " ") }))}
         value={filter}
-        onChange={t => { setFilter(t); }}
+        onChange={type => { setFilter(type); }}
       />
 
       {filtered.length === 0 && !loading && (
-        <p className="text-sm text-muted-foreground">Noch keine Aktivitäten. Fange an mitzumachen!</p>
+        <p className="text-sm text-muted-foreground">{t("activity.empty")}</p>
       )}
 
       <div className="space-y-3">
@@ -112,21 +114,21 @@ export function MyActivity() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-medium text-sm">{item.title}</span>
                       <Badge variant="outline" className={TYPE_BADGE[item.type] ?? "bg-zinc-100 text-zinc-600 border-zinc-200"}>
-                        {item.type.replace(/_/g, " ")}
+                        {t(`activity.activityTypes.${item.type}`, { defaultValue: item.type.replace(/_/g, " ") })}
                       </Badge>
                       {item.outcome && (
                         <Badge variant="outline" className={OUTCOME_BADGE[item.outcome] ?? "bg-zinc-100 text-zinc-600 border-zinc-200"}>
-                          {item.outcome}
+                          {t(`activity.outcomes.${item.outcome}`, { defaultValue: item.outcome })}
                         </Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-muted-foreground">
-                        {item.dayNumber > 0 ? `Day ${item.dayNumber}` : ""} {new Date(item.createdAt).toLocaleString("de-DE")}
+                        {item.dayNumber > 0 ? t("activity.day", { number: item.dayNumber }) : ""} {new Date(item.createdAt).toLocaleString("de-DE")}
                       </span>
                       {link && (
-                        <Link to={link} className="text-xs text-blue-600 hover:underline">View →</Link>
+                        <Link to={link} className="text-xs text-blue-600 hover:underline">{t("activity.view")}</Link>
                       )}
                     </div>
                   </div>
