@@ -33,9 +33,9 @@ const DEFAULT_CAPABILITIES: PartyCapabilities = {
   hasActiveElection: false,
 };
 
-export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabilities): string {
+export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabilities, realPositions?: string): string {
   const caps = capabilities ?? DEFAULT_CAPABILITIES;
-  const profile = partyId ? getPartyProfile(partyId) : "";
+  const profile = partyId ? getPartyProfile(partyId, realPositions) : "";
   const profileSection = profile ? `${profile}\n\n` : "";
 
   // Build rules dynamically based on capabilities
@@ -293,6 +293,9 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
   let briefingSection = "";
   if (depth.enableBriefing && ctx.briefing) {
     briefingSection = `\nDAILY BRIEFING:\n${ctx.briefing}\n`;
+  }
+  if (depth.enableKnowledgeGrounding && ctx.realWorldContext) {
+    briefingSection += `\n${ctx.realWorldContext}\n`;
   }
 
   // ── Priority 2+3: Budget-trimmed optional sections ────────────────────

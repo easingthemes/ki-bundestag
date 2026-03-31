@@ -277,6 +277,18 @@ export const aiCalls = sqliteTable("ai_calls", {
   createdAt: text("created_at").notNull(),
 });
 
+export const realWorldKnowledge = sqliteTable("real_world_knowledge", {
+  id: text("id").primaryKey(),
+  generation: integer("generation").notNull(),
+  category: text("category").notNull(),       // "landscape" | "party_position" | "shock" | "headline"
+  partyId: text("party_id"),
+  digest: text("digest").notNull(),
+  sourceUrls: text("source_urls", { mode: "json" }),
+  fetchedAt: text("fetched_at").notNull(),
+  simDayFirstUsed: integer("sim_day_first_used"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+});
+
 export const bundestagSeats = sqliteTable("bundestag_seats", {
   id: text("id").primaryKey(),
   seatNumber: integer("seat_number").notNull(),
