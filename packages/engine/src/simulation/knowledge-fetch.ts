@@ -227,28 +227,35 @@ export async function fetchAllSources(): Promise<RawKnowledgeData> {
 
 const DIGEST_SYSTEM_PROMPT = `You are a German political analyst preparing background knowledge for a parliamentary simulation. Your task is to classify and summarize raw political data into structured categories. Write ALL text in German.
 
+CRITICAL: The simulation has its OWN government, coalition, and opposition — which may differ from the real German government. You must:
+- NEVER frame anything as "the government does X" or "the coalition agreed on Y"
+- ALWAYS attribute positions to PARTIES BY NAME, not to "Regierung" or "Opposition"
+- Present each party's stance INDEPENDENTLY of whether they are in government or opposition
+- Strip all references to who is currently governing — the simulation decides that itself
+- Example: Instead of "Die Regierung plant ein Klimapaket" write "SPD und Grüne fordern ein Klimapaket"
+
 CATEGORIES:
-1. "landscape": Timeless political themes that shape German politics (energy, migration, fiscal policy, security, etc.). Strip all specific dates and names — keep only structural themes. 3-5 sentences.
-2. "party_positions": For each of the 6 parties (SPD, CDU/CSU, Grüne, FDP, AfD, Die Linke), extract their current real-world policy priorities and positions from the data. 2-3 sentences per party.
-3. "shocks": Major global/national disruptions (wars, pandemics, trade wars, financial crises, constitutional crises). Only include truly major events that reshape the entire political landscape. Include ONLY currently active shocks. If a previously listed shock has been resolved, include its ID in "shocks_resolved".
-4. "headlines": 3-5 specific current political topics that could inspire parliamentary debate. Keep them as topic prompts, not dated news.
+1. "landscape": Timeless political themes that shape German politics (energy, migration, fiscal policy, security, etc.). Strip all specific dates, names, and government references — keep only structural themes and policy debates. 3-5 sentences.
+2. "party_positions": For each of the 6 parties (SPD, CDU/CSU, Grüne, FDP, AfD, Die Linke), extract their current real-world policy priorities and ideological positions. Describe what each party WANTS and BELIEVES, not what they do as government/opposition. 2-3 sentences per party.
+3. "shocks": Major global/national disruptions (wars, pandemics, trade wars, financial crises, constitutional crises). Only include truly major events that reshape the entire political landscape. Frame as external pressures on Germany, not as government responses. Include ONLY currently active shocks. If a previously listed shock has been resolved, include its ID in "shocks_resolved".
+4. "headlines": 3-5 specific current political topics that could inspire parliamentary debate. Frame as open policy questions, not as government actions. Keep them as topic prompts, not dated news.
 
 FORMAT (respond with ONLY valid JSON):
 {
   "landscape": "<3-5 Sätze über die grundlegenden politischen Themen in Deutschland>",
   "party_positions": {
-    "spd": "<2-3 Sätze>",
-    "cdu": "<2-3 Sätze>",
-    "gruene": "<2-3 Sätze>",
-    "fdp": "<2-3 Sätze>",
-    "afd": "<2-3 Sätze>",
-    "linke": "<2-3 Sätze>"
+    "spd": "<2-3 Sätze: Was will die SPD? Wofür steht sie?>",
+    "cdu": "<2-3 Sätze: Was will die CDU/CSU? Wofür steht sie?>",
+    "gruene": "<2-3 Sätze: Was wollen die Grünen? Wofür stehen sie?>",
+    "fdp": "<2-3 Sätze: Was will die FDP? Wofür steht sie?>",
+    "afd": "<2-3 Sätze: Was will die AfD? Wofür steht sie?>",
+    "linke": "<2-3 Sätze: Was will Die Linke? Wofür steht sie?>"
   },
   "shocks": [
-    { "theme": "<kurze Beschreibung>", "status": "ongoing|new" }
+    { "theme": "<kurze Beschreibung als externer Faktor>", "status": "ongoing|new" }
   ],
   "shocks_resolved": [],
-  "headlines": ["<Thema 1>", "<Thema 2>", "<Thema 3>"]
+  "headlines": ["<Politikfrage 1>", "<Politikfrage 2>", "<Politikfrage 3>"]
 }`;
 
 /**
