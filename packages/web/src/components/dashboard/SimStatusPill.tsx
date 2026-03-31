@@ -23,11 +23,12 @@ function deriveState(status: SimulationStatus, now: number): SimState {
   const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
   const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
 
-  // Currently running a day — but cap at 5 min to catch crashed/failed runs
+  // Currently running a day — but cap at 15 min to catch crashed/failed runs
+  // (batch API calls can make days take 10+ minutes)
   if (started > completed) {
     const sinceStarted = now - started;
-    if (sinceStarted < 300_000) return "running";
-    // Started but never completed after 5 min → treat as stopped/failed
+    if (sinceStarted < 900_000) return "running";
+    // Started but never completed after 15 min → treat as stopped/failed
     return completed > 0 ? "paused" : "stopped";
   }
 
