@@ -33,6 +33,8 @@ export interface DepthConfig {
   enableBriefing: boolean;
   /** Whether to pass briefing to secondary calls (questions, media, interpellations). */
   enrichSecondaryCalls: boolean;
+  /** Whether to fetch and inject real-world knowledge (news, party positions, shocks). */
+  enableKnowledgeGrounding: boolean;
   /** Display label. */
   label: string;
 }
@@ -49,6 +51,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     includeP3: false,
     enableBriefing: false,
     enrichSecondaryCalls: false,
+    enableKnowledgeGrounding: false,
     label: "Low",
   },
   normal: {
@@ -62,6 +65,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     includeP3: true,
     enableBriefing: true,
     enrichSecondaryCalls: true,
+    enableKnowledgeGrounding: true,
     label: "Normal",
   },
   high: {
@@ -75,6 +79,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     includeP3: true,
     enableBriefing: true,
     enrichSecondaryCalls: true,
+    enableKnowledgeGrounding: true,
     label: "High",
   },
 };

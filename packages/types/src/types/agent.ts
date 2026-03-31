@@ -28,6 +28,8 @@ export interface AgentContext {
   mdbVoteSummary?: Record<string, { yes: number; no: number; abstain: number; total: number }>;  // keyed by billId
   briefing?: string;
   recentOwnActions?: Array<{ day: number; type: string; title: string }>;
+  realWorldContext?: string;
+  realPartyPositions?: string;
 }
 
 export interface ProposeBillAction {
