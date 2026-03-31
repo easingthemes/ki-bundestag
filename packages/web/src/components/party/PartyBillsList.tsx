@@ -13,7 +13,7 @@ interface PartyBillsListProps {
 
 export function PartyBillsList({ bills, visibleBills, onShowMore }: PartyBillsListProps) {
   if (bills.length === 0) {
-    return <p className="text-sm text-muted-foreground">No bills proposed yet.</p>;
+    return <p className="text-sm text-muted-foreground">Noch keine Gesetzentwürfe eingebracht.</p>;
   }
 
   return (
@@ -22,9 +22,9 @@ export function PartyBillsList({ bills, visibleBills, onShowMore }: PartyBillsLi
         <table className="w-full border-collapse text-sm min-w-[480px]">
           <thead>
             <tr>
-              <th className="text-left px-3 py-2 border-b-2 border-border">Title</th>
-              <th className="text-left px-3 py-2 border-b-2 border-border">Category</th>
-              <th className="text-center px-3 py-2 border-b-2 border-border">Day</th>
+              <th className="text-left px-3 py-2 border-b-2 border-border">Titel</th>
+              <th className="text-left px-3 py-2 border-b-2 border-border">Kategorie</th>
+              <th className="text-center px-3 py-2 border-b-2 border-border">Tag</th>
               <th className="text-center px-3 py-2 border-b-2 border-border">Status</th>
             </tr>
           </thead>

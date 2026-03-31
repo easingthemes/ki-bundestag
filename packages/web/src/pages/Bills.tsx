@@ -10,20 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_COLORS, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
+import { useTranslation } from "react-i18next";
 
 const GROUP_INITIAL = 5;
-
-const STATUS_LABELS: Record<string, string> = {
-  third_reading: "3. Lesung",
-  second_reading: "2. Lesung",
-  committee: "Ausschuss",
-  first_reading: "1. Lesung",
-  proposed: "Eingebracht",
-  passed: "Angenommen",
-  rejected: "Abgelehnt",
-  debate: "Debatte",
-  struck_down: "Verfassungswidrig",
-};
 
 const STATUS_ORDER = ["third_reading", "second_reading", "committee", "first_reading", "proposed", "passed", "rejected", "struck_down", "debate"];
 
@@ -32,6 +21,7 @@ const BILL_CATEGORIES = ["economy", "social", "environment", "immigration", "def
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Bills() {
+  const { t } = useTranslation("legislation");
   const { user } = useUser();
   const [bills, setBills] = useState<Bill[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
@@ -80,57 +70,57 @@ export function Bills() {
 
   return (
     <div>
-      <h2 className="section-title">Gesetzentwürfe</h2>
+      <h2 className="section-title">{t("title")}</h2>
 
       {/* Registration prompt */}
       {!user && signalReadyCount > 0 && (
         <div className={cn(ALERT_STYLES.info, "mb-4")}>
-          <Link to="/parties" className="text-blue-700 font-semibold hover:underline">Registrieren und einer Partei beitreten</Link> um deine Position zu Gesetzen in 2. und 3. Lesung zu signalisieren.
+          <Link to="/parties" className="text-blue-700 font-semibold hover:underline">{t("registerPrompt")}</Link> {t("registerPromptSuffix")}
         </div>
       )}
 
       {/* Signal-ready nudge for members */}
       {user && user.partyId && signalReadyCount > 0 && (
         <div className={cn(ALERT_STYLES.warning, "mb-4")}>
-          {signalReadyCount} Gesetz{signalReadyCount !== 1 ? "e" : ""} in der Lesung — klicken, um deine Position zu signalisieren.
+          {t("signalNudge", { count: signalReadyCount })}
         </div>
       )}
 
       <div className="flex gap-2 flex-wrap mb-4 items-center">
         <input
           type="text"
-          placeholder="Gesetze suchen..."
+          placeholder={t("filter.searchPlaceholder")}
           value={filterSearch}
           onChange={e => setFilterSearch(e.target.value)}
           className={cn(SELECT_CLS, "min-w-40")}
         />
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className={SELECT_CLS}>
-          <option value="">Alle Kategorien</option>
+          <option value="">{t("filter.allCategories")}</option>
           {BILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filterParty} onChange={e => setFilterParty(e.target.value)} className={SELECT_CLS}>
-          <option value="">Alle Parteien</option>
+          <option value="">{t("filter.allParties")}</option>
           {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
-          <option value="">Alle Status</option>
-          {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s] ?? s.replace("_", " ")}</option>)}
+          <option value="">{t("filter.allStatus")}</option>
+          {STATUS_ORDER.map(s => <option key={s} value={s}>{t(`status.${s}`, s.replace("_", " "))}</option>)}
         </select>
         {hasFilters && (
           <button
             onClick={() => { setFilterCategory(""); setFilterParty(""); setFilterSearch(""); setFilterStatus(""); }}
             className="h-9 px-3 text-xs rounded-md border border-input bg-secondary hover:bg-accent cursor-pointer"
           >
-            Zurücksetzen
+            {t("filter.reset")}
           </button>
         )}
         <span className="text-xs text-muted-foreground ml-1">
-          {filteredBills.length} Gesetz{filteredBills.length !== 1 ? "e" : ""}
+          {t("filter.billCount", { count: filteredBills.length })}
         </span>
       </div>
 
       {bills.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Gesetzentwürfe. Starte die Simulation, um Gesetze zu sehen.</p>
+        <p className="text-center py-8 text-muted-foreground">{t("empty")}</p>
       )}
       {grouped.map(group => {
         const limit = groupLimits[group.status] ?? GROUP_INITIAL;
@@ -138,7 +128,7 @@ export function Bills() {
         return (
           <div key={group.status} className="mb-8">
             <h2 className="section-title">
-              {STATUS_LABELS[group.status] ?? group.status} ({group.bills.length})
+              {t(`status.${group.status}`, group.status)} ({group.bills.length})
             </h2>
             {visible.map(bill => (
               <BillCard key={bill.id} bill={bill} partyMap={partyMap} isMember={!!user?.partyId} hasSeat={!!mySeat} />
@@ -157,6 +147,7 @@ export function Bills() {
 }
 
 function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap: Map<string, Party>; isMember: boolean; hasSeat: boolean }) {
+  const { t } = useTranslation("legislation");
   const proposer = partyMap.get(bill.proposedBy);
   const totalSeats = bill.votes.reduce((sum, v) => {
     const p = partyMap.get(v.partyId);
@@ -187,39 +178,39 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
           </div>
           <span className="flex gap-1.5 items-center">
             {hasSeat && ["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
-              <MdbActionIcon title={bill.status === "third_reading" ? "Abstimmen & Rede halten als MdB" : "Rede halten als MdB"} />
+              <MdbActionIcon title={bill.status === "third_reading" ? t("mdbAction") : t("mdbSpeechAction")} />
             )}
             {isMember && !hasSeat && (bill.status === "second_reading" || bill.status === "third_reading") && (
-              <UserActionIcon title="Position signalisieren" />
+              <UserActionIcon title={t("signalAction")} />
             )}
             {bill.isGovernmentBill && (
-              <Badge variant="outline" className={GOVT_BILL_BADGE}>Regierungsentwurf</Badge>
+              <Badge variant="outline" className={GOVT_BILL_BADGE}>{t("badges.govtBill")}</Badge>
             )}
             {bill.memberInitiative && (
-              <Badge className={MEMBER_INITIATIVE_BADGE}>Mitgliederinitiative</Badge>
+              <Badge className={MEMBER_INITIATIVE_BADGE}>{t("badges.memberInitiative")}</Badge>
             )}
             {bill.vetoedByPresident && (
-              <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vom Präsidenten vetiert</Badge>
+              <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>{t("badges.presidentialVeto")}</Badge>
             )}
             <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>
-              {STATUS_LABELS[bill.status] ?? bill.status}
+              {t(`status.${bill.status}`, bill.status)}
             </Badge>
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-1">{bill.description}</p>
         <p className="text-xs text-muted-foreground">
-          Eingebracht von {bill.memberInitiative && bill.proposerDisplayName
+          {t("proposedBy")} {bill.memberInitiative && bill.proposerDisplayName
             ? <><span className="font-medium text-purple-700">{bill.proposerDisplayName}</span> ({proposer?.name ?? bill.proposedBy})</>
             : proposer?.name ?? bill.proposedBy
-          } am Tag {bill.proposedOnDay}
+          } {t("onDay", { day: bill.proposedOnDay })}
         </p>
 
         {bill.committeeName && (
           <p className="text-xs text-muted-foreground mt-1">
-            Ausschuss: <strong>{bill.committeeName}</strong>
+            {t("committeeLabel")}: <strong>{bill.committeeName}</strong>
             {bill.committeeRecommendation && (
               <span className="ml-2">
-                — Empfehlung: <span
+                — {t("committeeRecommendation")}: <span
                   className="font-semibold"
                   style={{
                     color: bill.committeeRecommendation === "pass" ? "#155724"
@@ -227,7 +218,7 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
                       : "#856404"
                   }}
                 >
-                  {bill.committeeRecommendation === "pass" ? "Annahme" : bill.committeeRecommendation === "reject" ? "Ablehnung" : "Änderung"}
+                  {bill.committeeRecommendation === "pass" ? t("recommendationPass") : bill.committeeRecommendation === "reject" ? t("recommendationReject") : t("recommendationAmend")}
                 </span>
               </span>
             )}
@@ -237,7 +228,7 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
         {amendments.length > 0 && (
           <div className="mt-2">
             <p className="text-xs font-semibold text-muted-foreground mb-1">
-              Änderungsanträge ({amendments.length}):
+              {t("amendmentsLabel")} ({amendments.length}):
             </p>
             {amendments.map(a => (
               <div key={a.id} className="text-xs text-muted-foreground py-0.5 flex items-center gap-1.5">
@@ -245,7 +236,7 @@ function BillCard({ bill, partyMap, isMember, hasSeat }: { bill: Bill; partyMap:
                   "text-xs px-1.5 py-0",
                   a.accepted ? STATUS_BADGE.passed : STATUS_BADGE.rejected
                 )}>
-                  {a.accepted ? "angenommen" : "abgelehnt"}
+                  {a.accepted ? t("amendmentAccepted") : t("amendmentRejected")}
                 </Badge>
                 <span>„{a.title}" von {partyMap.get(a.proposedBy)?.name ?? a.proposedBy}</span>
               </div>

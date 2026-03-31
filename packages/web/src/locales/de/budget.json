@@ -1,0 +1,37 @@
+{
+  "title": "Bundeshaushalt",
+  "description": "Jährliche Haushaltszyklen — alle 60 Simulationstage schlägt die Koalition einen 300-Mrd.-EUR-Haushalt auf 8 Ministerien vor.",
+  "filter": {
+    "all": "Alle ({{count}})",
+    "passed": "Angenommen ({{count}})",
+    "rejected": "Abgelehnt ({{count}})"
+  },
+  "empty": {
+    "noBudgets": "Noch keine Haushaltszyklen. Abstimmungen erfolgen alle 60 Simulationstage.",
+    "noMatch": "Keine Haushaltspläne entsprechen dem aktuellen Filter."
+  },
+  "cycle": "Haushaltszyklus {{number}}",
+  "day": "Tag {{day}}",
+  "revised": "Überarbeitet",
+  "retryDay": "Wiederholung Tag {{day}}",
+  "status": {
+    "passed": "Angenommen",
+    "rejected": "Abgelehnt"
+  },
+  "vote": {
+    "parliamentVote": "Parlamentsabstimmung — Ja: {{yes}} / Nein: {{no}} Sitze",
+    "ministryAllocations": "Ministeriumsaufteilung (Gesamt: {{total}}Mrd. EUR)",
+    "economicEffects": "Wirtschaftliche Auswirkungen",
+    "partyVotes": "Parteiabstimmungen"
+  },
+  "ministry": {
+    "finance": "Finanzen",
+    "labour": "Arbeit & Soziales",
+    "environment": "Umwelt",
+    "interior": "Inneres",
+    "defence": "Verteidigung",
+    "education": "Bildung",
+    "health": "Gesundheit",
+    "infrastructure": "Infrastruktur"
+  }
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, type AppNotification } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
@@ -17,25 +18,9 @@ const TYPE_FILTERS = [
   "election_started", "election_result", "crisis_alert",
   "budget_outcome", "government_formed",
 ] as const;
-const TYPE_LABELS: Record<string, string> = {
-  all: "All",
-  morning_summary: "Morning Summary",
-  event_queued: "Queued",
-  event_ready: "Ready",
-  proposal_accepted: "Proposal Accepted",
-  proposal_declined: "Proposal Declined",
-  proposal_expired: "Proposal Expired",
-  question_answered: "Question Answered",
-  bill_outcome: "Bill Outcome",
-  mdb_vote_needed: "Vote Needed",
-  election_started: "Election",
-  election_result: "Election Result",
-  crisis_alert: "Crisis",
-  budget_outcome: "Budget",
-  government_formed: "Government",
-};
 
 export function Notifications() {
+  const { t } = useTranslation("notifications");
   const { user } = useUser();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [filter, setFilter] = useState("all");
@@ -52,8 +37,8 @@ export function Notifications() {
   if (!user) {
     return (
       <div>
-        <h2 className="section-title">Benachrichtigungen</h2>
-        <p className="text-sm text-muted-foreground">Melde dich an, um deine Benachrichtigungen zu sehen.</p>
+        <h2 className="section-title">{t("title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("loginPrompt")}</p>
       </div>
     );
   }
@@ -78,13 +63,13 @@ export function Notifications() {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="section-title !mb-0">Benachrichtigungen</h2>
+        <h2 className="section-title !mb-0">{t("title")}</h2>
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Alle als gelesen markieren ({unreadCount})
+            {t("markAllRead", { count: unreadCount })}
           </button>
         )}
       </div>
@@ -92,13 +77,13 @@ export function Notifications() {
       {/* Filter pills */}
       <FilterPills
         className="mb-5"
-        options={TYPE_FILTERS.map(t => ({ value: t, label: TYPE_LABELS[t] ?? t }))}
+        options={TYPE_FILTERS.map(type => ({ value: type, label: t(`types.${type}`) }))}
         value={filter}
-        onChange={t => { setFilter(t); setVisible(20); }}
+        onChange={type => { setFilter(type); setVisible(20); }}
       />
 
       {filtered.length === 0 && (
-        <EmptyState message="Keine Benachrichtigungen." icon="🔔" />
+        <EmptyState message={t("noNotifications")} icon="🔔" />
       )}
 
       <div className="space-y-3">
@@ -111,12 +96,12 @@ export function Notifications() {
                     {!n.read && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />}
                     <span className="font-medium text-sm">{n.title}</span>
                     <Badge variant="outline" className={NOTIFICATION_TYPE_BADGE[n.type] ?? "bg-zinc-100 text-zinc-600 border-zinc-200"}>
-                      {TYPE_LABELS[n.type] ?? n.type}
+                      {t(`types.${n.type}`, { defaultValue: n.type })}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground whitespace-pre-line">{n.message}</p>
                   <span className="text-xs text-muted-foreground mt-1 block">
-                    Day {n.dayNumber} &middot; {new Date(n.createdAt).toLocaleString("de-DE")}
+                    {t("day", { number: n.dayNumber })} &middot; {new Date(n.createdAt).toLocaleString("de-DE")}
                   </span>
                 </div>
                 {!n.read && (
@@ -124,7 +109,7 @@ export function Notifications() {
                     onClick={() => markRead(n.id)}
                     className="text-xs text-muted-foreground hover:text-foreground shrink-0 transition-colors"
                   >
-                    Gelesen
+                    {t("read")}
                   </button>
                 )}
               </div>

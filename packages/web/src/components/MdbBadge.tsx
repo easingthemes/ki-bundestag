@@ -12,7 +12,7 @@ export function MdbBadge() {
 
 export function DisciplineBadge({ level }: { level: number }) {
   const cls = DISCIPLINE_BADGE[level] ?? DISCIPLINE_BADGE[0];
-  const label = DISCIPLINE_LABEL[level] ?? "Unknown";
+  const label = DISCIPLINE_LABEL[level] ?? "Unbekannt";
   return (
     <Badge variant="outline" className={cn("text-xs", cls)}>
       {label}

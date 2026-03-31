@@ -1,0 +1,122 @@
+{
+  "title": "Gesetzentwürfe",
+  "status": {
+    "third_reading": "3. Lesung",
+    "second_reading": "2. Lesung",
+    "committee": "Ausschuss",
+    "first_reading": "1. Lesung",
+    "proposed": "Eingebracht",
+    "passed": "Angenommen",
+    "rejected": "Abgelehnt",
+    "debate": "Debatte",
+    "struck_down": "Verfassungswidrig"
+  },
+  "pipeline": {
+    "proposed": "Eingebracht",
+    "first_reading": "1. Lesung",
+    "committee": "Ausschuss",
+    "second_reading": "2. Lesung",
+    "third_reading": "3. Lesung",
+    "final": "Abschluss"
+  },
+  "filter": {
+    "searchPlaceholder": "Gesetze suchen...",
+    "allCategories": "Alle Kategorien",
+    "allParties": "Alle Parteien",
+    "allStatus": "Alle Status",
+    "reset": "Zurücksetzen",
+    "billCount": "{{count}} Gesetz",
+    "billCount_other": "{{count}} Gesetze"
+  },
+  "empty": "Noch keine Gesetzentwürfe. Starte die Simulation, um Gesetze zu sehen.",
+  "registerPrompt": "Registrieren und einer Partei beitreten",
+  "registerPromptSuffix": "um deine Position zu Gesetzen in 2. und 3. Lesung zu signalisieren.",
+  "signalNudge": "{{count}} Gesetz in der Lesung — klicken, um deine Position zu signalisieren.",
+  "signalNudge_other": "{{count}} Gesetze in der Lesung — klicken, um deine Position zu signalisieren.",
+  "proposedBy": "Eingebracht von",
+  "proposedByMember": "Vorgeschlagen von",
+  "onDay": "am Tag {{day}}",
+  "committeeLabel": "Ausschuss",
+  "committeeRecommendation": "Empfehlung",
+  "recommendationPass": "Annahme",
+  "recommendationReject": "Ablehnung",
+  "recommendationAmend": "Änderung",
+  "amendmentsLabel": "Änderungsanträge",
+  "amendmentAccepted": "angenommen",
+  "amendmentRejected": "abgelehnt",
+  "badges": {
+    "govtBill": "Regierungsentwurf",
+    "memberInitiative": "Mitgliederinitiative",
+    "presidentialVeto": "Vom Präsidenten vetiert"
+  },
+  "mdbAction": "Abstimmen & Rede halten als MdB",
+  "mdbSpeechAction": "Rede halten als MdB",
+  "signalAction": "Position signalisieren",
+  "backToAll": "Alle Gesetze",
+  "description": "Beschreibung",
+  "signals": {
+    "title": "Mitglieder-Signale",
+    "promptSignal": "Dieses Gesetz ist in der {{status}} — signalisiere deine Position, um die Abstimmung deiner Partei zu beeinflussen.",
+    "yes": "JA",
+    "no": "NEIN",
+    "yesCount": "{{count}} JA",
+    "noCount": "{{count}} NEIN",
+    "yesPct": "({{pct}}% JA)",
+    "signalHint": "Dein Signal ist für die Partei-KI bei der Abstimmung sichtbar.",
+    "noSignals": "Noch keine Signale.",
+    "joinToSignal": "Tritt einer Partei bei",
+    "joinToSignalSuffix": "um deine Meinung zu diesem Gesetz zu signalisieren."
+  },
+  "mdbVotes": {
+    "title": "MdB-Direktstimmen",
+    "promptVote": "Dieses Gesetz ist in der 3. Lesung — stimme als MdB direkt ab.",
+    "yes": "Ja",
+    "no": "Nein",
+    "abstain": "Enthaltung",
+    "totalVotes": "({{count}} MdB-Stimme gesamt)",
+    "totalVotes_other": "({{count}} MdB-Stimmen gesamt)",
+    "noVotes": "Noch keine MdB-Stimmen abgegeben.",
+    "yourVote": "Deine Stimme: {{vote}}",
+    "seatNumber": "Sitz #{{number}}"
+  },
+  "speeches": {
+    "title": "MdB-Reden",
+    "submit": "Rede einreichen",
+    "submitting": "Wird eingereicht…",
+    "submitted": "Rede eingereicht!",
+    "failed": "Einreichen fehlgeschlagen",
+    "placeholder": "Ihre Rede (20–500 Zeichen)",
+    "limitReached": "Tageslimit erreicht ({{used}}/{{limit}} Reden in 24h). Versuchen Sie es später erneut.",
+    "remaining": "Noch {{count}} Rede heute",
+    "remaining_other": "Noch {{count}} Reden heute",
+    "noSpeeches": "Noch keine Reden eingereicht.",
+    "readingDay": "Lesung {{reading}} · Tag {{day}}"
+  },
+  "legislativePipeline": "Gesetzgebungsverfahren",
+  "govtBillFastTrack": "Regierungsentwurf — beschleunigtes Verfahren (1. Lesung übersprungen)",
+  "committeeReview": "Ausschussprüfung",
+  "finalVote": "Schlussabstimmung",
+  "constitutionalChallenge": {
+    "title": "Verfassungsbeschwerde",
+    "filedBy": "Eingereicht von {{party}}",
+    "struckDown": "Verfassungswidrig",
+    "upheld": "Bestätigt",
+    "pending": "Ausstehend",
+    "arguments": "Argumente",
+    "courtReasoning": "Gerichtsbegründung"
+  },
+  "presidentialVeto": {
+    "title": "Vom Bundespräsidenten vetiert",
+    "description": "Der Bundespräsident hat die Unterzeichnung dieses Gesetzes verweigert."
+  },
+  "outcomeBanner": {
+    "youSignaled": "Du hast <strong>{{signal}}</strong> signalisiert. Das Gesetz wurde <strong>{{outcome}}</strong>",
+    "withYesVotes": "mit {{count}} Ja-Stimmen",
+    "youVotedMdb": "Du hast als MdB <strong>{{vote}}</strong> gestimmt. Das Gesetz wurde <strong>{{outcome}}</strong>."
+  },
+  "voteBar": {
+    "yes": "Ja",
+    "no": "Nein",
+    "abstain": "Enthaltung"
+  }
+}

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { type BundestagSeat } from "../../api";
 import { useUser } from "../../userContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +12,7 @@ interface MdbRosterTableProps {
 }
 
 export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
+  const { t } = useTranslation("parties");
   const { user } = useUser();
   const humanSeats = seats.filter(s => s.controller === "human");
   const aiSeats = seats.filter(s => s.controller === "ai");
@@ -24,11 +26,11 @@ export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
         <table className="w-full border-collapse text-sm min-w-[500px]">
           <thead>
             <tr>
-              <th className="text-left px-3 py-2 border-b-2 border-border">Sitz</th>
-              <th className="text-left px-3 py-2 border-b-2 border-border">Mitglied</th>
-              <th className="text-center px-3 py-2 border-b-2 border-border">Typ</th>
-              <th className="text-center px-3 py-2 border-b-2 border-border">Disziplin</th>
-              <th className="text-center px-3 py-2 border-b-2 border-border">Stellvertretung</th>
+              <th className="text-left px-3 py-2 border-b-2 border-border">{t("mdbRoster.colSeat")}</th>
+              <th className="text-left px-3 py-2 border-b-2 border-border">{t("mdbRoster.colMember")}</th>
+              <th className="text-center px-3 py-2 border-b-2 border-border">{t("mdbRoster.colType")}</th>
+              <th className="text-center px-3 py-2 border-b-2 border-border">{t("mdbRoster.colDiscipline")}</th>
+              <th className="text-center px-3 py-2 border-b-2 border-border">{t("mdbRoster.colProxy")}</th>
             </tr>
           </thead>
           <tbody>
@@ -39,9 +41,9 @@ export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
                   {seat.displayName ? (
                     <span className="font-semibold">{seat.displayName}</span>
                   ) : (
-                    <span className="text-emerald-600 italic">Frei</span>
+                    <span className="text-emerald-600 italic">{t("mdbRoster.free")}</span>
                   )}
-                  {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">(Du)</span>}
+                  {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">{t("mdbRoster.you")}</span>}
                 </td>
                 <td className="px-3 py-2 border-b border-border text-center">
                   <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
@@ -54,14 +56,14 @@ export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
                   )}
                 </td>
                 <td className="px-3 py-2 border-b border-border text-center text-xs text-muted-foreground">
-                  {seat.userId ? (seat.proxyDefault === "party_line" ? "Parteilinie" : "Enthaltung") : "—"}
+                  {seat.userId ? (seat.proxyDefault === "party_line" ? t("mdbRoster.proxyPartyLine") : t("mdbRoster.proxyAbstain")) : "—"}
                 </td>
               </tr>
             ))}
             {aiSeats.length > 0 && (
               <tr>
                 <td className="px-3 py-2 border-b border-border text-muted-foreground" colSpan={5}>
-                  + {aiSeats.length} KI-gesteuerte{aiSeats.length !== 1 ? " Sitze" : "r Sitz"}
+                  {aiSeats.length === 1 ? t("mdbRoster.aiSeat1") : t("mdbRoster.aiSeatsPlural", { count: aiSeats.length })}
                 </td>
               </tr>
             )}

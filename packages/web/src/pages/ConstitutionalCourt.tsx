@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, ConstitutionalChallenge, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -14,6 +15,7 @@ const DECISION_OPTIONS = ["all", "struck_down", "upheld"] as const;
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function ConstitutionalCourt() {
+  const { t } = useTranslation("parliament");
   const [challenges, setChallenges] = useState<ConstitutionalChallenge[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -39,31 +41,45 @@ export function ConstitutionalCourt() {
   });
   const visibleFiltered = filtered.slice(0, visibleCount);
 
+  const statusLabel = (s: string) => {
+    if (s === "all") return t("court.filter.all");
+    if (s === "pending") return t("court.filter.pending");
+    return t("court.filter.ruled");
+  };
+
+  const decisionLabel = (d: string) => {
+    if (d === "all") return t("court.filter.all");
+    if (d === "struck_down") return t("court.filter.struck_down");
+    return t("court.filter.upheld");
+  };
+
   return (
     <div>
-      <h2 className="section-title">Bundesverfassungsgericht</h2>
-      <p className="text-muted-foreground mb-4">Verfassungsbeschwerden gegen verabschiedete Gesetze</p>
+      <h2 className="section-title">{t("court.title")}</h2>
+      <p className="text-muted-foreground mb-4">{t("court.description")}</p>
 
       <div className="flex gap-4 mb-4 flex-wrap items-center">
         <label className="flex items-center gap-1.5 text-sm">
-          Status:
+          {t("court.filter.status")}
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={SELECT_CLS}>
             {STATUS_OPTIONS.map(s => (
-              <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              <option key={s} value={s}>{statusLabel(s)}</option>
             ))}
           </select>
         </label>
         <label className="flex items-center gap-1.5 text-sm">
-          Decision:
+          {t("court.filter.decision")}
           <select value={decisionFilter} onChange={e => setDecisionFilter(e.target.value)} className={SELECT_CLS}>
             {DECISION_OPTIONS.map(d => (
-              <option key={d} value={d}>
-                {d === "all" ? "All" : d === "struck_down" ? "Struck Down" : "Upheld"}
-              </option>
+              <option key={d} value={d}>{decisionLabel(d)}</option>
             ))}
           </select>
         </label>
-        <span className="text-xs text-muted-foreground">{filtered.length} challenge{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs text-muted-foreground">
+          {filtered.length === 1
+            ? t("court.challenge.singular")
+            : t("court.challenges", { count: filtered.length })}
+        </span>
       </div>
 
       {filtered.length === 0 ? (
@@ -96,17 +112,17 @@ export function ConstitutionalCourt() {
                         ? STATUS_BADGE.upheld
                         : STATUS_BADGE.pending
                     )}>
-                      {isStruckDown ? "Struck Down" : isUpheld ? "Upheld" : "Pending"}
+                      {isStruckDown ? t("court.status.struck_down") : isUpheld ? t("court.status.upheld") : t("court.status.pending")}
                     </Badge>
                     <span className="text-sm font-semibold">"{c.billTitle}"</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                     <span className="font-semibold" style={{ color: filedBy?.color ?? "#888" }}>
-                      Filed by {filedBy?.name ?? c.filedByPartyId}
+                      {t("court.filedBy", { name: filedBy?.name ?? c.filedByPartyId })}
                     </span>
-                    <span>Day {c.dayNumber}</span>
+                    <span>{t("court.day", { day: c.dayNumber })}</span>
                     {c.ruledOnDay != null && c.ruledOnDay !== c.dayNumber && (
-                      <span>Ruled Day {c.ruledOnDay}</span>
+                      <span>{t("court.ruledDay", { day: c.ruledOnDay })}</span>
                     )}
                     <span className="ml-auto text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
                   </div>
@@ -115,18 +131,18 @@ export function ConstitutionalCourt() {
                 {isExpanded && (
                   <div className="px-4 pb-4 pt-3.5 bg-muted/50 border-t border-border">
                     <div className="mb-3 text-sm leading-relaxed">
-                      <strong>Constitutional Arguments:</strong>
+                      <strong>{t("court.arguments")}</strong>
                       <p className="mt-1">{c.arguments}</p>
                     </div>
                     {c.reasoning && (
                       <div className="mb-3 text-sm leading-relaxed">
-                        <strong>Court Reasoning:</strong>
+                        <strong>{t("court.reasoning")}</strong>
                         <p className="mt-1 italic text-muted-foreground">{c.reasoning}</p>
                       </div>
                     )}
                     {isStruckDown && (
                       <div className={ALERT_STYLES.warning}>
-                        <strong>Effect:</strong> The law has been nullified. Its economic and sentiment effects have been reversed.
+                        <strong>{t("court.effect")}</strong> {t("court.effectText")}
                       </div>
                     )}
                   </div>

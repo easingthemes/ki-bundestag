@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, type Party, type Fraktion, type AlignmentData } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
@@ -33,6 +34,7 @@ function JoinModal({ party, onClose, onJoined }: {
   onClose: () => void;
   onJoined: () => void;
 }) {
+  const { t } = useTranslation("parties");
   const { user, updateUser } = useUser();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -55,7 +57,7 @@ function JoinModal({ party, onClose, onJoined }: {
       onJoined();
       onClose();
     } catch (err) {
-      setErrMsg(err instanceof Error ? err.message : "Failed to join");
+      setErrMsg(err instanceof Error ? err.message : "Beitritt fehlgeschlagen");
       setStatus("error");
     }
   };
@@ -69,10 +71,10 @@ function JoinModal({ party, onClose, onJoined }: {
     >
       <Card className="w-[calc(100vw-2rem)] max-w-[340px] shadow-lg" onClick={e => e.stopPropagation()}>
         <CardContent className="p-7">
-          <h3 className="text-lg font-semibold mb-4">{party.name} beitreten</h3>
+          <h3 className="text-lg font-semibold mb-4">{t("joinModal.title", { name: party.name })}</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Du trittst bei als <strong>{user.displayName}</strong>.
-            {user.partyId && <span className="text-muted-foreground/60"> Es gilt eine 7-Tage-Wechselsperre.</span>}
+            {t("joinModal.joining_as")} <strong>{user.displayName}</strong>.
+            {user.partyId && <span className="text-muted-foreground/60"> {t("joinModal.cooldown_notice")}</span>}
           </p>
           {status === "error" && (
             <div className="text-xs text-destructive my-2">{errMsg}</div>
@@ -83,7 +85,7 @@ function JoinModal({ party, onClose, onJoined }: {
               onClick={onClose}
               className="px-4 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
             >
-              Abbrechen
+              {t("joinModal.cancel")}
             </button>
             <button
               type="button"
@@ -92,7 +94,7 @@ function JoinModal({ party, onClose, onJoined }: {
               className="px-4 py-1.5 rounded border-none text-white font-bold text-sm cursor-pointer disabled:opacity-60"
               style={{ background: displayColor }}
             >
-              {status === "loading" ? "Beitritt…" : `${party.name} beitreten`}
+              {status === "loading" ? t("joinModal.joining") : t("joinModal.join", { name: party.name })}
             </button>
           </div>
         </CardContent>
@@ -102,6 +104,7 @@ function JoinModal({ party, onClose, onJoined }: {
 }
 
 export function Parties() {
+  const { t } = useTranslation("parties");
   const { user } = useUser();
   const [parties, setParties] = useState<Party[]>([]);
   const [fraktionen, setFraktionen] = useState<Fraktion[]>([]);
@@ -121,7 +124,7 @@ export function Parties() {
 
   return (
     <div>
-      <h2 className="section-title">Parteien</h2>
+      <h2 className="section-title">{t("heading")}</h2>
 
       <PartyCardGrid>
         {parties.map(p => {
@@ -142,14 +145,14 @@ export function Parties() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {fraktion && (
                         <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", FRAKTION_BADGE.active)}>
-                          Fraktion
+                          {t("card.fraktion")}
                         </Badge>
                       )}
                       {isMyParty && (
-                        <span className="text-[10px] font-bold" style={{ color: displayColor }}>Deine Partei</span>
+                        <span className="text-[10px] font-bold" style={{ color: displayColor }}>{t("card.myParty")}</span>
                       )}
                       <span className="text-[10px] text-muted-foreground">
-                        {p.memberCount} Mitgl.
+                        {t("card.memberCount", { count: p.memberCount })}
                       </span>
                     </div>
                     {p.recentApprovals && p.recentApprovals.length >= 2 && (
@@ -167,7 +170,7 @@ export function Parties() {
                   className="absolute top-2.5 right-2.5 text-[10px] px-2 py-0.5 rounded border bg-card font-semibold cursor-pointer hover:opacity-80"
                   style={{ borderColor: displayColor, color: displayColor }}
                 >
-                  Beitreten
+                  {t("card.join")}
                 </button>
               )}
             </div>
@@ -178,15 +181,15 @@ export function Parties() {
       {/* Vote Alignment Matrix */}
       {alignment && (
         <div className="mt-8">
-          <h2 className="section-title">Abstimmungsverhalten</h2>
+          <h2 className="section-title">{t("alignment.heading")}</h2>
           <p className="text-sm text-muted-foreground mb-3">
-            Prozentsatz der Abstimmungen, bei denen jedes Parteienpaar gleich gestimmt hat. Mindestens 3 gemeinsame Abstimmungen erforderlich.
+            {t("alignment.description")}
           </p>
           <div className="overflow-x-auto">
             <table className="border-collapse text-sm min-w-[400px]">
               <thead>
                 <tr>
-                  <th className="px-2.5 py-1.5 text-left border-b-2 border-primary text-primary text-xs uppercase font-semibold tracking-wider">Partei</th>
+                  <th className="px-2.5 py-1.5 text-left border-b-2 border-primary text-primary text-xs uppercase font-semibold tracking-wider">{t("alignment.colParty")}</th>
                   {alignment.parties.map(p => {
                     const color = fixColor(p.color);
                     return (

@@ -477,7 +477,7 @@ export function SimulationCosts() {
         ) : (
           <Card>
             <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">No cost data recorded yet. Cost tracking starts automatically when the simulation runs.</p>
+              <p className="text-sm text-muted-foreground">Noch keine Kostendaten erfasst. Kostenerfassung startet automatisch mit der Simulation.</p>
             </CardContent>
           </Card>
         )}

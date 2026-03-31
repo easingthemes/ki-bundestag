@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { VOTE_COLORS } from "@/lib/colors";
+import { useTranslation } from "react-i18next";
 
 interface VoteBarProps {
   yes: number;
@@ -12,6 +13,7 @@ interface VoteBarProps {
 }
 
 export function VoteBar({ yes, no, abstain, total, height = "h-5", showCounts = false }: VoteBarProps) {
+  const { t } = useTranslation("legislation");
   if (total === 0) return null;
 
   return (
@@ -29,7 +31,7 @@ export function VoteBar({ yes, no, abstain, total, height = "h-5", showCounts = 
       </div>
       {showCounts && (
         <p className="text-xs text-muted-foreground mt-0.5">
-          Yes: {yes} · No: {no} · Abstain: {abstain}
+          {t("voteBar.yes")}: {yes} · {t("voteBar.no")}: {no} · {t("voteBar.abstain")}: {abstain}
         </p>
       )}
     </>
