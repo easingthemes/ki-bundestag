@@ -276,20 +276,20 @@ export function generateMorningSummary(
 ): { title: string; message: string } {
   if (queuedEvents.length === 0) {
     return {
-      title: `Good morning! Day ${currentDay}`,
-      message: "No events were queued overnight. The simulation continues.",
+      title: `Guten Morgen! Tag ${currentDay}`,
+      message: "Keine Ereignisse über Nacht in der Warteschlange. Die Simulation läuft weiter.",
     };
   }
 
-  const eventLines = queuedEvents.map(e => `- ${e.eventType}: scheduled for day ${e.scheduledForDay}`);
+  const eventLines = queuedEvents.map(e => `- ${e.eventType}: geplant für Tag ${e.scheduledForDay}`);
 
   return {
-    title: `Good morning! ${queuedEvents.length} event(s) queued overnight`,
+    title: `Guten Morgen! ${queuedEvents.length} Ereignis(se) über Nacht eingereiht`,
     message: [
-      `While you slept, ${queuedEvents.length} event(s) were queued:`,
+      `Während du geschlafen hast, wurden ${queuedEvents.length} Ereignis(se) eingereiht:`,
       ...eventLines,
       "",
-      "These events are now being processed.",
+      "Diese Ereignisse werden jetzt verarbeitet.",
     ].join("\n"),
   };
 }

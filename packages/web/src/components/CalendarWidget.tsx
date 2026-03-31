@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { EVENT_TYPE_LABEL } from "@/lib/colors";
 
 const MONTH_NAMES = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -39,19 +40,7 @@ const EVENT_DOT: Record<string, string> = {
   government_cabinet_formed: "bg-slate-400",
 };
 
-const EVENT_LABEL: Record<string, string> = {
-  election_result: "Wahlergebnis", government_formed: "Regierung gebildet",
-  government_dissolved: "Regierung aufgelöst", crisis_start: "Krise",
-  constitutional_court_ruled: "Verfassungsgericht", vertrauensfrage: "Vertrauensfrage",
-  misstrauensvotum: "Misstrauensvotum", bill_proposed: "Gesetzentwurf",
-  bill_third_reading: "3. Lesung", presidential_veto: "Präsidentenveto",
-  budget_proposed: "Haushalt", interpellation_filed: "Anfrage",
-  election_announced: "Wahl angekündigt", motion_submitted: "Antrag",
-  statement: "Stellungnahme", amendment_proposed: "Änderungsantrag",
-  fraktion_formed: "Fraktion gebildet", fraktion_dissolved: "Fraktion aufgelöst",
-  member_proposal_accepted: "Bürgerinitiative", crisis_end: "Krise beendet",
-  negotiation_complete: "Koalitionsvertrag", government_cabinet_formed: "Kabinett",
-};
+// EVENT_TYPE_LABEL imported from @/lib/colors
 
 /** Link target for event types */
 function eventLink(evt: { type: string; id: string }): string | null {
@@ -207,7 +196,7 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
                         <div key={idx} className="flex items-center gap-1 truncate">
                           <span className={cn("size-1.5 rounded-full shrink-0", EVENT_DOT[evt.type] ?? "bg-slate-300")} />
                           <span className="truncate text-[10px] leading-tight text-muted-foreground">
-                            {EVENT_LABEL[evt.type] ?? evt.type.replace(/_/g, " ")}
+                            {EVENT_TYPE_LABEL[evt.type] ?? evt.type.replace(/_/g, " ")}
                           </span>
                         </div>
                       ))}
@@ -253,7 +242,7 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className={cn("size-2 rounded-full shrink-0", EVENT_DOT[evt.type] ?? "bg-slate-300")} />
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {EVENT_LABEL[evt.type] ?? evt.type.replace(/_/g, " ")}
+                            {EVENT_TYPE_LABEL[evt.type] ?? evt.type.replace(/_/g, " ")}
                           </Badge>
                           <span className="text-xs text-muted-foreground">{evt.actor}</span>
                         </div>

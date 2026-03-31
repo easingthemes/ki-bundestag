@@ -11,7 +11,7 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn, fixColor } from "@/lib/utils";
-import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL } from "@/lib/colors";
+import { MOOD_BADGE, SEVERITY_BADGE, ALERT_STYLES, SEMANTIC_HEX, PHASE_BADGE, DISCIPLINE_BADGE, DISCIPLINE_LABEL, EVENT_TYPE_LABEL } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { OnboardingOverlay } from "@/components/dashboard/OnboardingOverlay";
 import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
@@ -276,7 +276,7 @@ export function Dashboard() {
                       </div>
                       <div className="shrink-0 text-right">
                         <div className="text-[10px] font-medium text-muted-foreground">Tag {ev.dayNumber}</div>
-                        <div className="text-[10px] text-muted-foreground/60">{ev.type.replace(/_/g, " ")}</div>
+                        <div className="text-[10px] text-muted-foreground/60">{EVENT_TYPE_LABEL[ev.type] ?? ev.type.replace(/_/g, " ")}</div>
                       </div>
                     </div>
                   </CardContent>

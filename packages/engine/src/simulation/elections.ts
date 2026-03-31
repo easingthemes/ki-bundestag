@@ -69,8 +69,8 @@ export function advanceElectionPhase(
       dayNumber: currentDay,
       type: "election_campaign",
       actor: "system",
-      title: "Election campaign begins",
-      description: `Campaign period has started. Election day is Day ${election.electionDay}. Reason: ${election.triggerReason}`,
+      title: "Wahlkampf beginnt",
+      description: `Wahlkampf hat begonnen. Wahltag ist Tag ${election.electionDay}. Grund: ${election.triggerReason}`,
     });
   }
 

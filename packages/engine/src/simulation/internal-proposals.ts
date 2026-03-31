@@ -174,8 +174,8 @@ async function reviewProposalsBatch(
       db.insert(schema.simulationEvents).values({
         id: `evt-${randomUUID().slice(0, 8)}`,
         type: "member_proposal_accepted",
-        title: `${batch.party.name}: Member initiative "${proposal.title}" submitted to Bundestag`,
-        description: `Party member proposal accepted by ${batch.party.name}: "${proposal.title}". ${selection.reason}`,
+        title: `${batch.party.name}: Mitgliederinitiative "${proposal.title}" im Bundestag eingereicht`,
+        description: `Mitgliedervorschlag angenommen von ${batch.party.name}: "${proposal.title}". ${selection.reason}`,
         dayNumber: currentDay,
         actor: batch.party.id,
       }).run();
@@ -207,8 +207,8 @@ async function reviewProposalsBatch(
       db.insert(schema.simulationEvents).values({
         id: `evt-${randomUUID().slice(0, 8)}`,
         type: "member_proposal_declined",
-        title: `${batch.party.name}: Member proposal "${proposal.title}" declined`,
-        description: `${batch.party.name} leadership declined to sponsor "${proposal.title}". ${parsed.declineReason}`,
+        title: `${batch.party.name}: Mitgliedervorschlag "${proposal.title}" abgelehnt`,
+        description: `${batch.party.name} Parteiführung hat abgelehnt zu unterstützen: "${proposal.title}". ${parsed.declineReason}`,
         dayNumber: currentDay,
         actor: batch.party.id,
       }).run();

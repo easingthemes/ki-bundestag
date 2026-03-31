@@ -200,8 +200,8 @@ export async function runDay(): Promise<number> {
     dayNumber: currentDay,
     type: "day_start",
     actor: "system",
-    title: `Day ${currentDay} begins`,
-    description: `A new day in the Bundestag. Budget: ${nationalState.economy.budget}B, Unemployment: ${nationalState.economy.unemployment}%, Inflation: ${nationalState.economy.inflation}%, GDP Growth: ${nationalState.economy.gdpGrowth}%`,
+    title: `Tag ${currentDay} beginnt`,
+    description: `Ein neuer Tag im Bundestag. Haushalt: ${nationalState.economy.budget} Mrd., Arbeitslosigkeit: ${nationalState.economy.unemployment}%, Inflation: ${nationalState.economy.inflation}%, BIP-Wachstum: ${nationalState.economy.gdpGrowth}%`,
   };
   addEvent(dayEvents, dayStartEvent);
   db.insert(schema.simulationEvents).values({
@@ -224,8 +224,8 @@ export async function runDay(): Promise<number> {
     dayNumber: currentDay,
     type: "economy_update",
     actor: "system",
-    title: "Economic indicators updated",
-    description: `Budget: ${driftedEconomy.budget}B, Unemployment: ${driftedEconomy.unemployment}%, Inflation: ${driftedEconomy.inflation}%, GDP Growth: ${driftedEconomy.gdpGrowth}%`,
+    title: "Wirtschaftsindikatoren aktualisiert",
+    description: `Haushalt: ${driftedEconomy.budget} Mrd., Arbeitslosigkeit: ${driftedEconomy.unemployment}%, Inflation: ${driftedEconomy.inflation}%, BIP-Wachstum: ${driftedEconomy.gdpGrowth}%`,
   });
 
   // 3a. Process pending injections
@@ -334,8 +334,8 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "day_start",
       actor: "system",
-      title: "Election invalidated by court order",
-      description: "The most recent election has been invalidated. Pre-election seat counts restored. A new election will be called immediately.",
+      title: "Wahl durch Gerichtsbeschluss annulliert",
+      description: "Die letzte Wahl wurde annulliert. Sitzverteilung vor der Wahl wiederhergestellt. Eine Neuwahl wird sofort angesetzt.",
       data: { invalidated: true },
     });
   }
@@ -358,8 +358,8 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "crisis_end",
       actor: "system",
-      title: `Crisis ended: ${crisis.name}`,
-      description: `The ${crisis.name} (${crisis.severity}) has been resolved after ${currentDay - crisis.startDay} days.`,
+      title: `Krise beendet: ${crisis.name}`,
+      description: `Die Krise ${crisis.name} (${crisis.severity}) wurde nach ${currentDay - crisis.startDay} Tagen gelöst.`,
       data: { crisisId: crisis.id, templateId: crisis.templateId },
     });
 
@@ -397,12 +397,12 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "crisis_start",
       actor: "system",
-      title: `Crisis: ${newCrisis.name}`,
+      title: `Krise: ${newCrisis.name}`,
       description: newCrisis.description,
       data: { crisisId: newCrisis.id, severity: newCrisis.severity, category: newCrisis.category, endDay: newCrisis.endDay },
     });
 
-    try { createNotificationForAll("crisis_alert", `Crisis: ${newCrisis.name}`, `${newCrisis.description} (Severity: ${newCrisis.severity})`, { crisisId: newCrisis.id, severity: newCrisis.severity }, currentDay); } catch {}
+    try { createNotificationForAll("crisis_alert", `Krise: ${newCrisis.name}`, `${newCrisis.description} (Schweregrad: ${newCrisis.severity})`, { crisisId: newCrisis.id, severity: newCrisis.severity }, currentDay); } catch {}
 
     console.log(`  [Crisis] Started: ${newCrisis.name} (${newCrisis.severity}, until day ${newCrisis.endDay})`);
   }
@@ -457,12 +457,12 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "election_announced",
         actor: "system",
-        title: `Election announced: ${trigger.reason}`,
-        description: `A federal election has been called. Campaign begins Day ${newElection.campaignStartDay}, Election Day ${newElection.electionDay}.`,
+        title: `Wahl angekündigt: ${trigger.reason}`,
+        description: `Eine Bundestagswahl wurde angesetzt. Wahlkampf beginnt Tag ${newElection.campaignStartDay}, Wahltag ${newElection.electionDay}.`,
         data: { electionId: newElection.id, reason: trigger.reason },
       });
 
-      try { createNotificationForAll("election_started", "Election announced!", `A federal election has been called. Election Day: ${newElection.electionDay}.`, { electionId: newElection.id }, currentDay); } catch {}
+      try { createNotificationForAll("election_started", "Wahl angekündigt!", `Eine Bundestagswahl wurde angesetzt. Wahltag: ${newElection.electionDay}.`, { electionId: newElection.id }, currentDay); } catch {}
 
       console.log(`  [Election] Announced: ${trigger.reason} (election day: ${newElection.electionDay})`);
     }
@@ -533,8 +533,8 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "government_formed",
         actor: "system",
-        title: "Government formed (emergency fallback)",
-        description: `Negotiations stalled — coalition formed algorithmically: ${coalitionNames}`,
+        title: "Regierung gebildet (Notfall-Rückfalloption)",
+        description: `Verhandlungen gescheitert — Koalition algorithmisch gebildet: ${coalitionNames}`,
         data: { electionId: activeElection.id, coalition, opposition, fallback: true },
       });
 
@@ -546,8 +546,8 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "government_cabinet_formed",
         actor: "system",
-        title: `Chancellor ${cabinet.chancellorName} forms cabinet`,
-        description: `Chancellor: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Ministers: ${cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ")}`,
+        title: `Kanzler/in ${cabinet.chancellorName} bildet Kabinett`,
+        description: `Kanzler/in: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Minister: ${cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ")}`,
         data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
       });
 
@@ -664,10 +664,10 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "negotiation_complete",
         actor: "system",
-        title: "Coalition negotiations concluded",
+        title: "Koalitionsverhandlungen abgeschlossen",
         description: agreement
-          ? `Agreement reached: ${agreement.summary}`
-          : "No agreement reached — coalition formed algorithmically.",
+          ? `Einigung erzielt: ${agreement.summary}`
+          : "Keine Einigung — Koalition algorithmisch gebildet.",
         data: { electionId: activeElection.id, agreement },
       });
 
@@ -682,12 +682,12 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "government_formed",
         actor: "system",
-        title: "New government formed",
-        description: `Coalition: ${coalitionNames}`,
+        title: "Neue Regierung gebildet",
+        description: `Koalition: ${coalitionNames}`,
         data: { electionId: activeElection.id, coalition, opposition },
       });
 
-      try { createNotificationForAll("government_formed", "New government formed", `Coalition: ${coalitionNames}`, { coalition, opposition }, currentDay); } catch {}
+      try { createNotificationForAll("government_formed", "Neue Regierung gebildet", `Koalition: ${coalitionNames}`, { coalition, opposition }, currentDay); } catch {}
 
       // Form cabinet (Chancellor + Ministers)
       const cabinet = formCabinet(coalition, allParties, activeElection.id, currentDay);
@@ -696,8 +696,8 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "government_cabinet_formed",
         actor: "system",
-        title: `Chancellor ${cabinet.chancellorName} forms cabinet`,
-        description: `Chancellor: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Ministers: ${ministerList}`,
+        title: `Kanzler/in ${cabinet.chancellorName} bildet Kabinett`,
+        description: `Kanzler/in: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Minister: ${ministerList}`,
         data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
       });
       console.log(`  [Cabinet] Chancellor: ${cabinet.chancellorName}, ${cabinet.ministers.length} ministers`);
@@ -768,7 +768,7 @@ export async function runDay(): Promise<number> {
         .map(r => {
           const p = allParties.find(pp => pp.id === r.partyId)!;
           const delta = r.seatDelta >= 0 ? `+${r.seatDelta}` : `${r.seatDelta}`;
-          return `${p.name}: ${r.votesPercent}% (${r.seatsWon} seats, ${delta})`;
+          return `${p.name}: ${r.votesPercent}% (${r.seatsWon} Sitze, ${delta})`;
         })
         .join(", ");
 
@@ -776,12 +776,12 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "election_result",
         actor: "system",
-        title: "Federal election results",
+        title: "Bundestagswahlergebnis",
         description: resultsStr,
         data: { electionId: activeElection.id, results },
       });
 
-      try { createNotificationForAll("election_result", "Election results are in!", resultsStr, { electionId: activeElection.id }, currentDay); } catch {}
+      try { createNotificationForAll("election_result", "Wahlergebnis steht fest!", resultsStr, { electionId: activeElection.id }, currentDay); } catch {}
 
       console.log(`  [Election] Results: ${resultsStr}`);
       console.log(`  [Election] Entering negotiation phase...`);
@@ -1059,7 +1059,7 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "bill_proposed",
           actor: partyId,
-          title: `${party.name} proposes: "${action.title}"${govBill ? " [Govt. Bill]" : ""}`,
+          title: `${party.name} beantragt: "${action.title}"${govBill ? " [Regierungsentwurf]" : ""}`,
           description: action.description,
           data: { billId, category: action.category, impact: action.impact, isGovernmentBill: govBill },
         });
@@ -1102,7 +1102,7 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "amendment_proposed",
           actor: partyId,
-          title: `${party.name} proposes amendment to "${targetBill.title}"`,
+          title: `${party.name} beantragt Änderung zu "${targetBill.title}"`,
           description: `${action.title}: ${action.description}`,
           data: { billId: targetBill.id, amendmentId, impactChange: action.impactChange },
         });
@@ -1131,7 +1131,7 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: "vote_cast",
             actor: partyId,
-            title: `${party.name} votes ${voteAction.vote} on "${bill.title}"`,
+            title: `${party.name} stimmt ${voteAction.vote} über "${bill.title}"`,
             description: voteAction.reason,
             data: { billId: bill.id, vote: voteAction.vote },
           });
@@ -1192,8 +1192,8 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: result.passed ? "bill_passed" : "bill_rejected",
         actor: "system",
-        title: `"${bill.title}" ${result.passed ? "PASSED" : "REJECTED"}`,
-        description: `Yes: ${result.yesSeats} seats, No: ${result.noSeats} seats, Abstain: ${result.abstainSeats} seats`,
+        title: `"${bill.title}" ${result.passed ? "ANGENOMMEN" : "ABGELEHNT"}`,
+        description: `Ja: ${result.yesSeats} Sitze, Nein: ${result.noSeats} Sitze, Enthaltung: ${result.abstainSeats} Sitze`,
         data: { billId: bill.id, ...result },
       });
 
@@ -1257,7 +1257,7 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: "election_campaign",
             actor: partyId,
-            title: `${party.name} campaign: ${action.title}`,
+            title: `${party.name} Wahlkampf: ${action.title}`,
             description: action.promise,
           });
           console.log(`  [Campaign] ${party.name}: "${action.title}"`);
@@ -1317,7 +1317,7 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "motion_submitted",
           actor: partyId,
-          title: `${party.name} submits ${typeLabel}: "${motion.title}"`,
+          title: `${party.name} reicht ${typeLabel} ein: "${motion.title}"`,
           description: motion.description,
           data: { motionId, motionType: motion.type },
         });
@@ -1326,8 +1326,8 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: passed ? "motion_passed" : "motion_rejected",
           actor: "system",
-          title: `${typeLabel} "${motion.title}" ${passed ? "PASSED" : "REJECTED"}`,
-          description: `Votes: ${votes.filter(v => v.vote === "yes").length} yes, ${votes.filter(v => v.vote === "no").length} no`,
+          title: `${typeLabel} "${motion.title}" ${passed ? "ANGENOMMEN" : "ABGELEHNT"}`,
+          description: `Stimmen: ${votes.filter(v => v.vote === "yes").length} Ja, ${votes.filter(v => v.vote === "no").length} Nein`,
           data: { motionId, passed },
         });
 
@@ -1369,8 +1369,8 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "interpellation_filed",
           actor: partyId,
-          title: `${party.name} files ${typeLabel}: "${action.title}"`,
-          description: `${typeLabel} targeting ${minister.name} (${action.targetMinistry}): ${action.question}`,
+          title: `${party.name} reicht ${typeLabel} ein: "${action.title}"`,
+          description: `${typeLabel} an ${minister.name} (${action.targetMinistry}): ${action.question}`,
           data: { interpellationId: interpId, interpellationType: action.interpellationType, targetMinistry: action.targetMinistry },
         });
 
@@ -1419,7 +1419,7 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: "confidence_vote_filed",
             actor: partyId,
-            title: `${party.name} calls Vertrauensfrage: "${action.title}"`,
+            title: `${party.name} stellt Vertrauensfrage: "${action.title}"`,
             description: action.description,
             data: { confidenceVoteId: cvId, type: "vertrauensfrage" },
           });
@@ -1428,8 +1428,8 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: tally.passed ? "confidence_vote_passed" : "confidence_vote_failed",
             actor: "system",
-            title: `Vertrauensfrage "${action.title}" — ${tally.passed ? "PASSED" : "FAILED"}`,
-            description: `Yes: ${tally.yesSeats} seats, No: ${tally.noSeats} seats. ${tally.passed ? "Government survives." : "Government falls — snap election triggered."}`,
+            title: `Vertrauensfrage "${action.title}" — ${tally.passed ? "BESTANDEN" : "GESCHEITERT"}`,
+            description: `Ja: ${tally.yesSeats} Sitze, Nein: ${tally.noSeats} Sitze. ${tally.passed ? "Regierung überlebt." : "Regierung gestürzt — Neuwahl ausgelöst."}`,
             data: { confidenceVoteId: cvId, yesSeats: tally.yesSeats, noSeats: tally.noSeats },
           });
 
@@ -1444,8 +1444,8 @@ export async function runDay(): Promise<number> {
               dayNumber: currentDay,
               type: "government_dissolved",
               actor: "system",
-              title: `Government dissolved — Vertrauensfrage failed`,
-              description: `Chancellor ${govNow.chancellorName}'s government has lost the confidence of the Bundestag. A snap election will be called.`,
+              title: `Regierung aufgelöst — Vertrauensfrage gescheitert`,
+              description: `Die Regierung von Kanzler/in ${govNow.chancellorName} hat das Vertrauen des Bundestags verloren. Neuwahlen werden angesetzt.`,
               data: { governmentId: govNow.id, confidenceVoteId: cvId },
             });
 
@@ -1494,8 +1494,8 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: "confidence_vote_filed",
             actor: partyId,
-            title: `${party.name} files Misstrauensvotum: "${action.title}"`,
-            description: `${action.description} Proposed Chancellor: ${action.proposedChancellor} (${action.proposedChancellorPartyId})`,
+            title: `${party.name} reicht Misstrauensvotum ein: "${action.title}"`,
+            description: `${action.description} Vorgeschlagener Kanzler: ${action.proposedChancellor} (${action.proposedChancellorPartyId})`,
             data: { confidenceVoteId: cvId, type: "misstrauensvotum", proposedChancellor: action.proposedChancellor },
           });
 
@@ -1503,8 +1503,8 @@ export async function runDay(): Promise<number> {
             dayNumber: currentDay,
             type: tally.passed ? "confidence_vote_passed" : "confidence_vote_failed",
             actor: "system",
-            title: `Misstrauensvotum "${action.title}" — ${tally.passed ? "PASSED" : "FAILED"}`,
-            description: `Yes: ${tally.yesSeats} seats, No: ${tally.noSeats} seats. ${tally.passed ? `New Chancellor: ${action.proposedChancellor}.` : "Government survives."}`,
+            title: `Misstrauensvotum "${action.title}" — ${tally.passed ? "ANGENOMMEN" : "GESCHEITERT"}`,
+            description: `Ja: ${tally.yesSeats} Sitze, Nein: ${tally.noSeats} Sitze. ${tally.passed ? `Neuer Kanzler: ${action.proposedChancellor}.` : "Regierung überlebt."}`,
             data: { confidenceVoteId: cvId, yesSeats: tally.yesSeats, noSeats: tally.noSeats },
           });
 
@@ -1518,8 +1518,8 @@ export async function runDay(): Promise<number> {
               dayNumber: currentDay,
               type: "government_dissolved",
               actor: "system",
-              title: `Government dissolved — Misstrauensvotum passed`,
-              description: `Chancellor ${govNow.chancellorName}'s government has been voted out. ${action.proposedChancellor} (${action.proposedChancellorPartyId}) takes over.`,
+              title: `Regierung aufgelöst — Misstrauensvotum angenommen`,
+              description: `Die Regierung von Kanzler/in ${govNow.chancellorName} wurde abgewählt. ${action.proposedChancellor} (${action.proposedChancellorPartyId}) übernimmt.`,
               data: { governmentId: govNow.id, confidenceVoteId: cvId },
             });
 
@@ -1564,8 +1564,8 @@ export async function runDay(): Promise<number> {
               dayNumber: currentDay,
               type: "government_formed",
               actor: "system",
-              title: `New government formed via Misstrauensvotum`,
-              description: `Coalition: ${coalitionNames}. Chancellor: ${newCabinet.chancellorName}.`,
+              title: `Neue Regierung durch Misstrauensvotum gebildet`,
+              description: `Koalition: ${coalitionNames}. Kanzler/in: ${newCabinet.chancellorName}.`,
               data: { coalition: newCoalition, opposition: newOpposition, confidenceVoteId: cvId },
             });
 
@@ -1573,8 +1573,8 @@ export async function runDay(): Promise<number> {
               dayNumber: currentDay,
               type: "government_cabinet_formed",
               actor: "system",
-              title: `Chancellor ${newCabinet.chancellorName} forms cabinet`,
-              description: `New cabinet formed after Konstruktives Misstrauensvotum. ${newCabinet.ministers.length} ministers appointed.`,
+              title: `Kanzler/in ${newCabinet.chancellorName} bildet Kabinett`,
+              description: `Neues Kabinett nach Konstruktivem Misstrauensvotum gebildet. ${newCabinet.ministers.length} Minister ernannt.`,
               data: { governmentId: newCabinet.id, chancellorName: newCabinet.chancellorName },
             });
 
@@ -1626,7 +1626,7 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "constitutional_challenge_filed",
           actor: partyId,
-          title: `${party.name} challenges "${targetBill.title}" at Bundesverfassungsgericht`,
+          title: `${party.name} klagt gegen "${targetBill.title}" vor dem Bundesverfassungsgericht`,
           description: action.arguments,
           data: { challengeId, billId: targetBill.id },
         });
@@ -1635,7 +1635,7 @@ export async function runDay(): Promise<number> {
           dayNumber: currentDay,
           type: "constitutional_court_ruled",
           actor: "system",
-          title: `Bundesverfassungsgericht: "${targetBill.title}" — ${struckDown ? "STRUCK DOWN" : "UPHELD"}`,
+          title: `Bundesverfassungsgericht: "${targetBill.title}" — ${struckDown ? "VERFASSUNGSWIDRIG" : "BESTÄTIGT"}`,
           description: reasoning,
           data: { challengeId, billId: targetBill.id, decision },
         });
@@ -1721,8 +1721,8 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "interpellation_answered",
       actor: answered.targetPartyId,
-      title: `${answered.targetMinisterName} answers: "${answered.title}"`,
-      description: answered.response ?? "No response recorded.",
+      title: `${answered.targetMinisterName} antwortet: "${answered.title}"`,
+      description: answered.response ?? "Keine Antwort erfasst.",
       data: { interpellationId: answered.id, filedBy: answered.filedByPartyId, targetMinistry: answered.targetMinistry },
     });
   }
@@ -1739,8 +1739,8 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "interpellation_expired",
       actor: "system",
-      title: `Unanswered: "${expired.title}" — embarrassment for ${targetParty?.name ?? expired.targetPartyId}`,
-      description: `The ${expired.type === "große" ? "Große Anfrage" : "Kleine Anfrage"} from ${expired.filedByPartyId} went unanswered for 14 days.`,
+      title: `Unbeantwortet: "${expired.title}" — Blamage für ${targetParty?.name ?? expired.targetPartyId}`,
+      description: `Die ${expired.type === "große" ? "Große Anfrage" : "Kleine Anfrage"} von ${expired.filedByPartyId} blieb 14 Tage unbeantwortet.`,
       data: { interpellationId: expired.id, targetPartyId: expired.targetPartyId },
     });
   }
@@ -1769,7 +1769,7 @@ export async function runDay(): Promise<number> {
       const prefPollId = `poll-pref-${generateId()}`;
       db.insert(schema.polls).values({
         id: prefPollId,
-        question: "Which party do you trust most to lead Germany?",
+        question: "Welcher Partei vertrauen Sie am meisten, Deutschland zu führen?",
         options: allParties.map(p => p.name) as any,
         votes: Object.fromEntries(allParties.map(p => [p.name, 0])) as any,
         createdOnDay: currentDay,
@@ -1836,8 +1836,8 @@ export async function runDay(): Promise<number> {
         dayNumber: currentDay,
         type: "weekly_report",
         actor: "system",
-        title: `Weekly Report — Day ${currentDay}`,
-        description: `Weekly opinion recalculation complete. Sentiment: ${nationalState.publicSentiment}/100. Active crises: ${activeCrises.length}.`,
+        title: `Wochenbericht — Tag ${currentDay}`,
+        description: `Wöchentliche Meinungsberechnung abgeschlossen. Stimmung: ${nationalState.publicSentiment}/100. Aktive Krisen: ${activeCrises.length}.`,
       });
       console.log(`  [Cycle] Weekly report — Day ${currentDay}`);
     }
@@ -1851,7 +1851,7 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: "monthly_report",
       actor: "system",
-      title: `Monthly Economic Report — Day ${currentDay}`,
+      title: `Monatlicher Wirtschaftsbericht — Tag ${currentDay}`,
       description: report,
     });
 
@@ -1899,8 +1899,8 @@ export async function runDay(): Promise<number> {
 
       addEvent(dayEvents, {
         dayNumber: currentDay, type: "provisional_budget_started", actor: "system",
-        title: `Budget Cycle ${cycleNumber} REJECTED — Provisional Budget Activated`,
-        description: `Parliament rejected the budget (Yes: ${yesSeats}, No: ${noSeats}). Operating under vorläufige Haushaltsführung (Art. 111 GG). Revised vote scheduled for Day ${retryDay}.`,
+        title: `Haushaltszyklus ${cycleNumber} ABGELEHNT — Vorläufiger Haushalt aktiviert`,
+        description: `Parlament hat den Haushalt abgelehnt (Ja: ${yesSeats}, Nein: ${noSeats}). Vorläufige Haushaltsführung gemäß Art. 111 GG. Erneute Abstimmung geplant für Tag ${retryDay}.`,
         data: { cycleNumber, yesSeats, noSeats, retryDay },
       });
     }
@@ -1925,12 +1925,12 @@ export async function runDay(): Promise<number> {
       dayNumber: currentDay,
       type: budgetPassed ? "budget_passed" : "budget_rejected",
       actor: "system",
-      title: `Budget Cycle ${cycleNumber} ${budgetPassed ? "PASSED" : "REJECTED"}`,
-      description: `${budgetPassed ? "Approved" : "Rejected"} by parliament. Yes: ${yesSeats} seats, No: ${noSeats} seats.`,
+      title: `Haushaltszyklus ${cycleNumber} ${budgetPassed ? "ANGENOMMEN" : "ABGELEHNT"}`,
+      description: `${budgetPassed ? "Vom Parlament angenommen" : "Vom Parlament abgelehnt"}. Ja: ${yesSeats} Sitze, Nein: ${noSeats} Sitze.`,
       data: { budgetId, cycleNumber, yesSeats, noSeats },
     });
 
-    try { createNotificationForAll("budget_outcome", `Budget ${budgetPassed ? "passed" : "rejected"}`, `Budget Cycle ${cycleNumber}: ${budgetPassed ? "Approved" : "Rejected"} (${yesSeats} vs ${noSeats}).`, { budgetPassed, cycleNumber }, currentDay); } catch {}
+    try { createNotificationForAll("budget_outcome", `Haushalt ${budgetPassed ? "angenommen" : "abgelehnt"}`, `Haushaltszyklus ${cycleNumber}: ${budgetPassed ? "Angenommen" : "Abgelehnt"} (${yesSeats} gegen ${noSeats}).`, { budgetPassed, cycleNumber }, currentDay); } catch {}
 
     console.log(`  [Budget] Cycle ${cycleNumber}: ${budgetPassed ? "PASSED" : "REJECTED"} (${yesSeats} vs ${noSeats})`);
   }
@@ -1962,8 +1962,8 @@ export async function runDay(): Promise<number> {
 
       addEvent(dayEvents, {
         dayNumber: currentDay, type: "budget_revision_rejected", actor: "system",
-        title: `Revised Budget Cycle ${cycleNumber} REJECTED — Coalition Crisis`,
-        description: `Revised budget failed: ${yesSeats} yes vs ${noSeats} no. Government dissolved, snap election triggered.`,
+        title: `Überarbeiteter Haushaltszyklus ${cycleNumber} ABGELEHNT — Koalitionskrise`,
+        description: `Überarbeiteter Haushalt gescheitert: ${yesSeats} Ja gegen ${noSeats} Nein. Regierung aufgelöst, Neuwahl ausgelöst.`,
         data: { cycleNumber, yesSeats, noSeats },
       });
 
@@ -1975,8 +1975,8 @@ export async function runDay(): Promise<number> {
         dissolveGovernment(currentDay);
         addEvent(dayEvents, {
           dayNumber: currentDay, type: "government_dissolved", actor: "system",
-          title: "Government dissolved — Budget crisis",
-          description: "Coalition failed to pass a revised budget. Snap election triggered.",
+          title: "Regierung aufgelöst — Haushaltskrise",
+          description: "Koalition konnte keinen überarbeiteten Haushalt verabschieden. Neuwahl ausgelöst.",
           data: { governmentId: govNow.id },
         });
         nextElectionDay = currentDay;
@@ -2002,8 +2002,8 @@ export async function runDay(): Promise<number> {
     addEvent(dayEvents, {
       dayNumber: currentDay,
       type: budgetPassed ? "budget_passed" : "budget_rejected", actor: "system",
-      title: `Revised Budget Cycle ${cycleNumber} ${budgetPassed ? "PASSED" : "REJECTED"}`,
-      description: `Revision vote: Yes: ${yesSeats}, No: ${noSeats}.`,
+      title: `Überarbeiteter Haushaltszyklus ${cycleNumber} ${budgetPassed ? "ANGENOMMEN" : "ABGELEHNT"}`,
+      description: `Nachtragsabstimmung: Ja: ${yesSeats}, Nein: ${noSeats}.`,
       data: { budgetId, cycleNumber, yesSeats, noSeats, revisionAttempt: 1 },
     });
 
