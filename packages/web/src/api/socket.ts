@@ -72,3 +72,8 @@ export function onNotificationRefresh(handler: NotificationRefreshHandler): () =
   notificationHandlers.add(handler);
   return () => { notificationHandlers.delete(handler); };
 }
+
+/** Trigger notification refresh locally (e.g. after marking as read). */
+export function triggerNotificationRefresh(): void {
+  for (const h of notificationHandlers) h();
+}
