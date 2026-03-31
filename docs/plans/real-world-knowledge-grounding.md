@@ -5,47 +5,68 @@
 
 ## Goal
 
-Ground the simulation in real German politics by fetching real-world news (RSS) and official party positions (websites), digesting them via AI into structured knowledge, storing in DB, and injecting into agent prompts with a **decay mechanism** that prevents stale info from dominating fast-moving sim days.
+Ground the simulation in real German politics by fetching real-world news and party positions from structured APIs, digesting them via AI into category-based knowledge, storing in DB, and injecting into agent prompts with a model that respects the fundamental mismatch between sim time and real time.
 
-## Design Principles
-
-1. **Fetch once, use many** — fetch on seed (or first run) + once per real week
-2. **AI digest** — raw HTML/RSS is never stored; an AI call summarizes it into simulation-relevant knowledge
-3. **Decay over sim days** — fresh knowledge is prominent on first sim day, fades to background, then disappears after N sim days
-4. **Two tiers** — shared news landscape + per-party identity from official sources
-5. **Graceful degradation** — if fetch fails (network, site down), simulation runs as before
-
-## The Decay Model
+## Core Problem: Sim Time vs Real Time
 
 ```
-Sim days since knowledge was first used:
-  Day 0 (first use):  FULL injection (~600 tokens) — "AKTUELLE POLITISCHE LAGE"
-  Days 1-4:           BRIEF reminder (~100 tokens) — one-liner summary
-  Days 5+:            NOT injected — absorbed into simulation's own history
+Real time:  Week 1 ──── Week 2 ──── Week 3 ──── ... Week 6
+Fetches:    F1          F2          F3               F6
+Sim time:   Day 1 ──────────────────────────────── Day 840+ (2+ Wahlperioden)
 ```
 
-This prevents:
-- Re-reacting to the same news across many sim days
-- Stale real-world info overriding decisions the sim already made
-- Token waste on old context
+At ~20 sim days/real day, 6 real weeks = ~840 sim days. The simulation holds elections, forms governments, passes hundreds of bills — while the real world barely changes. Real-world info cannot pretend to be "current news" on sim day 500.
+
+## Design: Category-Based Injection (not time-decay)
+
+Real-world data is digested into **four categories**, each with different injection behavior:
+
+| Category | What it is | Example | Where injected | Lifespan |
+|----------|-----------|---------|----------------|----------|
+| **Political Landscape** | Timeless themes distilled from news | "Germany faces energy transition, migration debate, fiscal discipline tension" | Briefing system prompt (background) | Until next fetch overwrites |
+| **Party Positions** | Authentic real-world policy stances | "CDU opposes wealth tax, pushes Schuldenbremse" | Merged into party profile (system prompt) | Until next fetch overwrites |
+| **Structural Shocks** | Major global/national disruptions | War, pandemic, trade war, financial crisis | Permanent context section | Persists until a subsequent fetch says crisis resolved |
+| **Headline Inspiration** | Specific dated news items | "Scholz meets Biden on Tuesday" | User prompt, first sim day only | 1 sim day, then gone forever |
+
+### Why This Works
+
+- **Landscape + Party Positions**: Timeless. "Germany debates Schuldenbremse reform" is valid whether the sim is on day 1 or day 500. These shape what parties fight about.
+- **Structural Shocks**: Wars, pandemics, trade disruptions reshape politics for years. Even on sim day 840, "international trade disruptions" is a valid theme. These are stored as dateless context.
+- **Headlines**: The only category that "ages." Injected once as creative inspiration, then discarded. Parties react on that sim day; subsequent days see only the sim's own events.
 
 ## Data Sources
 
-### Tier 1: News Landscape (shared across all parties)
-- **Source**: tagesschau.de RSS feed (`https://www.tagesschau.de/xml/rss2`)
-- **Content**: Top German political headlines + summaries
-- **Digest output**: ~400-600 tokens, structured as political topics relevant to parliament
+### News (two perspectives for balance)
 
-### Tier 2: Party Identity (per-party)
-- **Sources**: Official party press/news pages
-  - SPD: `https://www.spd.de/aktuelles/`
-  - CDU: `https://www.cdu.de/aktuelles`
-  - Grüne: `https://www.gruene.de/artikel`
-  - FDP: `https://www.fdp.de/aktuelles`
-  - AfD: `https://www.afd.de/news/`
-  - Die Linke: `https://www.die-linke.de/start/nachrichten/`
-- **Content**: Current policy positions, press releases, key statements
-- **Digest output**: ~300-400 tokens per party, structured as policy priorities + recent positions
+| Source | URL | Lean | Format | Auth |
+|--------|-----|------|--------|------|
+| **Tagesschau API** | `https://www.tagesschau.de/api2u/news/?ressort=inland` | Center/government | JSON | None (60 req/hr) |
+| **WELT RSS** | `https://www.welt.de/feeds/section/politik.rss` | Center-right/opposition | RSS/XML | None |
+
+Tagesschau provides the establishment/factual perspective; WELT provides the critical/opposition angle. The AI digest synthesizes both into a balanced view.
+
+### Party Positions (structured APIs, not website scraping)
+
+| Source | URL | Data | Auth | License |
+|--------|-----|------|------|---------|
+| **abgeordnetenwatch.de API** | `https://www.abgeordnetenwatch.de/api/v2/` | Voting records, party stances, politician profiles | None | CC0 1.0 |
+| **Bundestag DIP API** | `https://search.dip.bundestag.de/api/v1/` | Bills, motions, legislative procedures | API key (public) | Open |
+| **Wahl-O-Mat data** | GitHub `qual-o-mat-data` repo | 38 key position statements per party | None | Community |
+
+**Why this is better than scraping party websites:**
+- Structured JSON, not noisy HTML
+- Voting records show actual behavior, not PR spin
+- DIP API shows what bills each party actually filed
+- abgeordnetenwatch is CC0 licensed, designed for reuse
+- No scraping fragility (URL changes, layout changes, bot blocking)
+
+### Supplementary (lower priority, future enhancement)
+
+| Source | URL | Data |
+|--------|-----|------|
+| Bundestag RSS | `bundestag.de/services/rss/` | New bills, press releases, committee agendas |
+| bundeshaushalt-api | via bund.dev | Federal budget data |
+| dashboard-deutschland | via bund.dev | Economic/social indicators |
 
 ## DB Schema
 
@@ -55,81 +76,173 @@ New table in `simulation.db`:
 CREATE TABLE IF NOT EXISTS real_world_knowledge (
   id TEXT PRIMARY KEY,
   generation INTEGER NOT NULL,
-  source_type TEXT NOT NULL,        -- 'news' | 'party_identity'
-  party_id TEXT,                    -- NULL for news, party ID for identity
-  digest TEXT NOT NULL,             -- AI-generated summary
-  brief TEXT NOT NULL,              -- One-liner for decay phase (days 1-4)
+  category TEXT NOT NULL,           -- 'landscape' | 'party_position' | 'shock' | 'headline'
+  party_id TEXT,                    -- NULL for shared categories, party ID for positions
+  digest TEXT NOT NULL,             -- AI-generated summary (injected into prompts)
+  source_urls TEXT,                 -- JSON array of source URLs
   fetched_at TEXT NOT NULL,         -- Real wall-clock ISO timestamp
-  sim_day_first_used INTEGER,      -- Set on first injection
-  raw_urls TEXT                     -- JSON array of source URLs (for dedup)
+  sim_day_first_used INTEGER,      -- Set on first injection (only matters for 'headline')
+  active INTEGER NOT NULL DEFAULT 1 -- 0 = superseded by newer generation or resolved
 );
 ```
 
+**Generation model:**
+- Each weekly fetch increments `generation`
+- New fetch marks previous generation's `landscape` and `party_position` rows as `active = 0`
+- `shock` rows stay `active = 1` until a fetch's digest explicitly resolves them
+- `headline` rows: `active` set to `0` after first sim day use
+
+## AI Digest Pipeline
+
+One AI call per fetch that classifies + summarizes all raw data:
+
+**Input to digest call:**
+```
+NEWS SOURCES (tagesschau + WELT):
+[raw headlines + summaries from both]
+
+PARLIAMENTARY DATA (DIP + abgeordnetenwatch):
+[recent bills filed, voting patterns by party]
+
+EXISTING SHOCKS (still active):
+[list of active shock rows from DB]
+```
+
+**Output (structured JSON):**
+```json
+{
+  "landscape": "Germany faces... (3-4 sentences, timeless themes)",
+  "party_positions": {
+    "spd": "Pushes Bürgergeld reform, minimum wage €15...",
+    "cdu": "Opposes wealth tax, defends Schuldenbremse...",
+    ...
+  },
+  "shocks": [
+    { "theme": "International trade disruptions", "status": "ongoing" },
+    { "theme": "European defense spending pressure", "status": "new" }
+  ],
+  "shocks_resolved": ["previous-shock-id-if-resolved"],
+  "headlines": [
+    "Bundestag debates new immigration law",
+    "Coalition tensions over climate spending"
+  ]
+}
+```
+
+Single Haiku call, ~$0.003. Replaces 7 separate calls (1 news + 6 party) from v1 design.
+
 ## Implementation Steps
 
-### Step 1: DB table + migration (`packages/engine/src/db/ddl.ts`)
-- Add `real_world_knowledge` table to `SIM_TABLE_DDL`
-- No column migrations needed (new table)
+### Step 1: DB table + Drizzle schema
+- **`packages/engine/src/db/ddl.ts`**: Add `real_world_knowledge` to `SIM_TABLE_DDL`
+- **`packages/engine/src/db/schema-sim.ts`**: Add Drizzle table definition
+- **`packages/engine/src/db/schema.ts`**: Re-export
 
 ### Step 2: Knowledge fetch module (`packages/engine/src/simulation/knowledge-fetch.ts`)
 - **New file** with:
-  - `fetchNewsRSS()`: Fetch tagesschau RSS, parse XML, extract top 10 headlines + summaries
-  - `fetchPartyPage(partyId, url)`: Fetch party webpage, extract text content
-  - `shouldFetchKnowledge()`: Check `real_world_knowledge.fetched_at` — return true if no rows OR latest `fetched_at` is >7 real days ago
-  - `storeKnowledge(generation, sourceType, partyId, digest, brief, urls)`: Insert into DB
-- Uses native `fetch()` for HTTP + simple text extraction (strip HTML tags)
-- RSS parsing: lightweight XML extraction (no heavy dependency — regex or DOMParser-like approach)
+  - `shouldFetchKnowledge()`: Check DB — return true if no rows OR latest `fetched_at` > 7 real days ago
+  - `fetchTagesschauNews()`: GET `/api2u/news/?ressort=inland`, extract top 15 title + teaser
+  - `fetchWeltRSS()`: GET WELT politics RSS, parse XML, extract top 15 headlines
+  - `fetchPartyVotingData()`: GET abgeordnetenwatch `/polls` for recent votes + party positions
+  - `fetchRecentBills()`: GET DIP API `/vorgang` for recent legislative procedures
+  - `fetchWahlomatPositions()`: One-time load of structured party positions from GitHub JSON (cached)
+  - All fetches wrapped in try/catch — individual source failure doesn't block others
 
-### Step 3: Knowledge digest batch requests (`packages/engine/src/simulation/knowledge-fetch.ts`)
-- `buildNewsDigestBatchRequest(rawHeadlines)`: Creates a BatchRequest with `roleKey: "daily"` that summarizes raw headlines into a political landscape digest + brief one-liner
-- `buildPartyDigestBatchRequest(partyId, rawText)`: Creates a BatchRequest per party to extract current policy priorities from their website content
-- `processDigestResults(results)`: Parse AI responses, store digests in DB
+### Step 3: Digest batch request (`packages/engine/src/simulation/knowledge-fetch.ts`)
+- `buildKnowledgeDigestRequest(rawData, activeShocks)`: Single BatchRequest with `roleKey: "daily"`
+  - System prompt: "You are a German political analyst. Classify and summarize..."
+  - Outputs the structured JSON above
+  - Max 1024 tokens
+- `processKnowledgeDigestResult(result, generation)`: Parse JSON, store rows in DB by category
 
-### Step 4: Knowledge query + decay (`packages/engine/src/simulation/knowledge-fetch.ts`)
-- `getActiveKnowledge(currentDay, partyId)`: Query DB for latest generation
-  - If `sim_day_first_used` is NULL → set it to `currentDay`, return full digest
-  - If `currentDay - sim_day_first_used <= 4` → return brief one-liner
-  - If `currentDay - sim_day_first_used > 4` → return null (decayed)
-- Returns `{ newsDigest?: string; partyDigest?: string; isFresh: boolean }`
+### Step 4: Knowledge query functions (`packages/engine/src/simulation/knowledge-fetch.ts`)
+- `getActiveLandscape()`: Latest active `landscape` row → string or null
+- `getPartyPositions(partyId)`: Latest active `party_position` for this party → string or null
+- `getActiveShocks()`: All active `shock` rows → string[] or empty
+- `getHeadlineInspiration(currentDay)`: Active `headline` rows where `sim_day_first_used` is NULL → set `sim_day_first_used = currentDay`, return headlines. If already used → return null.
 
 ### Step 5: Wire into AgentContext (`packages/types/src/types/agent.ts`)
 - Add `realWorldContext?: string` field to `AgentContext`
 
 ### Step 6: Inject into prompts (`packages/engine/src/agent/prompt.ts`)
-- In `buildUserPrompt()`, add after briefing section (Priority 1.5):
+- **System prompt** (via party profiles): Append real party positions
+- **Briefing system prompt**: Append political landscape + structural shocks
+- **User prompt** (Priority 1.5): Headlines (first sim day only) + landscape summary
+
+```
+REAL-WORLD POLITICAL CONTEXT:
+[Political landscape — always present if available]
+
+MAJOR GLOBAL FACTORS:
+[Structural shocks — always present if active]
+
+TODAY'S POLITICAL INSPIRATION:
+[Headlines — first sim day after fetch only]
+```
+
+### Step 7: Enrich party profiles (`packages/engine/src/agent/party-profiles.ts`)
+- `getPartyProfile(partyId, realPositions?)`: If `realPositions` provided, append:
   ```
-  if (ctx.realWorldContext) {
-    briefingSection += `\nREAL-WORLD POLITICAL CONTEXT:\n${ctx.realWorldContext}\n`;
-  }
+  CURRENT REAL-WORLD POLICY PRIORITIES:
+  ${realPositions}
   ```
-- Fresh knowledge gets full injection; decayed knowledge gets brief reminder — this is handled by `getActiveKnowledge()` returning different content
+- Static profile = base ideology. Real positions = factual overlay from voting records + bills.
 
-### Step 7: Wire into simulation loop (`packages/engine/src/simulation/loop.ts`)
-- At the start of `runDay()`, before briefing:
-  1. Call `shouldFetchKnowledge()` — if true, fetch + digest + store (adds batch requests)
-  2. Call `getActiveKnowledge(currentDay, partyId)` for each party when building agent contexts
-  3. Set `ctx.realWorldContext` = combined news + party digest (if available)
+### Step 8: Depth config controls (`packages/engine/src/agent/context-depth.ts`)
+- Add `enableKnowledgeGrounding: boolean` to `DepthConfig`
+- Low: disabled. Normal: enabled. High: enabled.
 
-### Step 8: Enrich party profiles with real positions (`packages/engine/src/agent/party-profiles.ts`)
-- Modify `getPartyProfile(partyId)` to accept optional `realPositions?: string`
-- If provided, append to the static profile: `\nCURRENT REAL-WORLD POSITIONS:\n${realPositions}`
-- The static profile remains the base; real positions overlay factual context
+### Step 9: Wire into simulation loop (`packages/engine/src/simulation/loop.ts`)
+- Early in `runDay()`, before party agents:
+  1. `shouldFetchKnowledge()` → if true, run fetch + digest (adds to batch)
+  2. `getActiveLandscape()` + `getActiveShocks()` → shared context
+  3. Per party: `getPartyPositions(partyId)` → enrich profile
+  4. `getHeadlineInspiration(currentDay)` → one-time injection
+  5. Combine into `ctx.realWorldContext`
 
-### Step 9: Add depth config controls (`packages/engine/src/agent/context-depth.ts`)
-- Add to `DepthConfig`:
-  - `enableKnowledgeGrounding: boolean`
-  - `knowledgeDecayDays: number` (how many sim days until full decay)
-- Low depth: disabled. Normal: enabled, 5-day decay. High: enabled, 7-day decay.
-
-### Step 10: Update exports + types
-- Export new functions from `packages/engine/src/agent/index.ts` (if needed)
-- Add Drizzle schema for `real_world_knowledge` in `packages/engine/src/db/schema-sim.ts`
-
-### Step 11: Handle seed scenario (`packages/engine/src/db/seed.ts`)
+### Step 10: Handle seed scenario (`packages/engine/src/db/seed.ts`)
 - On `npm run seed`: trigger initial knowledge fetch + digest
-- Store as generation 1, `sim_day_first_used = null` (will be set on first sim day)
+- Store as generation 1
+
+### Step 11: Update exports
+- **`packages/engine/src/agent/index.ts`**: Export knowledge functions
+- **`packages/engine/src/simulation/index.ts`**: Export if needed
 
 ---
+
+## Prompt Injection Examples
+
+### In system prompt (party profile for SPD):
+```
+PARTY CHARACTER — SPD (Sozialdemokratische Partei Deutschlands):
+You speak with the voice of social democracy...
+[existing static profile]
+
+CURRENT REAL-WORLD POLICY PRIORITIES:
+SPD pushes Bürgergeld reform and €15 minimum wage. In recent Bundestag votes,
+SPD supported renewable energy expansion (Drucksache 20/1234) and opposed
+CDU's motion to relax debt brake rules. Key focus: social housing investment.
+```
+
+### In briefing context:
+```
+POLITICAL LANDSCAPE:
+German politics is shaped by tensions between fiscal discipline and green
+investment, rising migration debate, and transatlantic security commitments.
+The coalition faces internal friction over Schuldenbremse reform.
+
+MAJOR GLOBAL FACTORS:
+- International trade disruptions creating economic uncertainty for German exporters
+- European defense spending pressure following security developments in Eastern Europe
+```
+
+### In user prompt (first sim day after fetch only):
+```
+TODAY'S POLITICAL INSPIRATION (use as creative context, not literal events):
+- Bundestag debates new immigration law framework
+- Coalition tensions over €50B climate investment package
+- Opposition demands committee hearing on defense procurement
+```
 
 ## Files Changed
 
@@ -137,36 +250,38 @@ CREATE TABLE IF NOT EXISTS real_world_knowledge (
 |------|--------|-------------|
 | `engine/src/db/ddl.ts` | Modify | Add `real_world_knowledge` table DDL |
 | `engine/src/db/schema-sim.ts` | Modify | Add Drizzle schema for new table |
-| `engine/src/db/schema.ts` | Modify | Re-export new schema |
-| `engine/src/simulation/knowledge-fetch.ts` | **New** | Fetch, digest, store, query with decay |
-| `engine/src/agent/prompt.ts` | Modify | Inject `realWorldContext` into user prompt |
+| `engine/src/db/schema.ts` | Modify | Re-export new table |
+| `engine/src/simulation/knowledge-fetch.ts` | **New** | Fetch, digest, store, query — all knowledge logic |
+| `engine/src/agent/prompt.ts` | Modify | Inject landscape + shocks + headlines into prompts |
 | `engine/src/agent/party-profiles.ts` | Modify | Accept optional real positions overlay |
-| `engine/src/agent/context-depth.ts` | Modify | Add knowledge grounding depth controls |
-| `engine/src/simulation/loop.ts` | Modify | Wire knowledge fetch + query into runDay() |
+| `engine/src/agent/context-depth.ts` | Modify | Add `enableKnowledgeGrounding` flag |
+| `engine/src/simulation/loop.ts` | Modify | Wire knowledge into runDay() |
 | `types/src/types/agent.ts` | Modify | Add `realWorldContext?: string` to AgentContext |
-| `engine/src/agent/index.ts` | Modify | Export new functions if needed |
+| `engine/src/agent/index.ts` | Modify | Export knowledge functions |
 
 ## Cost Impact
 
 | Item | Frequency | Cost |
 |------|-----------|------|
-| News digest (1 Haiku call) | ~1x/real week | ~$0.002 |
-| Party digests (6 Haiku calls) | ~1x/real week | ~$0.012 |
-| Extra prompt tokens (knowledge in context) | Each sim day (decaying) | ~$0.002/day avg |
-| **Total** | | **~$0.016/week + ~$0.002/sim day** |
+| Knowledge digest (1 Haiku call) | ~1x/real week | ~$0.003 |
+| Extra prompt tokens (context) | Each sim day | ~$0.002/day |
+| HTTP fetches (4 sources) | ~1x/real week | Free |
+| **Total** | | **~$0.003/week + ~$0.002/sim day** |
 
-Negligible vs current ~$0.055/sim day.
+Cheaper than v1 design (single digest call vs 7 separate calls).
 
 ## Risks
 
-- **RSS/website changes**: URLs or formats may change. Mitigation: graceful fallback (skip if fetch fails)
-- **Content quality**: Party websites may have noise (navigation, ads). Mitigation: AI digest filters noise
-- **Rate limiting**: Fetching only weekly, very unlikely to hit rate limits
-- **Blocked by websites**: Some sites may block server-side fetches. Mitigation: proper User-Agent header, fallback to skip
+- **API changes**: DIP key expires May 2026 (renewable). abgeordnetenwatch is stable CC0. Tagesschau is unofficial.
+- **Tagesschau rate limit**: 60 req/hr — not a concern with weekly fetches
+- **Source downtime**: Each source fetched independently with try/catch. Partial data is fine.
+- **Digest quality**: Single call must classify correctly. Mitigation: structured JSON schema + validation.
+- **Shock persistence**: AI must correctly identify when a shock is resolved. Mitigation: explicit prompt + manual override via admin API (future).
 
 ## Not In Scope
 
-- Multiple news sources (start with tagesschau only, expand later)
-- Real-time news (weekly fetch is sufficient for grounding)
-- User-facing UI for knowledge sources
-- Wahlprogramm PDF ingestion (possible future enhancement)
+- User-facing UI for knowledge sources (future)
+- Wahlprogramm PDF ingestion (future)
+- Real-time news feed (weekly is sufficient)
+- Bundestag RSS for bill triggers (future enhancement)
+- bundeshaushalt/economic indicator APIs (future)
