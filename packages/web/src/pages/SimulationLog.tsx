@@ -4,6 +4,7 @@ import { api, DaySummary, SimulationEvent } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
+import { EVENT_TYPE_LABEL } from "@/lib/colors";
 
 function formatRealDate(iso: string | null): string {
   if (!iso) return "";
@@ -83,7 +84,7 @@ export function SimulationLog() {
                     <CardContent className="p-5 divide-y divide-border">
                       {dayEvents.map(ev => (
                         <div key={ev.id} className="py-3 first:pt-0 last:pb-0">
-                          <div className="text-xs text-muted-foreground uppercase">{ev.type.replace(/_/g, " ")}</div>
+                          <div className="text-xs text-muted-foreground uppercase">{EVENT_TYPE_LABEL[ev.type] ?? ev.type.replace(/_/g, " ")}</div>
                           <div className="font-medium mt-0.5">{ev.title}</div>
                           <div className="text-sm text-muted-foreground mt-0.5">{ev.description}</div>
                         </div>

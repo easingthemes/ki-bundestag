@@ -153,7 +153,7 @@ export async function processDaySpeeches(currentDay: number): Promise<number> {
     db.insert(schema.simulationEvents).values({
       id: `evt-${randomUUID().slice(0, 8)}`,
       type: "mdb_speech",
-      title: `MdB ${displayName} speaks on "${bill?.title ?? "Unknown Bill"}" (${readingLabel} reading)`,
+      title: `MdB ${displayName} spricht zu "${bill?.title ?? "Unbekannter Gesetzentwurf"}" (${readingLabel}. Lesung)`,
       description: speech.content,
       dayNumber: currentDay,
       actor: displayName,

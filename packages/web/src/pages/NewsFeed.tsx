@@ -7,7 +7,7 @@ import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { SEMANTIC_HEX } from "@/lib/colors";
+import { SEMANTIC_HEX, EVENT_TYPE_LABEL } from "@/lib/colors";
 
 type EventCategory = {
   labelKey: string;
@@ -183,7 +183,7 @@ export function NewsFeed() {
                   onClick={() => toggleFilter(type)}
                   style={{ borderLeftColor: EVENT_BORDER_COLOR[type] || "#888" }}
                 >
-                  {type.replace(/_/g, " ")}
+                  {EVENT_TYPE_LABEL[type] ?? type.replace(/_/g, " ")}
                 </button>
               ))}
             </div>
@@ -242,7 +242,7 @@ export function NewsFeed() {
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             <Badge variant="outline" className="text-muted-foreground text-xs">
-                              {ev.type.replace(/_/g, " ")}
+                              {EVENT_TYPE_LABEL[ev.type] ?? ev.type.replace(/_/g, " ")}
                             </Badge>
                             {ev.actor !== "system" && (
                               <Link
