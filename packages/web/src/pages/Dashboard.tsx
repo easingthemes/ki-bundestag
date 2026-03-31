@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData } from "../api";
 import { CalendarWidget } from "../components/CalendarWidget";
 import { UpcomingCalendar } from "../components/UpcomingCalendar";
@@ -27,6 +28,7 @@ const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
 };
 
 export function Dashboard() {
+  const { t } = useTranslation("dashboard");
   const { user } = useUser();
   const [state, setState] = useState<NationalState | null>(null);
   const [parties, setParties] = useState<Party[]>([]);
@@ -134,7 +136,7 @@ export function Dashboard() {
       {/* ── Header row ── */}
       <div className="flex items-center justify-between mb-1 gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="!mb-0">Tag {simStatus.currentDay}</h1>
+          <h1 className="!mb-0">{t("tag", { day: simStatus.currentDay })}</h1>
           <SimStatusPill status={simStatus} />
         </div>
         {mood && moodBadgeCls && (
@@ -171,7 +173,7 @@ export function Dashboard() {
 
           {/* Bundestag Composition — Hemicycle + coalition info */}
           <section>
-            <div className="section-title">Bundestag</div>
+            <div className="section-title">{t("bundestag")}</div>
             <Card>
               <CardContent className="p-5">
                 <div className="flex flex-col gap-5 items-center">
@@ -183,7 +185,7 @@ export function Dashboard() {
                   <div className="grid grid-cols-2 gap-x-12 w-full max-w-4xl px-4">
                     <div className="flex flex-col gap-2 items-center">
                       <div className="text-[13px] font-bold uppercase tracking-wide text-emerald-600">
-                        Koalition
+                        {t("koalition")}
                         <span className={cn("ml-1.5", coalitionSeats >= 368 ? "text-emerald-600" : "text-destructive")}>
                           {coalitionSeats} Sitze {coalitionSeats >= 368 ? "✓" : "✗"}
                         </span>
@@ -199,7 +201,7 @@ export function Dashboard() {
                       {state.coalitionCohesion != null && (
                         <div className="pt-2 border-t border-border mt-1 w-full max-w-[200px]">
                           <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Kohäsion</span>
+                            <span className="text-muted-foreground">{t("kohesion")}</span>
                             <span className="font-bold" style={{ color: state.coalitionCohesion >= 90 ? SEMANTIC_HEX.positive : state.coalitionCohesion >= 70 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative }}>
                               {state.coalitionCohesion}%
                             </span>
@@ -215,7 +217,7 @@ export function Dashboard() {
                     </div>
                     <div className="flex flex-col gap-2 items-center">
                       <div className="text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
-                        Opposition
+                        {t("opposition")}
                         <span className="ml-1.5 text-muted-foreground">
                           {oppositionPartyList.reduce((s, p) => s + p.seatCount, 0)} Sitze
                         </span>
@@ -237,7 +239,7 @@ export function Dashboard() {
 
           {/* Economy Stats */}
           <section>
-            <div className="section-title">Wirtschaft</div>
+            <div className="section-title">{t("wirtschaft")}</div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { v: state.economy.gdpGrowth, l: "BIP-Wachstum", fmt: (n: number) => `${n >= 0 ? "+" : ""}${n}%`, c: state.economy.gdpGrowth >= 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative },
@@ -258,12 +260,12 @@ export function Dashboard() {
           {/* Latest Events */}
           <section>
             <div className="flex justify-between items-baseline mb-3">
-              <div className="section-title !mb-0 !pb-0 !border-b-0">Aktuelle Ereignisse</div>
-              <Link to="/news" className="text-xs font-medium text-primary hover:underline">Alle →</Link>
+              <div className="section-title !mb-0 !pb-0 !border-b-0">{t("aktuelleEreignisse")}</div>
+              <Link to="/news" className="text-xs font-medium text-primary hover:underline">{t("alleEreignisse")}</Link>
             </div>
             <div className="space-y-2">
               {events.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-4">Noch keine Ereignisse.</div>
+                <div className="text-sm text-muted-foreground py-4">{t("keineEreignisse")}</div>
               ) : events.map(ev => (
                 <Card key={ev.id}>
                   <CardContent className="p-3.5">
@@ -287,8 +289,8 @@ export function Dashboard() {
           {latestMedia.length > 0 && (
             <section>
               <div className="flex justify-between items-baseline mb-3">
-                <div className="section-title !mb-0 !pb-0 !border-b-0">Presse</div>
-                <Link to="/media" className="text-xs font-medium text-primary hover:underline">Alle Artikel →</Link>
+                <div className="section-title !mb-0 !pb-0 !border-b-0">{t("presse")}</div>
+                <Link to="/media" className="text-xs font-medium text-primary hover:underline">{t("alleArtikel")}</Link>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {latestMedia.map(a => {
@@ -316,19 +318,19 @@ export function Dashboard() {
             <section>
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="section-title !mb-0 !pb-0 !border-b-0">Kalender</div>
+                  <div className="section-title !mb-0 !pb-0 !border-b-0">{t("kalender")}</div>
                   <div className="flex gap-1">
                     {(["upcoming", "past"] as const).map(v => (
                       <button key={v} onClick={() => setCalendarView(v)} className={cn(
                         "px-2.5 py-0.5 text-[11px] font-medium rounded-full border cursor-pointer transition-colors",
                         calendarView === v ? "bg-primary text-white border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/30",
                       )}>
-                        {v === "upcoming" ? "Termine" : "Vergangene"}
+                        {v === "upcoming" ? t("termine") : t("vergangene")}
                       </button>
                     ))}
                   </div>
                 </div>
-                <Link to="/log" className="text-xs font-medium text-primary hover:underline">Alle Tage →</Link>
+                <Link to="/log" className="text-xs font-medium text-primary hover:underline">{t("alleTage")}</Link>
               </div>
               {calendarView === "upcoming" && upcomingCalendar && <UpcomingCalendar data={upcomingCalendar} />}
               {calendarView === "past" && calendar && <CalendarWidget data={calendar} onMonthChange={setCalendarMonth} />}
@@ -345,7 +347,7 @@ export function Dashboard() {
             return (
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Bundeskanzler/in</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t("bundeskanzlerin")}</div>
                   <div className="flex items-center gap-2.5">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: fixColor(cp?.color || "#333") }}>
                       {government.chancellorName.split(" ").map(w => w[0]).join("").slice(0, 2)}
@@ -364,8 +366,8 @@ export function Dashboard() {
           <Card>
             <CardContent className="p-4">
               <div className="flex justify-between items-center mb-3">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Zustimmung</div>
-                <Link to="/parties" className="text-[11px] font-medium text-primary hover:underline">Alle →</Link>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("zustimmung")}</div>
+                <Link to="/parties" className="text-[11px] font-medium text-primary hover:underline">{t("alleParteien")}</Link>
               </div>
               <div className="space-y-2">
                 {partiesByApproval.map(p => {
@@ -389,7 +391,7 @@ export function Dashboard() {
           {/* Public Sentiment */}
           <Card>
             <CardContent className="p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Öffentliche Stimmung</div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("oeffentlicheStimmung")}</div>
               <div className="flex items-center gap-3">
                 <div className="stat-value text-2xl" style={{ color: sentimentColor }}>{state.publicSentiment}</div>
                 <div className="flex-1">
@@ -410,7 +412,7 @@ export function Dashboard() {
             return (
               <Card style={{ borderLeft: `3px solid ${seatColor}` }}>
                 <CardContent className="p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Ihr MdB-Sitz</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">{t("mdbSitz")}</div>
                   <div className="font-bold text-sm">Sitz #{mySeat.seatNumber} · {seatParty?.name ?? mySeat.partyId}</div>
                   <div className="flex items-center gap-2 mt-1.5">
                     <span className="text-xs text-muted-foreground">Disziplin:</span>
@@ -429,19 +431,19 @@ export function Dashboard() {
           })()}
           {!mySeat && user?.partyId && myApplications.length === 0 && (
             <Link to={`/parties/${user.partyId}#mdb-seats`} className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-              <span className="block font-semibold text-xs text-primary">MdB-Sitz beantragen</span>
-              <span className="block text-[11px] text-muted-foreground">Direkt abstimmen und Reden halten</span>
+              <span className="block font-semibold text-xs text-primary">{t("mdbBeantragen")}</span>
+              <span className="block text-[11px] text-muted-foreground">{t("mdbBeantragenBeschreibung")}</span>
             </Link>
           )}
           {!mySeat && myApplications.some(a => a.status === "pending") && (
-            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800">Bewerbung läuft...</div>
+            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800">{t("bewerbungLaeuft")}</div>
           )}
 
           {/* Active Crises */}
           {crises.length > 0 && (
             <Card>
               <CardContent className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-destructive mb-2">Aktive Krisen</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-destructive mb-2">{t("aktiveKrisen")}</div>
                 {crises.map(c => (
                   <div key={c.id} className="mb-2 last:mb-0">
                     <div className="flex justify-between items-center">
@@ -459,14 +461,14 @@ export function Dashboard() {
           {election && (
             <Card>
               <CardContent className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-blue-600 mb-2">Wahl</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-blue-600 mb-2">{t("wahl")}</div>
                 <div className="flex justify-between items-center mb-1">
                   <Badge variant="outline" className={cn("text-[10px]", PHASE_BADGE[election.status])}>{election.status}</Badge>
                   <span className="text-xs text-muted-foreground">Tag {election.electionDay}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">{election.triggerReason}</div>
                 {election.electionDay - simStatus.currentDay > 0 && (
-                  <div className="mt-1.5 font-bold text-sm">{election.electionDay - simStatus.currentDay} Tage bis zur Wahl</div>
+                  <div className="mt-1.5 font-bold text-sm">{t("tagesBisWahl", { days: election.electionDay - simStatus.currentDay })}</div>
                 )}
                 <Link to="/elections" className="text-xs text-primary mt-1.5 inline-block font-medium hover:underline">Details →</Link>
               </CardContent>
@@ -477,18 +479,18 @@ export function Dashboard() {
           <div className="space-y-1.5">
             {!user ? (
               <Link to="/login" className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-semibold text-xs text-primary">Anmelden</span>
-                <span className="block text-[11px] text-muted-foreground">Anmelden, um mitzumachen</span>
+                <span className="block font-semibold text-xs text-primary">{t("anmelden")}</span>
+                <span className="block text-[11px] text-muted-foreground">{t("anmeldenBeschreibung")}</span>
               </Link>
             ) : user.partyId ? (
               <Link to={`/parties/${user.partyId}`} className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-semibold text-xs text-primary">Ihre Partei</span>
+                <span className="block font-semibold text-xs text-primary">{t("ihrepartei")}</span>
                 <span className="block text-[11px] text-muted-foreground">{parties.find(p => p.id === user.partyId)?.name ?? user.partyId}</span>
               </Link>
             ) : (
               <Link to="/parties" className="block p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors no-underline">
-                <span className="block font-semibold text-xs text-primary">Partei beitreten</span>
-                <span className="block text-[11px] text-muted-foreground">Wählen Sie eine Partei</span>
+                <span className="block font-semibold text-xs text-primary">{t("parteiBeitreten")}</span>
+                <span className="block text-[11px] text-muted-foreground">{t("parteiBetreteNBeschreibung")}</span>
               </Link>
             )}
             {user && (
@@ -496,8 +498,8 @@ export function Dashboard() {
                 onClick={() => setShowWelcome(true)}
                 className="w-full text-left p-3 rounded-lg border border-dashed border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
               >
-                <span className="block font-semibold text-xs text-muted-foreground">Willkommen-Guide</span>
-                <span className="block text-[11px] text-muted-foreground/70">Einführung nochmal anzeigen</span>
+                <span className="block font-semibold text-xs text-muted-foreground">{t("willkommenGuide")}</span>
+                <span className="block text-[11px] text-muted-foreground/70">{t("einfuehrungnochmal")}</span>
               </button>
             )}
           </div>
@@ -521,7 +523,7 @@ export function Dashboard() {
             return (
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Entscheidung des Monats</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("entscheidungDesMonats")}</div>
                   <Link to={`/bills/${decisionOfMonth.id}`} className="font-bold text-sm text-foreground no-underline hover:underline leading-snug">
                     {decisionOfMonth.title}
                   </Link>
@@ -546,15 +548,15 @@ export function Dashboard() {
           {politicianOfMonth && (
             <Card>
               <CardContent className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Partei des Monats</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("parteiDesMonats")}</div>
                 <Link to={`/parties/${politicianOfMonth.party.id}`} className="flex items-center gap-2 no-underline text-foreground">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fixColor(politicianOfMonth.party.color) }} />
                   <span className="font-bold text-sm">{politicianOfMonth.party.name}</span>
                 </Link>
-                <div className="text-xs text-muted-foreground mt-1">Aktuelle Zustimmung: {politicianOfMonth.party.approvalRating.toFixed(1)}%</div>
+                <div className="text-xs text-muted-foreground mt-1">{t("aktuelleZustimmung", { value: politicianOfMonth.party.approvalRating.toFixed(1) })}</div>
                 <div className="mt-1.5 font-extrabold text-lg" style={{ color: politicianOfMonth.delta > 0 ? SEMANTIC_HEX.positive : politicianOfMonth.delta < 0 ? SEMANTIC_HEX.negative : SEMANTIC_HEX.neutral }}>
                   {politicianOfMonth.delta > 0 ? "+" : ""}{politicianOfMonth.delta.toFixed(1)}
-                  <span className="font-normal text-[11px] text-muted-foreground ml-1.5">Veränderung</span>
+                  <span className="font-normal text-[11px] text-muted-foreground ml-1.5">{t("veraenderung")}</span>
                 </div>
               </CardContent>
             </Card>

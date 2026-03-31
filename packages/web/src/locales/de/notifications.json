@@ -1,0 +1,59 @@
+{
+  "title": "Benachrichtigungen",
+  "loginPrompt": "Melde dich an, um deine Benachrichtigungen zu sehen.",
+  "markAllRead": "Alle als gelesen markieren ({{count}})",
+  "noNotifications": "Keine Benachrichtigungen.",
+  "read": "Gelesen",
+  "day": "Tag {{number}}",
+  "types": {
+    "all": "Alle",
+    "morning_summary": "Morgenbericht",
+    "event_queued": "In Warteschlange",
+    "event_ready": "Bereit",
+    "proposal_accepted": "Vorschlag angenommen",
+    "proposal_declined": "Vorschlag abgelehnt",
+    "proposal_expired": "Vorschlag abgelaufen",
+    "question_answered": "Frage beantwortet",
+    "bill_outcome": "Abstimmungsergebnis",
+    "mdb_vote_needed": "Abstimmung nötig",
+    "election_started": "Wahl",
+    "election_result": "Wahlergebnis",
+    "crisis_alert": "Krise",
+    "budget_outcome": "Haushalt",
+    "government_formed": "Regierung"
+  },
+  "activity": {
+    "title": "Meine Aktivitäten",
+    "loginPrompt": "Melde dich an, um deine Aktivitäten zu sehen.",
+    "subtitle": "Alles, was du in der Simulation getan hast.",
+    "empty": "Noch keine Aktivitäten. Fange an mitzumachen!",
+    "filter": {
+      "all": "Alle"
+    },
+    "view": "Ansehen →",
+    "day": "Tag {{number}}",
+    "activityTypes": {
+      "proposal": "Vorschlag",
+      "signal": "Signal",
+      "mdb_vote": "MdB-Abstimmung",
+      "speech": "Rede",
+      "application": "Bewerbung",
+      "question": "Anfrage"
+    },
+    "outcomes": {
+      "accepted": "Angenommen",
+      "declined": "Abgelehnt",
+      "expired": "Abgelaufen",
+      "open": "Offen",
+      "answered": "Beantwortet",
+      "pending": "Ausstehend",
+      "approved": "Genehmigt",
+      "rejected": "Abgelehnt"
+    }
+  },
+  "simulationLog": {
+    "title": "Simulationsprotokoll",
+    "empty": "Noch keine Simulationsdaten. Starte die Simulation, um das Protokoll zu sehen.",
+    "events": "{{count}} Ereignisse"
+  }
+}

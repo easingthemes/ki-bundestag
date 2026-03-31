@@ -16,18 +16,18 @@ import type { TimingPreset } from "../api";
 
 /** Real-time duration for one full election term (1461 sim days) per preset */
 export const TERM_DURATION: Record<TimingPreset, string> = {
-  "ultra-fast": "~3-7 days",
-  fast: "~2 weeks",
-  normal: "~1 month",
-  slow: "~5 months",
+  "ultra-fast": "~3–7 Tage",
+  fast: "~2 Wochen",
+  normal: "~1 Monat",
+  slow: "~5 Monate",
 };
 
 /** Short label for the preset */
 export const PRESET_LABEL: Record<TimingPreset, string> = {
-  "ultra-fast": "Ultra-Fast",
-  fast: "Fast",
+  "ultra-fast": "Ultra-Schnell",
+  fast: "Schnell",
   normal: "Normal",
-  slow: "Slow",
+  slow: "Langsam",
 };
 
 /**

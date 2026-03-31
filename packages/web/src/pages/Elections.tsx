@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, type Election, type ElectionResult, type NationalState, type Party, type SimulationStatus, type Fraktion } from "../api";
 import { usePolling } from "../usePolling";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,6 +56,7 @@ function InitialAvatar({ name, color, size = 32 }: { name: string; color: string
 }
 
 export function Elections() {
+  const { t } = useTranslation("elections");
   const [elections, setElections] = useState<Election[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [fraktionen, setFraktionen] = useState<Fraktion[]>([]);
@@ -179,7 +181,7 @@ export function Elections() {
   }
 
   if (elections.length === 0) {
-    return <div><h1>Wahlen</h1><p className="text-center py-8 text-muted-foreground">Laden…</p></div>;
+    return <div><h1>{t("bundestagwahl")}</h1><p className="text-center py-8 text-muted-foreground">Laden…</p></div>;
   }
 
   /* ── Main election view ────────────────────────────────────────── */
@@ -253,7 +255,7 @@ export function Elections() {
                             <strong>{party?.name || r.partyId}</strong>
                             {isCoalition && (
                               <span className="text-xs text-primary ml-1.5">
-                                {selected.newCoalition?.[0] === r.partyId ? "Regierung" : "Koalition"}
+                                {selected.newCoalition?.[0] === r.partyId ? t("regierungBadge") : t("koalitionBadge")}
                               </span>
                             )}
                           </td>

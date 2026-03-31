@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MODEL_TYPE_BADGE } from "@/lib/colors";
@@ -282,6 +283,7 @@ const TYPE_LABEL: Record<ActionType, string> = {
 };
 
 export function ActionsReference() {
+  const { t } = useTranslation("admin");
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -299,7 +301,7 @@ export function ActionsReference() {
         className="mb-4"
         options={categories.map(c => ({
           value: c,
-          label: c === "all" ? `All (${ACTIONS.length})` : `${c} (${ACTIONS.filter(a => a.category === c).length})`,
+          label: c === "all" ? t("actionsReference.filterAlle", { count: ACTIONS.length }) : `${c} (${ACTIONS.filter(a => a.category === c).length})`,
         }))}
         value={categoryFilter}
         onChange={setCategoryFilter}
@@ -336,7 +338,7 @@ export function ActionsReference() {
                         <button
                           className="bg-transparent border-none cursor-pointer text-xs text-muted-foreground px-1 py-0.5 rounded hover:bg-accent hover:text-foreground"
                           onClick={() => toggleAction(key)}
-                          title={isOpen ? "Collapse" : "Show detail"}
+                          title={isOpen ? t("actionsReference.einklappen") : t("actionsReference.detailsAnzeigen")}
                         >
                           {isOpen ? "▲" : "▼"}
                         </button>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, MediaArticle } from "../api";
 import { usePolling } from "../usePolling";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,13 +38,8 @@ function ArticleBanner({ id, category }: { id: string; category: string }) {
   );
 }
 
-const BIAS_LABELS: Record<string, string> = {
-  left: "Left",
-  center: "Center",
-  right: "Right",
-};
-
 export function Media() {
+  const { t } = useTranslation("media");
   const [articles, setArticles] = useState<MediaArticle[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [limit, setLimit] = useState(50);
@@ -91,17 +87,17 @@ export function Media() {
 
   return (
     <div>
-      <h2 className="section-title">Medien</h2>
+      <h2 className="section-title">{t("title")}</h2>
       {articles.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            Noch keine Artikel. Starte die Simulation, um Medienberichte zu erzeugen.
+            {t("noArticles")}
           </CardContent>
         </Card>
       ) : (
         <>
           {/* Today's Front Pages */}
-          <h2 className="section-title">Titelseiten von heute</h2>
+          <h2 className="section-title">{t("frontPages")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {OUTLET_ORDER.map(outletName => {
               const article = frontPageMap.get(outletName);
@@ -113,7 +109,7 @@ export function Media() {
                   <Card key={outletName} className="opacity-50">
                     <CardContent className="p-4">
                       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{outletName}</div>
-                      <p className="text-sm text-muted-foreground">Keine Berichterstattung heute</p>
+                      <p className="text-sm text-muted-foreground">{t("noCoverage")}</p>
                     </CardContent>
                   </Card>
                 );
@@ -130,7 +126,7 @@ export function Media() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{outletName}</span>
                       <Badge variant="outline" className={SHARED_BIAS_BADGE[article.bias] || SHARED_BIAS_BADGE.center}>
-                        {BIAS_LABELS[article.bias] || "Center"}
+                        {t(`bias.${article.bias}`, { defaultValue: t("bias.center") })}
                       </Badge>
                     </div>
                     <div className="font-bold text-base mb-2 leading-tight">{article.headline}</div>
@@ -145,7 +141,7 @@ export function Media() {
                       </div>
                     )}
                     {!isExpanded && (
-                      <p className="text-xs text-muted-foreground mt-1.5">Klicken für vollständigen Artikel</p>
+                      <p className="text-xs text-muted-foreground mt-1.5">{t("clickForFullArticle")}</p>
                     )}
                   </CardContent>
                 </Card>
@@ -153,10 +149,10 @@ export function Media() {
             })}
           </div>
 
-          <h2 className="section-title">Archiv</h2>
+          <h2 className="section-title">{t("archive")}</h2>
           {visible.map(group => (
             <div key={group.day}>
-              <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">Day {group.day}</div>
+              <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">Tag {group.day}</div>
               {group.articles.map(article => {
                 const borderColor = CATEGORY_COLORS[article.category] || "#888";
                 const isExpanded = expanded.has(article.id);
@@ -173,7 +169,7 @@ export function Media() {
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{article.outlet}</span>
                         <Badge variant="outline" className={SHARED_BIAS_BADGE[article.bias] || SHARED_BIAS_BADGE.center}>
-                          {BIAS_LABELS[article.bias] || "Center"}
+                          {t(`bias.${article.bias}`, { defaultValue: t("bias.center") })}
                         </Badge>
                         <Badge
                           className="hover:opacity-80"
@@ -192,7 +188,7 @@ export function Media() {
                         </div>
                       )}
                       {!isExpanded && (
-                        <p className="text-xs text-muted-foreground mt-1.5">Klicken für vollständigen Artikel</p>
+                        <p className="text-xs text-muted-foreground mt-1.5">{t("clickForFullArticle")}</p>
                       )}
                     </CardContent>
                   </Card>
@@ -205,7 +201,7 @@ export function Media() {
               onClick={() => setLimit(l => l + 50)}
               className="block mx-auto my-6 py-3 px-8 border border-input rounded-md bg-card cursor-pointer text-sm hover:bg-accent"
             >
-              Mehr laden
+              {t("loadMore")}
             </button>
           )}
         </>
