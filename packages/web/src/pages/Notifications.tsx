@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type AppNotification } from "../api";
+import { api, triggerNotificationRefresh, type AppNotification } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,6 +50,7 @@ export function Notifications() {
     try {
       await api.markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      triggerNotificationRefresh();
     } catch (err) { console.error(err); }
   }
 
@@ -57,6 +58,7 @@ export function Notifications() {
     try {
       await api.markNotificationRead(id);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      triggerNotificationRefresh();
     } catch (err) { console.error(err); }
   }
 
