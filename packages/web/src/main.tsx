@@ -29,7 +29,7 @@ import { api, setErrorHandler, type User, type SimulationStatus, type BundestagS
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu, Bell, Pencil, Check, X } from "lucide-react";
+import { Menu, Bell, Pencil, Check, X, Play, Pause, Square, Zap, Gauge, Timer, Snail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import "./locales";
@@ -363,6 +363,24 @@ function UserMenu({ user }: { user: User }) {
 
 /* ── Simulation status indicator ───────────────────────────────── */
 
+type SimState = "running" | "paused" | "stopped";
+
+const PRESET_ICON: Record<string, typeof Zap> = {
+  "ultra-fast": Zap, fast: Gauge, normal: Timer, slow: Snail,
+};
+
+function deriveSimState(status: SimulationStatus, now: number): SimState {
+  const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
+  const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
+  if (started > completed) {
+    if (now - started < 900_000) return "running";
+    return completed > 0 ? "paused" : "stopped";
+  }
+  if (completed > 0 && now - completed < 120_000) return "running";
+  if (completed > 0) return "paused";
+  return "stopped";
+}
+
 function SimStatus() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<SimulationStatus | null>(null);
@@ -406,16 +424,29 @@ function SimStatus() {
     return { running: false, pct: 0 };
   }, [status, now]);
 
+  const simState = useMemo(() => status ? deriveSimState(status, now) : "stopped", [status, now]);
+
   if (!status) return null;
+
+  const PresetIcon = PRESET_ICON[status.timingPreset] ?? Timer;
 
   return (
     <div className="shrink-0 flex flex-col items-end gap-0.5 min-w-[60px] md:min-w-[80px]">
       <div className="flex items-center gap-1.5 text-xs text-white/70 tabular-nums whitespace-nowrap">
-        <span className={cn(
-          "w-[6px] h-[6px] rounded-full shrink-0",
-          running ? "bg-emerald-400 shadow-[0_0_4px_#34d399] animate-pulse" : "bg-white/30"
-        )} />
         <span>{t("day", { number: status.currentDay })}</span>
+        {/* State icon */}
+        <span className={cn(
+          "inline-flex items-center justify-center w-3.5 h-3.5 rounded-full shrink-0",
+          simState === "running" && "text-emerald-400",
+          simState === "paused" && "text-amber-400",
+          simState === "stopped" && "text-white/40",
+        )}>
+          {simState === "running" && <Play className="w-2.5 h-2.5 fill-current" />}
+          {simState === "paused" && <Pause className="w-2.5 h-2.5 fill-current" />}
+          {simState === "stopped" && <Square className="w-2.5 h-2.5 fill-current" />}
+        </span>
+        {/* Mode icon */}
+        <PresetIcon className="w-3 h-3 text-white/50 shrink-0" />
       </div>
       <div className="w-full h-[2px] bg-white/15 rounded-sm overflow-hidden">
         <div
