@@ -1,8 +1,8 @@
-# KI Bundestag
+# KAI Bundestag
 
 AI-powered simulation of the German parliament. Six political parties, each driven by Claude AI, propose bills, debate, vote, and issue statements day by day. After elections, parties negotiate coalition terms over multiple rounds. Results are stored in SQLite and served via a REST API to a React frontend.
 
-**Live:** [http://49.13.230.58](http://49.13.230.58)
+**Live:** [https://bundestag.easingthemes.com/](https://bundestag.easingthemes.com/)
 
 ## Quick Start
 
