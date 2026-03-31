@@ -121,7 +121,7 @@ function MobileNav({ user }: { user: User | null }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="md:hidden ml-auto p-1.5 text-white/70 hover:text-white" aria-label={t("aria.toggleMenu")}>
+        <button className="p-1.5 text-white/70 hover:text-white" aria-label={t("aria.toggleMenu")}>
           <Menu className="size-5" />
         </button>
       </SheetTrigger>
@@ -409,7 +409,7 @@ function SimStatus() {
   if (!status) return null;
 
   return (
-    <div className="ml-auto shrink-0 flex flex-col items-end gap-0.5 min-w-[80px]">
+    <div className="shrink-0 flex flex-col items-end gap-0.5 min-w-[60px] md:min-w-[80px]">
       <div className="flex items-center gap-1.5 text-xs text-white/70 tabular-nums whitespace-nowrap">
         <span className={cn(
           "w-[6px] h-[6px] rounded-full shrink-0",
@@ -603,8 +603,12 @@ function App() {
             </div>
           </div>
 
-          {/* Mobile hamburger */}
-          <MobileNav user={user} />
+          {/* Mobile: sim status + notification bell + hamburger */}
+          <div className="md:hidden flex items-center ml-auto gap-2">
+            <SimStatus />
+            <NotificationBell />
+            <MobileNav user={user} />
+          </div>
         </nav>
 
         {/* Error toast */}
