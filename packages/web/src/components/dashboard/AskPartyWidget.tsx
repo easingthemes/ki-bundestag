@@ -28,7 +28,7 @@ export function AskPartyWidget({ parties, coalitionParties }: AskPartyWidgetProp
       setQuestionText("");
       setTimeout(() => setSubmitStatus("idle"), 3000);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Submission failed");
+      setErrorMsg(err instanceof Error ? err.message : "Einreichen fehlgeschlagen");
       setSubmitStatus("error");
       setTimeout(() => setSubmitStatus("idle"), 4000);
     }
