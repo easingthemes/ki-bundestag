@@ -19,6 +19,7 @@ import type {
 import { getDb, getSqlite, getUserDb, getUserSqlite, schema, migrateDatabase } from "../db/index.js";
 import { runPartyAgent, buildPartyAgentRequests, processPartyAgentResult } from "../agent/index.js";
 import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
+import { AIProviderLimitError } from "../agent/client.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
 import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
@@ -914,10 +915,19 @@ export async function runDay(): Promise<number> {
     // Generate daily briefing (cross-day narrative context, shared across all parties)
     const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties, depthConfig);
     if (briefingReq) {
-      const briefingResults = await submitBatch([briefingReq]);
-      briefingText = processBriefingResult(findResult(briefingResults, briefingReq.customId));
-      if (briefingText) {
-        console.log(`  [Briefing] Generated daily political briefing`);
+      try {
+        const briefingResults = await submitBatch([briefingReq]);
+        briefingText = processBriefingResult(findResult(briefingResults, briefingReq.customId));
+        if (briefingText) {
+          console.log(`  [Briefing] Generated daily political briefing`);
+        }
+      } catch (err) {
+        if (err instanceof AIProviderLimitError) {
+          console.warn(`  [Briefing] Skipped — ${err.message}`);
+        } else {
+          console.warn(`  [Briefing] Failed, continuing without briefing:`, (err as Error).message);
+        }
+        // briefingText stays null — parties proceed without the context document
       }
     }
 
@@ -955,7 +965,17 @@ export async function runDay(): Promise<number> {
     // Submit all 6 party agent calls as one batch (50% cost savings)
     const agentRequests = buildPartyAgentRequests(agentContexts, currentDay, depthConfig);
     console.log(`  [Batch] Submitting ${agentRequests.length} party agent requests...`);
-    const agentResults = await submitBatch(agentRequests);
+    let agentResults: import("../agent/batch-client.js").BatchResult[] = [];
+    try {
+      agentResults = await submitBatch(agentRequests);
+    } catch (err) {
+      if (err instanceof AIProviderLimitError) {
+        console.error(`[Loop] *** Party agent batch blocked — ${err.message} — all parties abstain this day ***`);
+      } else {
+        console.error(`[Loop] Party agent batch failed (${(err as Error).message}) — all parties abstain this day`);
+      }
+      // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
+    }
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
@@ -1746,7 +1766,16 @@ export async function runDay(): Promise<number> {
     // Submit batched poll + referendum requests
     if (midCycleRequests.length > 0) {
       console.log(`  [Batch] Submitting ${midCycleRequests.length} mid-cycle requests (polls+referendums)...`);
-      const midCycleResults = await submitBatch(midCycleRequests);
+      let midCycleResults: import("../agent/batch-client.js").BatchResult[] = [];
+      try {
+        midCycleResults = await submitBatch(midCycleRequests);
+      } catch (err) {
+        if (err instanceof AIProviderLimitError) {
+          console.warn(`  [Mid-cycle] Skipped polls/referendums — ${err.message}`);
+        } else {
+          console.warn(`  [Mid-cycle] Batch failed, skipping polls/referendums:`, (err as Error).message);
+        }
+      }
 
       // Process context poll result
       if (isWeekly) {
@@ -1997,7 +2026,17 @@ export async function runDay(): Promise<number> {
   endOfDayRequests.push(summaryReq);
 
   console.log(`  [Batch] Submitting ${endOfDayRequests.length} end-of-day requests (media+summary)...`);
-  const endOfDayResults = await submitBatch(endOfDayRequests);
+  let endOfDayResults: import("../agent/batch-client.js").BatchResult[] = [];
+  try {
+    endOfDayResults = await submitBatch(endOfDayRequests);
+  } catch (err) {
+    if (err instanceof AIProviderLimitError) {
+      console.warn(`  [End-of-day] Skipped media+summary — ${err.message}`);
+    } else {
+      console.warn(`  [End-of-day] Batch failed, skipping media+summary:`, (err as Error).message);
+    }
+    // endOfDayResults stays [] — media and summary steps are silently skipped
+  }
 
   // Process media results
   if (mediaReq) {

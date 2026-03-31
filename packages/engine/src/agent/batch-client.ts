@@ -132,15 +132,27 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   // Poll for completion
   const deadline = Date.now() + BATCH_TIMEOUT_MS;
   let status = batch.processing_status;
+  let pollFailures = 0;
+  const MAX_POLL_FAILURES = 3;
 
   while (status !== "ended" && Date.now() < deadline) {
     await new Promise(r => setTimeout(r, BATCH_POLL_INTERVAL_MS));
-    const updated = await client.messages.batches.retrieve(batch.id);
-    status = updated.processing_status;
-    const counts = updated.request_counts;
-    console.log(
-      `  [Batch] ${batch.id}: ${counts.succeeded} succeeded, ${counts.processing} processing, ${counts.errored} errored`,
-    );
+    try {
+      const updated = await client.messages.batches.retrieve(batch.id);
+      status = updated.processing_status;
+      pollFailures = 0; // reset on success
+      const counts = updated.request_counts;
+      console.log(
+        `  [Batch] ${batch.id}: ${counts.succeeded} succeeded, ${counts.processing} processing, ${counts.errored} errored`,
+      );
+    } catch (pollErr) {
+      pollFailures++;
+      console.warn(`  [Batch] Poll error for ${batch.id} (${pollFailures}/${MAX_POLL_FAILURES}):`, (pollErr as Error).message);
+      if (pollFailures >= MAX_POLL_FAILURES) {
+        throw new Error(`Batch ${batch.id} polling failed after ${MAX_POLL_FAILURES} consecutive errors: ${(pollErr as Error).message}`);
+      }
+      // Continue polling — transient network glitch
+    }
   }
 
   if (status !== "ended") {
