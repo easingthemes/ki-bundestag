@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { api, Budget as BudgetRecord, BudgetAllocations, Party, SimulationStatus } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -8,17 +9,6 @@ import { cn } from "@/lib/utils";
 import { STATUS_BADGE, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { FilterPills } from "@/components/FilterPills";
-
-const MINISTRY_LABELS: Record<keyof BudgetAllocations, string> = {
-  finance: "Finance",
-  labour: "Labour & Social",
-  environment: "Environment",
-  interior: "Interior",
-  defence: "Defence",
-  education: "Education",
-  health: "Health",
-  infrastructure: "Infrastructure",
-};
 
 const MINISTRY_COLORS: Record<keyof BudgetAllocations, string> = {
   finance: "#4a6fa5",
@@ -34,6 +24,7 @@ const MINISTRY_COLORS: Record<keyof BudgetAllocations, string> = {
 const TOTAL_SEATS = 735;
 
 export function Budget() {
+  const { t } = useTranslation("budget");
   const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
@@ -70,17 +61,17 @@ export function Budget() {
 
   return (
     <div>
-      <h2 className="section-title">Bundeshaushalt</h2>
+      <h2 className="section-title">{t("title")}</h2>
       <p className="text-sm text-muted-foreground mb-6">
-        Annual budget cycles — every 60 simulation days, the coalition proposes a 300B EUR budget across 8 ministries.
+        {t("description")}
       </p>
 
       <FilterPills
         className="mb-6"
         options={[
-          { value: "all", label: `All (${budgets.length})` },
-          { value: "passed", label: `Passed (${passedCount})` },
-          { value: "rejected", label: `Rejected (${rejectedCount})` },
+          { value: "all", label: t("filter.all", { count: budgets.length }) },
+          { value: "passed", label: t("filter.passed", { count: passedCount }) },
+          { value: "rejected", label: t("filter.rejected", { count: rejectedCount }) },
         ]}
         value={filter}
         onChange={setFilter}
@@ -89,8 +80,8 @@ export function Budget() {
       {filtered.length === 0 && (
         <p className="text-center py-8 text-muted-foreground">
           {budgets.length === 0
-            ? "No budget cycles yet. Budget votes occur every 60 simulation days."
-            : "No budgets match the current filter."}
+            ? t("empty.noBudgets")
+            : t("empty.noMatch")}
         </p>
       )}
 
@@ -108,13 +99,13 @@ export function Budget() {
                 onClick={() => toggleExpand(budget.id)}
               >
                 <div className="flex items-center gap-2 flex-wrap">
-                  <strong>Budget Cycle {budget.cycleNumber}</strong>
-                  <span className="text-sm text-muted-foreground">Day {budget.proposedOnDay}</span>
+                  <strong>{t("cycle", { number: budget.cycleNumber })}</strong>
+                  <span className="text-sm text-muted-foreground">{t("day", { day: budget.proposedOnDay })}</span>
                   {budget.revisionAttempt > 0 && (
-                    <Badge variant="outline" className={REVISED_BADGE}>Revised</Badge>
+                    <Badge variant="outline" className={REVISED_BADGE}>{t("revised")}</Badge>
                   )}
                   {budget.status === "rejected" && budget.revisionAttempt === 0 && simStatus?.budgetRetryDay != null && (
-                    <span className="text-xs text-amber-600">Retry Day {simStatus.budgetRetryDay}</span>
+                    <span className="text-xs text-amber-600">{t("retryDay", { day: simStatus.budgetRetryDay })}</span>
                   )}
                 </div>
                 <div className="flex gap-2 items-center">
@@ -122,7 +113,7 @@ export function Budget() {
                     ? STATUS_BADGE.passed
                     : STATUS_BADGE.rejected
                   }>
-                    {budget.status === "passed" ? "Passed" : "Rejected"}
+                    {budget.status === "passed" ? t("status.passed") : t("status.rejected")}
                   </Badge>
                   <span className="text-xs text-muted-foreground">{isOpen ? "▲" : "▼"}</span>
                 </div>
@@ -131,7 +122,7 @@ export function Budget() {
               {/* Seat vote bar */}
               <div className="mt-3">
                 <div className="text-xs text-muted-foreground mb-1">
-                  Parliament vote — Yes: {budget.yesSeats ?? 0} / No: {budget.noSeats ?? 0} seats
+                  {t("vote.parliamentVote", { yes: budget.yesSeats ?? 0, no: budget.noSeats ?? 0 })}
                 </div>
                 <div className="my-2">
                   <VoteBar yes={budget.yesSeats ?? 0} no={budget.noSeats ?? 0} abstain={0} total={TOTAL_SEATS} />
@@ -143,7 +134,7 @@ export function Budget() {
                   {/* Ministry allocations */}
                   <div className="mb-4">
                     <div className="text-sm font-semibold mb-2">
-                      Ministry Allocations (Total: {budget.totalAmount}B EUR)
+                      {t("vote.ministryAllocations", { total: budget.totalAmount })}
                     </div>
                     {(Object.keys(budget.allocations) as (keyof BudgetAllocations)[]).map(k => {
                       const amount = budget.allocations[k];
@@ -151,7 +142,7 @@ export function Budget() {
                       const color = MINISTRY_COLORS[k] || "#999";
                       return (
                         <div key={k} className="flex items-center gap-2 mb-1 flex-wrap sm:flex-nowrap">
-                          <div className="w-full sm:w-auto sm:min-w-36 text-xs">{MINISTRY_LABELS[k]}</div>
+                          <div className="w-full sm:w-auto sm:min-w-36 text-xs">{t(`ministry.${k}`)}</div>
                           <div className="hidden sm:block min-w-18 text-xs text-right text-muted-foreground">{amount.toFixed(1)}B</div>
                           <div className="hidden sm:block min-w-11 text-xs text-right text-muted-foreground">{share.toFixed(1)}%</div>
                           <div className="flex-1 bg-muted rounded h-3 overflow-hidden min-w-15">
@@ -166,7 +157,7 @@ export function Budget() {
                   {/* Economic effect */}
                   {budget.economicEffect && Object.keys(budget.economicEffect).length > 0 && (
                     <div className="mb-4">
-                      <div className="text-sm font-semibold mb-1">Economic Effects</div>
+                      <div className="text-sm font-semibold mb-1">{t("vote.economicEffects")}</div>
                       {Object.entries(budget.economicEffect).map(([key, delta]) => {
                         const d = delta as number;
                         return (
@@ -181,7 +172,7 @@ export function Budget() {
                   {/* Party vote breakdown */}
                   {budget.votes.length > 0 && (
                     <div>
-                      <div className="text-sm font-semibold mb-1">Party Votes</div>
+                      <div className="text-sm font-semibold mb-1">{t("vote.partyVotes")}</div>
                       <div className="flex flex-wrap gap-1.5">
                         {budget.votes.map(v => {
                           const party = partyMap.get(v.partyId);

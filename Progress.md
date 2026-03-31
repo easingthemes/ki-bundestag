@@ -37,8 +37,9 @@
 
 ### Step 6: Budget namespace
 
-- **Status**: in-progress
-- **Plan**: Extract ~15 strings from Budget.tsx. Fix English MINISTRY_LABELS (8), filter labels (3), description text, empty state.
+- **Status**: done
+- **Files**: `Budget.tsx`, `locales/de/budget.json`
+- **Result**: Populated budget.json with all strings (title, description, filter labels, empty states, cycle/day/revised/retryDay, status, vote section headers, 8 ministry labels). Added useTranslation("budget") to Budget.tsx, removed MINISTRY_LABELS constant, replaced all hardcoded English strings with t() calls. Typecheck passes.
 
 ### Step 7: Notifications & activity namespace
 
