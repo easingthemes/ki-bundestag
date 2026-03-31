@@ -1,0 +1,28 @@
+{
+  "title": "Medien",
+  "frontPages": "Titelseiten von heute",
+  "archive": "Archiv",
+  "noArticles": "Noch keine Artikel. Starte die Simulation, um Medienberichte zu erzeugen.",
+  "noCoverage": "Keine Berichterstattung heute",
+  "clickForFullArticle": "Klicken für vollständigen Artikel",
+  "loadMore": "Mehr laden",
+  "bias": {
+    "left": "Links",
+    "center": "Mitte",
+    "right": "Rechts"
+  },
+  "newsfeed": {
+    "title": "Nachrichtenfeed",
+    "noEvents": "Noch keine Ereignisse. Starte zuerst die Simulation.",
+    "loadMore": "Mehr laden",
+    "breaking": "Breaking",
+    "resetFilters": "Filter zurücksetzen",
+    "categories": {
+      "legislative": "Gesetzgebung",
+      "crises": "Krisen",
+      "elections": "Wahlen",
+      "statements": "Stellungnahmen",
+      "system": "System"
+    }
+  }
+}

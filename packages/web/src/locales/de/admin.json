@@ -1,0 +1,26 @@
+{
+  "modelConfig": {
+    "titel": "KI-Modell-Konfiguration",
+    "spalteKey": "Key",
+    "spalteModel": "Modell",
+    "spalteTokens": "Tokens",
+    "spalteEnvOverride": "Env-Variable",
+    "spalteUsedFor": "Verwendung",
+    "einklappen": "Einklappen",
+    "ausklappen": "Ausklappen",
+    "systemPrompt": "System-Prompt",
+    "userContext": "Benutzerkontext",
+    "notes": "Hinweise"
+  },
+  "actionsReference": {
+    "titel": "Simulationsaktionen",
+    "filterAlle": "Alle ({{count}})",
+    "spalteAction": "Aktion",
+    "spalteCategory": "Kategorie",
+    "spalteType": "Typ",
+    "spalteTriggeredBy": "Ausgelöst von",
+    "spalteDescription": "Beschreibung",
+    "einklappen": "Einklappen",
+    "detailsAnzeigen": "Details anzeigen"
+  }
+}

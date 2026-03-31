@@ -1,0 +1,71 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "parlament": "Parlament",
+    "bills": "Gesetze",
+    "motions": "Anträge",
+    "interpellations": "Anfragen",
+    "confidenceVotes": "Vertrauensvoten",
+    "constitutionalCourt": "Verfassungsgericht",
+    "budget": "Haushalt",
+    "partiesAndElections": "Parteien & Wahlen",
+    "parties": "Parteien",
+    "elections": "Wahlen",
+    "polls": "Umfragen",
+    "participate": "Mitmachen",
+    "citizenQuestions": "Bürgerfragen",
+    "referendums": "Volksabstimmungen",
+    "news": "Nachrichten",
+    "newsTicker": "Newsticker",
+    "press": "Presse",
+    "protocol": "Protokoll",
+    "about": "Über",
+    "simulation": "Simulation",
+    "impressum": "Impressum",
+    "datenschutz": "Datenschutz",
+    "login": "Anmelden",
+    "menu": "Menü"
+  },
+  "user": {
+    "myParty": "Meine Partei",
+    "myQuestions": "Meine Fragen",
+    "myActivity": "Meine Aktivität",
+    "logout": "Abmelden",
+    "seatNumber": "Sitz #{{number}}"
+  },
+  "aria": {
+    "toggleMenu": "Menü umschalten",
+    "userMenu": "Benutzermenü",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "editName": "Name bearbeiten"
+  },
+  "footer": {
+    "tagline": "KAI Bundestag — KI-gestützte Parlamentssimulation"
+  },
+  "actions": {
+    "participate": "Du kannst teilnehmen",
+    "mdbAction": "MdB-Aktion verfügbar",
+    "showMore": "{{count}} weitere anzeigen",
+    "remaining": "noch {{count}}"
+  },
+  "day": "Tag {{number}}",
+  "discipline": {
+    "0": "Gut",
+    "1": "Warnung",
+    "2": "Eingeschränkt",
+    "3": "Fraktionszwang"
+  },
+  "preset": {
+    "ultra-fast": "Ultra-Schnell",
+    "fast": "Schnell",
+    "normal": "Normal",
+    "slow": "Langsam"
+  },
+  "termDuration": {
+    "ultra-fast": "~3–7 Tage",
+    "fast": "~2 Wochen",
+    "normal": "~1 Monat",
+    "slow": "~5 Monate"
+  }
+}

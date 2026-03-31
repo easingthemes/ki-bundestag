@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { type Bill, type Poll, type BundestagSeat } from "../../api";
 import { cn } from "@/lib/utils";
 
@@ -10,28 +11,29 @@ interface QuickActionsBarProps {
 }
 
 export function QuickActionsBar({ user, mySeat, bills, polls }: QuickActionsBarProps) {
+  const { t } = useTranslation("dashboard");
   if (!user) return null;
 
   const actions: { label: string; to: string; primary?: boolean }[] = [];
 
   if (!user.partyId) {
-    actions.push({ label: "Partei beitreten", to: "/parties", primary: true });
+    actions.push({ label: t("quickActions.parteiBeitreten"), to: "/parties", primary: true });
   } else {
     if (!mySeat) {
-      actions.push({ label: "Gesetzentwurf vorschlagen", to: `/parties/${user.partyId}#proposals` });
-      actions.push({ label: "Frage stellen", to: `/parties/${user.partyId}#ask-question` });
-      actions.push({ label: "MdB-Sitz beantragen", to: `/parties/${user.partyId}#mdb-seats` });
+      actions.push({ label: t("quickActions.gesetzentwurfVorschlagen"), to: `/parties/${user.partyId}#proposals` });
+      actions.push({ label: t("quickActions.frageStellen"), to: `/parties/${user.partyId}#ask-question` });
+      actions.push({ label: t("quickActions.mdbSitzBeantragen"), to: `/parties/${user.partyId}#mdb-seats` });
     } else {
       const thirdReading = bills.filter(b => b.status === "third_reading");
       if (thirdReading.length > 0) {
-        actions.push({ label: `Über ${thirdReading.length} Gesetz${thirdReading.length !== 1 ? "e" : ""} abstimmen`, to: "/bills?status=third_reading", primary: true });
+        actions.push({ label: t("quickActions.abstimmenUeber", { count: thirdReading.length, plural: thirdReading.length !== 1 ? "e" : "" }), to: "/bills?status=third_reading", primary: true });
       }
-      actions.push({ label: "Rede einreichen", to: "/bills" });
+      actions.push({ label: t("quickActions.redeEinreichen"), to: "/bills" });
     }
   }
 
-  if (polls.length > 0) actions.push({ label: "Umfragen abstimmen", to: "/polls#active-polls" });
-  actions.push({ label: "Volksabstimmungen", to: "/referendums" });
+  if (polls.length > 0) actions.push({ label: t("quickActions.umfragenAbstimmen"), to: "/polls#active-polls" });
+  actions.push({ label: t("quickActions.volksabstimmungen"), to: "/referendums" });
 
   if (actions.length === 0) return null;
 
