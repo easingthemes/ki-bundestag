@@ -34,6 +34,18 @@ Real-world data is digested into **four categories**, each with different inject
 - **Structural Shocks**: Wars, pandemics, trade disruptions reshape politics for years. Even on sim day 840, "international trade disruptions" is a valid theme. These are stored as dateless context.
 - **Headlines**: The only category that "ages." Injected once as creative inspiration, then discarded. Parties react on that sim day; subsequent days see only the sim's own events.
 
+## Critical: Sim Government ≠ Real Government
+
+The simulation forms its own governments through elections. By sim day 100, the sim could have a CDU-FDP coalition while the real Bundestag has SPD-Grüne-FDP. The AI digest prompt must:
+
+- **NEVER** frame anything as "the government does X" or "the coalition agreed on Y"
+- **ALWAYS** attribute positions to parties by name (e.g., "SPD fordert..." not "Die Regierung plant...")
+- Present each party's stance **independently** of whether they're in government or opposition
+- Strip all references to who is currently governing — the simulation decides that
+- Frame shocks as **external pressures on Germany**, not as government responses
+
+This is enforced in the digest system prompt with explicit instructions and examples.
+
 ## Data Sources
 
 ### News (two perspectives for balance)
