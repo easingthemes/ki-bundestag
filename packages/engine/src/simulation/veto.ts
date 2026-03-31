@@ -31,7 +31,7 @@ export function checkPresidentialVeto(
       dayNumber: currentDay,
       type: "presidential_veto",
       actor: "system",
-      title: `Bundespräsident vetoes "${bill.title}"`,
+      title: `Bundespräsident legt Veto ein gegen "${bill.title}"`,
       description: reason,
       data: { billId: bill.id },
     });

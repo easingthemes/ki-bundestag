@@ -58,8 +58,8 @@ export function processInjections(
           dayNumber: currentDay,
           type: "day_start",
           actor: "system",
-          title: "Snap election triggered",
-          description: "A snap election has been called via user injection.",
+          title: "Neuwahl ausgelöst",
+          description: "Eine Neuwahl wurde per Nutzereingriff angesetzt.",
           data: { injected: true },
         });
         break;
@@ -70,8 +70,8 @@ export function processInjections(
           dayNumber: currentDay,
           type: "day_start",
           actor: "system",
-          title: "Election invalidation ordered",
-          description: "A court order has been issued to invalidate the most recent election.",
+          title: "Wahlannullierung angeordnet",
+          description: "Ein Gerichtsbeschluss zur Annullierung der letzten Wahl wurde erlassen.",
           data: { injected: true },
         });
         break;
@@ -82,8 +82,8 @@ export function processInjections(
           dayNumber: currentDay,
           type: "budget_proposed",
           actor: "system",
-          title: "Budget cycle triggered by admin",
-          description: "A budget vote has been manually triggered via admin injection.",
+          title: "Haushaltszyklus durch Admin ausgelöst",
+          description: "Eine Haushaltsabstimmung wurde manuell per Admin-Eingriff ausgelöst.",
           data: { injected: true },
         });
         break;
@@ -96,8 +96,8 @@ export function processInjections(
             dayNumber: currentDay,
             type: "economy_update",
             actor: "system",
-            title: "Economic shock injected",
-            description: `User-injected economic event: budget ${impact.budget || 0}, unemployment ${impact.unemployment || 0}, inflation ${impact.inflation || 0}, GDP growth ${impact.gdpGrowth || 0}, sentiment ${impact.publicSentiment || 0}`,
+            title: "Wirtschaftsschock injiziert",
+            description: `Nutzer-injiziertes Wirtschaftsereignis: Haushalt ${impact.budget || 0}, Arbeitslosigkeit ${impact.unemployment || 0}, Inflation ${impact.inflation || 0}, BIP-Wachstum ${impact.gdpGrowth || 0}, Stimmung ${impact.publicSentiment || 0}`,
             data: { impact, injected: true },
           });
         }
