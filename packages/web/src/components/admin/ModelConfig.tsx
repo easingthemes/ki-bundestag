@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 
 const MODEL_CONFIG = [
@@ -106,6 +107,7 @@ const MODEL_CONFIG = [
 ];
 
 export function ModelConfig() {
+  const { t } = useTranslation("admin");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
 
   const toggleModel = (key: string) =>
@@ -140,7 +142,7 @@ export function ModelConfig() {
                       <button
                         className="bg-transparent border-none cursor-pointer text-xs text-muted-foreground px-1 py-0.5 rounded hover:bg-accent hover:text-foreground"
                         onClick={() => toggleModel(m.key)}
-                        title={expandedModels.has(m.key) ? "Collapse" : "Expand"}
+                        title={expandedModels.has(m.key) ? t("modelConfig.einklappen") : t("modelConfig.ausklappen")}
                       >
                         {expandedModels.has(m.key) ? "▲" : "▼"}
                       </button>

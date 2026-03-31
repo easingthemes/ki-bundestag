@@ -80,7 +80,7 @@ export function LiveEventTicker({ simStatus }: LiveEventTickerProps) {
         <div key={ev.id} className="bg-card border border-border rounded-lg shadow-lg px-4 py-3 animate-in slide-in-from-right-3 fade-in duration-300">
           <div className="flex justify-between items-start gap-2">
             <div>
-              <div className="text-xs text-muted-foreground">Day {ev.dayNumber} · {ev.type.replace(/_/g, " ")}</div>
+              <div className="text-xs text-muted-foreground">Tag {ev.dayNumber} · {ev.type.replace(/_/g, " ")}</div>
               <div className="font-semibold text-sm mt-0.5">{ev.title}</div>
             </div>
             <button onClick={() => setToasts(prev => prev.filter(t => t.id !== ev.id))} className="text-xs text-muted-foreground hover:text-foreground bg-transparent border-none cursor-pointer shrink-0">×</button>

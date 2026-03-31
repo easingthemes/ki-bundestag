@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, Poll } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton, UserActionIcon } from "../components/shared";
@@ -28,6 +29,7 @@ function markVoted(pollId: string) {
 const BAR_COLORS = ["#004b91", "#28a745", "#dc3545", "#ffc107", "#6f42c1", "#17a2b8"];
 
 export function Polls() {
+  const { t } = useTranslation("polls");
   const { user } = useUser();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(getVotedPolls);
@@ -69,25 +71,25 @@ export function Polls() {
       {/* Registration prompt */}
       {!user && activePolls.length > 0 && (
         <div className={`${ALERT_STYLES.info} mb-4`}>
-          <Link to="/parties" className="text-primary font-semibold hover:underline">Registrieren und einer Partei beitreten</Link> um an der Simulation teilzunehmen — Umfragen abstimmen, Fragen einreichen und mehr.
+          <Link to="/parties" className="text-primary font-semibold hover:underline">{t("registrierungsLink")}</Link> {t("registrierungsHinweis")}
         </div>
       )}
 
       {/* Unvoted nudge */}
       {unvotedCount > 0 && (
         <div className={`${ALERT_STYLES.warning} mb-4`}>
-          {unvotedCount} aktive Umfrage{unvotedCount !== 1 ? "n" : ""} warten auf deine Stimme.
+          {t("unvotedNudge", { count: unvotedCount })}
         </div>
       )}
 
       {activePolls.length === 0 && closedPolls.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Umfragen. Starte die Simulation bis Tag 7 für die ersten Umfragen.</p>
+        <p className="text-center py-8 text-muted-foreground">{t("keineUmfragen")}</p>
       )}
 
       {/* Active polls */}
       {activePolls.length > 0 && (
         <div id="active-polls" className="mb-8">
-          <h2 className="section-title">Aktive Umfragen ({activePolls.length})</h2>
+          <h2 className="section-title">{t("aktiveUmfragen", { count: activePolls.length })}</h2>
           {activePolls.map(poll => (
             <PollCard
               key={poll.id}
@@ -107,7 +109,7 @@ export function Polls() {
             onClick={() => setShowClosed(!showClosed)}
             className="bg-transparent border-none cursor-pointer text-base font-semibold text-muted-foreground p-0"
           >
-            {showClosed ? "▾" : "▸"} Vergangene Umfragen ({closedPolls.length})
+            {showClosed ? "▾" : "▸"} {t("vergangeneUmfragen", { count: closedPolls.length })}
           </button>
           {showClosed && (
             <div className="mt-3">
@@ -145,6 +147,7 @@ function PollCard({
   isVoting: boolean;
   onVote: (option: string) => void;
 }) {
+  const { t } = useTranslation("polls");
   const totalVotes = Object.values(poll.votes).reduce((s, v) => s + v, 0);
   const showResults = hasVoted || !poll.active;
 
@@ -155,18 +158,18 @@ function PollCard({
           <div>
             <div className="font-semibold text-[1.05rem]">{poll.question}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Tag {poll.createdOnDay}
-              {poll.expiresOnDay && ` · Endet Tag ${poll.expiresOnDay}`}
-              {totalVotes > 0 && ` · ${totalVotes} Stimme${totalVotes !== 1 ? "n" : ""}`}
+              {t("tagLabel", { day: poll.createdOnDay })}
+              {poll.expiresOnDay && ` · ${t("endetTag", { day: poll.expiresOnDay })}`}
+              {totalVotes > 0 && ` · ${t("stimmen", { count: totalVotes })}`}
             </div>
           </div>
           <span className="flex gap-1.5 items-center">
-            {poll.active && !hasVoted && <UserActionIcon title="Jetzt abstimmen" />}
+            {poll.active && !hasVoted && <UserActionIcon title={t("jetzAbstimmen")} />}
             <Badge variant="outline" className={poll.active
               ? STATUS_BADGE.active
               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-100"
             }>
-              {poll.active ? "Aktiv" : "Abgeschlossen"}
+              {poll.active ? t("aktiv") : t("abgeschlossen")}
             </Badge>
           </span>
         </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, CitizenQuestion, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { useUser } from "../userContext";
@@ -12,6 +13,7 @@ import { EmptyState } from "../components/EmptyState";
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Questions() {
+  const { t } = useTranslation("parties");
   const { user } = useUser();
   const [questions, setQuestions] = useState<CitizenQuestion[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
@@ -65,7 +67,7 @@ export function Questions() {
       <div className="flex flex-col items-center shrink-0 mr-3 min-w-10">
         <button
           onClick={() => handleVote(q, 1)}
-          title={q.userVote === 1 ? "Retract upvote" : "Upvote"}
+          title={q.userVote === 1 ? t("questions.retractUpvote") : t("questions.upvote")}
           className="border-none bg-transparent cursor-pointer text-lg p-0 leading-none"
           style={{ color: q.userVote === 1 ? SEMANTIC_HEX.positive : "#aaa" }}
         >▲</button>
@@ -74,7 +76,7 @@ export function Questions() {
         </span>
         <button
           onClick={() => handleVote(q, -1)}
-          title={q.userVote === -1 ? "Retract downvote" : "Downvote"}
+          title={q.userVote === -1 ? t("questions.retractDownvote") : t("questions.downvote")}
           className="border-none bg-transparent cursor-pointer text-lg p-0 leading-none"
           style={{ color: q.userVote === -1 ? SEMANTIC_HEX.negative : "#aaa" }}
         >▼</button>
@@ -93,7 +95,7 @@ export function Questions() {
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPartyColor(q.targetPartyId) }} />
                 <span className="font-semibold text-sm">{getPartyName(q.targetPartyId)}</span>
-                {user && q.status === "pending" && <UserActionIcon title="Upvote or downvote" />}
+                {user && q.status === "pending" && <UserActionIcon title={t("questions.upvoteOrDownvote")} />}
                 <Badge variant="outline" className={cn(
                   q.status === "pending"
                     ? STATUS_BADGE.pending
@@ -107,7 +109,7 @@ export function Questions() {
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground ml-auto">
-                  Day {q.createdOnDay}
+                  {t("questions.questionDay", { day: q.createdOnDay })}
                 </span>
               </div>
               <p className="text-sm italic mb-1.5">{q.question}</p>
@@ -128,29 +130,29 @@ export function Questions() {
 
   return (
     <div>
-      <h2 className="section-title">Bürgerfragen</h2>
+      <h2 className="section-title">{t("questions.heading")}</h2>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         <select value={filterParty} onChange={e => setFilterParty(e.target.value)} className={SELECT_CLS}>
-          <option value="">Alle Parteien</option>
+          <option value="">{t("questions.filterAllParties")}</option>
           {parties.map(p => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
-          <option value="">Alle Status</option>
-          <option value="pending">Offen</option>
-          <option value="answered">Beantwortet</option>
+          <option value="">{t("questions.filterAllStatus")}</option>
+          <option value="pending">{t("questions.filterPending")}</option>
+          <option value="answered">{t("questions.filterAnswered")}</option>
         </select>
       </div>
 
       {questions.length === 0 ? (
-        <EmptyState message="Noch keine Fragen. Besuche eine Parteiseite, um eine Frage zu stellen." icon="❓" />
+        <EmptyState message={t("questions.emptyState")} icon="❓" />
       ) : (
         <>
           {showPending && pending.length > 0 && (
             <div className="mb-6">
-              <h2 className="section-title">Offen ({pending.length})</h2>
+              <h2 className="section-title">{t("questions.pendingSection", { count: pending.length })}</h2>
               {pending.slice(0, pendingVisible).map(renderQuestionCard)}
               <ShowMoreButton
                 total={pending.length}
@@ -163,7 +165,7 @@ export function Questions() {
 
           {showAnswered && answered.length > 0 && (
             <div>
-              <h2 className="section-title">Beantwortet ({answered.length})</h2>
+              <h2 className="section-title">{t("questions.answeredSection", { count: answered.length })}</h2>
               {answered.slice(0, answeredVisible).map(renderQuestionCard)}
               <ShowMoreButton
                 total={answered.length}

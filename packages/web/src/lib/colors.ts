@@ -151,10 +151,10 @@ export const DISCIPLINE_BADGE: Record<number, string> = {
 };
 
 export const DISCIPLINE_LABEL: Record<number, string> = {
-  0: "Good",
-  1: "Warning",
-  2: "Restricted",
-  3: "Whipped",
+  0: "Gut",
+  1: "Warnung",
+  2: "Eingeschränkt",
+  3: "Fraktionszwang",
 };
 
 // ── Notification type badges ─────────────────────────────────────────────────

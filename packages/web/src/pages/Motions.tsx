@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, Motion, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -13,6 +14,7 @@ import { VoteBar } from "@/components/VoteBar";
 const STATUS_ORDER = ["passed", "rejected"];
 
 export function Motions() {
+  const { t } = useTranslation("parliament");
   const [motions, setMotions] = useState<Motion[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -38,14 +40,14 @@ export function Motions() {
 
   return (
     <div>
-      <h2 className="section-title">Anträge & Entschließungen</h2>
+      <h2 className="section-title">{t("motions.title")}</h2>
       {motions.length === 0 && (
-        <EmptyState message="Noch keine Anträge. Starte die Simulation, um Anträge zu sehen." icon="📋" />
+        <EmptyState message={t("motions.empty")} icon="📋" />
       )}
       {grouped.map(group => (
         <div key={group.status} className="mb-8">
           <h2 className="section-title">
-            {group.status === "passed" ? "Angenommen" : "Abgelehnt"} ({motions.filter(m => m.status === group.status).length})
+            {group.status === "passed" ? t("motions.status.passed") : t("motions.status.rejected")} ({motions.filter(m => m.status === group.status).length})
           </h2>
           {group.motions.map(motion => (
             <MotionCard key={motion.id} motion={motion} partyMap={partyMap} />
@@ -63,8 +65,9 @@ export function Motions() {
 }
 
 function MotionCard({ motion, partyMap }: { motion: Motion; partyMap: Map<string, Party> }) {
+  const { t } = useTranslation("parliament");
   const proposer = partyMap.get(motion.proposedBy);
-  const typeLabel = motion.type === "motion" ? "Antrag" : "Entschließung";
+  const typeLabel = motion.type === "motion" ? t("motions.type.motion") : t("motions.type.resolution");
 
   const totalSeats = motion.votes.reduce((sum, v) => {
     const p = partyMap.get(v.partyId);
@@ -97,12 +100,12 @@ function MotionCard({ motion, partyMap }: { motion: Motion; partyMap: Map<string
               ? STATUS_BADGE.passed
               : STATUS_BADGE.rejected
           )}>
-            {motion.status}
+            {motion.status === "passed" ? t("motions.status.passed") : t("motions.status.rejected")}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-1">{motion.description}</p>
         <p className="text-xs text-muted-foreground">
-          Proposed by {proposer?.name ?? motion.proposedBy} on day {motion.dayNumber}
+          {t("motions.proposedBy", { name: proposer?.name ?? motion.proposedBy, day: motion.dayNumber })}
         </p>
 
         {motion.votes.length > 0 && totalSeats > 0 && (

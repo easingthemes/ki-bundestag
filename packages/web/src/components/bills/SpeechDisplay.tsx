@@ -3,14 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MDB_BADGE } from "@/lib/colors";
+import { useTranslation } from "react-i18next";
 
 interface SpeechDisplayProps {
   speeches: MdbSpeech[];
 }
 
 export function SpeechDisplay({ speeches }: SpeechDisplayProps) {
+  const { t } = useTranslation("legislation");
+
   if (speeches.length === 0) {
-    return <div className="text-sm text-muted-foreground">No speeches submitted yet.</div>;
+    return <div className="text-sm text-muted-foreground">{t("speeches.noSpeeches")}</div>;
   }
 
   return (
@@ -24,7 +27,7 @@ export function SpeechDisplay({ speeches }: SpeechDisplayProps) {
                 <span className="font-semibold text-sm">{s.displayName ?? "MdB"}</span>
               </div>
               <span className="text-xs text-muted-foreground">
-                Reading {s.reading} · Day {s.dayNumber}
+                {t("speeches.readingDay", { reading: s.reading, day: s.dayNumber })}
               </span>
             </div>
             <div className="text-sm text-muted-foreground leading-relaxed">{s.content}</div>

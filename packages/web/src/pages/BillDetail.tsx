@@ -13,27 +13,7 @@ import { BillImpactDisplay } from "@/components/bills/BillImpactDisplay";
 import { MdbVoteButtons } from "@/components/bills/MdbVoteButtons";
 import { SpeechDisplay } from "@/components/bills/SpeechDisplay";
 import { SpeechSubmitForm } from "@/components/bills/SpeechSubmitForm";
-
-const STATUS_LABELS: Record<string, string> = {
-  third_reading: "Third Reading",
-  second_reading: "Second Reading",
-  committee: "Committee",
-  first_reading: "First Reading",
-  proposed: "Proposed",
-  passed: "Passed",
-  rejected: "Rejected",
-  debate: "Debate",
-  struck_down: "Struck Down",
-};
-
-const PIPELINE_STAGES = [
-  { key: "proposed", label: "Proposed", idx: 0 },
-  { key: "first_reading", label: "1st Reading", idx: 1 },
-  { key: "committee", label: "Committee", idx: 2 },
-  { key: "second_reading", label: "2nd Reading", idx: 3 },
-  { key: "third_reading", label: "3rd Reading", idx: 4 },
-  { key: "final", label: "Final", idx: 5 },
-];
+import { useTranslation } from "react-i18next";
 
 const STAGE_ORDER: Record<string, number> = {
   proposed: 0,
@@ -46,7 +26,17 @@ const STAGE_ORDER: Record<string, number> = {
   struck_down: 5,
 };
 
+const PIPELINE_STAGES = [
+  { key: "proposed", idx: 0 },
+  { key: "first_reading", idx: 1 },
+  { key: "committee", idx: 2 },
+  { key: "second_reading", idx: 3 },
+  { key: "third_reading", idx: 4 },
+  { key: "final", idx: 5 },
+];
+
 export function BillDetail() {
+  const { t } = useTranslation("legislation");
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const [bill, setBill] = useState<Bill | null>(null);
@@ -106,7 +96,7 @@ export function BillDetail() {
       {/* Back link */}
       <div style={{ marginBottom: "1.5rem" }}>
         <Link to="/bills" style={{ fontSize: "0.85rem", color: "#666", textDecoration: "none" }}>
-          &larr; Alle Gesetze
+          &larr; {t("backToAll")}
         </Link>
       </div>
 
@@ -115,24 +105,24 @@ export function BillDetail() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
           <h1 style={{ margin: 0, fontSize: "1.4rem", flex: 1, minWidth: 0 }}>{bill.title}</h1>
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
-            {bill.isGovernmentBill && <Badge variant="outline" className={GOVT_BILL_BADGE}>Govt. Bill</Badge>}
-            {bill.memberInitiative && <Badge className={MEMBER_INITIATIVE_BADGE}>Member Initiative</Badge>}
-            {bill.vetoedByPresident && <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>Vetoed by President</Badge>}
+            {bill.isGovernmentBill && <Badge variant="outline" className={GOVT_BILL_BADGE}>{t("badges.govtBill")}</Badge>}
+            {bill.memberInitiative && <Badge className={MEMBER_INITIATIVE_BADGE}>{t("badges.memberInitiative")}</Badge>}
+            {bill.vetoedByPresident && <Badge variant="outline" className={PRESIDENTIAL_VETO_BADGE}>{t("badges.presidentialVeto")}</Badge>}
             <Badge variant="outline" className={STATUS_BADGE[bill.status] || ""}>
-              {STATUS_LABELS[bill.status] ?? bill.status}
+              {t(`status.${bill.status}`, bill.status)}
             </Badge>
           </div>
         </div>
         <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#666" }}>
           <span style={{ textTransform: "capitalize" }}>{bill.category}</span>
-          {" · Proposed by "}
+          {" · "}{t("proposedBy")}{" "}
           <Link to={`/parties/${bill.proposedBy}`} style={{ color: displayColor, fontWeight: 600, textDecoration: "none" }}>
             {proposer?.name ?? bill.proposedBy}
           </Link>
-          {" on Day "}{bill.proposedOnDay}
+          {" "}{t("onDay", { day: bill.proposedOnDay })}
           {bill.memberInitiative && bill.proposerDisplayName && (
             <span style={{ marginLeft: 8, color: "#6f42c1", fontWeight: 500 }}>
-              · Originally proposed by {bill.proposerDisplayName}
+              · {t("proposedByMember")} {bill.proposerDisplayName}
             </span>
           )}
         </div>
@@ -144,8 +134,9 @@ export function BillDetail() {
           "rounded-md border px-4 py-3 text-sm mb-4",
           bill.status === "passed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
         )}>
-          You signaled <strong>{signals.userSignal.toUpperCase()}</strong> on this bill. It was <strong>{bill.status.toUpperCase()}</strong>
-          {bill.votes.length > 0 && ` with ${bill.votes.reduce((s: number, v: { vote: string; partyId: string }) => s + (v.vote === "yes" ? (partyMap.get(v.partyId)?.seatCount ?? 0) : 0), 0)} yes votes`}.
+
+          Du hast <strong>{signals.userSignal === "yes" ? t("signals.yes") : t("signals.no")}</strong> signalisiert. Das Gesetz wurde <strong>{t(`status.${bill.status}`, bill.status)}</strong>
+          {bill.votes.length > 0 && ` ${t("outcomeBanner.withYesVotes", { count: bill.votes.reduce((s: number, v: { vote: string; partyId: string }) => s + (v.vote === "yes" ? (partyMap.get(v.partyId)?.seatCount ?? 0) : 0), 0) })}`}.
         </div>
       )}
 
@@ -155,13 +146,14 @@ export function BillDetail() {
           "rounded-md border px-4 py-3 text-sm mb-4",
           bill.status === "passed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
         )}>
-          You voted <strong>{mdbVotes.userVote.toUpperCase()}</strong> as an MdB on this bill. It was <strong>{bill.status.toUpperCase()}</strong>.
+
+          Du hast als MdB <strong>{t(`mdbVotes.${mdbVotes.userVote}`)}</strong> gestimmt. Das Gesetz wurde <strong>{t(`status.${bill.status}`, bill.status)}</strong>.
         </div>
       )}
 
       {/* Description */}
       <div className="mb-6">
-        <h2 className="section-title">Beschreibung</h2>
+        <h2 className="section-title">{t("description")}</h2>
         <Card><CardContent className="p-5">
           <p style={{ fontSize: "0.95rem", color: "#333", lineHeight: 1.6, margin: 0 }}>{bill.description}</p>
         </CardContent></Card>
@@ -170,10 +162,10 @@ export function BillDetail() {
       {/* Member Signals */}
       {(bill.status === "second_reading" || bill.status === "third_reading") && (
         <div id="member-signals" className="mb-6">
-          <h2 className="section-title">Mitglieder-Signale</h2>
+          <h2 className="section-title">{t("signals.title")}</h2>
           {user && user.partyId && signals && signals.userSignal === null && (
             <div className={ALERT_STYLES.info}>
-              This bill is in {STATUS_LABELS[bill.status] ?? bill.status} — signal your position to influence your party's vote.
+              {t("signals.promptSignal", { status: t(`status.${bill.status}`, bill.status) })}
             </div>
           )}
           <Card><CardContent className="p-5">
@@ -189,10 +181,10 @@ export function BillDetail() {
                       )}
                     </div>
                     <div style={{ flexShrink: 0, fontSize: "0.85rem", color: "#555" }}>
-                      <strong style={{ color: SEMANTIC_HEX.positive }}>{signals.yes} YES</strong>
+                      <strong style={{ color: SEMANTIC_HEX.positive }}>{t("signals.yesCount", { count: signals.yes })}</strong>
                       {" / "}
-                      <strong style={{ color: SEMANTIC_HEX.negative }}>{signals.no} NO</strong>
-                      {total > 0 && <span style={{ color: SEMANTIC_HEX.neutral, marginLeft: 4 }}>({yesPct}% YES)</span>}
+                      <strong style={{ color: SEMANTIC_HEX.negative }}>{t("signals.noCount", { count: signals.no })}</strong>
+                      {total > 0 && <span style={{ color: SEMANTIC_HEX.neutral, marginLeft: 4 }}>{t("signals.yesPct", { pct: yesPct })}</span>}
                     </div>
                   </div>
                   {user && (
@@ -203,27 +195,27 @@ export function BillDetail() {
                           setSignals(s);
                         }}
                         style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "yes" ? SEMANTIC_HEX.positive : "#ddd"}`, background: signals.userSignal === "yes" ? "var(--color-emerald-50, #ecfdf5)" : "white", color: SEMANTIC_HEX.positive, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-                      >YES</button>
+                      >{t("signals.yes")}</button>
                       <button
                         onClick={async () => {
                           const s = await api.signalBill(bill.id, "no");
                           setSignals(s);
                         }}
                         style={{ padding: "5px 14px", borderRadius: 4, border: `2px solid ${signals.userSignal === "no" ? SEMANTIC_HEX.negative : "#ddd"}`, background: signals.userSignal === "no" ? "#f8d7da" : "white", color: SEMANTIC_HEX.negative, fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-                      >NO</button>
-                      <span style={{ fontSize: "0.78rem", color: SEMANTIC_HEX.neutral }}>Your signal is visible to the party AI when it votes.</span>
+                      >{t("signals.no")}</button>
+                      <span style={{ fontSize: "0.78rem", color: SEMANTIC_HEX.neutral }}>{t("signals.signalHint")}</span>
                     </div>
                   )}
                   {!user && total === 0 && (
                     <div style={{ fontSize: "0.85rem", color: SEMANTIC_HEX.neutral }}>
-                      <Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your vote on this bill.
+                      <Link to="/parties" style={{ color: displayColor }}>{t("signals.joinToSignal")}</Link> {t("signals.joinToSignalSuffix")}
                     </div>
                   )}
                 </div>
               );
             })() : (
-              <div style={{ fontSize: "0.85rem", color: SEMANTIC_HEX.neutral }}>No signals yet.{" "}
-                {user ? "" : <><Link to="/parties" style={{ color: displayColor }}>Join a party</Link> to signal your opinion.</>}
+              <div style={{ fontSize: "0.85rem", color: SEMANTIC_HEX.neutral }}>{t("signals.noSignals")}{" "}
+                {user ? "" : <><Link to="/parties" style={{ color: displayColor }}>{t("signals.joinToSignal")}</Link> {t("signals.joinToSignalSuffix")}</>}
               </div>
             )}
           </CardContent></Card>
@@ -245,7 +237,7 @@ export function BillDetail() {
       {/* MdB Speeches */}
       {["first_reading", "second_reading", "third_reading"].includes(bill.status) && (
         <div id="speeches" className="mb-6">
-          <h2 className="section-title">MdB-Reden ({speeches.length})</h2>
+          <h2 className="section-title">{t("speeches.title")} ({speeches.length})</h2>
           {user && mySeat && (
             <SpeechSubmitForm
               billId={bill.id}
@@ -261,11 +253,11 @@ export function BillDetail() {
 
       {/* Legislative Pipeline */}
       <div className="mb-6">
-        <h2 className="section-title">Gesetzgebungsverfahren</h2>
+        <h2 className="section-title">{t("legislativePipeline")}</h2>
         <Card><CardContent className="p-5">
           {bill.isGovernmentBill && (
             <div className="text-sm text-amber-700 mb-3 bg-amber-50 px-2 py-1 rounded inline-block">
-              Government bill — fast-tracked (1st reading skipped)
+              {t("govtBillFastTrack")}
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.25rem" }}>
@@ -278,8 +270,8 @@ export function BillDetail() {
               const isFuture = !isCurrent && stageIdx > currentStageIdx;
               const isSkipped = stage.key === "first_reading" && bill.isGovernmentBill;
               const displayLabel = stage.key === "final" && isCurrent
-                ? (STATUS_LABELS[bill.status] ?? "Final")
-                : stage.label;
+                ? t(`status.${bill.status}`, t("pipeline.final"))
+                : t(`pipeline.${stage.key}`, stage.key);
 
               return (
                 <span key={stage.key} style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
@@ -310,19 +302,19 @@ export function BillDetail() {
       {/* Committee */}
       {bill.committeeName && (
         <div className="mb-6">
-          <h2 className="section-title">Ausschussprüfung</h2>
+          <h2 className="section-title">{t("committeeReview")}</h2>
           <Card><CardContent className="p-5">
             <div style={{ fontWeight: 600 }}>{bill.committeeName}</div>
             {bill.committeeRecommendation && (
               <div style={{ marginTop: "0.25rem", fontSize: "0.9rem" }}>
-                Recommendation:{" "}
+                {t("committeeRecommendation")}:{" "}
                 <span style={{
                   fontWeight: 600,
                   color: bill.committeeRecommendation === "pass" ? "#155724"
                     : bill.committeeRecommendation === "reject" ? "#721c24"
                     : "#856404",
                 }}>
-                  {bill.committeeRecommendation}
+                  {bill.committeeRecommendation === "pass" ? t("recommendationPass") : bill.committeeRecommendation === "reject" ? t("recommendationReject") : t("recommendationAmend")}
                 </span>
               </div>
             )}
@@ -333,7 +325,7 @@ export function BillDetail() {
       {/* Amendments */}
       {amendments.length > 0 && (
         <div className="mb-6">
-          <h2 className="section-title">Änderungsanträge ({amendments.length})</h2>
+          <h2 className="section-title">{t("amendmentsLabel")} ({amendments.length})</h2>
           {amendments.map(a => {
             const amendProposer = partyMap.get(a.proposedBy);
             const amendColor = amendProposer?.color === "#FFED00" ? "#c4a900" : (amendProposer?.color ?? "#888");
@@ -346,11 +338,11 @@ export function BillDetail() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <strong style={{ fontSize: "0.95rem" }}>{a.title}</strong>
                   <Badge variant="outline" className={a.accepted ? STATUS_BADGE.passed : STATUS_BADGE.rejected}>
-                    {a.accepted ? "Accepted" : "Rejected"}
+                    {a.accepted ? t("amendmentAccepted") : t("amendmentRejected")}
                   </Badge>
                 </div>
                 <div style={{ fontSize: "0.8rem", color: "#888", marginTop: 2 }}>
-                  Proposed by{" "}
+                  {t("proposedBy")}{" "}
                   <Link to={`/parties/${a.proposedBy}`} style={{ color: amendColor, fontWeight: 600, textDecoration: "none" }}>
                     {amendProposer?.name ?? a.proposedBy}
                   </Link>
@@ -373,7 +365,7 @@ export function BillDetail() {
       {/* Final Vote */}
       {bill.votes.length > 0 && totalSeats > 0 && (
         <div className="mb-6">
-          <h2 className="section-title">Schlussabstimmung</h2>
+          <h2 className="section-title">{t("finalVote")}</h2>
           <Card><CardContent className="p-5">
             <div className="my-2">
               <VoteBar yes={yesSeats} no={noSeats} abstain={abstainSeats} total={totalSeats} showCounts />
@@ -398,7 +390,7 @@ export function BillDetail() {
       {/* Constitutional Challenge */}
       {challenge && (
         <div className="mb-6">
-          <h2 className="section-title">Verfassungsbeschwerde</h2>
+          <h2 className="section-title">{t("constitutionalChallenge.title")}</h2>
           <Card className={cn(
             challenge.decision === "struck_down" ? "border-red-300 bg-red-50/50"
             : challenge.decision === "upheld" ? "border-emerald-300 bg-emerald-50/50"
@@ -406,20 +398,20 @@ export function BillDetail() {
           )}><CardContent className="p-5">
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600 }}>
-                Filed by {partyMap.get(challenge.filedByPartyId)?.name ?? challenge.filedByPartyId}
+                {t("constitutionalChallenge.filedBy", { party: partyMap.get(challenge.filedByPartyId)?.name ?? challenge.filedByPartyId })}
               </span>
-              {challenge.decision === "struck_down" && <Badge variant="outline" className={STATUS_BADGE.struck_down}>Struck Down</Badge>}
-              {challenge.decision === "upheld" && <Badge variant="outline" className={STATUS_BADGE.upheld}>Upheld</Badge>}
-              {!challenge.decision && <Badge variant="outline" className={STATUS_BADGE.pending}>Pending</Badge>}
-              <span style={{ fontSize: "0.8rem", color: "#888" }}>Day {challenge.dayNumber}</span>
+              {challenge.decision === "struck_down" && <Badge variant="outline" className={STATUS_BADGE.struck_down}>{t("constitutionalChallenge.struckDown")}</Badge>}
+              {challenge.decision === "upheld" && <Badge variant="outline" className={STATUS_BADGE.upheld}>{t("constitutionalChallenge.upheld")}</Badge>}
+              {!challenge.decision && <Badge variant="outline" className={STATUS_BADGE.pending}>{t("constitutionalChallenge.pending")}</Badge>}
+              <span style={{ fontSize: "0.8rem", color: "#888" }}>{t("onDay", { day: challenge.dayNumber }).replace("am ", "")}</span>
             </div>
             <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
-              <strong>Arguments:</strong>
+              <strong>{t("constitutionalChallenge.arguments")}:</strong>
               <p style={{ margin: "0.25rem 0 0", color: "#333", lineHeight: 1.5 }}>{challenge.arguments}</p>
             </div>
             {challenge.reasoning && (
               <div style={{ fontSize: "0.9rem" }}>
-                <strong>Court Reasoning:</strong>
+                <strong>{t("constitutionalChallenge.courtReasoning")}:</strong>
                 <p style={{ margin: "0.25rem 0 0", color: "#444", fontStyle: "italic", lineHeight: 1.5 }}>{challenge.reasoning}</p>
               </div>
             )}
@@ -431,9 +423,9 @@ export function BillDetail() {
       {bill.vetoedByPresident && (
         <div className="mb-6">
           <Card className="border-amber-300 bg-amber-50"><CardContent className="p-5">
-            <strong>Vetoed by the Bundespräsident</strong>
+            <strong>{t("presidentialVeto.title")}</strong>
             <p style={{ margin: "0.25rem 0 0", fontSize: "0.9rem" }} className="text-amber-700">
-              The Federal President has refused to sign this bill into law.
+              {t("presidentialVeto.description")}
             </p>
           </CardContent></Card>
         </div>
