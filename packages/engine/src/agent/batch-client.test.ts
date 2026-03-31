@@ -90,12 +90,12 @@ const mocks = vi.hoisted(() => ({
   },
   // client.js helpers
   callAI: vi.fn(),
-  detectLimitError: vi.fn(() => ({ type: "none" as const })),
+  detectLimitError: vi.fn((): { type: "hard"; provider: "anthropic" | "xai"; until: string } | { type: "transient"; provider: "anthropic" | "xai" } | { type: "none" } => ({ type: "none" })),
   parseResetTime: vi.fn(() => Date.now() + 60_000),
   markProviderLimited: vi.fn(),
   // model-config mock
-  getPartyModel: vi.fn(() => ({ provider: "anthropic" as const, model: "claude-haiku-4-5-20251001" })),
-  getRoleModel: vi.fn(() => ({ provider: "anthropic" as const, model: "claude-haiku-4-5-20251001" })),
+  getPartyModel: vi.fn((): { provider: "anthropic" | "xai"; model: string } => ({ provider: "anthropic", model: "claude-haiku-4-5-20251001" })),
+  getRoleModel: vi.fn((): { provider: "anthropic" | "xai"; model: string } => ({ provider: "anthropic", model: "claude-haiku-4-5-20251001" })),
 }));
 
 // Step 2: register the mocks — factories only reference mocks.*, which is safe
