@@ -168,6 +168,7 @@ export function seedDatabase() {
   sqlite.exec(`
     DROP TABLE IF EXISTS ai_calls;
     DROP TABLE IF EXISTS bundestag_seats;
+    DROP TABLE IF EXISTS real_world_knowledge;
     DROP TABLE IF EXISTS event_queue;
     DROP TABLE IF EXISTS budgets;
     DROP TABLE IF EXISTS constitutional_challenges;

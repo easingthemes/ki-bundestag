@@ -51,6 +51,10 @@ import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
+import {
+  shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest,
+  processKnowledgeDigestResult, getActiveShocks, buildRealWorldContext, getPartyPositions,
+} from "./knowledge-fetch.js";
 import { setTrackingDay } from "../agent/cost-tracker.js";
 import type { TimingPreset } from "./timing.js";
 import type { ContextDepth } from "../agent/context-depth.js";
@@ -912,6 +916,28 @@ export async function runDay(): Promise<number> {
       } catch { /* table may not exist yet */ }
     }
 
+    // Real-world knowledge grounding (fetch + digest weekly)
+    if (depthConfig.enableKnowledgeGrounding && shouldFetchKnowledge()) {
+      try {
+        const rawData = await fetchAllSources();
+        if (rawData.newsItems.length > 0 || rawData.parliamentaryItems.length > 0) {
+          const activeShocks = getActiveShocks();
+          const digestReq = buildKnowledgeDigestRequest(rawData, activeShocks);
+          const digestResults = await submitBatch([digestReq]);
+          processKnowledgeDigestResult(findResult(digestResults, digestReq.customId));
+        }
+      } catch (err) {
+        if (err instanceof AIProviderLimitError) {
+          console.warn(`  [Knowledge] Skipped — ${err.message}`);
+        } else {
+          console.warn(`  [Knowledge] Failed, continuing without grounding:`, (err as Error).message);
+        }
+      }
+    }
+
+    // Build real-world context for prompts (reads from DB, applies decay)
+    const realWorldCtx = depthConfig.enableKnowledgeGrounding ? buildRealWorldContext(currentDay) : null;
+
     // Generate daily briefing (cross-day narrative context, shared across all parties)
     const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties, depthConfig);
     if (briefingReq) {
@@ -959,6 +985,8 @@ export async function runDay(): Promise<number> {
         mdbVoteSummary: Object.keys(mdbVoteSummaryByBill).length > 0 ? mdbVoteSummaryByBill : undefined,
         briefing: briefingText ?? undefined,
         recentOwnActions: getPartyRecentActions(party.id, currentDay, depthConfig),
+        realWorldContext: realWorldCtx ?? undefined,
+        realPartyPositions: depthConfig.enableKnowledgeGrounding ? (getPartyPositions(party.id) ?? undefined) : undefined,
       });
     }
 
