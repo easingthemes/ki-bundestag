@@ -191,9 +191,9 @@ Three configurable levels control how much context agents receive. Set via GitHu
 
 | Setting | Token Budget | Briefing | Own Actions | Events | Media | P3 | Secondary Enrichment | Est. Cost/Day |
 |---------|-------------|----------|-------------|--------|-------|-----|---------------------|---------------|
-| `low` | 3,000 | Off | Off | 5 | 2 | Off | Off | ~$0.030 |
-| `normal` | 8,000 | 30d lookback | 14d (15 items) | 10 | 3 | On | On | ~$0.055 |
-| `high` | 16,000 | 60d lookback | 30d (30 items) | 20 | 5 | On | On | ~$0.09 |
+| `low` | 3,000 | Off | Off | 5 | 2 | Off | Off | ~$0.020 |
+| `normal` | 8,000 | 30d lookback | 14d (15 items) | 10 | 3 | On | On | ~$0.028 (measured) |
+| `high` | 16,000 | 60d lookback | 30d (30 items) | 20 | 5 | On | On | ~$0.040 |
 
 ### Token-budgeted context
 

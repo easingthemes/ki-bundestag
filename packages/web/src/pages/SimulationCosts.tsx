@@ -15,7 +15,7 @@ interface ModelRow {
 }
 
 const MODELS: ModelRow[] = [
-  { model: "claude-haiku-4-5-20251001", provider: "Anthropic", priceIn: "$0.80", priceOut: "$4.00", usedFor: "Party agents, media, polls, referendums, summaries, Q&A, interpellations, proposals, negotiations" },
+  { model: "claude-haiku-4-5-20251001", provider: "Anthropic", priceIn: "$1.00", priceOut: "$5.00", usedFor: "Party agents, media, polls, referendums, summaries, Q&A, interpellations, proposals, negotiations" },
   { model: "claude-sonnet-4-5-20250929", provider: "Anthropic", priceIn: "$3.00", priceOut: "$15.00", usedFor: "Coalition agreement synthesis (rare)" },
   { model: "grok-3-mini", provider: "xAI", priceIn: "$0.30", priceOut: "$0.50", usedFor: "AfD party agent — Grok used because other models refuse to roleplay as AfD" },
 ];
@@ -61,39 +61,40 @@ interface CostRow {
 }
 
 const QUIET_DAY: CostRow[] = [
-  { label: "Daily Briefing (Haiku)", count: 1, inputTok: "2,000", outputTok: "512", cost: "$0.002" },
-  { label: "5x Party Agent (Haiku)", count: 5, inputTok: "20,000", outputTok: "5,000", cost: "$0.035" },
-  { label: "1x Party Agent (AfD/Grok)", count: 1, inputTok: "4,000", outputTok: "1,000", cost: "$0.002" },
-  { label: "Daily Summary", count: 1, inputTok: "800", outputTok: "200", cost: "$0.001" },
-  { label: "Media Articles", count: 1, inputTok: "2,500", outputTok: "1,500", cost: "$0.005" },
-  { label: "Total", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "~$0.055", highlight: true },
+  { label: "Daily Briefing (Haiku)", count: 1, inputTok: "2,500", outputTok: "800", cost: "$0.003" },
+  { label: "5x Party Agent (Haiku)", count: 5, inputTok: "18,000", outputTok: "2,500", cost: "$0.015" },
+  { label: "1x Party Agent (AfD/Grok)", count: 1, inputTok: "3,500", outputTok: "500", cost: "$0.002" },
+  { label: "Daily Summary (Haiku)", count: 1, inputTok: "2,000", outputTok: "300", cost: "$0.002" },
+  { label: "Media Articles (Haiku)", count: 1, inputTok: "3,000", outputTok: "1,000", cost: "$0.004" },
+  { label: "Mid-cycle (polls/interp)", count: "0-2", inputTok: "1,800", outputTok: "400", cost: "$0.002" },
+  { label: "Total (measured)", count: "~11", inputTok: "30,800", outputTok: "5,500", cost: "~$0.028", highlight: true },
 ];
 
 const ACTIVE_DAY_1K: CostRow[] = [
-  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
+  { label: "Base (sim-driven, measured)", count: "~11", inputTok: "30,800", outputTok: "5,500", cost: "$0.028" },
   { label: "Q&A batch (6 parties)", count: 6, inputTok: "5,400", outputTok: "2,400", cost: "$0.014" },
   { label: "MdB app select (6 parties)", count: 6, inputTok: "2,000", outputTok: "500", cost: "$0.004" },
   { label: "Speech flag (5 bills)", count: 5, inputTok: "3,250", outputTok: "200", cost: "$0.004" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "1,500", outputTok: "300", cost: "$0.002" },
-  { label: "Total", count: 32, inputTok: "41,450", outputTok: "11,612", cost: "~$0.079", highlight: true },
+  { label: "Total", count: "~34", inputTok: "42,950", outputTok: "8,900", cost: "~$0.052", highlight: true },
 ];
 
 const ACTIVE_DAY_100K: CostRow[] = [
-  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
+  { label: "Base (sim-driven, measured)", count: "~11", inputTok: "30,800", outputTok: "5,500", cost: "$0.028" },
   { label: "Q&A batch (6 parties × 50 Qs)", count: 6, inputTok: "54,000", outputTok: "24,000", cost: "$0.140" },
   { label: "MdB app select (6 parties)", count: 6, inputTok: "30,000", outputTok: "1,000", cost: "$0.028" },
   { label: "Speech flag (~10 bills)", count: 10, inputTok: "65,000", outputTok: "500", cost: "$0.054" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "13,200", outputTok: "600", cost: "$0.013" },
-  { label: "Total", count: 37, inputTok: "191,500", outputTok: "34,312", cost: "~$0.29", highlight: true },
+  { label: "Total", count: "~39", inputTok: "193,000", outputTok: "31,600", cost: "~$0.26", highlight: true },
 ];
 
 const ACTIVE_DAY_1M: CostRow[] = [
-  { label: "Base (sim-driven)", count: 9, inputTok: "29,300", outputTok: "8,212", cost: "$0.055" },
+  { label: "Base (sim-driven, measured)", count: "~11", inputTok: "30,800", outputTok: "5,500", cost: "$0.028" },
   { label: "Q&A batch (12 chunks)", count: 12, inputTok: "108,000", outputTok: "48,000", cost: "$0.278" },
   { label: "MdB app select (12 chunks)", count: 12, inputTok: "120,000", outputTok: "2,000", cost: "$0.104" },
   { label: "Speech flag (~20 bills)", count: 20, inputTok: "390,000", outputTok: "2,000", cost: "$0.320" },
   { label: "Proposal rank (6 parties)", count: 6, inputTok: "66,000", outputTok: "1,500", cost: "$0.059" },
-  { label: "Total", count: "~59", inputTok: "713,300", outputTok: "61,712", cost: "~$0.82", highlight: true },
+  { label: "Total", count: "~61", inputTok: "714,800", outputTok: "59,000", cost: "~$0.79", highlight: true },
 ];
 
 const ELECTION_COSTS: CostRow[] = [
@@ -112,11 +113,11 @@ interface AggRow {
 }
 
 const AGG_SIM: AggRow[] = [
-  { scenario: "Quiet (no visitors, no election)", callsDay: "9", costDay: "$0.055", callsMonth: "270", costMonth: "$1.65", costWP: "$6.72" },
-  { scenario: "Active — 1K users (batch)", callsDay: "~32", costDay: "$0.079", callsMonth: "960", costMonth: "$2.37", costWP: "$9.60" },
-  { scenario: "Active — 100K users (batch)", callsDay: "~37", costDay: "$0.29", callsMonth: "1,110", costMonth: "$8.70", costWP: "$35" },
-  { scenario: "Active — 1M users (batch)", callsDay: "~59", costDay: "$0.82", callsMonth: "1,770", costMonth: "$24.60", costWP: "$100" },
-  { scenario: "Election cycle (3 neg. days)", callsDay: "~10", costDay: "$0.059", callsMonth: "289", costMonth: "$1.77", costWP: "$7.18" },
+  { scenario: "Quiet (no visitors, measured)", callsDay: "~11", costDay: "$0.028", callsMonth: "330", costMonth: "$0.84", costWP: "$41" },
+  { scenario: "Active — 1K users (batch)", callsDay: "~34", costDay: "$0.052", callsMonth: "1,020", costMonth: "$1.56", costWP: "$76" },
+  { scenario: "Active — 100K users (batch)", callsDay: "~39", costDay: "$0.26", callsMonth: "1,170", costMonth: "$7.80", costWP: "$380" },
+  { scenario: "Active — 1M users (batch)", callsDay: "~61", costDay: "$0.79", callsMonth: "1,830", costMonth: "$23.70", costWP: "$1,154" },
+  { scenario: "Election cycle (3 neg. days)", callsDay: "~10", costDay: "$0.059", callsMonth: "289", costMonth: "$1.77", costWP: "$86" },
 ];
 
 interface RealTimeRow {
@@ -128,13 +129,14 @@ interface RealTimeRow {
 }
 
 const AGG_REAL: RealTimeRow[] = [
-  { scenario: "Ultra-fast / Fast (pure sim)", simDays: "~1,400", wallClock: "~60s/day", costDay: "$77", costMonth: "$2,310" },
-  { scenario: "Normal — 1K users", simDays: "48/day", wallClock: "~30 min + 2 min batch", costDay: "$3.79", costMonth: "$114" },
-  { scenario: "Normal — 100K users", simDays: "48/day", wallClock: "~30 min + 5 min batch", costDay: "$13.92", costMonth: "$418" },
-  { scenario: "Normal — 1M users", simDays: "48/day", wallClock: "~30 min + 15 min batch", costDay: "$39.36", costMonth: "$1,181" },
-  { scenario: "Slow — 1K users", simDays: "~10/day", wallClock: "~90 min + 2 min batch", costDay: "$0.79", costMonth: "$24" },
-  { scenario: "Slow — 100K users", simDays: "~10/day", wallClock: "~90 min + 5 min batch", costDay: "$2.90", costMonth: "$87" },
-  { scenario: "Slow — 1M users", simDays: "~10/day", wallClock: "~90 min + 15 min batch", costDay: "$8.20", costMonth: "$246" },
+  { scenario: "Ultra-fast (pure sim, measured)", simDays: "~144/day", wallClock: "~10 min/day (batch)", costDay: "$4.03", costMonth: "$121" },
+  { scenario: "Fast (pure sim)", simDays: "~85/day", wallClock: "~17 min/day (7+10)", costDay: "$2.38", costMonth: "$71" },
+  { scenario: "Normal — 1K users", simDays: "~36/day", wallClock: "~40 min (30+10)", costDay: "$1.87", costMonth: "$56" },
+  { scenario: "Normal — 100K users", simDays: "~36/day", wallClock: "~40 min (30+10)", costDay: "$9.36", costMonth: "$281" },
+  { scenario: "Normal — 1M users", simDays: "~36/day", wallClock: "~40 min (30+10)", costDay: "$28.44", costMonth: "$853" },
+  { scenario: "Slow — 1K users", simDays: "~14/day", wallClock: "~100 min (90+10)", costDay: "$0.73", costMonth: "$22" },
+  { scenario: "Slow — 100K users", simDays: "~14/day", wallClock: "~100 min (90+10)", costDay: "$3.64", costMonth: "$109" },
+  { scenario: "Slow — 1M users", simDays: "~14/day", wallClock: "~100 min (90+10)", costDay: "$11.06", costMonth: "$332" },
 ];
 
 interface AltRow {
@@ -148,11 +150,11 @@ interface AltRow {
 }
 
 const ALTERNATIVES: AltRow[] = [
-  { model: "All Haiku (current default)", priceLabel: "$0.80 / $4.00", perSimDay: "$0.055", perWP: "$6.72", perRealDay: "$77", delta: "baseline", deltaColor: "text-muted-foreground" },
-  { model: "All Grok-3-mini", priceLabel: "$0.30 / $0.50", perSimDay: "$0.010", perWP: "$1.22", perRealDay: "$14", delta: "-79%", deltaColor: "text-emerald-600" },
-  { model: "All Sonnet", priceLabel: "$3.00 / $15.00", perSimDay: "$0.177", perWP: "$21.42", perRealDay: "$248", delta: "+276%", deltaColor: "text-red-600" },
-  { model: "GPT-4o-mini (OpenAI)", priceLabel: "$0.15 / $0.60", perSimDay: "$0.008", perWP: "$0.97", perRealDay: "$11", delta: "-83%", deltaColor: "text-emerald-600" },
-  { model: "Gemini 2.0 Flash (Google)", priceLabel: "$0.10 / $0.40", perSimDay: "$0.005", perWP: "$0.61", perRealDay: "$7", delta: "-89%", deltaColor: "text-emerald-600" },
+  { model: "All Haiku 4.5 (current)", priceLabel: "$1.00 / $5.00", perSimDay: "$0.028", perWP: "$41", perRealDay: "$4.03", delta: "baseline (measured)", deltaColor: "text-muted-foreground" },
+  { model: "All Grok-3-mini", priceLabel: "$0.30 / $0.50", perSimDay: "$0.005", perWP: "$7", perRealDay: "$0.72", delta: "-82%", deltaColor: "text-emerald-600" },
+  { model: "All Sonnet 4.6", priceLabel: "$3.00 / $15.00", perSimDay: "$0.090", perWP: "$131", perRealDay: "$12.96", delta: "+221%", deltaColor: "text-red-600" },
+  { model: "GPT-4o-mini (OpenAI)", priceLabel: "$0.15 / $0.60", perSimDay: "$0.004", perWP: "$6", perRealDay: "$0.58", delta: "-86%", deltaColor: "text-emerald-600" },
+  { model: "Gemini 2.0 Flash (Google)", priceLabel: "$0.10 / $0.40", perSimDay: "$0.003", perWP: "$4", perRealDay: "$0.43", delta: "-89%", deltaColor: "text-emerald-600" },
 ];
 
 // ─── Input scaling comparison ───────────────────────────────────────────────
@@ -166,10 +168,10 @@ interface InputScaleRow {
 }
 
 const INPUT_SCALE: InputScaleRow[] = [
-  { preset: "Ultra-fast", simDaysPerDay: "~1,400", currentPerMonth: "$1,512", scaled20xPerMonth: "$13,188", delta: "+$11,676" },
-  { preset: "Fast", simDaysPerDay: "~209", currentPerMonth: "$226", scaled20xPerMonth: "$1,969", delta: "+$1,743" },
-  { preset: "Normal", simDaysPerDay: "48", currentPerMonth: "$52", scaled20xPerMonth: "$452", delta: "+$400" },
-  { preset: "Slow", simDaysPerDay: "10", currentPerMonth: "$11", scaled20xPerMonth: "$94", delta: "+$83" },
+  { preset: "Ultra-fast", simDaysPerDay: "~144", currentPerMonth: "$121", scaled20xPerMonth: "$1,037", delta: "+$916" },
+  { preset: "Fast", simDaysPerDay: "~85", currentPerMonth: "$71", scaled20xPerMonth: "$612", delta: "+$541" },
+  { preset: "Normal", simDaysPerDay: "~36", currentPerMonth: "$30", scaled20xPerMonth: "$261", delta: "+$231" },
+  { preset: "Slow", simDaysPerDay: "~14", currentPerMonth: "$12", scaled20xPerMonth: "$101", delta: "+$89" },
 ];
 
 // ─── Comprehensive cost matrix: preset × depth × users ─────────────────────
@@ -185,26 +187,29 @@ interface CostMatrixRow {
 }
 
 // Ultra-fast & Fast have no users (non-participatory)
-// Normal: 48 sim days/real day × 30 = 1,440/month
-// Slow: 10 sim days/real day × 30 = 300/month
-// User-driven per sim day: 1K=$0.024, 10K=$0.06, 100K=$0.235
+// Ultra-fast: ~144 sim days/real day × 30 = ~4,320/month
+// Fast: ~85/day × 30 = ~2,550/month
+// Normal: ~36/day × 30 = ~1,080/month
+// Slow: ~14/day × 30 = ~420/month
+// Base cost: $0.028/day (measured, normal ctx)
+// User-driven per sim day: 1K=$0.024, 10K=$0.06, 100K=$0.232
 const COST_MATRIX: CostMatrixRow[] = [
-  // Ultra-fast: 42,000 sim days/month, no users
-  { preset: "Ultra-fast", depth: "Low", noUsers: "$1,260", users1k: "—", users10k: "—", users100k: "—" },
-  { preset: "Ultra-fast", depth: "Normal", noUsers: "$2,310", users1k: "—", users10k: "—", users100k: "—" },
-  { preset: "Ultra-fast", depth: "High", noUsers: "$3,780", users1k: "—", users10k: "—", users100k: "—" },
-  // Fast: 6,270 sim days/month, no users
-  { preset: "Fast", depth: "Low", noUsers: "$188", users1k: "—", users10k: "—", users100k: "—" },
-  { preset: "Fast", depth: "Normal", noUsers: "$345", users1k: "—", users10k: "—", users100k: "—" },
-  { preset: "Fast", depth: "High", noUsers: "$564", users1k: "—", users10k: "—", users100k: "—" },
-  // Normal: 1,440 sim days/month
-  { preset: "Normal", depth: "Low", noUsers: "$43", users1k: "$78", users10k: "$130", users100k: "$382" },
-  { preset: "Normal", depth: "Normal", noUsers: "$79", users1k: "$114", users10k: "$166", users100k: "$418", highlight: true },
-  { preset: "Normal", depth: "High", noUsers: "$130", users1k: "$164", users10k: "$216", users100k: "$468" },
-  // Slow: 300 sim days/month
-  { preset: "Slow", depth: "Low", noUsers: "$9", users1k: "$16", users10k: "$27", users100k: "$80" },
-  { preset: "Slow", depth: "Normal", noUsers: "$17", users1k: "$24", users10k: "$35", users100k: "$87", highlight: true },
-  { preset: "Slow", depth: "High", noUsers: "$27", users1k: "$34", users10k: "$45", users100k: "$98" },
+  // Ultra-fast: ~4,320 sim days/month, no users
+  { preset: "Ultra-fast", depth: "Low", noUsers: "$86", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Ultra-fast", depth: "Normal", noUsers: "$121", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Ultra-fast", depth: "High", noUsers: "$173", users1k: "—", users10k: "—", users100k: "—" },
+  // Fast: ~2,550 sim days/month, no users
+  { preset: "Fast", depth: "Low", noUsers: "$51", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Fast", depth: "Normal", noUsers: "$71", users1k: "—", users10k: "—", users100k: "—" },
+  { preset: "Fast", depth: "High", noUsers: "$102", users1k: "—", users10k: "—", users100k: "—" },
+  // Normal: ~1,080 sim days/month
+  { preset: "Normal", depth: "Low", noUsers: "$22", users1k: "$48", users10k: "$87", users100k: "$273" },
+  { preset: "Normal", depth: "Normal", noUsers: "$30", users1k: "$56", users10k: "$95", users100k: "$281", highlight: true },
+  { preset: "Normal", depth: "High", noUsers: "$43", users1k: "$69", users10k: "$108", users100k: "$294" },
+  // Slow: ~420 sim days/month
+  { preset: "Slow", depth: "Low", noUsers: "$8", users1k: "$18", users10k: "$34", users100k: "$105" },
+  { preset: "Slow", depth: "Normal", noUsers: "$12", users1k: "$22", users10k: "$37", users100k: "$109", highlight: true },
+  { preset: "Slow", depth: "High", noUsers: "$17", users1k: "$27", users10k: "$42", users100k: "$114" },
 ];
 
 // ─── Context depth levels ───────────────────────────────────────────────────
@@ -223,9 +228,9 @@ interface DepthRow {
 }
 
 const DEPTH_LEVELS: DepthRow[] = [
-  { depth: "Low", tokenBudget: "3,000", briefing: "Off", ownActions: "Off", events: "5", media: "2", p3: "Off", secondary: "Off", estCostDay: "~$0.030", costBadge: "$" },
-  { depth: "Normal", tokenBudget: "8,000", briefing: "30 days", ownActions: "14 days (15 items)", events: "10", media: "3", p3: "On", secondary: "On", estCostDay: "~$0.055", costBadge: "$$" },
-  { depth: "High", tokenBudget: "16,000", briefing: "60 days", ownActions: "30 days (30 items)", events: "20", media: "5", p3: "On", secondary: "On", estCostDay: "~$0.09", costBadge: "$$$" },
+  { depth: "Low", tokenBudget: "3,000", briefing: "Off", ownActions: "Off", events: "5", media: "2", p3: "Off", secondary: "Off", estCostDay: "~$0.020", costBadge: "$" },
+  { depth: "Normal", tokenBudget: "8,000", briefing: "30 days", ownActions: "14 days (15 items)", events: "10", media: "3", p3: "On", secondary: "On", estCostDay: "~$0.028 (measured)", costBadge: "$$" },
+  { depth: "High", tokenBudget: "16,000", briefing: "60 days", ownActions: "30 days (30 items)", events: "20", media: "5", p3: "On", secondary: "On", estCostDay: "~$0.040", costBadge: "$$$" },
 ];
 
 // ─── Live cost data types ───────────────────────────────────────────────────
