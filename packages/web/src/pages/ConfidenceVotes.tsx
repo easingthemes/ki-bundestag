@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, ConfidenceVote, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -14,6 +15,7 @@ const STATUS_OPTIONS = ["all", "passed", "failed"] as const;
 const TYPE_OPTIONS = ["all", "vertrauensfrage", "misstrauensvotum"] as const;
 
 export function ConfidenceVotes() {
+  const { t } = useTranslation("parliament");
   const [votes, setVotes] = useState<ConfidenceVote[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -42,26 +44,31 @@ export function ConfidenceVotes() {
 
   return (
     <div>
-      <h2 className="section-title">Vertrauensvoten</h2>
-      <p className="text-muted-foreground mb-4">
-        Parlamentarische Vertrauensmechanismen. <strong>Vertrauensfrage</strong>: Der Kanzler stellt
-        die Vertrauensfrage — Scheitern löst Neuwahlen aus. <strong>Konstruktives Misstrauensvotum</strong>:
-        Die Opposition benennt einen Ersatzkanzler — Erfolg überträgt die Macht sofort.
-      </p>
+      <h2 className="section-title">{t("confidenceVotes.title")}</h2>
+      <p
+        className="text-muted-foreground mb-4"
+        dangerouslySetInnerHTML={{ __html: t("confidenceVotes.intro") }}
+      />
 
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Status:</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t("confidenceVotes.filter.status")}</span>
           <FilterPills
-            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "Alle" : opt === "passed" ? "Angenommen" : "Abgelehnt" }))}
+            options={STATUS_OPTIONS.map(opt => ({
+              value: opt,
+              label: opt === "all" ? t("confidenceVotes.filter.all") : opt === "passed" ? t("confidenceVotes.filter.passed") : t("confidenceVotes.filter.failed"),
+            }))}
             value={statusFilter}
             onChange={setStatusFilter}
           />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Typ:</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t("confidenceVotes.filter.type")}</span>
           <FilterPills
-            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "Alle" : opt === "vertrauensfrage" ? "Vertrauensfrage" : "Misstrauensvotum" }))}
+            options={TYPE_OPTIONS.map(opt => ({
+              value: opt,
+              label: opt === "all" ? t("confidenceVotes.filter.all") : opt === "vertrauensfrage" ? t("confidenceVotes.type.vertrauensfrage") : t("confidenceVotes.type.misstrauensvotum"),
+            }))}
             value={typeFilter}
             onChange={setTypeFilter}
           />
@@ -70,7 +77,7 @@ export function ConfidenceVotes() {
 
       {filtered.length === 0 && (
         <p className="text-center py-8 text-muted-foreground">
-          Noch keine Vertrauensvoten. Der Koalitionsführer kann eine Vertrauensfrage stellen; Oppositionsparteien können ein Misstrauensvotum einreichen.
+          {t("confidenceVotes.empty")}
         </p>
       )}
 
@@ -104,24 +111,25 @@ function ConfidenceVoteCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation("parliament");
   const initiator = partyMap.get(vote.initiatedByPartyId);
   const proposedParty = vote.proposedChancellorPartyId
     ? partyMap.get(vote.proposedChancellorPartyId)
     : null;
 
   const isVertrauensfrage = vote.type === "vertrauensfrage";
-  const typeLabel = isVertrauensfrage ? "Vertrauensfrage" : "Misstrauensvotum";
+  const typeLabel = isVertrauensfrage ? t("confidenceVotes.type.vertrauensfrage") : t("confidenceVotes.type.misstrauensvotum");
 
   // Outcome description
   let outcomeText = "";
   if (isVertrauensfrage) {
     outcomeText = vote.status === "passed"
-      ? `Regierung von Bundeskanzler/in ${vote.chancellorName} hat das Vertrauen gewonnen.`
-      : `Regierung gestürzt — Neuwahlen ausgelöst.`;
+      ? t("confidenceVotes.outcome.vertrauensfrage.passed", { name: vote.chancellorName })
+      : t("confidenceVotes.outcome.vertrauensfrage.failed");
   } else {
     outcomeText = vote.status === "passed"
-      ? `Neue/r Bundeskanzler/in: ${vote.proposedChancellor ?? "Unbekannt"} — Regierungswechsel ohne Wahl.`
-      : `Antrag gescheitert — Regierung von ${vote.chancellorName} überlebt.`;
+      ? t("confidenceVotes.outcome.misstrauensvotum.passed", { name: vote.proposedChancellor ?? t("confidenceVotes.outcome.unknown") })
+      : t("confidenceVotes.outcome.misstrauensvotum.failed", { name: vote.chancellorName });
   }
 
   // Seat tally from votes
@@ -153,26 +161,26 @@ function ConfidenceVoteCard({
               ? STATUS_BADGE.passed
               : STATUS_BADGE.rejected
           )}>
-            {vote.status === "passed" ? "Angenommen" : "Gescheitert"}
+            {vote.status === "passed" ? t("confidenceVotes.status.passed") : t("confidenceVotes.status.failed")}
           </Badge>
         </div>
 
         <p className="text-sm text-muted-foreground mt-1">
           {isVertrauensfrage ? (
             <>
-              Gestellt von{" "}
+              {t("confidenceVotes.filedBy.vertrauensfrage")}{" "}
               <span className="font-semibold" style={{ color: initiator?.color ?? "#333" }}>
                 {initiator?.name ?? vote.initiatedByPartyId}
               </span>
-              {" "}· Bundeskanzler/in: <strong>{vote.chancellorName}</strong>
+              {" "}{t("confidenceVotes.chancellor")} <strong>{vote.chancellorName}</strong>
             </>
           ) : (
             <>
-              Eingereicht von{" "}
+              {t("confidenceVotes.filedBy.misstrauensvotum")}{" "}
               <span className="font-semibold" style={{ color: initiator?.color ?? "#333" }}>
                 {initiator?.name ?? vote.initiatedByPartyId}
               </span>
-              {" "}· Vorgeschlagen: <strong>{vote.proposedChancellor}</strong>
+              {" "}{t("confidenceVotes.proposed")} <strong>{vote.proposedChancellor}</strong>
               {proposedParty && (
                 <span style={{ color: proposedParty.color }}> ({proposedParty.name})</span>
               )}
@@ -185,10 +193,10 @@ function ConfidenceVoteCard({
           <div className="my-2">
             <VoteBar yes={totalYes} no={totalNo} abstain={0} total={totalSeats} height="h-2" />
             <p className="text-xs text-muted-foreground mt-0.5">
-              <span style={{ color: SEMANTIC_HEX.positive }}>Ja: {totalYes}</span>
+              <span style={{ color: SEMANTIC_HEX.positive }}>{t("confidenceVotes.voteYes", { count: totalYes })}</span>
               {" · "}
-              <span style={{ color: SEMANTIC_HEX.negative }}>Nein: {totalNo}</span>
-              {" · "}Schwellenwert: 368
+              <span style={{ color: SEMANTIC_HEX.negative }}>{t("confidenceVotes.voteNo", { count: totalNo })}</span>
+              {" · "}{t("confidenceVotes.threshold")}
               {totalYes >= 368 && <span style={{ color: SEMANTIC_HEX.positive }}> ✓</span>}
             </p>
           </div>
@@ -197,20 +205,20 @@ function ConfidenceVoteCard({
         <p className="text-xs text-muted-foreground italic">{outcomeText}</p>
 
         <p className="text-xs text-muted-foreground mt-0.5">
-          Tag {vote.dayNumber}
+          {t("confidenceVotes.day", { day: vote.dayNumber })}
           {vote.sentimentImpact != null && vote.sentimentImpact !== 0 && (
             <span style={{ color: vote.sentimentImpact > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-              {" "}· Stimmung: {vote.sentimentImpact > 0 ? "+" : ""}{vote.sentimentImpact}
+              {" "}{t("confidenceVotes.sentiment")} {vote.sentimentImpact > 0 ? "+" : ""}{vote.sentimentImpact}
             </span>
           )}
         </p>
 
         {expanded && vote.votes.length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
-            <strong className="text-sm">Beschreibung:</strong>
+            <strong className="text-sm">{t("confidenceVotes.description")}</strong>
             <p className="text-sm mb-2">{vote.description}</p>
 
-            <strong className="text-sm">Abstimmungsergebnis:</strong>
+            <strong className="text-sm">{t("confidenceVotes.voteResult")}</strong>
             <div className="flex flex-wrap gap-1.5 mt-1">
               {vote.votes.map(v => {
                 const p = partyMap.get(v.partyId);
@@ -226,7 +234,7 @@ function ConfidenceVoteCard({
                     )}
                     style={{ border: `1px solid ${p?.color ?? "#ccc"}` }}
                   >
-                    {p?.name ?? v.partyId}: {v.vote === "yes" ? "Ja" : "Nein"}
+                    {p?.name ?? v.partyId}: {v.vote === "yes" ? t("confidenceVotes.voteJa") : t("confidenceVotes.voteNein")}
                   </Badge>
                 );
               })}
