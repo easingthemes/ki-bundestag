@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat, type MdbApplication } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -16,6 +17,7 @@ import { ProposalForm } from "@/components/party/ProposalForm";
 import { QuestionForm } from "@/components/party/QuestionForm";
 
 export function PartyDetail() {
+  const { t } = useTranslation("parties");
   const { id } = useParams<{ id: string }>();
   const { user, updateUser } = useUser();
   const [party, setParty] = useState<Party | null>(null);
@@ -117,7 +119,7 @@ export function PartyDetail() {
     <div className="min-w-0 overflow-hidden">
       {/* Header */}
       <div className="mb-6">
-        <Link to="/parties" className="text-sm text-muted-foreground no-underline hover:text-foreground">&larr; Alle Parteien</Link>
+        <Link to="/parties" className="text-sm text-muted-foreground no-underline hover:text-foreground">{t("detail.backLink")}</Link>
       </div>
 
       {/* Party color block header */}
@@ -137,15 +139,15 @@ export function PartyDetail() {
           <div className="flex gap-8">
             <div>
               <div className="stat-value" style={{ color: displayColor }}>{party.seatCount}</div>
-              <div className="stat-label">Sitze</div>
+              <div className="stat-label">{t("detail.seats")}</div>
             </div>
             <div>
               <div className="stat-value" style={{ color: displayColor }}>{party.approvalRating}%</div>
-              <div className="stat-label">Zustimmung</div>
+              <div className="stat-label">{t("detail.approval")}</div>
             </div>
           </div>
           <div className="mt-3">
-            <div className="stat-label">Politische Schwerpunkte</div>
+            <div className="stat-label">{t("detail.policyPriorities")}</div>
             <div className="flex flex-wrap gap-1 mt-1">
               {Object.entries(party.policyPriorities).map(([key, val]) => (
                 <span
@@ -161,15 +163,15 @@ export function PartyDetail() {
           {/* Membership section */}
           <div id="join-party" className="mt-4 pt-3 border-t border-border flex items-center justify-between flex-wrap gap-2">
             <span className="text-sm text-muted-foreground">
-              👥 <strong>{party.memberCount}</strong> member{party.memberCount !== 1 ? "s" : ""}
-              {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>Mitglied</span>}
+              👥 {t("detail.memberCount", { count: party.memberCount })}
+              {isMyParty && <span className="ml-2 font-bold" style={{ color: displayColor }}>{t("detail.memberBadge")}</span>}
             </span>
             {isMyParty ? (
               <button
                 onClick={handleLeave}
                 className="text-xs px-3 py-1 rounded border border-input bg-card text-muted-foreground cursor-pointer hover:bg-accent"
               >
-                Austreten
+                {t("detail.leave")}
               </button>
             ) : (
               <div className="flex gap-1.5 items-center flex-wrap">
@@ -179,7 +181,7 @@ export function PartyDetail() {
                   className="text-sm px-3.5 py-1 rounded border bg-card font-semibold cursor-pointer hover:opacity-80 disabled:opacity-50"
                   style={{ borderColor: displayColor, color: displayColor }}
                 >
-                  {joinStatus === "loading" ? "Beitritt…" : "Beitreten"}
+                  {joinStatus === "loading" ? t("detail.joining") : t("detail.join")}
                 </button>
                 {joinStatus === "error" && <span className="text-xs text-destructive">{joinError}</span>}
               </div>
@@ -191,19 +193,19 @@ export function PartyDetail() {
       {/* Fraktion */}
       {fraktion && (
         <div className="mb-8">
-          <h2 className="section-title">Fraktion</h2>
+          <h2 className="section-title">{t("detail.fraktionSection")}</h2>
           <Card>
             <CardContent className="p-5">
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-semibold">Fraktion Leader: {fraktion.leaderName}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Formed on Day {fraktion.formedOnDay}</div>
+                  <div className="font-semibold">{t("detail.fraktionLeader", { name: fraktion.leaderName })}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{t("detail.fraktionFormed", { day: fraktion.formedOnDay })}</div>
                   {fraktion.status === "dissolved" && fraktion.dissolvedOnDay != null && (
-                    <div className="text-sm text-destructive mt-0.5">Dissolved on Day {fraktion.dissolvedOnDay}</div>
+                    <div className="text-sm text-destructive mt-0.5">{t("detail.fraktionDissolved", { day: fraktion.dissolvedOnDay })}</div>
                   )}
                 </div>
                 <Badge variant="outline" className={fraktion.status === "active" ? FRAKTION_BADGE.active : FRAKTION_BADGE.none}>
-                  {fraktion.status === "active" ? "Active" : "Dissolved"}
+                  {fraktion.status === "active" ? t("detail.fraktionActive") : t("detail.fraktionDissolvedBadge")}
                 </Badge>
               </div>
             </CardContent>
@@ -215,10 +217,10 @@ export function PartyDetail() {
       {seats.length > 0 && (
         <div id="mdb-seats" className="mb-8">
           <h2 className="section-title">
-            Bundestagsabgeordnete
+            {t("detail.mdbSection")}
             <span className="block sm:inline text-sm font-normal text-muted-foreground sm:ml-2 mt-0.5 sm:mt-0">
-              {humanSeats.filter(s => s.userId).length}/{humanSeats.length} besetzt · {seats.length} Sitze gesamt
-              {openCount > 0 && <span className="text-emerald-600 ml-1">({openCount} frei)</span>}
+              {t("detail.mdbSeatStats", { occupied: humanSeats.filter(s => s.userId).length, total: humanSeats.length, seats: seats.length })}
+              {openCount > 0 && <span className="text-emerald-600 ml-1">{t("detail.mdbOpenSeats", { count: openCount })}</span>}
             </span>
           </h2>
 
@@ -228,34 +230,34 @@ export function PartyDetail() {
               <CardContent className="p-5">
                 <div className="flex flex-col md:flex-row gap-4 md:items-start">
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-base mb-1.5" style={{ color: displayColor }}>Werde MdB für {party.name}</div>
+                    <div className="font-bold text-base mb-1.5" style={{ color: displayColor }}>{t("detail.mdbApplyTitle", { name: party.name })}</div>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Als Mitglied des Bundestags nimmst du direkt an der parlamentarischen Arbeit teil.
+                      {t("detail.mdbApplyDesc")}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-3">
                       <div className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                        <span>Direkte Abstimmung über Gesetze in 3. Lesung</span>
+                        <span>{t("detail.mdbBenefit1")}</span>
                       </div>
                       <div className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                        <span>Reden halten in allen Lesungen</span>
+                        <span>{t("detail.mdbBenefit2")}</span>
                       </div>
                       <div className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                        <span>Anträge und Entschließungen einbringen</span>
+                        <span>{t("detail.mdbBenefit3")}</span>
                       </div>
                       <div className="flex items-start gap-1.5">
                         <span className="text-emerald-500 mt-0.5 shrink-0">+</span>
-                        <span>Änderungsanträge in 2. Lesung stellen</span>
+                        <span>{t("detail.mdbBenefit4")}</span>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>Voraussetzung: Parteimitglied</span>
+                      <span>{t("detail.mdbReq1")}</span>
                       <span>·</span>
-                      <span>KI-Bewertung der Bewerbung</span>
+                      <span>{t("detail.mdbReq2")}</span>
                       <span>·</span>
-                      <span>7 Tage Wartezeit nach Ablehnung</span>
+                      <span>{t("detail.mdbReq3")}</span>
                     </div>
                   </div>
                   <button
@@ -263,7 +265,7 @@ export function PartyDetail() {
                     className="shrink-0 px-5 py-2.5 rounded-lg text-white font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity"
                     style={{ background: displayColor }}
                   >
-                    Jetzt bewerben
+                    {t("detail.mdbApplyButton")}
                   </button>
                 </div>
               </CardContent>
@@ -273,15 +275,15 @@ export function PartyDetail() {
           {/* Pending application notice */}
           {pendingApp && (
             <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800 flex items-center gap-2">
-              <span className="font-semibold">Bewerbung läuft</span>
-              <span className="text-xs text-amber-600">— eingereicht Tag {pendingApp.createdOnDay}, wird demnächst geprüft</span>
+              <span className="font-semibold">{t("detail.mdbPendingTitle")}</span>
+              <span className="text-xs text-amber-600">{t("detail.mdbPendingDetail", { day: pendingApp.createdOnDay })}</span>
             </div>
           )}
 
           {/* Rejected with cooldown notice */}
           {rejectedApp && rejectedApp.cooldownUntilDay && simStatus && rejectedApp.cooldownUntilDay > simStatus.currentDay && (
             <div className="mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-sm text-muted-foreground">
-              Letzte Bewerbung abgelehnt — erneute Bewerbung ab Tag {rejectedApp.cooldownUntilDay} möglich
+              {t("detail.mdbRejectedCooldown", { day: rejectedApp.cooldownUntilDay })}
             </div>
           )}
 
@@ -289,12 +291,12 @@ export function PartyDetail() {
           {showApplyForm && (
             <Card className="mb-4" style={{ borderLeft: `3px solid ${displayColor}` }}>
               <CardContent className="p-5">
-                <div className="font-semibold mb-1">Bewerbung als Bundestagsabgeordnete/r</div>
-                <p className="text-xs text-muted-foreground mb-3">Begründe, warum du diese Partei vertreten willst. Nenne konkrete politische Ziele — die KI-Fraktionsführung bewertet Substanz und Parteinähe.</p>
+                <div className="font-semibold mb-1">{t("detail.mdbFormTitle")}</div>
+                <p className="text-xs text-muted-foreground mb-3">{t("detail.mdbFormDesc")}</p>
                 <textarea
                   value={applyMotivation}
                   onChange={e => setApplyMotivation(e.target.value)}
-                  placeholder="Warum willst du diese Partei vertreten? (20–500 Zeichen)"
+                  placeholder={t("detail.mdbFormPlaceholder")}
                   maxLength={500}
                   rows={3}
                   className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
@@ -302,18 +304,18 @@ export function PartyDetail() {
                 <select
                   value={applyFocus}
                   onChange={e => setApplyFocus(e.target.value)}
-                  aria-label="Politischer Schwerpunkt"
+                  aria-label={t("detail.mdbFocusPlaceholder")}
                   className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 bg-transparent"
                 >
-                  <option value="">Politischer Schwerpunkt (optional)</option>
-                  <option value="economy">Wirtschaft</option>
-                  <option value="social">Soziales</option>
-                  <option value="environment">Umwelt</option>
-                  <option value="immigration">Migration</option>
-                  <option value="defense">Verteidigung</option>
-                  <option value="education">Bildung</option>
-                  <option value="healthcare">Gesundheit</option>
-                  <option value="infrastructure">Infrastruktur</option>
+                  <option value="">{t("detail.mdbFocusPlaceholder")}</option>
+                  <option value="economy">{t("detail.mdbFocusEconomy")}</option>
+                  <option value="social">{t("detail.mdbFocusSocial")}</option>
+                  <option value="environment">{t("detail.mdbFocusEnvironment")}</option>
+                  <option value="immigration">{t("detail.mdbFocusImmigration")}</option>
+                  <option value="defense">{t("detail.mdbFocusDefense")}</option>
+                  <option value="education">{t("detail.mdbFocusEducation")}</option>
+                  <option value="healthcare">{t("detail.mdbFocusHealthcare")}</option>
+                  <option value="infrastructure">{t("detail.mdbFocusInfrastructure")}</option>
                 </select>
                 <div className="flex gap-2 items-center flex-wrap">
                   <button
@@ -325,7 +327,7 @@ export function PartyDetail() {
                         await api.applyForSeat(applyMotivation.trim(), applyFocus.trim() || undefined);
                         setApplyMotivation(""); setApplyFocus("");
                         setShowApplyForm(false);
-                        setApplyMsg("Bewerbung eingereicht! Du wirst über das Ergebnis benachrichtigt.");
+                        setApplyMsg(t("detail.mdbApplied"));
                         refresh();
                       } catch (e) {
                         setApplyMsg(e instanceof Error ? e.message : "Fehler beim Einreichen");
@@ -338,13 +340,13 @@ export function PartyDetail() {
                     className="px-3.5 py-1.5 rounded border-none text-white font-semibold text-sm cursor-pointer disabled:opacity-50"
                     style={{ background: displayColor }}
                   >
-                    {applySubmitting ? "Wird gesendet…" : "Bewerben"}
+                    {applySubmitting ? t("detail.mdbSubmitting") : t("detail.mdbSubmit")}
                   </button>
                   <button
                     onClick={() => { setShowApplyForm(false); setApplyMotivation(""); setApplyFocus(""); }}
                     className="px-2.5 py-1.5 rounded border border-input bg-card text-sm cursor-pointer hover:bg-accent"
                   >
-                    Abbrechen
+                    {t("detail.mdbCancel")}
                   </button>
                   {applyMsg && <span className={`text-xs ${applyMsg.includes("Fehler") ? "text-destructive" : "text-emerald-500"}`}>{applyMsg}</span>}
                 </div>
@@ -359,7 +361,7 @@ export function PartyDetail() {
       {/* Approval chart */}
       {history.length >= 2 && (
         <div className="mb-8">
-          <h2 className="section-title">Zustimmungsverlauf</h2>
+          <h2 className="section-title">{t("detail.approvalSection")}</h2>
           <Card>
             <CardContent className="p-5">
               <ApprovalChart history={history} color={party.color} partyId={party.id} />
@@ -370,7 +372,7 @@ export function PartyDetail() {
 
       {/* Bills proposed */}
       <div className="mb-8">
-        <h2 className="section-title">Gesetzentwürfe ({bills.length})</h2>
+        <h2 className="section-title">{t("detail.billsSection", { count: bills.length })}</h2>
         <PartyBillsList
           bills={bills}
           visibleBills={visibleBills}
@@ -380,19 +382,19 @@ export function PartyDetail() {
 
       {/* Voting record */}
       <div className="mb-8">
-        <h2 className="section-title">Abstimmungsverhalten ({votes.length})</h2>
+        <h2 className="section-title">{t("detail.votesSection", { count: votes.length })}</h2>
         {votes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No votes yet.</p>
+          <p className="text-sm text-muted-foreground">{t("detail.noVotes")}</p>
         ) : (
           <Card>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full border-collapse text-sm min-w-[480px]">
                 <thead>
                   <tr>
-                    <th className="text-left px-3 py-2 border-b-2 border-border">Bill</th>
-                    <th className="text-center px-3 py-2 border-b-2 border-border">Day</th>
-                    <th className="text-center px-3 py-2 border-b-2 border-border">Vote</th>
-                    <th className="text-center px-3 py-2 border-b-2 border-border">Outcome</th>
+                    <th className="text-left px-3 py-2 border-b-2 border-border">{t("detail.votesColBill")}</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">{t("detail.votesColDay")}</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">{t("detail.votesColVote")}</th>
+                    <th className="text-center px-3 py-2 border-b-2 border-border">{t("detail.votesColOutcome")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -402,7 +404,7 @@ export function PartyDetail() {
                         <Link to={`/bills/${bill.id}`} className="text-inherit no-underline hover:text-primary">{bill.title}</Link>
                         <div className="text-xs text-muted-foreground mt-0.5">{vote.reason}</div>
                       </td>
-                      <td className="px-3 py-2 border-b border-border text-center">{bill.proposedOnDay}</td>
+                      <td className="px-3 py-2 border-b border-border text-center">{t("detail.votesDay", { day: bill.proposedOnDay })}</td>
                       <td className="px-3 py-2 border-b border-border text-center">
                         <span className="font-semibold" style={{ color: VOTE_HEX[vote.vote as keyof typeof VOTE_HEX] || "#888" }}>
                           {vote.vote.toUpperCase()}
@@ -449,11 +451,11 @@ export function PartyDetail() {
 
         return (
           <div className="mb-8">
-            <h2 className="section-title">Abstimmungsübereinstimmung</h2>
+            <h2 className="section-title">{t("detail.alignmentSection")}</h2>
             <Card>
               <CardContent className="p-5">
                 <div className="text-xs text-muted-foreground mb-3">
-                  Based on last 30 days ({sample === recentVotes ? recentVotes.length : votes.length} shared votes)
+                  {t("detail.alignmentBasis", { count: sample === recentVotes ? recentVotes.length : votes.length })}
                 </div>
                 {alignment.map(({ party: other, pct, count }) => {
                   const otherColor = other.color === "#FFED00" ? "#c4a900" : other.color;
@@ -494,7 +496,7 @@ export function PartyDetail() {
 
         return (
           <div className="mb-8">
-            <h2 className="section-title">Politische Schwerpunkte</h2>
+            <h2 className="section-title">{t("detail.policyFocusSection")}</h2>
             <Card>
               <CardContent className="p-5">
                 <div className="flex flex-wrap gap-2">
@@ -512,9 +514,9 @@ export function PartyDetail() {
 
       {/* Statements */}
       <div className="mb-8">
-        <h2 className="section-title">Erklärungen ({statements.length})</h2>
+        <h2 className="section-title">{t("detail.statementsSection", { count: statements.length })}</h2>
         {statements.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No statements yet.</p>
+          <p className="text-sm text-muted-foreground">{t("detail.noStatements")}</p>
         ) : (
           <div>
             {statements.slice(0, visibleStatements).map(s => (
@@ -522,7 +524,7 @@ export function PartyDetail() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center">
                     <div className="font-semibold text-sm">{s.title}</div>
-                    <div className="text-xs text-muted-foreground">Day {s.dayNumber}</div>
+                    <div className="text-xs text-muted-foreground">{t("detail.statementDay", { day: s.dayNumber })}</div>
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">{s.description}</div>
                 </CardContent>

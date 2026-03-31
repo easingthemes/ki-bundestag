@@ -1,4 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { useTranslation } from "react-i18next";
 import { type PartyHistory } from "../../api";
 
 interface ApprovalChartProps {
@@ -8,6 +9,7 @@ interface ApprovalChartProps {
 }
 
 export function ApprovalChart({ history, color, partyId }: ApprovalChartProps) {
+  const { t } = useTranslation("parties");
   if (history.length < 2) return null;
   const partyColor = color === "#FFED00" ? "#c4a900" : color;
   const chartData = history.map(h => ({ day: h.dayNumber, approval: h.approvalRating }));
@@ -27,7 +29,7 @@ export function ApprovalChart({ history, color, partyId }: ApprovalChartProps) {
           dataKey="day"
           tick={{ fontSize: 11 }}
           tickLine={false}
-          label={{ value: "Day", position: "insideBottomRight", offset: -4, fontSize: 11 }}
+          label={{ value: t("approvalChart.xLabel"), position: "insideBottomRight", offset: -4, fontSize: 11 }}
         />
         <YAxis
           domain={[0, 60]}
@@ -37,8 +39,8 @@ export function ApprovalChart({ history, color, partyId }: ApprovalChartProps) {
           tickFormatter={(v: number) => `${v}%`}
         />
         <Tooltip
-          formatter={(v: number) => [`${v.toFixed(1)}%`, "Approval"]}
-          labelFormatter={(l: number) => `Day ${l}`}
+          formatter={(v: number) => [`${v.toFixed(1)}%`, t("approvalChart.tooltipValue")]}
+          labelFormatter={(l: number) => t("approvalChart.tooltipLabel", { day: l })}
         />
         <Area
           type="monotone"
