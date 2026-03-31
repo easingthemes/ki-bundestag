@@ -59,7 +59,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
       updateUser(result);
       setJoinStatus("success");
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : "Failed to join");
+      setJoinError(err instanceof Error ? err.message : "Beitritt fehlgeschlagen");
       setJoinStatus("error");
     }
   };

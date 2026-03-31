@@ -235,13 +235,13 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
                 return `${d.getDate()}. ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()} — Tag ${selectedDay.dayNumber}`;
               })()}
             </DialogTitle>
-            <DialogDescription className="sr-only">Events for this simulation day</DialogDescription>
+            <DialogDescription className="sr-only">Ereignisse für diesen Simulationstag</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {loadingEvents ? (
-              <div className="text-sm text-muted-foreground py-4 text-center">Loading...</div>
+              <div className="text-sm text-muted-foreground py-4 text-center">Laden…</div>
             ) : dayEvents.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-4 text-center">No events</div>
+              <div className="text-sm text-muted-foreground py-4 text-center">Keine Ereignisse</div>
             ) : (
               <div className="divide-y divide-border">
                 {dayEvents
