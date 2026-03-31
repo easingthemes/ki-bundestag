@@ -24,7 +24,11 @@ import type { Provider } from "../agent/model-config.js";
 const FETCH_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TAGESSCHAU_URL = "https://www.tagesschau.de/api2u/news/?ressort=inland";
 const WELT_RSS_URL = "https://www.welt.de/feeds/section/politik.rss";
-const ABGEORDNETENWATCH_URL = "https://www.abgeordnetenwatch.de/api/v2/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=132";
+// Try 21st Bundestag (2025–) first, fall back to 20th (2021–2025)
+const ABGEORDNETENWATCH_URLS = [
+  "https://www.abgeordnetenwatch.de/api/v2/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=165",
+  "https://www.abgeordnetenwatch.de/api/v2/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=132",
+];
 const DIP_API_URL = "https://search.dip.bundestag.de/api/v1/vorgang?f.vorgangstyp=Gesetzgebung&rows=10&sort=datum&desc=true";
 const DIP_API_KEY = "OSOegLs.PR2lwJ1dwCeje9vTj7FPOt3hvpYKtwKkhw";
 
@@ -115,7 +119,11 @@ interface RawParliamentaryItem {
 }
 
 async function fetchAbgeordnetenwatchPolls(): Promise<RawParliamentaryItem[]> {
-  const text = await fetchWithTimeout(ABGEORDNETENWATCH_URL);
+  let text: string | null = null;
+  for (const url of ABGEORDNETENWATCH_URLS) {
+    text = await fetchWithTimeout(url);
+    if (text) break;
+  }
   if (!text) return [];
   try {
     const data = JSON.parse(text);

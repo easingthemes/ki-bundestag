@@ -87,7 +87,12 @@ export function validateActions(
         }
         const billExists = votableBills.some(b => b.id === action.billId);
         if (!billExists) {
-          console.warn(`[${partyId}] Vote for non-existent bill ${action.billId}, skipping`);
+          const inSecondReading = secondReadingBills?.some(b => b.id === action.billId);
+          if (inSecondReading) {
+            console.warn(`[${partyId}] Vote for second-reading bill ${action.billId} (not yet in third reading), skipping`);
+          } else {
+            console.warn(`[${partyId}] Vote for non-existent bill ${action.billId}, skipping`);
+          }
           continue;
         }
         votedBills.add(action.billId);
