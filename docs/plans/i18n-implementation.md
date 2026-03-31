@@ -1,232 +1,183 @@
-# Plan: i18n (Internationalization) Implementation
+# Plan: Centralize UI Strings & Fix Untranslated English
 
-> **Status**: Planning
+> **Status**: Ready
 
 ## Goal
 
-Add full internationalization support to KI Bundestag, covering three layers:
-1. **App labels** — All hardcoded UI strings in the React frontend
-2. **User-generated content** — Questions, proposals, speeches, applications
-3. **Model-generated content** — AI-produced bills, media articles, summaries, poll questions, etc.
+The app is **German-only**. Many UI strings are already German, but ~75 strings remain in English (status labels, notification types, ministry names, tooltips, filter labels). Additionally, strings are scattered inline across ~40 components with no central management.
 
-The app is currently a mix of hardcoded German UI (navigation, forms, errors) and English (admin labels, notification types). AI content is mandated German via system prompts. There is **no i18n infrastructure** today.
+**Objectives:**
+1. Centralize all UI strings into organized translation files (one source of truth)
+2. Fix all remaining English strings → translate to German
+3. Eliminate duplicate/inconsistent label maps (e.g. STATUS_LABELS defined differently in Bills.tsx vs BillDetail.tsx)
+4. Use `react-i18next` as a string management tool (single locale: `de`)
 
-## Current State
+## Current Problems
 
-- **~300+ hardcoded strings** in the frontend, predominantly German
-- **No i18n library** installed (no react-i18next, react-intl, etc.)
-- **AI prompts explicitly require German** output (`"ALL text content...MUST be written in German"`)
-- **User content** has no language tagging or translation pipeline
-- **API layer** returns DB content as-is, no language negotiation
-- **Inconsistent language mixing**: German nav + English notification types + English budget labels
+- **~75 English strings** scattered across 15+ files (see inventory below)
+- **Duplicate label maps**: `STATUS_LABELS` in Bills.tsx (German) vs BillDetail.tsx (English) — different translations for same keys
+- **No central string registry**: Every component defines its own inline constants
+- **Hard to audit**: No way to grep for untranslated strings when they're mixed into JSX
 
 ---
 
-## Architecture Decision
+## English Strings Inventory (by functional group)
 
-**Library**: `react-i18next` + `i18next` (most popular, well-supported, lazy loading, namespace support)
+### Legislation
+| File | String(s) | German |
+|------|-----------|--------|
+| `BillDetail.tsx:17-27` | STATUS_LABELS: "Third Reading", "Second Reading", "Committee", "First Reading", "Proposed", "Passed", "Rejected", "Debate", "Struck Down" | "3. Lesung", "2. Lesung", "Ausschuss", "1. Lesung", "Eingebracht", "Angenommen", "Abgelehnt", "Debatte", "Verfassungswidrig" |
+| `BillDetail.tsx:29-36` | PIPELINE_STAGES: "Proposed", "1st Reading", "Committee", "2nd Reading", "3rd Reading", "Final" | "Eingebracht", "1. Lesung", "Ausschuss", "2. Lesung", "3. Lesung", "Abschluss" |
 
-**Translation file structure**: JSON files organized by language and namespace (matching functional groups):
+### Budget
+| File | String(s) | German |
+|------|-----------|--------|
+| `Budget.tsx:12-21` | MINISTRY_LABELS: "Finance", "Labour & Social", "Environment", "Interior", "Defence", "Education", "Health", "Infrastructure" | "Finanzen", "Arbeit & Soziales", "Umwelt", "Inneres", "Verteidigung", "Bildung", "Gesundheit", "Infrastruktur" |
+| `Budget.tsx:75-93` | Description text, filter labels "All", "Passed", "Rejected", empty state text | "Alle", "Angenommen", "Abgelehnt", etc. |
 
+### Media & News
+| File | String(s) | German |
+|------|-----------|--------|
+| `Media.tsx:40-44` | BIAS_LABELS: "Left", "Center", "Right" | "Links", "Mitte", "Rechts" |
+| `NewsFeed.tsx:11-31` | EVENT_CATEGORIES: "Legislative", "Crises", "Elections", "Statements", "System" | "Gesetzgebung", "Krisen", "Wahlen", "Stellungnahmen", "System" |
+
+### Notifications
+| File | String(s) | German |
+|------|-----------|--------|
+| `Notifications.tsx:20-36` | TYPE_LABELS: "All", "Morning Summary", "Queued", "Ready", "Proposal Accepted/Declined/Expired", "Question Answered", "Bill Outcome", "Vote Needed", "Election", "Election Result", "Crisis", "Budget", "Government" (15 strings) | "Alle", "Morgenbericht", "Warteschlange", "Bereit", "Vorschlag angenommen/abgelehnt/abgelaufen", "Frage beantwortet", "Abstimmungsergebnis", "Abstimmung nötig", "Wahl", "Wahlergebnis", "Krise", "Haushalt", "Regierung" |
+
+### Parliament
+| File | String(s) | German |
+|------|-----------|--------|
+| `Interpellations.tsx:55,61` | "All" (filter) | "Alle" |
+| `ConstitutionalCourt.tsx:52-66` | "All", "Decision:", "Struck Down", "Upheld", "challenge(s)" | "Alle", "Entscheidung:", "Abgelehnt", "Bestätigt", "Beschwerde(n)" |
+
+### Shared / Common
+| File | String(s) | German |
+|------|-----------|--------|
+| `shared.tsx:73,82` | "You can participate", "MdB action available" | "Du kannst teilnehmen", "MdB-Aktion verfügbar" |
+| `main.tsx:121-316` | aria-labels: "Toggle menu", "User menu", "Save", "Cancel", "Edit name" | "Menü umschalten", "Benutzermenü", "Speichern", "Abbrechen", "Name bearbeiten" |
+| `colors.ts:153-158` | DISCIPLINE_LABEL: "Good", "Warning", "Restricted", "Whipped" | "Gut", "Warnung", "Eingeschränkt", "Fraktionszwang" |
+| `timing.ts` | PRESET_LABEL values (if English) | German equivalents |
+
+### Tooltips & Interactions
+| File | String(s) | German |
+|------|-----------|--------|
+| `Questions.tsx:68-96` | "Retract upvote/downvote", "Upvote", "Downvote", "Upvote or downvote" | "Zustimmung zurücknehmen", "Zustimmen", "Ablehnen", etc. |
+| `Referendums.tsx:129` | "Cast your vote" | "Stimme abgeben" |
+| `ProposalForm.tsx:186,200` | "Retract upvote/downvote", "Upvote", "Downvote" | Same as Questions |
+| `AskPartyWidget.tsx:46` | "Select party" | "Partei wählen" |
+| `ModelConfig.tsx:143` | "Collapse" / "Expand" | "Einklappen" / "Ausklappen" |
+| `ActionsReference.tsx:339` | "Collapse" / "Show detail" | "Einklappen" / "Details anzeigen" |
+| `MyActivity.tsx:94` | "All" (filter) | "Alle" |
+
+---
+
+## Architecture
+
+**Library**: `react-i18next` (single locale `de`, no language switcher needed)
+
+**File structure** — organized by functional group:
 ```
 packages/web/src/locales/
 ├── de/
-│   ├── common.json          # Shared: nav, buttons, errors, loading states
-│   ├── legislation.json     # Bills, amendments, readings, votes
-│   ├── parliament.json      # Motions, interpellations, confidence votes, court
-│   ├── elections.json       # Elections, coalitions, government
-│   ├── media.json           # News, press, outlets, bias labels
-│   ├── polls.json           # Polls, referendums, voting
-│   ├── parties.json         # Party pages, profiles, membership
-│   ├── citizens.json        # Questions, proposals, speeches, MdB
-│   ├── dashboard.json       # Dashboard widgets, onboarding, quick actions
-│   ├── admin.json           # Admin panels, timing, model config
-│   ├── calendar.json        # Calendar, months, event types
-│   ├── notifications.json   # Notification types, messages
-│   └── legal.json           # About, Impressum, Datenschutz (large text blocks)
-├── en/
-│   └── (same structure)
-└── index.ts                 # i18n init config
+│   ├── common.json          # Nav, buttons, aria-labels, loading, errors, shared labels
+│   ├── legislation.json     # Bills, amendments, readings, votes, status labels, pipeline
+│   ├── parliament.json      # Motions, interpellations, confidence votes, constitutional court
+│   ├── elections.json       # Elections, coalitions, government formation
+│   ├── media.json           # News feed, press, outlets, bias labels, event categories
+│   ├── budget.json          # Budget page, ministry labels
+│   ├── polls.json           # Polls, referendums
+│   ├── parties.json         # Party pages, membership, questions, proposals, MdB
+│   ├── dashboard.json       # Dashboard widgets, onboarding, quick actions, calendar
+│   ├── notifications.json   # Notification types, activity labels
+│   └── admin.json           # Admin panels, timing, model config
+└── index.ts                 # i18n init (locale: 'de', no detection needed)
 ```
 
-**Language detection**: Browser `navigator.language` → localStorage override → fallback `de`
-
-**Content translation strategy** (3 tiers):
-
-| Tier | Content Type | Strategy |
-|------|-------------|----------|
-| **1. Static UI** | Nav, buttons, labels, errors, status maps | Translation JSON files, `useTranslation()` hook |
-| **2. Model-generated** | Bills, media, summaries, polls, etc. | Dual-language generation in AI prompts OR on-demand translation via API |
-| **3. User-generated** | Questions, proposals, speeches | Display as-is (original language) with optional translate button |
+**Why i18next even for single-language?**
+- Central string registry — one place to audit all user-facing text
+- Namespace organization — strings grouped by feature area
+- Interpolation support — `t('limit.remaining', { count: 3 })` cleaner than template literals
+- Future-proof — adding EN later is just adding `en/` folder
+- Prevents regression — new strings must be added to JSON files, easy to review in PRs
 
 ---
 
-## Implementation Steps (grouped by functionality)
+## Implementation Steps
 
-### Phase 1: Foundation & Infrastructure
+### Step 1: Install dependencies and configure i18next
+- `npm install i18next react-i18next` in `packages/web`
+- Create `packages/web/src/locales/index.ts` — init i18next with `lng: 'de'`, no detector
+- Create empty namespace JSON files in `de/`
+- Wrap app with `I18nextProvider` in `main.tsx`
+- **No language switcher** — German only
 
-#### Step 1.1: Install i18n dependencies and configure
-- Install `i18next`, `react-i18next`, `i18next-browser-languagedetector`
-- Create `packages/web/src/locales/index.ts` with i18n init
-- Wrap app root with `I18nextProvider` in `main.tsx`
-- Add language switcher component (DE/EN toggle in header)
-- Create empty namespace JSON files for `de/` and `en/`
+### Step 2: Common namespace — nav, buttons, shared labels
+- Extract from: `main.tsx` (nav labels, aria-labels, user menu), `shared.tsx` (tooltips), `colors.ts` (DISCIPLINE_LABEL), `timing.ts` (PRESET_LABEL), `FilterPills.tsx`, `EmptyState.tsx`, `LoadingSkeleton.tsx`
+- Fix English: aria-labels in main.tsx, DISCIPLINE_LABEL in colors.ts, default tooltips in shared.tsx
+- **~40 strings**
 
-#### Step 1.2: Extract shared/common strings
-- **File**: `common.json`
-- **Source files**: `main.tsx`, `shared.tsx`, `EmptyState.tsx`, `LoadingSkeleton.tsx`, `FilterPills.tsx`
-- **Strings**: Navigation labels (~20), button text (Save, Cancel, Submit, etc.), loading states ("Lade..."), generic errors, search placeholders, user menu items
-- **Constant maps**: `DISCIPLINE_LABEL` in `colors.ts`, `PRESET_LABEL` in `timing.ts`
+### Step 3: Legislation namespace — bills, amendments, votes
+- Extract from: `Bills.tsx`, `BillDetail.tsx`, `BillImpactDisplay.tsx`, `SpeechSubmitForm.tsx`, `SpeechDisplay.tsx`, `MdbVoteButtons.tsx`, `VoteBar.tsx`
+- Fix English: STATUS_LABELS in BillDetail.tsx (9 strings), PIPELINE_STAGES (6 strings)
+- Consolidate duplicate STATUS_LABELS from Bills.tsx + BillDetail.tsx into single translation keys
+- **~30 strings**
 
-### Phase 2: Page-by-Page UI Extraction (by functional group)
+### Step 4: Parliament namespace — motions, interpellations, court
+- Extract from: `Motions.tsx`, `Interpellations.tsx`, `ConfidenceVotes.tsx`, `ConstitutionalCourt.tsx`
+- Fix English: "All" filters in Interpellations, "Struck Down"/"Upheld"/"Decision:" in ConstitutionalCourt
+- **~20 strings**
 
-#### Step 2.1: Legislation namespace
-- **File**: `legislation.json`
-- **Source files**: `Bills.tsx`, `BillDetail.tsx`, `BillImpactDisplay.tsx`, `SpeechDisplay.tsx`, `MdbVoteButtons.tsx`, `VoteBar.tsx`
-- **Strings**: `STATUS_LABELS` (2 different maps — German in Bills.tsx, English in BillDetail.tsx → unify), reading stage labels, vote labels (Ja/Nein/Enthaltung), bill search placeholder, category/party/status filter labels, impact field names, amendment labels
-- **Note**: BillDetail.tsx and Bills.tsx have DUPLICATE but inconsistent STATUS_LABELS — consolidate into one shared translation key
+### Step 5: Media & news namespace
+- Extract from: `Media.tsx`, `NewsFeed.tsx`
+- Fix English: BIAS_LABELS (3 strings), EVENT_CATEGORIES labels (5 strings)
+- **~15 strings**
 
-#### Step 2.2: Parliament namespace
-- **File**: `parliament.json`
-- **Source files**: `Motions.tsx`, `Interpellations.tsx`, `ConfidenceVotes.tsx`, `ConstitutionalCourt.tsx`
-- **Strings**: Page headings, status labels, motion types (Antrag/Entschließung), interpellation types (kleine/große Anfrage), vote outcome labels, court decision labels
+### Step 6: Budget namespace
+- Extract from: `Budget.tsx`
+- Fix English: MINISTRY_LABELS (8 strings), filter labels (3), description text, empty state
+- **~15 strings**
 
-#### Step 2.3: Elections namespace
-- **File**: `elections.json`
-- **Source files**: `Elections.tsx`, `CoalitionCalculator.tsx`, `VoteBarChart.tsx`, `CoalitionChips.tsx`
-- **Strings**: Page headings, coalition calculator labels, government formation labels, vote percentage labels, election result headings
+### Step 7: Notifications & activity namespace
+- Extract from: `Notifications.tsx`, `MyActivity.tsx`, `SimulationLog.tsx`
+- Fix English: TYPE_LABELS (15 strings), "All" filter in MyActivity
+- **~20 strings**
 
-#### Step 2.4: Media namespace
-- **File**: `media.json`
-- **Source files**: `Media.tsx`, `NewsFeed.tsx`
-- **Strings**: Page headings ("Medien", "Titelseiten von heute", "Archiv"), `BIAS_LABELS` (Left/Center/Right), outlet filter labels, category labels
+### Step 8: Parties & citizens namespace
+- Extract from: `Parties.tsx`, `PartyDetail.tsx`, `QuestionForm.tsx`, `ProposalForm.tsx`, `SpeechSubmitForm.tsx`, `ApprovalChart.tsx`, `MdbRosterTable.tsx`, `MdbBadge.tsx`
+- Fix English: vote tooltips in ProposalForm.tsx, Questions.tsx
+- **~40 strings**
 
-#### Step 2.5: Polls namespace
-- **File**: `polls.json`
-- **Source files**: `Polls.tsx`, `Referendums.tsx`
-- **Strings**: Page headings, vote buttons, result labels, category labels, referendum status labels
+### Step 9: Dashboard, calendar, elections, polls, admin namespaces
+- Extract from: `Dashboard.tsx`, `OnboardingOverlay.tsx`, `QuickActionsBar.tsx`, `CalendarWidget.tsx`, `Elections.tsx`, `Polls.tsx`, `Referendums.tsx`, `ModelConfig.tsx`, `ActionsReference.tsx`, `AskPartyWidget.tsx`
+- Fix English: "Select party", "Collapse"/"Expand", "Cast your vote", vote tooltips
+- **~60 strings**
 
-#### Step 2.6: Parties & citizens namespace
-- **File**: `parties.json` + `citizens.json`
-- **Source files**: `Parties.tsx`, `PartyDetail.tsx`, `QuestionForm.tsx`, `ProposalForm.tsx`, `SpeechSubmitForm.tsx`, `ApprovalChart.tsx`, `PartyBillsList.tsx`, `MdbRosterTable.tsx`, `MdbBadge.tsx`
-- **Strings**: Party page headings, join modal text, form labels/placeholders/validation messages, daily limit messages, question/proposal/speech submission UI, MdB roster labels, approval chart labels
-- **Note**: This is the largest group — many form validation messages and interactive prompts
-
-#### Step 2.7: Dashboard namespace
-- **File**: `dashboard.json`
-- **Source files**: `Dashboard.tsx`, `OnboardingOverlay.tsx`, `QuickActionsBar.tsx`, `MyImpactCard.tsx`, `CatchupCard.tsx`, `CalendarWidget.tsx`
-- **Strings**: Welcome messages, onboarding steps, quick action labels, impact card labels, catchup summary labels
-- **Calendar**: `MONTH_NAMES` (12), `EVENT_LABEL` (~22 event types) → move to `calendar.json`
-
-#### Step 2.8: Notifications & admin namespace
-- **File**: `notifications.json` + `admin.json`
-- **Source files**: `Notifications.tsx`, `MyActivity.tsx`, `SimulationLog.tsx`, `SimulationInfo.tsx`, `ActionsReference.tsx`, `ModelConfig.tsx`
-- **Strings**: `TYPE_LABELS` (~15 notification types), activity labels, log entry labels, admin panel labels
-
-#### Step 2.9: Legal/content pages
-- **File**: `legal.json`
-- **Source files**: `About.tsx`, `Impressum.tsx`, `Datenschutz.tsx`
-- **Strings**: Large blocks of narrative German text (100+ lines each)
-- **Strategy**: Store as markdown strings in translation files, render with a markdown component or use `Trans` component for rich text
-
-### Phase 3: Model-Generated Content (AI layer)
-
-#### Step 3.1: Add language parameter to AI prompts
-- **Affected files**: `packages/engine/src/agent/prompt.ts`, `simulation/media.ts`, `simulation/summary.ts`, `simulation/polls.ts`, `simulation/referendums.ts`, `simulation/questions.ts`, `simulation/interpellations.ts`, `simulation/internal-proposals.ts`, `simulation/speeches.ts`, `simulation/discipline.ts`, `agent/group-prompts.ts`
-- **Change**: Replace hardcoded `"MUST be written in German"` with a configurable language parameter
-- **New config**: `CONTENT_LANGUAGE` env var or simulation setting (default: `"de"`)
-- **Prompt template update**: `"ALL text content...MUST be written in ${language === 'de' ? 'German' : 'English'}"`
-- **Mood labels** in `summary.ts`: Make the 7 mood options language-aware (currently hardcoded German)
-
-#### Step 3.2: Dual-language content generation (optional, higher cost)
-- **Strategy A (recommended)**: Generate content in ONE language (based on simulation config), translate on-demand via lightweight API call when user requests other language
-- **Strategy B (expensive)**: Generate content in both languages simultaneously (doubles AI cost)
-- **Strategy C (cheapest)**: Generate in German only, add client-side "Translate" button that calls a translation API
-- **Recommendation**: Start with Strategy A (single language generation), add Strategy C as enhancement
-
-#### Step 3.3: API language negotiation
-- **Affected files**: `packages/api/src/` middleware and routes
-- **Change**: Accept `Accept-Language` header or `?lang=de|en` query parameter
-- **Behavior**: For static enums (categories, statuses), return translated values; for AI content, return as stored (original language)
-- **New middleware**: Language detection middleware that sets `req.locale`
-- **Enum translations**: Minister portfolios, bill categories, crisis types, event types — add server-side translation maps
-
-#### Step 3.4: Translate existing DB content (migration)
-- **Approach**: NOT recommended for initial release — too much content, too expensive
-- **Future**: Could add a `translations` table with `(entity_type, entity_id, field, locale, text)` for cached translations
-- **On-demand**: When user requests English for a German article, translate via API, cache in translations table
-
-### Phase 4: User-Generated Content
-
-#### Step 4.1: Language tagging for user content
-- **Schema change**: Add `language` column to `citizenQuestions`, `internalProposals`, `mdbApplications`, `mdbSpeeches` tables
-- **Detection**: Auto-detect language on submission (lightweight, e.g., `franc` library or simple heuristic)
-- **Storage**: Store original text + detected language code
-
-#### Step 4.2: Client-side translate button
-- **UI change**: Add "Translate" button next to user-generated content (questions, proposals, speeches)
-- **API**: New endpoint `POST /api/translate` that accepts text + target locale, returns translated text
-- **Caching**: Cache translations client-side (React Query) and optionally server-side
-- **Cost control**: Rate-limit translation requests per user
-
-#### Step 4.3: AI responses in user's language
-- **Change**: When answering citizen questions, detect the question's language and respond in kind
-- **Affected files**: `simulation/questions.ts`, `agent/group-prompts.ts`
-- **Prompt update**: `"Answer in the same language as the question"`
+### Step 10: Verify — audit for remaining inline strings
+- Grep all `.tsx` files for quoted strings in JSX that aren't translation keys
+- Run the app and visually check each page for English text
+- Fix any stragglers
 
 ---
 
-## Functional Group Summary
+## Files Changed
 
-| Group | UI Strings | AI Content | User Content | Priority |
-|-------|-----------|------------|--------------|----------|
-| **Common/Nav** | ~40 strings | — | — | P0 |
-| **Legislation** | ~30 strings | Bill titles, descriptions, vote reasons | Speeches, amendments | P0 |
-| **Parliament** | ~20 strings | Motions, interpellations, court rulings | — | P1 |
-| **Elections** | ~15 strings | Coalition summaries | — | P1 |
-| **Media/News** | ~15 strings | Headlines, articles, summaries | — | P1 |
-| **Polls** | ~10 strings | Poll questions, referendum text | Poll/referendum votes (no text) | P2 |
-| **Parties/Citizens** | ~40 strings | Question responses, proposal decisions | Questions, proposals, applications | P0 |
-| **Dashboard** | ~30 strings | Daily narrative summary | — | P1 |
-| **Calendar** | ~35 strings | — | — | P1 |
-| **Notifications** | ~20 strings | Notification messages | — | P2 |
-| **Admin** | ~15 strings | — | — | P2 |
-| **Legal pages** | ~300+ words | — | — | P2 |
+| Package | Files | Change |
+|---------|-------|--------|
+| `web` | `package.json` | Add i18next, react-i18next |
+| `web` | 1 new dir `locales/de/` | 11 namespace JSON files |
+| `web` | `locales/index.ts` | i18n config (new file) |
+| `web` | `main.tsx` | I18nextProvider wrapper + extract nav strings |
+| `web` | ~30 components | Replace inline strings with `t()` calls |
+| `web` | `lib/colors.ts` | Extract DISCIPLINE_LABEL to translation |
+| `web` | `lib/timing.ts` | Extract PRESET_LABEL to translation |
 
----
+## Out of Scope
 
-## Key Risks & Decisions
-
-1. **AI cost**: Dual-language generation doubles Haiku costs (~$0.06→$0.12/day). On-demand translation is cheaper but adds latency.
-2. **Content consistency**: AI-generated German bills debated in German parliament should stay German — translating them breaks immersion. Consider: translate only the UI chrome, keep simulation content in German with optional translate button.
-3. **Mixed-language UGC**: Users may submit in any language. AI responses currently forced to German. Need policy: respond in question's language? Always German? Configurable?
-4. **SEO/URL structure**: Current routes are language-neutral (`/bills`, `/parties`). Could add `/de/bills`, `/en/bills` prefix — but probably overkill for this app.
-5. **RTL languages**: Not in scope. Only DE and EN for v1.
-6. **Date/number formatting**: German uses `DD.MM.YYYY` and `1.000,00` vs English `MM/DD/YYYY` and `1,000.00`. Use `Intl.DateTimeFormat` and `Intl.NumberFormat`.
-
----
-
-## Files Changed (estimated)
-
-| Package | Files | Type of Change |
-|---------|-------|---------------|
-| `web` | ~40 components | Extract strings to `useTranslation()` |
-| `web` | 1 new dir (`locales/`) | Translation JSON files (2 languages × 13 namespaces) |
-| `web` | `main.tsx` | i18n provider, language switcher |
-| `web` | `package.json` | New deps: i18next, react-i18next, i18next-browser-languagedetector |
-| `engine` | ~10 prompt files | Parameterize language in system prompts |
-| `engine` | 4 schema files | Add `language` column to UGC tables |
-| `api` | ~5 route files | Language middleware, enum translations |
-| `api` | 1 new route | Translation endpoint |
-
----
-
-## Out of Scope (v1)
-
-- More than 2 languages (DE + EN only)
-- Translating historical DB content (too expensive)
-- RTL language support
-- URL-based locale routing (`/de/`, `/en/`)
-- Server-side rendering with locale
-- Translating AI system prompts themselves (they stay English internally)
-- Per-user language preference stored in DB (use localStorage for now)
+- Multi-language support (no EN locale, no language switcher)
+- Translating AI-generated content or DB content
+- Translating user-generated content
+- API-layer changes
+- Server-side locale handling
+- Legal pages (About, Impressum, Datenschutz) — already fully German, large text blocks, low ROI to extract
