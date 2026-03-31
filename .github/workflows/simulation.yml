@@ -25,6 +25,12 @@ on:
           - 3-days
           - 6-days
           - full-mandat
+          - custom
+      custom_days:
+        description: "[start/custom] Number of simulation days to run"
+        required: false
+        type: string
+        default: ""
       preset:
         description: "[start] Timing preset (leave unchanged to keep current)"
         required: false
@@ -75,6 +81,13 @@ jobs:
           if [[ "${{ inputs.action }}" == "inject" && "${{ inputs.injection }}" == "" ]]; then
             echo "::error::Injection type is required when action is 'inject'"
             exit 1
+          fi
+          if [[ "${{ inputs.action }}" == "start" && "${{ inputs.mode }}" == "custom" ]]; then
+            DAYS="${{ inputs.custom_days }}"
+            if [[ -z "$DAYS" || ! "$DAYS" =~ ^[0-9]+$ || "$DAYS" -lt 1 ]]; then
+              echo "::error::custom_days must be a positive integer when mode is 'custom'"
+              exit 1
+            fi
           fi
 
       - name: Execute simulation action
@@ -135,6 +148,17 @@ jobs:
                     pm2 delete ki-simulate 2>/dev/null || true
                     pm2 start npx --name ki-simulate --no-autorestart -- tsx packages/engine/src/runner.ts "$REMAINING"
                     echo "==> Full Mandat simulation started. Check progress with: pm2 logs ki-simulate"
+                    pm2 save
+                    pm2 status
+                    ;;
+
+                  custom)
+                    DAYS="${{ inputs.custom_days }}"
+                    echo "==> Running $DAYS custom simulation day(s) via PM2..."
+                    pm2 stop ki-simulate 2>/dev/null || true
+                    pm2 delete ki-simulate 2>/dev/null || true
+                    pm2 start npx --name ki-simulate --no-autorestart -- tsx packages/engine/src/runner.ts "$DAYS"
+                    echo "==> Custom simulation started. Check progress with: pm2 logs ki-simulate"
                     pm2 save
                     pm2 status
                     ;;
