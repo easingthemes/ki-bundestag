@@ -46,7 +46,11 @@ RELATIONSHIPS: Share social policy goals with SPD and Greens but push them furth
 
 /**
  * Get the personality profile for a party, or empty string if unknown.
+ * If realPositions is provided (from knowledge grounding), it's appended
+ * as a factual overlay on top of the static ideology profile.
  */
-export function getPartyProfile(partyId: string): string {
-  return PROFILES[partyId] ?? "";
+export function getPartyProfile(partyId: string, realPositions?: string): string {
+  const base = PROFILES[partyId] ?? "";
+  if (!base || !realPositions) return base;
+  return `${base}\nAKTUELLE REALE POLITISCHE PRIORITÄTEN:\n${realPositions}`;
 }
