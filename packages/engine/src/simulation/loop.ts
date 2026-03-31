@@ -60,6 +60,13 @@ import type { TimingPreset } from "./timing.js";
 import type { ContextDepth } from "../agent/context-depth.js";
 import { getDepthConfig, isValidContextDepth } from "../agent/context-depth.js";
 
+/** Update heartbeat timestamp so the frontend knows the sim process is alive */
+function heartbeat(): void {
+  try {
+    getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?").run(new Date().toISOString());
+  } catch { /* best-effort */ }
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
@@ -161,8 +168,9 @@ export async function runDay(): Promise<number> {
   // Mark day as started (for frontend status), but do NOT commit currentDay yet.
   // currentDay is only committed at the end of a successful day to prevent
   // advancing the counter when AI calls fail mid-day.
+  const now = new Date().toISOString();
   db.update(schema.simulationMeta)
-    .set({ dayStartedAt: new Date().toISOString() } as any)
+    .set({ dayStartedAt: now, heartbeatAt: now } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
 
@@ -1004,6 +1012,7 @@ export async function runDay(): Promise<number> {
       }
       // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
     }
+    heartbeat();
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
@@ -1804,6 +1813,7 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Mid-cycle] Batch failed, skipping polls/referendums:`, (err as Error).message);
         }
       }
+      heartbeat();
 
       // Process context poll result
       if (isWeekly) {
@@ -2065,6 +2075,7 @@ export async function runDay(): Promise<number> {
     }
     // endOfDayResults stays [] — media and summary steps are silently skipped
   }
+  heartbeat();
 
   // Process media results
   if (mediaReq) {
