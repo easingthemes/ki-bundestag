@@ -213,7 +213,7 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
                       ))}
                       {calDay.totalCount > 2 && (
                         <span className="text-[10px] text-muted-foreground/70">
-                          +{calDay.totalCount - 2} more
+                          +{calDay.totalCount - 2} weitere
                         </span>
                       )}
                     </div>
