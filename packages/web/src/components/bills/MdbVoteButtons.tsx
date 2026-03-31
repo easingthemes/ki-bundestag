@@ -4,6 +4,7 @@ import { SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { Card, CardContent } from "@/components/ui/card";
 import { ALERT_STYLES } from "@/lib/colors";
+import { useTranslation } from "react-i18next";
 
 interface MdbVoteButtonsProps {
   billId: string;
@@ -14,12 +15,14 @@ interface MdbVoteButtonsProps {
 }
 
 export function MdbVoteButtons({ billId, userSeat, mdbVotes, onVoted, onError }: MdbVoteButtonsProps) {
+  const { t } = useTranslation("legislation");
+  const VOTE_LABELS: Record<string, string> = { yes: t("mdbVotes.yes"), no: t("mdbVotes.no"), abstain: t("mdbVotes.abstain") };
   return (
     <div id="mdb-votes" className="mb-6">
-      <h2 className="section-title">MdB-Direktstimmen</h2>
+      <h2 className="section-title">{t("mdbVotes.title")}</h2>
       {userSeat && !mdbVotes?.userVote && (
         <div className={ALERT_STYLES.info}>
-          This bill is in Third Reading — cast your direct vote as an MdB.
+          {t("mdbVotes.promptVote")}
         </div>
       )}
       <Card><CardContent className="p-5">
@@ -32,17 +35,17 @@ export function MdbVoteButtons({ billId, userSeat, mdbVotes, onVoted, onError }:
                 <VoteBar yes={s.yes} no={s.no} abstain={s.abstain} total={total} />
               </div>
               <div className="text-xs text-muted-foreground mb-3">
-                <strong style={{ color: SEMANTIC_HEX.positive }}>{s.yes} Yes</strong>
+                <strong style={{ color: SEMANTIC_HEX.positive }}>{s.yes} {t("mdbVotes.yes")}</strong>
                 {" / "}
-                <strong style={{ color: SEMANTIC_HEX.negative }}>{s.no} No</strong>
+                <strong style={{ color: SEMANTIC_HEX.negative }}>{s.no} {t("mdbVotes.no")}</strong>
                 {" / "}
-                <strong style={{ color: SEMANTIC_HEX.warning }}>{s.abstain} Abstain</strong>
-                <span className="ml-2">({total} total MdB vote{total !== 1 ? "s" : ""})</span>
+                <strong style={{ color: SEMANTIC_HEX.warning }}>{s.abstain} {t("mdbVotes.abstain")}</strong>
+                <span className="ml-2">{t("mdbVotes.totalVotes", { count: total })}</span>
               </div>
             </div>
           );
         })() : (
-          <div className="text-sm text-muted-foreground mb-3">No MdB votes cast yet.</div>
+          <div className="text-sm text-muted-foreground mb-3">{t("mdbVotes.noVotes")}</div>
         )}
         {userSeat && (
           <div className="flex gap-2 items-center">
@@ -54,7 +57,7 @@ export function MdbVoteButtons({ billId, userSeat, mdbVotes, onVoted, onError }:
                     const result = await api.castMdbVote(billId, v);
                     onVoted({ summary: result.summary, userVote: result.userVote, byParty: mdbVotes?.byParty ?? {} });
                   } catch (e) {
-                    onError(e instanceof Error ? e.message : "Failed");
+                    onError(e instanceof Error ? e.message : "Fehlgeschlagen");
                   }
                 }}
                 style={{
@@ -68,10 +71,10 @@ export function MdbVoteButtons({ billId, userSeat, mdbVotes, onVoted, onError }:
                   cursor: "pointer",
                   textTransform: "uppercase",
                 }}
-              >{v}</button>
+              >{VOTE_LABELS[v]}</button>
             ))}
             <span className="text-xs text-muted-foreground ml-2">
-              {mdbVotes?.userVote ? `Your vote: ${mdbVotes.userVote.toUpperCase()}` : `Seat #${userSeat.seatNumber}`}
+              {mdbVotes?.userVote ? t("mdbVotes.yourVote", { vote: VOTE_LABELS[mdbVotes.userVote]?.toUpperCase() }) : t("mdbVotes.seatNumber", { number: userSeat.seatNumber })}
             </span>
           </div>
         )}

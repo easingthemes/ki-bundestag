@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, Interpellation, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -13,6 +14,7 @@ const STATUS_OPTIONS = ["all", "pending", "answered", "expired"] as const;
 const TYPE_OPTIONS = ["all", "kleine", "große"] as const;
 
 export function Interpellations() {
+  const { t } = useTranslation("parliament");
   const [interpellations, setInterpellations] = useState<Interpellation[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -40,27 +42,39 @@ export function Interpellations() {
   });
   const visibleFiltered = filtered.slice(0, visibleCount);
 
+  const statusLabels: Record<string, string> = {
+    all: t("interpellations.filter.all"),
+    pending: t("interpellations.filter.pending"),
+    answered: t("interpellations.filter.answered"),
+    expired: t("interpellations.filter.expired"),
+  };
+
+  const typeLabels: Record<string, string> = {
+    all: t("interpellations.filter.all"),
+    große: t("interpellations.type.grosse"),
+    kleine: t("interpellations.type.kleine"),
+  };
+
   return (
     <div>
-      <h2 className="section-title">Anfragen</h2>
+      <h2 className="section-title">{t("interpellations.title")}</h2>
       <p className="text-muted-foreground mb-4">
-        Oppositionsparteien befragen formell Regierungsminister. Kleine Anfrage = schriftliche Frage.
-        Große Anfrage = umfassende Befragung mit Plenardebatte.
+        {t("interpellations.description")}
       </p>
 
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Status:</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t("interpellations.filter.status")}</span>
           <FilterPills
-            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt.charAt(0).toUpperCase() + opt.slice(1) }))}
+            options={STATUS_OPTIONS.map(opt => ({ value: opt, label: statusLabels[opt] ?? opt }))}
             value={statusFilter}
             onChange={setStatusFilter}
           />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Type:</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t("interpellations.filter.type")}</span>
           <FilterPills
-            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: opt === "all" ? "All" : opt === "große" ? "Große Anfrage" : "Kleine Anfrage" }))}
+            options={TYPE_OPTIONS.map(opt => ({ value: opt, label: typeLabels[opt] ?? opt }))}
             value={typeFilter}
             onChange={setTypeFilter}
           />
@@ -68,7 +82,7 @@ export function Interpellations() {
       </div>
 
       {filtered.length === 0 && (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Anfragen. Starte die Simulation, um parlamentarische Anfragen zu sehen.</p>
+        <p className="text-center py-8 text-muted-foreground">{t("interpellations.empty")}</p>
       )}
 
       {visibleFiltered.map(interp => (
@@ -102,9 +116,10 @@ function InterpellationCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation("parliament");
   const filer = partyMap.get(interp.filedByPartyId);
   const targetParty = partyMap.get(interp.targetPartyId);
-  const typeLabel = interp.type === "große" ? "Große Anfrage" : "Kleine Anfrage";
+  const typeLabel = interp.type === "große" ? t("interpellations.type.grosse") : t("interpellations.type.kleine");
 
   return (
     <Card className="mb-3 cursor-pointer" onClick={onToggle}>
@@ -121,16 +136,18 @@ function InterpellationCard({
             </Badge>
           </div>
           <Badge variant="outline" className={STATUS_BADGE_COLORS[interp.status] ?? STATUS_BADGE_COLORS.pending}>
-            {interp.status}
+            {interp.status === "pending" ? t("interpellations.filter.pending")
+              : interp.status === "answered" ? t("interpellations.filter.answered")
+              : t("interpellations.filter.expired")}
           </Badge>
         </div>
 
         <p className="text-sm text-muted-foreground mt-1">
-          Filed by{" "}
+          {t("interpellations.filedBy")}{" "}
           <span className="font-semibold" style={{ color: filer?.color ?? "#333" }}>
             {filer?.name ?? interp.filedByPartyId}
           </span>
-          {" "}targeting{" "}
+          {" "}{t("interpellations.targeting")}{" "}
           <strong>{interp.targetMinisterName}</strong> ({interp.targetMinistry})
           {targetParty && (
             <span style={{ color: targetParty.color }}> — {targetParty.name}</span>
@@ -138,11 +155,11 @@ function InterpellationCard({
         </p>
 
         <p className="text-xs text-muted-foreground">
-          Day {interp.dayNumber}
-          {interp.respondedOnDay != null && ` · Answered on day ${interp.respondedOnDay}`}
+          {t("interpellations.day", { day: interp.dayNumber })}
+          {interp.respondedOnDay != null && ` ${t("interpellations.answeredOnDay", { day: interp.respondedOnDay })}`}
           {interp.sentimentImpact != null && interp.sentimentImpact !== 0 && (
             <span style={{ color: interp.sentimentImpact > 0 ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
-              {" "}· Sentiment: {interp.sentimentImpact > 0 ? "+" : ""}{interp.sentimentImpact}
+              {" "}{t("interpellations.sentiment")} {interp.sentimentImpact > 0 ? "+" : ""}{interp.sentimentImpact}
             </span>
           )}
         </p>
@@ -150,13 +167,13 @@ function InterpellationCard({
         {expanded && (
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-2">
-              <strong>Question:</strong>
+              <strong>{t("interpellations.question")}</strong>
               <p className="text-sm mt-1">{interp.question}</p>
             </div>
 
             {interp.response && (
               <div className="mt-2">
-                <strong>Minister's Response ({interp.targetMinisterName}):</strong>
+                <strong>{t("interpellations.ministerResponse", { name: interp.targetMinisterName })}</strong>
                 <div
                   className="text-sm mt-1 p-2 rounded bg-muted"
                   style={{ borderLeft: `3px solid ${targetParty?.color ?? "#666"}` }}
@@ -168,7 +185,7 @@ function InterpellationCard({
 
             {interp.status === "expired" && (
               <p className="mt-2 text-sm text-destructive italic">
-                This interpellation went unanswered for 14 days — an embarrassment for the government.
+                {t("interpellations.expired")}
               </p>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api, type Party } from "../../api";
 import { useUser } from "../../userContext";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ interface OnboardingOverlayProps {
 }
 
 export function OnboardingOverlay({ externalOpen, onClose, parties }: OnboardingOverlayProps) {
+  const { t } = useTranslation("dashboard");
   const { user, updateUser } = useUser();
   const [step, setStep] = useState(0);
   const [show, setShow] = useState(false);
@@ -57,7 +59,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
       updateUser(result);
       setJoinStatus("success");
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : "Failed to join");
+      setJoinError(err instanceof Error ? err.message : "Beitritt fehlgeschlagen");
       setJoinStatus("error");
     }
   };
@@ -85,21 +87,21 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
 
   const steps = [
     {
-      title: "Partei beitreten",
-      desc: "Wähle eine Partei. Das schaltet Anträge, Abstimmungen und mehr frei.",
+      title: t("onboarding.schritt1Titel"),
+      desc: t("onboarding.schritt1Desc"),
       content: (
         <div className="mt-3">
           {alreadyInParty ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-sm">
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: currentParty?.color }} />
-              Mitglied: <strong>{currentParty?.name}</strong>
+              {t("onboarding.mitglied")} <strong>{currentParty?.name}</strong>
             </div>
           ) : (
             <div className="space-y-2">
               <select
                 value={selectedPartyId}
                 onChange={e => { setSelectedPartyId(e.target.value); setJoinStatus("idle"); }}
-                aria-label="Partei wählen"
+                aria-label={t("askParty.parteiWaehlen")}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               >
                 {seatedParties.map(p => (
@@ -116,7 +118,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
                     : "bg-foreground text-background hover:opacity-90"
                 )}
               >
-                {joinStatus === "loading" ? "..." : joinStatus === "success" ? "Beigetreten!" : "Beitreten"}
+                {joinStatus === "loading" ? "..." : joinStatus === "success" ? t("onboarding.beigetreten") : t("onboarding.beitreten")}
               </button>
               {joinStatus === "error" && (
                 <div className="text-xs text-destructive">{joinError}</div>
@@ -127,14 +129,14 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
       ),
     },
     {
-      title: "Frage stellen",
-      desc: "Stelle einer Partei eine Frage. KI-Sprecher antworten.",
+      title: t("onboarding.schritt2Titel"),
+      desc: t("onboarding.schritt2Desc"),
       content: (
         <div className="mt-3 space-y-2">
           <select
             value={askPartyId}
             onChange={e => setAskPartyId(e.target.value)}
-            aria-label="Partei für Frage wählen"
+            aria-label={t("askParty.parteiWaehlen")}
             className="border-input h-9 w-full rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
           >
             {seatedParties.map(p => (
@@ -144,7 +146,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
           <div className="flex gap-1.5">
             <input
               type="text"
-              placeholder="5–140 Zeichen"
+              placeholder={t("askParty.placeholder")}
               value={askText}
               onChange={e => setAskText(e.target.value)}
               maxLength={140}
@@ -160,59 +162,59 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
                   : "bg-foreground text-background hover:opacity-90"
               )}
             >
-              {askStatus === "loading" ? "..." : askStatus === "success" ? "Gesendet!" : "Fragen"}
+              {askStatus === "loading" ? "..." : askStatus === "success" ? t("onboarding.gesendet") : t("onboarding.fragen")}
             </button>
           </div>
           {askStatus === "error" && (
-            <div className="text-xs text-destructive">Fehler beim Senden</div>
+            <div className="text-xs text-destructive">{t("onboarding.fehlerBeimSenden")}</div>
           )}
         </div>
       ),
     },
     {
-      title: "Umfragen abstimmen",
-      desc: "Teile deine Meinung in aktiven Umfragen und sieh, was andere denken.",
+      title: t("onboarding.schritt3Titel"),
+      desc: t("onboarding.schritt3Desc"),
       content: (
         <div className="mt-3">
           <a href="/polls#active-polls" onClick={dismiss} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline font-medium">
-            Umfragen ansehen →
+            {t("onboarding.schritt3Link")}
           </a>
         </div>
       ),
     },
     {
-      title: "Gesetz vorschlagen",
-      desc: "Als Parteimitglied kannst du Gesetzentwürfe einreichen.",
+      title: t("onboarding.schritt4Titel"),
+      desc: t("onboarding.schritt4Desc"),
       content: (
         <div className="mt-3">
           {alreadyInParty || joinStatus === "success" ? (
             <a href={`/parties/${user?.partyId ?? selectedPartyId}#proposals`} onClick={dismiss} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline font-medium">
-              Vorschlag einreichen →
+              {t("onboarding.schritt4Link")}
             </a>
           ) : (
-            <div className="text-sm text-muted-foreground italic">Erst einer Partei beitreten (Schritt 1)</div>
+            <div className="text-sm text-muted-foreground italic">{t("onboarding.erstParteiSchritt1")}</div>
           )}
         </div>
       ),
     },
     {
-      title: "MdB-Sitz beantragen",
-      desc: "Werde Mitglied des Bundestags — direkt über Gesetze abstimmen, Reden halten, Anträge stellen und Änderungsanträge einbringen.",
+      title: t("onboarding.schritt5Titel"),
+      desc: t("onboarding.schritt5Desc"),
       content: (
         <div className="mt-3">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mb-2.5">
-            <span>Parteimitglied sein</span>
+            <span>{t("onboarding.parteimitgliedSein")}</span>
             <span>·</span>
-            <span>KI prüft Bewerbung</span>
+            <span>{t("onboarding.kiPrueftBewerbung")}</span>
             <span>·</span>
-            <span>7d Wartezeit nach Ablehnung</span>
+            <span>{t("onboarding.wartezeit")}</span>
           </div>
           {alreadyInParty || joinStatus === "success" ? (
             <a href={`/parties/${user?.partyId ?? selectedPartyId}#mdb-seats`} onClick={dismiss} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline font-medium">
-              Jetzt bewerben →
+              {t("onboarding.schritt5Link")}
             </a>
           ) : (
-            <div className="text-sm text-muted-foreground italic">Erst einer Partei beitreten (Schritt 1)</div>
+            <div className="text-sm text-muted-foreground italic">{t("onboarding.erstParteiSchritt1")}</div>
           )}
         </div>
       ),
@@ -225,8 +227,8 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
     <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={dismiss}>
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-medium text-muted-foreground">Schritt {step + 1} von {steps.length}</span>
-          <button onClick={dismiss} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Überspringen</button>
+          <span className="text-xs font-medium text-muted-foreground">{t("onboarding.schritt", { current: step + 1, total: steps.length })}</span>
+          <button onClick={dismiss} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">{t("onboarding.ueberspringen")}</button>
         </div>
         <h3 className="text-lg font-semibold mb-1">{current.title}</h3>
         <p className="text-sm text-muted-foreground">{current.desc}</p>
@@ -234,22 +236,22 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
         <div className="flex items-center gap-2 mt-4">
           {step > 0 && (
             <button onClick={() => setStep(s => s - 1)} className="px-3 py-2 text-sm rounded border border-input hover:bg-accent cursor-pointer">
-              Zurück
+              {t("onboarding.zurueck")}
             </button>
           )}
           {step < steps.length - 1 ? (
             <button onClick={() => setStep(s => s + 1)} className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90">
-              Weiter
+              {t("onboarding.weiter")}
             </button>
           ) : (
             <button onClick={dismiss} className="px-4 py-2 text-sm rounded bg-foreground text-background font-medium cursor-pointer hover:opacity-90">
-              Los geht's
+              {t("onboarding.losgehts")}
             </button>
           )}
         </div>
         <div className="flex justify-center gap-1.5 mt-4">
           {steps.map((_, i) => (
-            <button key={i} onClick={() => setStep(i)} aria-label={`Schritt ${i + 1}`} className={cn("w-2 h-2 rounded-full border-none cursor-pointer p-0", i === step ? "bg-foreground" : i < step ? "bg-foreground/40" : "bg-muted")} />
+            <button key={i} onClick={() => setStep(i)} aria-label={t("onboarding.schritt", { current: i + 1, total: steps.length })} className={cn("w-2 h-2 rounded-full border-none cursor-pointer p-0", i === step ? "bg-foreground" : i < step ? "bg-foreground/40" : "bg-muted")} />
           ))}
         </div>
       </div>

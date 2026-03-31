@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, Referendum } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton, UserActionIcon } from "../components/shared";
@@ -11,6 +12,7 @@ import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Referendums() {
+  const { t } = useTranslation("polls");
   const { user } = useUser();
   const [referendums, setReferendums] = useState<Referendum[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("");
@@ -47,24 +49,24 @@ export function Referendums() {
       {/* Registration prompt */}
       {!user && active.length > 0 && (
         <div className={`${ALERT_STYLES.info} mb-4`}>
-          <Link to="/parties" className="text-primary font-semibold hover:underline">Register and join a party</Link> to participate — vote on referendums and shape policy.
+          <Link to="/parties" className="text-primary font-semibold hover:underline">{t("registrierungsLinkReferendum")}</Link> {t("registrierungsHinweisReferendum")}
         </div>
       )}
 
       {/* Unvoted nudge */}
       {unvotedActive.length > 0 && (
         <div className={`${ALERT_STYLES.warning} mb-4`}>
-          {unvotedActive.length} active referendum{unvotedActive.length !== 1 ? "s" : ""} awaiting your vote.
+          {t("unvotedReferendum", { count: unvotedActive.length })}
         </div>
       )}
 
       <div className="flex gap-2 mb-6 flex-wrap">
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={SELECT_CLS}>
-          <option value="">All</option>
-          <option value="active">Active</option>
-          <option value="passed">Passed</option>
-          <option value="rejected">Rejected</option>
-          <option value="expired">Expired</option>
+          <option value="">{t("filterAlle")}</option>
+          <option value="active">{t("filterAktiv")}</option>
+          <option value="passed">{t("filterAngenommen")}</option>
+          <option value="rejected">{t("filterAbgelehnt")}</option>
+          <option value="expired">{t("filterAbgelaufen")}</option>
         </select>
       </div>
 
@@ -118,6 +120,7 @@ function ReferendumCard({
   referendum: Referendum;
   onVote: (id: string, option: string) => void;
 }) {
+  const { t } = useTranslation("polls");
   const hasVoted = !!referendum.userVoted;
   const totalVotes = Object.values(referendum.votes).reduce((s, v) => s + v, 0);
   const showResults = hasVoted || referendum.status !== "active";
@@ -126,13 +129,13 @@ function ReferendumCard({
     <Card className="mb-2.5">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
-          {referendum.status === "active" && !hasVoted && <UserActionIcon title="Cast your vote" />}
+          {referendum.status === "active" && !hasVoted && <UserActionIcon title={t("stimmeAbgeben")} />}
           <Badge variant="outline" className={STATUS_BADGE[referendum.status] || ""}>
             {referendum.status}
           </Badge>
           <span className="text-xs text-muted-foreground">{referendum.category}</span>
           <span className="text-xs text-muted-foreground ml-auto">
-            Day {referendum.createdOnDay} — Closes Day {referendum.closesOnDay}
+            {t("tagLabel", { day: referendum.createdOnDay })} — {t("schliesstTag", { day: referendum.closesOnDay })}
           </span>
         </div>
 
@@ -164,21 +167,21 @@ function ReferendumCard({
                     style={{ width: `${pct}%`, background: isWinner ? "#10b981" : "#71717a" }}
                   />
                   <span className="relative z-10">
-                    {opt}: {count} votes ({pct}%)
+                    {opt}: {t("stimmen", { count })} ({pct}%)
                     {isWinner && " ✓"}
                   </span>
                 </div>
               );
             })}
             <p className="text-xs text-muted-foreground mt-1">
-              {totalVotes} total votes {totalVotes < 10 && referendum.status === "active" && `(need ${10 - totalVotes} more for quorum)`}
+              {t("stimmenGesamt", { count: totalVotes })} {totalVotes < 10 && referendum.status === "active" && t("quorumFehlt", { remaining: 10 - totalVotes })}
             </p>
           </div>
         )}
 
         {showResults && referendum.impact && referendum.status === "passed" && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Impact: {Object.entries(referendum.impact)
+            {t("auswirkung")} {Object.entries(referendum.impact)
               .filter(([, v]) => v != null && v !== 0)
               .map(([k, v]) => `${k}: ${(v as number) > 0 ? "+" : ""}${v}`)
               .join(", ")}

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, SimulationEvent, Party } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
@@ -8,25 +9,30 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SEMANTIC_HEX } from "@/lib/colors";
 
-const EVENT_CATEGORIES: Record<string, { label: string; types: string[] }> = {
+type EventCategory = {
+  labelKey: string;
+  types: string[];
+};
+
+const EVENT_CATEGORIES: Record<string, EventCategory> = {
   legislative: {
-    label: "Legislative",
+    labelKey: "newsfeed.categories.legislative",
     types: ["bill_proposed", "bill_debate", "bill_passed", "bill_rejected"],
   },
   crises: {
-    label: "Crises",
+    labelKey: "newsfeed.categories.crises",
     types: ["crisis_start", "crisis_end"],
   },
   elections: {
-    label: "Elections",
+    labelKey: "newsfeed.categories.elections",
     types: ["election_announced", "election_campaign", "election_result", "government_formed", "negotiation_round", "negotiation_complete"],
   },
   statements: {
-    label: "Statements",
+    labelKey: "newsfeed.categories.statements",
     types: ["statement", "vote_cast"],
   },
   system: {
-    label: "System",
+    labelKey: "newsfeed.categories.system",
     types: ["economy_update", "weekly_report", "monthly_report", "day_start"],
   },
 };
@@ -68,6 +74,7 @@ const PAGE_SIZE = 50;
 const DAY_INITIAL = 5;
 
 export function NewsFeed() {
+  const { t } = useTranslation("media");
   const [events, setEvents] = useState<SimulationEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -109,11 +116,11 @@ export function NewsFeed() {
     setOffset(0);
     setActiveFilters(prev => {
       const next = new Set(prev);
-      const allActive = types.every(t => next.has(t));
+      const allActive = types.every(tp => next.has(tp));
       if (allActive) {
-        types.forEach(t => next.delete(t));
+        types.forEach(tp => next.delete(tp));
       } else {
-        types.forEach(t => next.add(t));
+        types.forEach(tp => next.add(tp));
       }
       return next;
     });
@@ -146,7 +153,7 @@ export function NewsFeed() {
 
   return (
     <div>
-      <h2 className="section-title">Nachrichtenfeed</h2>
+      <h2 className="section-title">{t("newsfeed.title")}</h2>
 
       {/* Filter bar */}
       <Card className="mb-6">
@@ -156,13 +163,13 @@ export function NewsFeed() {
               <button
                 className={cn(
                   "px-3 py-1 border rounded-full text-xs font-semibold cursor-pointer transition-colors",
-                  cat.types.every(t => activeFilters.has(t))
+                  cat.types.every(tp => activeFilters.has(tp))
                     ? "bg-primary border-primary text-white"
                     : "bg-card border-input text-muted-foreground hover:bg-accent hover:border-border"
                 )}
                 onClick={() => toggleCategory(cat.types)}
               >
-                {cat.label}
+                {t(cat.labelKey)}
               </button>
               {cat.types.map(type => (
                 <button
@@ -186,7 +193,7 @@ export function NewsFeed() {
               className="px-3 py-1 border border-input rounded-full text-xs font-medium cursor-pointer text-destructive bg-card hover:bg-accent"
               onClick={clearFilters}
             >
-              Filter zurücksetzen
+              {t("newsfeed.resetFilters")}
             </button>
           )}
         </CardContent>
@@ -194,7 +201,7 @@ export function NewsFeed() {
 
       {/* Event stream */}
       {dayGroups.length === 0 ? (
-        <p className="text-center py-8 text-muted-foreground">Noch keine Ereignisse. Starte zuerst die Simulation.</p>
+        <p className="text-center py-8 text-muted-foreground">{t("newsfeed.noEvents")}</p>
       ) : (
         <div>
           {dayGroups.map(group => {
@@ -226,7 +233,7 @@ export function NewsFeed() {
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex-1">
                             {showBreaking && (
-                              <div className="text-xs font-bold text-destructive uppercase mb-0.5">Breaking</div>
+                              <div className="text-xs font-bold text-destructive uppercase mb-0.5">{t("newsfeed.breaking")}</div>
                             )}
                             <div className={cn("font-semibold", showBreaking ? "text-base" : "text-sm")}>
                               {ev.title}
@@ -284,7 +291,7 @@ export function NewsFeed() {
                 onClick={() => setOffset(events.length)}
                 className="py-2 px-8 rounded border border-input bg-card cursor-pointer text-sm hover:bg-accent"
               >
-                Mehr laden ({total - events.length} verbleibend)
+                {t("newsfeed.loadMore")} ({total - events.length} verbleibend)
               </button>
             </div>
           )}
