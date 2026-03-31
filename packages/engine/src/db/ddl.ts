@@ -90,6 +90,7 @@ export const SIM_TABLE_DDL = `
     budget_retry_day INTEGER,
     daily_summary TEXT,
     day_started_at TEXT,
+    heartbeat_at TEXT,
     timing_preset TEXT NOT NULL DEFAULT 'normal',
     context_depth TEXT NOT NULL DEFAULT 'normal',
     start_date TEXT
@@ -486,6 +487,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "start_date", sql: "ALTER TABLE simulation_meta ADD COLUMN start_date TEXT" },
   { table: "simulation_meta", column: "context_depth", sql: "ALTER TABLE simulation_meta ADD COLUMN context_depth TEXT NOT NULL DEFAULT 'normal'" },
   { table: "bundestag_seats", column: "unique_active_user", sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_bundestag_seats_active_user ON bundestag_seats(user_id) WHERE active = 1 AND user_id IS NOT NULL" },
+  { table: "simulation_meta", column: "heartbeat_at", sql: "ALTER TABLE simulation_meta ADD COLUMN heartbeat_at TEXT" },
 ];
 
 /** Column migrations for user DB */

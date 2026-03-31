@@ -409,12 +409,17 @@ function SimStatus() {
     if (!status?.dayStartedAt) return { running: false, pct: 0 };
     const started = new Date(status.dayStartedAt).getTime();
     const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
+    const heartbeat = status.heartbeatAt ? new Date(status.heartbeatAt).getTime() : 0;
 
     if (started > completed) {
-      const elapsed = now - started;
-      // Cap at 5 min — if still "running" after that, the day likely failed
-      if (elapsed < 300_000) {
-        return { running: true, pct: Math.min(Math.round((elapsed / 30_000) * 95), 95) };
+      // Check heartbeat — if fresh (within 2 min), sim is alive
+      const isAlive = heartbeat > 0
+        ? (now - heartbeat) < 120_000
+        : (now - started) < 1_800_000; // fallback for old server without heartbeat
+      if (isAlive) {
+        const elapsed = now - started;
+        // Progress bar fills over ~5 min then holds at 95%
+        return { running: true, pct: Math.min(Math.round((elapsed / 300_000) * 95), 95) };
       }
       return { running: false, pct: 0 };
     }
