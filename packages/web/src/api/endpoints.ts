@@ -42,6 +42,7 @@ import {
   CatchupData,
   CommitteeListItem,
   CommitteeDetail,
+  Sidejob,
 } from "./types.js";
 import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js";
 
@@ -166,6 +167,13 @@ export const getConstitutionalChallenge = (id: string) =>
 
 export const getCommittees = () => fetchJson<CommitteeListItem[]>("/committees");
 export const getCommitteeDetail = (id: string) => fetchJson<CommitteeDetail>(`/committees/${id}`);
+
+// ── Sidejobs ────────────────────────────────────────────────────────────────
+
+export const getSidejobs = (partyId?: string) =>
+  fetchJson<Sidejob[]>(`/sidejobs${partyId ? `?partyId=${partyId}` : ""}`);
+export const getSeatSidejobs = (seatId: string) =>
+  fetchJson<Sidejob[]>(`/sidejobs/seat/${seatId}`);
 
 // ── Content (media, questions, polls, referendums, crises) ───────────────────
 
@@ -370,4 +378,6 @@ export const api = {
   getMdbProfile,
   getCommittees,
   getCommitteeDetail,
+  getSidejobs,
+  getSeatSidejobs,
 };

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat, type MdbApplication } from "../api";
+import { api, type Party, type PartyHistory, type Bill, type PartyVoteRecord, type SimulationEvent, type CitizenQuestion, type Fraktion, type SimulationStatus, type InternalProposal, type BundestagSeat, type MdbApplication, type Sidejob } from "../api";
 import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
 import { useUser } from "../userContext";
@@ -44,6 +44,8 @@ export function PartyDetail() {
   const [applySubmitting, setApplySubmitting] = useState(false);
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
   const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
+  const [sidejobs, setSidejobs] = useState<Sidejob[]>([]);
+  const [showSidejobs, setShowSidejobs] = useState(false);
 
   const refresh = useCallback(() => {
     if (!id) return;
@@ -59,6 +61,7 @@ export function PartyDetail() {
     api.getPartySeats(id).then(setSeats).catch(console.error);
     api.getAvailableSeats().then(setAvailableSeats).catch(console.error);
     if (user) api.getMySeat().then(r => setMyApplications(r.applications)).catch(() => {});
+    api.getSidejobs(id).then(setSidejobs).catch(() => {});
     api.getFraktionen().then(all => {
       const active = all.find(f => f.partyId === id && f.status === "active");
       if (active) {
@@ -511,6 +514,80 @@ export function PartyDetail() {
           </div>
         );
       })()}
+
+      {/* Nebentätigkeiten */}
+      {sidejobs.length > 0 && (
+        <div className="mb-8">
+          <h2 className="section-title">Nebentätigkeiten</h2>
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-muted-foreground">
+                  {sidejobs.length} Nebentätigkeiten, davon{" "}
+                  <span className="font-medium text-red-600">
+                    {sidejobs.filter(s => s.isControversial).length} kontrovers
+                  </span>
+                </p>
+                <button
+                  onClick={() => setShowSidejobs(!showSidejobs)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  {showSidejobs ? "Ausblenden" : "Anzeigen"}
+                </button>
+              </div>
+              {showSidejobs && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 pr-3 font-medium">Name</th>
+                        <th className="py-2 pr-3 font-medium">Organisation</th>
+                        <th className="py-2 pr-3 font-medium">Tätigkeit</th>
+                        <th className="py-2 pr-3 font-medium">Einkommen</th>
+                        <th className="py-2 font-medium">Kategorie</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...sidejobs].sort((a, b) => {
+                        if (a.isControversial !== b.isControversial) return a.isControversial ? -1 : 1;
+                        const order = ["30000+", "15000-30000", "7000-15000", "3500-7000", "1000-3500"];
+                        return order.indexOf(a.incomeLevel) - order.indexOf(b.incomeLevel);
+                      }).map(sj => (
+                        <tr key={sj.id} className="border-b last:border-0">
+                          <td className="py-2 pr-3">
+                            {sj.politicianName}
+                            {sj.isControversial && (
+                              <Badge variant="outline" className="ml-1.5 text-xs bg-red-50 text-red-700 border-red-200">!</Badge>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 text-muted-foreground">{sj.organization}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{sj.role}</td>
+                          <td className="py-2 pr-3">
+                            <Badge variant="outline" className={cn("text-xs",
+                              sj.incomeLevel === "30000+" || sj.incomeLevel === "15000-30000"
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : sj.incomeLevel === "7000-15000"
+                                  ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                  : "bg-green-50 text-green-700 border-green-200"
+                            )}>
+                              {sj.incomeLevel}€
+                            </Badge>
+                          </td>
+                          <td className="py-2">
+                            <Badge variant="outline" className="text-xs">
+                              {{ beratung: "Beratung", vortrag: "Vortrag", aufsichtsrat: "Aufsichtsrat", verband: "Verband", medien: "Medien", sonstiges: "Sonstiges" }[sj.category] ?? sj.category}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Statements */}
       <div className="mb-8">

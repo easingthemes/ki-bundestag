@@ -24,5 +24,6 @@ export { processMdbActions } from "./mdb-actions.js";
 export type { MdbActionResult } from "./mdb-actions.js";
 export { reviewPartyDiscipline } from "./discipline.js";
 export { shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest, processKnowledgeDigestResult, getActiveLandscape, getPartyPositions, getActiveShocks, getHeadlineInspiration, buildRealWorldContext, getStoredCommitteeNames, fetchCommitteeNames } from "./knowledge-fetch.js";
+export { shouldGenerateSidejobs, buildSidejobBatchRequest, processSidejobResult, applySidejobScandalImpact } from "./sidejobs.js";
 export { dayToDate, easterSunday, germanPublicHolidays, isWeekend, isPublicHoliday, getPublicHoliday, isWorkday, snapToNextWorkday, snapToNextSunday, isRecessDay, isRealisticSessionDay, getHolidaysInRange } from "./calendar.js";
 export type { PublicHoliday } from "./calendar.js";
