@@ -10,6 +10,40 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ---
 
+## Critical Design Constraint: Simulation Time vs Real Time
+
+**Simulation days run much faster than real days.** A simulation started today could be in its second year within one real-world month. This creates a fundamental temporal mismatch when integrating real-world data:
+
+### Rules for ALL groups:
+
+1. **Real-world data is INSPIRATION, not ground truth.** Never present real-world data as current simulation facts. The simulation has its own government, coalition, opposition, and political timeline that diverge from reality immediately.
+
+2. **Ruling parties differ.** The simulation's coalition may be completely different from the real German government. Never assume who governs — always attribute positions to parties by name, never to "Regierung" or "Opposition".
+
+3. **Real-world data becomes stale fast.** Knowledge is fetched every 7 real-world days, but the simulation may advance 30+ sim days in that time. By the time new data arrives, the simulation may have already addressed those issues organically.
+
+4. **Use real data for STRUCTURAL grounding only:**
+   - Committee names → stable across a legislative period (OK to use directly)
+   - Party ideological positions → evolve slowly (OK as baseline calibration)
+   - Voting patterns → useful as behavioral tendency, not as prescriptive rules
+   - News headlines → treat as "topic inspiration", not dated events
+   - Side jobs / Q&A topics → use as creative templates, not literal facts
+
+5. **Never inject dated real-world events into simulation timeline.** Frame everything as timeless themes, structural tendencies, or creative inspiration. The existing digest system already strips dates and government references — all new features must follow this pattern.
+
+6. **Label clearly.** When showing real-world data alongside simulation data (e.g., Group 4 voting comparison), clearly label which is "Realwelt" and which is "Simulation" so users aren't confused.
+
+7. **Graceful degradation.** All features must work without real-world data. If API fetches fail or data is stale, fall back to simulation-only data. Real-world grounding is an enhancement, not a dependency.
+
+### Existing safeguards (in `knowledge-fetch.ts`):
+- Digest prompt explicitly strips government references and dates
+- Headlines consumed once per sim day then deactivated
+- Shocks persist until AI marks them resolved
+- Party positions stored as ideological stances, not government actions
+- 7-day fetch cooldown prevents over-fetching
+
+---
+
 ## Group 1: MdB Profiles & Listing (High Impact)
 
 **Status**: Not started
