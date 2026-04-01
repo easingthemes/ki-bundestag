@@ -186,7 +186,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 ## Group 6: Transparency & Matching Tools (Lower Impact)
 
 **Plan**: [group6-transparency-tools.md](./group6-transparency-tools.md)
-**Status**: Not started
+**Status**: Complete
 **Effort**: Medium–High
 
 ### 6.1 "Which Party Matches You?" Quiz
