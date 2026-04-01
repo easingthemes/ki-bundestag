@@ -3,6 +3,7 @@ import { runDay } from "./simulation/index.js";
 import { closeDb, getSqlite } from "./db/index.js";
 import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
 import { allProvidersLimited, AIProviderLimitError } from "./agent/client.js";
+import { printRunSummary } from "./simulation/run-stats.js";
 
 /** Clear dayStartedAt so the frontend stops showing "running" after a failure */
 function clearDayStarted(): void {
@@ -48,6 +49,9 @@ process.on("SIGINT", () => {
 async function main() {
   const preset = readPreset();
   console.log(`[Runner] Auto-simulate: preset="${preset}" (Ctrl+C to stop)`);
+  const runStart = Date.now();
+  const dayTimings: Array<{ day: number; durationMs: number }> = [];
+  let daysCompleted = 0;
 
   while (running) {
     // Night pause for slow mode: wait until morning
@@ -61,8 +65,20 @@ async function main() {
     }
 
     const dayBefore = readCurrentDay();
+    const dayStart = Date.now();
     try {
       await runDay();
+      const durationMs = Date.now() - dayStart;
+      const dayAfter = readCurrentDay();
+      dayTimings.push({ day: dayAfter, durationMs });
+      daysCompleted++;
+      const durationSec = (durationMs / 1000).toFixed(1);
+      console.log(`  [Timing] Day ${dayAfter} completed in ${durationSec}s`);
+
+      // Print periodic summary every 10 days
+      if (daysCompleted % 10 === 0) {
+        printRunSummary(dayTimings.slice(-10), Date.now() - runStart, { periodic: true, totalDays: daysCompleted });
+      }
     } catch (err) {
       console.error("[Runner] Simulation day failed:", err);
       clearDayStarted();
@@ -105,6 +121,11 @@ async function main() {
       }
     }
     // ultra-fast (delay=0): no wait, loop immediately
+  }
+
+  // Final summary
+  if (dayTimings.length > 0) {
+    printRunSummary(dayTimings, Date.now() - runStart);
   }
 
   closeDb();
