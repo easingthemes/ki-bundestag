@@ -62,6 +62,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
 | 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | done | Engine / Agent | — |
 | 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
+| 038 | [Batch API latency monitoring](./038-batch-api-latency-monitoring.md) | open | Engine / Operations | — |
 | 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | done | Engine / Agent | — |
 | 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | done | Engine / Simulation | — |
 | 036 | [Presidential veto rate tuning](./036-presidential-veto-tuning.md) | done | Engine / Simulation | — |
@@ -72,6 +73,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 34 of 36
+- **Done**: 34 of 37
 - **Postponed**: 2 (#022, #027)
-- **Open**: 2 remaining (#029, #032)
+- **Open**: 3 remaining (#029, #032, #038)
