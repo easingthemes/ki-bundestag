@@ -46,10 +46,10 @@ export function About() {
             Die Simulationsgeschwindigkeit ist über Zeitvorgaben konfigurierbar:
           </p>
           <ul className="my-2 ml-6 list-disc">
-            <li className="mb-1"><strong>Ultraschnell</strong> — KI-gebundene Geschwindigkeit, ca. 24 Stunden pro Wahlperiode (für Tests/Demos)</li>
-            <li className="mb-1"><strong>Schnell</strong> — 7 Min. pro Tag, ca. 1 Woche pro Wahlperiode (Aufholmodus)</li>
-            <li className="mb-1"><strong>Normal</strong> — 30 Min. pro Tag, ca. 1 Monat pro Wahlperiode (tägliche Einblicke)</li>
-            <li className="mb-1"><strong>Langsam</strong> — 1,5 Std. pro Tag, ca. 5 Monate pro Wahlperiode (volle Teilnahme)</li>
+            <li className="mb-1"><strong>Ultraschnell</strong> — ~10 Min. pro Tag (KI-Batch-gebunden), ca. 10 Tage pro Wahlperiode (für Tests/Demos)</li>
+            <li className="mb-1"><strong>Schnell</strong> — ~17 Min. pro Tag, ca. 2–3 Wochen pro Wahlperiode (Aufholmodus)</li>
+            <li className="mb-1"><strong>Normal</strong> — ~30 Min. pro Tag, ca. 1 Monat pro Wahlperiode (tägliche Einblicke)</li>
+            <li className="mb-1"><strong>Langsam</strong> — ~1,5 Std. pro Tag, ca. 3–5 Monate pro Wahlperiode (volle Teilnahme)</li>
           </ul>
           <p>
             Im Normalmodus kannst du ein- oder zweimal täglich vorbeischauen und das politische

@@ -497,7 +497,7 @@ export function SimulationCosts() {
           <span><strong className="text-foreground">~1 year</strong> = budget cycle</span>
           <span><strong className="text-foreground">~4 years</strong> = 1 Wahlperiode</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">Speed varies by preset: Ultra-Fast (~3-7 days/term, no users), Fast (~2 weeks/term, no users), Normal (~1 month/term, 30% human seats), Slow (~5 months/term, 70% human seats). All AI calls use the Batch API for 50% cost savings (adds ~2-5 min latency per batch). Sequential calls would be faster but cost 2x more.</p>
+        <p className="text-xs text-muted-foreground mt-2">Speed varies by preset: Ultra-Fast (~10 days/term, no users), Fast (~2-3 weeks/term, no users), Normal (~1 month/term, 30% human seats), Slow (~5 months/term, 70% human seats). All AI calls use the Batch API for 50% cost savings (adds ~2-5 min latency per batch). Sequential calls would be faster but cost 2x more.</p>
       </div>
 
       {/* ── Current Models ────────────────────────────────────────── */}

@@ -63,8 +63,8 @@
     "slow": "Langsam"
   },
   "termDuration": {
-    "ultra-fast": "~3–7 Tage",
-    "fast": "~2 Wochen",
+    "ultra-fast": "~10 Tage",
+    "fast": "~2–3 Wochen",
     "normal": "~1 Monat",
     "slow": "~5 Monate"
   }
