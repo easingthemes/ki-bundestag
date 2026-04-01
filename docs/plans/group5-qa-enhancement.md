@@ -2,7 +2,7 @@
 
 > Detailed implementation plan
 > Parent: docs/plans/abgeordnetenwatch-feature-roadmap.md
-> Status: Not started
+> Status: Complete
 > Dependency: #031 (API fetching) already done — `fetchCitizenQuestions()` in knowledge-fetch.ts
 
 ## Overview

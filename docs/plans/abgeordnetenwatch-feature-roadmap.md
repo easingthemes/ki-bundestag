@@ -163,7 +163,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 ## Group 5: Citizen Q&A Enhancement (Lower Impact)
 
 **Plan**: [group5-qa-enhancement.md](./group5-qa-enhancement.md)
-**Status**: Partially started (API fetching done in #031)
+**Status**: Complete
 **Effort**: Low
 
 ### 5.1 Question Topic Suggestions
