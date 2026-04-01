@@ -625,6 +625,19 @@ export interface MdbCommitteeMembership {
   role: "chair" | "deputy_chair" | "member";
 }
 
+export interface Sidejob {
+  id: string;
+  seatId: string;
+  partyId: string;
+  politicianName: string;
+  organization: string;
+  role: string;
+  incomeLevel: string;
+  category: string;
+  isControversial: boolean;
+  createdOnDay: number;
+}
+
 export interface MdbProfile {
   seat: BundestagSeat;
   party: { id: string; name: string; color: string } | null;

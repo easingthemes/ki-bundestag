@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type MdbProfile } from "../api";
+import { api, type MdbProfile, type Sidejob } from "../api";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,24 @@ import { cn } from "@/lib/utils";
 import { MDB_BADGE, STATUS_BADGE, VOTE_HEX } from "@/lib/colors";
 import { DisciplineBadge } from "@/components/MdbBadge";
 
-type Tab = "votes" | "speeches" | "info";
+type Tab = "votes" | "speeches" | "sidejobs" | "info";
+
+const SIDEJOB_INCOME_COLOR: Record<string, string> = {
+  "1000-3500": "bg-green-50 text-green-700 border-green-200",
+  "3500-7000": "bg-green-50 text-green-700 border-green-200",
+  "7000-15000": "bg-yellow-50 text-yellow-700 border-yellow-200",
+  "15000-30000": "bg-red-50 text-red-700 border-red-200",
+  "30000+": "bg-red-100 text-red-800 border-red-300",
+};
+
+const SIDEJOB_CATEGORY_LABELS: Record<string, string> = {
+  beratung: "Beratung",
+  vortrag: "Vortrag",
+  aufsichtsrat: "Aufsichtsrat",
+  verband: "Verband",
+  medien: "Medien",
+  sonstiges: "Sonstiges",
+};
 
 const VOTE_BADGE: Record<string, string> = {
   yes: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -25,6 +42,7 @@ const VOTE_LABEL: Record<string, string> = {
 export function MdbDetail() {
   const { seatId } = useParams<{ seatId: string }>();
   const [profile, setProfile] = useState<MdbProfile | null>(null);
+  const [sidejobs, setSidejobs] = useState<Sidejob[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("votes");
 
@@ -33,6 +51,9 @@ export function MdbDetail() {
     api.getMdbProfile(seatId)
       .then(p => { setProfile(p); setLoading(false); })
       .catch(() => setLoading(false));
+    api.getSeatSidejobs(seatId)
+      .then(setSidejobs)
+      .catch(() => {});
   }, [seatId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -55,6 +76,7 @@ export function MdbDetail() {
   const tabs: Array<{ key: Tab; label: string; count: number }> = [
     { key: "votes", label: "Abstimmungen", count: votes.length },
     { key: "speeches", label: "Reden", count: speeches.length },
+    { key: "sidejobs", label: "Nebentätigkeiten", count: sidejobs.length },
     { key: "info", label: "Profil", count: 0 },
   ];
 
@@ -180,6 +202,39 @@ export function MdbDetail() {
                         Stimmungseffekt: {s.sentimentImpact > 0 ? "+" : ""}{s.sentimentImpact.toFixed(1)}%
                       </p>
                     )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "sidejobs" && (
+        <div>
+          {sidejobs.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4">Keine Nebentätigkeiten bekannt.</p>
+          ) : (
+            <div className="space-y-2">
+              {sidejobs.map(sj => (
+                <Card key={sj.id}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-sm font-medium">{sj.organization}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {sj.isControversial && (
+                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">Kontrovers</Badge>
+                        )}
+                        <Badge variant="outline" className={cn("text-xs", SIDEJOB_INCOME_COLOR[sj.incomeLevel] ?? "bg-zinc-50 text-zinc-600")}>
+                          {sj.incomeLevel}€
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{sj.role}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{SIDEJOB_CATEGORY_LABELS[sj.category] ?? sj.category}</Badge>
+                      <span className="text-xs text-muted-foreground">Tag {sj.createdOnDay}</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

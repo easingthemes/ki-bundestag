@@ -321,6 +321,20 @@ export const committeeMemberships = sqliteTable("committee_memberships", {
   assignedOnDay: integer("assigned_on_day").notNull(),
 });
 
+export const sidejobs = sqliteTable("sidejobs", {
+  id: text("id").primaryKey(),
+  seatId: text("seat_id").notNull(),
+  partyId: text("party_id").notNull(),
+  politicianName: text("politician_name").notNull(),
+  organization: text("organization").notNull(),
+  role: text("role").notNull(),
+  incomeLevel: text("income_level").notNull(),
+  category: text("category").notNull(),
+  isControversial: integer("is_controversial", { mode: "boolean" }).notNull().default(false),
+  createdOnDay: integer("created_on_day").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+});
+
 export const eraSummaries = sqliteTable("era_summaries", {
   id: text("id").primaryKey(),
   startDay: integer("start_day").notNull(),

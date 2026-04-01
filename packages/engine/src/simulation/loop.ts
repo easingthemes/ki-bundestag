@@ -53,6 +53,7 @@ import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
 import { shouldGenerateEraSummary, buildEraSummaryBatchRequest, processEraSummaryResult, getEraSummaries } from "./era-summary.js";
+import { shouldGenerateSidejobs, buildSidejobBatchRequest, processSidejobResult, applySidejobScandalImpact } from "./sidejobs.js";
 import {
   shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest,
   processKnowledgeDigestResult, getActiveShocks, buildRealWorldContext, getPartyPositions,
@@ -2086,6 +2087,29 @@ export async function runDay(): Promise<number> {
       approvalRating: party.approvalRating,
       seatCount: party.seatCount,
     }).run();
+  }
+
+  // 11e. Sidejob generation (every ~30 days)
+  if (shouldGenerateSidejobs(currentDay)) {
+    const aiSeats = db.select().from(schema.bundestagSeats)
+      .where(and(eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "ai")))
+      .all();
+    if (aiSeats.length > 0) {
+      const { request: sjReq, candidates: sjCandidates } = buildSidejobBatchRequest(currentDay, allParties, aiSeats);
+      try {
+        const sjResults = await submitBatch([sjReq]);
+        const sjEvents = processSidejobResult(findResult(sjResults, sjReq.customId), sjCandidates, currentDay);
+        applySidejobScandalImpact(sjEvents, allParties);
+        dayEvents.push(...sjEvents);
+      } catch (err) {
+        if (err instanceof AIProviderLimitError) {
+          console.warn(`  [Sidejobs] Skipped — ${err.message}`);
+        } else {
+          console.warn(`  [Sidejobs] Batch failed:`, (err as Error).message);
+        }
+      }
+      heartbeat();
+    }
   }
 
   // 12. Save updated national state

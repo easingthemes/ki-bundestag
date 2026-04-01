@@ -334,6 +334,21 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (seat_id) REFERENCES bundestag_seats(id)
   );
 
+  CREATE TABLE IF NOT EXISTS sidejobs (
+    id TEXT PRIMARY KEY,
+    seat_id TEXT NOT NULL,
+    party_id TEXT NOT NULL,
+    politician_name TEXT NOT NULL,
+    organization TEXT NOT NULL,
+    role TEXT NOT NULL,
+    income_level TEXT NOT NULL,
+    category TEXT NOT NULL,
+    is_controversial INTEGER NOT NULL DEFAULT 0,
+    created_on_day INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (seat_id) REFERENCES bundestag_seats(id)
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -543,6 +558,8 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_era_summaries_days", sql: "CREATE INDEX IF NOT EXISTS idx_era_summaries_days ON era_summaries(start_day, end_day)" },
   { name: "idx_committee_memberships_committee", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_committee ON committee_memberships(committee_id)" },
   { name: "idx_committee_memberships_seat", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_seat ON committee_memberships(seat_id)" },
+  { name: "idx_sidejobs_party", sql: "CREATE INDEX IF NOT EXISTS idx_sidejobs_party ON sidejobs(party_id)" },
+  { name: "idx_sidejobs_seat", sql: "CREATE INDEX IF NOT EXISTS idx_sidejobs_seat ON sidejobs(seat_id)" },
 ];
 
 /** Index migrations for user DB */
