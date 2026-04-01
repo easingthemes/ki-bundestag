@@ -60,7 +60,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 027 | [Scalability: user load testing & architecture improvements](./027-scalability-user-loads.md) | postponed | Engine / API / DB | — |
 | 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
-| 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | open | Engine / Agent | — |
+| 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | done | Engine / Agent | — |
 | 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
 | 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | done | Engine / Agent | — |
 | 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | done | Engine / Simulation | — |
@@ -72,6 +72,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 33 of 36
+- **Done**: 34 of 36
 - **Postponed**: 2 (#022, #027)
-- **Open**: 3 remaining (#029, #031, #032)
+- **Open**: 2 remaining (#029, #032)
