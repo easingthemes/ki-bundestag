@@ -24,15 +24,16 @@ import type { Provider } from "../agent/model-config.js";
 const FETCH_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TAGESSCHAU_URL = "https://www.tagesschau.de/api2u/news/?ressort=inland";
 const WELT_RSS_URL = "https://www.welt.de/feeds/section/politik.rss";
-// Try 21st Bundestag (2025–) first, fall back to 20th (2021–2025)
-const ABGEORDNETENWATCH_URLS = [
-  "https://www.abgeordnetenwatch.de/api/v2/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=165",
-  "https://www.abgeordnetenwatch.de/api/v2/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=132",
-];
+const AW_BASE = "https://www.abgeordnetenwatch.de/api/v2";
+// Fallback parliament period IDs if dynamic discovery fails
+const FALLBACK_PERIOD_IDS = [165, 132]; // 21st (2025–), 20th (2021–2025)
 const DIP_API_URL = "https://search.dip.bundestag.de/api/v1/vorgang?f.vorgangstyp=Gesetzgebung&rows=10&sort=datum&desc=true";
 const DIP_API_KEY = "OSOegLs.PR2lwJ1dwCeje9vTj7FPOt3hvpYKtwKkhw";
 
 const PARTY_IDS = ["spd", "cdu", "gruene", "fdp", "afd", "linke"] as const;
+
+// Module-level cache for the current parliament period ID
+let cachedPeriodId: number | null = null;
 
 const USER_AGENT = "KI-Bundestag/1.0 (simulation; github.com/easingthemes/ki-bundestag)";
 
@@ -118,27 +119,212 @@ interface RawParliamentaryItem {
   detail: string;
 }
 
-async function fetchAbgeordnetenwatchPolls(): Promise<RawParliamentaryItem[]> {
-  let text: string | null = null;
-  for (const url of ABGEORDNETENWATCH_URLS) {
-    text = await fetchWithTimeout(url);
-    if (text) break;
+/**
+ * Discover the current Bundestag parliament period ID dynamically.
+ * Caches the result — period IDs change only every 4 years.
+ */
+async function getCurrentParliamentPeriodId(): Promise<number> {
+  if (cachedPeriodId) return cachedPeriodId;
+
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/parliament-periods?parliament=5&type=legislature&sort_by=id&sort_order=desc&range_end=1`,
+  );
+  if (text) {
+    try {
+      const data = JSON.parse(text);
+      const periods = data.data as Array<{ id?: number }> | undefined;
+      if (periods?.[0]?.id) {
+        cachedPeriodId = periods[0].id;
+        console.log(`  [Knowledge] Discovered parliament period ID: ${cachedPeriodId}`);
+        return cachedPeriodId;
+      }
+    } catch {
+      console.warn("  [Knowledge] Failed to parse parliament-periods response");
+    }
   }
+
+  // Fallback: try known IDs sequentially
+  for (const id of FALLBACK_PERIOD_IDS) {
+    const probe = await fetchWithTimeout(`${AW_BASE}/polls?parliament_period=${id}&range_end=1`);
+    if (probe) {
+      try {
+        const probeData = JSON.parse(probe);
+        if (probeData.data?.length > 0) {
+          cachedPeriodId = id;
+          console.log(`  [Knowledge] Using fallback parliament period ID: ${id}`);
+          return id;
+        }
+      } catch { /* try next */ }
+    }
+  }
+
+  cachedPeriodId = FALLBACK_PERIOD_IDS[0];
+  return cachedPeriodId;
+}
+
+async function fetchAbgeordnetenwatchPolls(): Promise<RawParliamentaryItem[]> {
+  const periodId = await getCurrentParliamentPeriodId();
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=${periodId}`,
+  );
   if (!text) return [];
   try {
     const data = JSON.parse(text);
     const polls = (data.data ?? []) as Array<{
+      id?: number;
       label?: string;
       field_intro?: string;
       field_poll_date?: string;
     }>;
-    return polls.slice(0, 10).map(p => ({
+    // Fetch per-party vote breakdowns for up to 3 recent polls
+    const enrichedPolls = polls.slice(0, 10).map(p => ({
       source: "abgeordnetenwatch",
       title: p.label ?? "",
       detail: p.field_intro ?? "",
+      pollId: p.id,
     })).filter(p => p.title);
+
+    // Enrich top 3 polls with voting breakdowns (parallel, best-effort)
+    const toEnrich = enrichedPolls.slice(0, 3).filter(p => p.pollId);
+    const breakdowns = await Promise.all(
+      toEnrich.map(p => fetchPollVoteBreakdown(p.pollId!)),
+    );
+    for (let i = 0; i < toEnrich.length; i++) {
+      if (breakdowns[i]) {
+        toEnrich[i].detail = `${toEnrich[i].detail}\nAbstimmung: ${breakdowns[i]}`;
+      }
+    }
+
+    return enrichedPolls.map(({ pollId: _pollId, ...rest }) => rest);
   } catch {
-    console.warn("  [Knowledge] Failed to parse abgeordnetenwatch JSON");
+    console.warn("  [Knowledge] Failed to parse abgeordnetenwatch polls JSON");
+    return [];
+  }
+}
+
+/**
+ * Fetch individual votes for a poll and aggregate by party/Fraktion.
+ * Returns a summary string like "SPD: 180 Ja, 0 Nein; CDU: 0 Ja, 196 Nein; ..."
+ */
+async function fetchPollVoteBreakdown(pollId: number): Promise<string | null> {
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/votes?poll=${pollId}&range_end=800`,
+  );
+  if (!text) return null;
+  try {
+    const data = JSON.parse(text);
+    const votes = (data.data ?? []) as Array<{
+      vote?: string;
+      mandate?: {
+        label?: string;
+        fraction_membership?: Array<{
+          fraction?: { label?: string; short_name?: string };
+        }>;
+      };
+    }>;
+
+    // Aggregate by fraction
+    const byFraction: Record<string, { yes: number; no: number; abstain: number; noShow: number }> = {};
+    for (const v of votes) {
+      const fractionName = v.mandate?.fraction_membership?.[0]?.fraction?.short_name
+        ?? v.mandate?.fraction_membership?.[0]?.fraction?.label
+        ?? "Unbekannt";
+      if (!byFraction[fractionName]) {
+        byFraction[fractionName] = { yes: 0, no: 0, abstain: 0, noShow: 0 };
+      }
+      const tally = byFraction[fractionName];
+      switch (v.vote) {
+        case "yes": tally.yes++; break;
+        case "no": tally.no++; break;
+        case "abstain": tally.abstain++; break;
+        case "no_show": tally.noShow++; break;
+      }
+    }
+
+    return Object.entries(byFraction)
+      .map(([name, t]) => `${name}: ${t.yes} Ja, ${t.no} Nein, ${t.abstain} Enthaltung`)
+      .join("; ");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch real Bundestag committee names for the current period.
+ */
+export async function fetchCommitteeNames(): Promise<string[]> {
+  const periodId = await getCurrentParliamentPeriodId();
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/committees?parliament_period=${periodId}&range_end=50`,
+  );
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text);
+    const committees = (data.data ?? []) as Array<{ label?: string }>;
+    return committees.map(c => c.label ?? "").filter(Boolean);
+  } catch {
+    console.warn("  [Knowledge] Failed to parse committees JSON");
+    return [];
+  }
+}
+
+/**
+ * Fetch recent citizen questions from abgeordnetenwatch.
+ * Returns question topics as inspiration for simulation citizen questions.
+ */
+async function fetchCitizenQuestions(): Promise<RawParliamentaryItem[]> {
+  const periodId = await getCurrentParliamentPeriodId();
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/questions?parliament_period=${periodId}&sort_by=created&sort_order=desc&range_end=10`,
+  );
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text);
+    const questions = (data.data ?? []) as Array<{
+      body?: string;
+      topic?: { label?: string };
+      politician?: { label?: string; party?: { short_name?: string } };
+    }>;
+    return questions.slice(0, 10).map(q => ({
+      source: "abgeordnetenwatch-fragen",
+      title: q.topic?.label ?? "Bürgerfrage",
+      detail: (q.body ?? "").slice(0, 200) + (q.politician?.party?.short_name ? ` (an ${q.politician.party.short_name})` : ""),
+    })).filter(q => q.detail.length > 10);
+  } catch {
+    console.warn("  [Knowledge] Failed to parse citizen questions JSON");
+    return [];
+  }
+}
+
+/**
+ * Fetch recent politician side jobs for media scandal inspiration.
+ */
+async function fetchSidejobs(): Promise<RawParliamentaryItem[]> {
+  const text = await fetchWithTimeout(
+    `${AW_BASE}/sidejobs?sort_by=created&sort_order=desc&range_end=10`,
+  );
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text);
+    const jobs = (data.data ?? []) as Array<{
+      label?: string;
+      income_level?: string;
+      sidejob_organization?: { label?: string };
+      mandates?: Array<{
+        politician?: { label?: string; party?: { short_name?: string } };
+      }>;
+    }>;
+    return jobs.slice(0, 5).map(j => {
+      const politician = j.mandates?.[0]?.politician;
+      const who = politician ? `${politician.label} (${politician.party?.short_name ?? "?"})` : "Unbekannt";
+      return {
+        source: "abgeordnetenwatch-nebentätigkeit",
+        title: `Nebentätigkeit: ${who}`,
+        detail: `${j.label ?? ""} bei ${j.sidejob_organization?.label ?? "?"}, Einkommensstufe: ${j.income_level ?? "?"}`,
+      };
+    }).filter(j => j.detail.length > 10);
+  } catch {
+    console.warn("  [Knowledge] Failed to parse sidejobs JSON");
     return [];
   }
 }
@@ -214,18 +400,26 @@ function getNextGeneration(): number {
 export async function fetchAllSources(): Promise<RawKnowledgeData> {
   console.log("  [Knowledge] Fetching real-world data...");
 
-  const [tagesschau, welt, polls, bills] = await Promise.all([
+  const [tagesschau, welt, polls, bills, questions, sidejobs, committees] = await Promise.all([
     fetchTagesschauNews(),
     fetchWeltRSS(),
     fetchAbgeordnetenwatchPolls(),
     fetchDIPBills(),
+    fetchCitizenQuestions(),
+    fetchSidejobs(),
+    fetchCommitteeNames(),
   ]);
 
-  console.log(`  [Knowledge] Fetched: ${tagesschau.length} tagesschau, ${welt.length} WELT, ${polls.length} abgeordnetenwatch, ${bills.length} DIP bills`);
+  // Store committee names for use by bill-pipeline
+  if (committees.length > 0) {
+    storeCommitteeNames(committees);
+  }
+
+  console.log(`  [Knowledge] Fetched: ${tagesschau.length} tagesschau, ${welt.length} WELT, ${polls.length} abgeordnetenwatch polls (with vote breakdowns), ${bills.length} DIP bills, ${questions.length} citizen questions, ${sidejobs.length} sidejobs, ${committees.length} committees`);
 
   return {
     newsItems: [...tagesschau, ...welt],
-    parliamentaryItems: [...polls, ...bills],
+    parliamentaryItems: [...polls, ...bills, ...questions, ...sidejobs],
   };
 }
 
@@ -526,6 +720,55 @@ export function getHeadlineInspiration(currentDay: number): string[] | null {
     stmt.run(currentDay, row.id);
   }
 
+  return rows.map(r => r.digest);
+}
+
+/**
+ * Store real Bundestag committee names in the knowledge DB.
+ * Replaces previous committee entries.
+ */
+function storeCommitteeNames(names: string[]): void {
+  const sqlite = getSqlite();
+  const db = getDb();
+  const generation = getNextGeneration();
+  const fetchedAt = new Date().toISOString();
+  const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+
+  // Deactivate previous committee rows
+  sqlite.prepare(
+    "UPDATE real_world_knowledge SET active = 0 WHERE category = 'committee' AND active = 1",
+  ).run();
+
+  for (const name of names) {
+    db.insert(schema.realWorldKnowledge).values({
+      id: genId(),
+      generation,
+      category: "committee",
+      partyId: null,
+      digest: name,
+      sourceUrls: null,
+      fetchedAt,
+      simDayFirstUsed: null,
+      active: true,
+    }).run();
+  }
+
+  console.log(`  [Knowledge] Stored ${names.length} real committee names`);
+}
+
+/**
+ * Get stored real committee names from abgeordnetenwatch.
+ * Returns empty array if none stored — callers should fall back to hardcoded list.
+ */
+export function getStoredCommitteeNames(): string[] {
+  const db = getDb();
+  const rows = db.select({ digest: schema.realWorldKnowledge.digest })
+    .from(schema.realWorldKnowledge)
+    .where(and(
+      eq(schema.realWorldKnowledge.category, "committee"),
+      eq(schema.realWorldKnowledge.active, true),
+    ))
+    .all() as Array<{ digest: string }>;
   return rows.map(r => r.digest);
 }
 
