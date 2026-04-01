@@ -167,6 +167,10 @@ export function seedDatabase() {
   // Drop simulation tables for a clean start
   sqlite.exec(`
     DROP TABLE IF EXISTS ai_calls;
+    DROP TABLE IF EXISTS party_donations;
+    DROP TABLE IF EXISTS lobbying_events;
+    DROP TABLE IF EXISTS quiz_party_positions;
+    DROP TABLE IF EXISTS quiz_theses;
     DROP TABLE IF EXISTS bundestag_seats;
     DROP TABLE IF EXISTS real_world_knowledge;
     DROP TABLE IF EXISTS event_queue;
@@ -334,9 +338,160 @@ export function seedDatabase() {
     active: true,
   }).run();
 
+  // ── Seed quiz theses and party positions ──
+  const QUIZ_THESES = [
+    { id: "thesis-001", text: "Der Mindestlohn sollte auf 15 Euro angehoben werden.", category: "economy" },
+    { id: "thesis-002", text: "Unternehmenssteuern sollten gesenkt werden, um Investitionen zu foerdern.", category: "economy" },
+    { id: "thesis-003", text: "Das Buergergeld sollte deutlich erhoeht werden.", category: "social" },
+    { id: "thesis-004", text: "Gleichgeschlechtliche Paare sollten bei Adoptionen gleichgestellt werden.", category: "social" },
+    { id: "thesis-005", text: "Deutschland sollte bis 2035 vollstaendig aus der Kohle aussteigen.", category: "environment" },
+    { id: "thesis-006", text: "Tempolimit von 130 km/h auf Autobahnen.", category: "environment" },
+    { id: "thesis-007", text: "Deutschland sollte mehr Gefluechtete aufnehmen.", category: "immigration" },
+    { id: "thesis-008", text: "Abschiebungen abgelehnter Asylbewerber sollten konsequenter durchgesetzt werden.", category: "immigration" },
+    { id: "thesis-009", text: "Die Bundeswehr sollte staerker finanziell ausgestattet werden.", category: "defense" },
+    { id: "thesis-010", text: "Studiengebuehren sollten bundesweit abgeschafft bleiben.", category: "education" },
+    { id: "thesis-011", text: "Digitalisierung an Schulen sollte hoechste Prioritaet haben.", category: "education" },
+    { id: "thesis-012", text: "Cannabis sollte vollstaendig legalisiert werden.", category: "healthcare" },
+    { id: "thesis-013", text: "Die Buergerversicherung sollte die private Krankenversicherung ersetzen.", category: "healthcare" },
+    { id: "thesis-014", text: "Der oeffentliche Nahverkehr sollte kostenlos sein.", category: "infrastructure" },
+    { id: "thesis-015", text: "Der Ausbau von Autobahnen sollte Vorrang vor Schienenausbau haben.", category: "infrastructure" },
+  ];
+
+  for (const thesis of QUIZ_THESES) {
+    db.insert(schema.quizTheses).values({
+      id: thesis.id,
+      text: thesis.text,
+      category: thesis.category,
+      generatedOnDay: 0,
+      active: true,
+    }).run();
+  }
+
+  // Party positions based on real-world political stances (seed data for MVP)
+  type Pos = "agree" | "disagree" | "neutral";
+  const PARTY_POSITIONS: Record<string, Record<string, { position: Pos; reasoning: string }>> = {
+    spd: {
+      "thesis-001": { position: "agree", reasoning: "Die SPD setzt sich fuer hoehere Loehne und soziale Gerechtigkeit ein." },
+      "thesis-002": { position: "disagree", reasoning: "Steuersenkungen fuer Unternehmen widersprechen dem Gerechtigkeitsprinzip der SPD." },
+      "thesis-003": { position: "agree", reasoning: "Als Partei des Sozialstaats unterstuetzt die SPD hoehere Sozialleistungen." },
+      "thesis-004": { position: "agree", reasoning: "Die SPD steht fuer Gleichberechtigung und moderne Familienpolitik." },
+      "thesis-005": { position: "agree", reasoning: "Die SPD unterstuetzt den Kohleausstieg, achtet aber auf Arbeitnehmerinteressen." },
+      "thesis-006": { position: "agree", reasoning: "Die SPD befuerwortet ein Tempolimit fuer mehr Sicherheit und Klimaschutz." },
+      "thesis-007": { position: "agree", reasoning: "Die SPD steht fuer eine humanitaere Fluechtlingspolitik." },
+      "thesis-008": { position: "neutral", reasoning: "Die SPD differenziert zwischen humanitaerem Schutz und Durchsetzung geltenden Rechts." },
+      "thesis-009": { position: "neutral", reasoning: "Die SPD unterstuetzt die Bundeswehr, setzt aber auf diplomatische Loesungen." },
+      "thesis-010": { position: "agree", reasoning: "Bildung muss fuer alle zugaenglich und kostenfrei sein." },
+      "thesis-011": { position: "agree", reasoning: "Die SPD setzt sich fuer Digitalisierung im Bildungsbereich ein." },
+      "thesis-012": { position: "agree", reasoning: "Die SPD hat die Cannabis-Legalisierung in der Ampelkoalition mitgetragen." },
+      "thesis-013": { position: "agree", reasoning: "Die SPD fordert seit langem eine solidarische Buergerversicherung." },
+      "thesis-014": { position: "agree", reasoning: "Die SPD setzt auf den Ausbau des oeffentlichen Nahverkehrs." },
+      "thesis-015": { position: "disagree", reasoning: "Die SPD bevorzugt Investitionen in die Schiene gegenueber dem Autobahnausbau." },
+    },
+    cdu: {
+      "thesis-001": { position: "disagree", reasoning: "Die CDU warnt vor zu hohen Mindestloehnen als Belastung fuer den Mittelstand." },
+      "thesis-002": { position: "agree", reasoning: "Die CDU setzt auf Steuererleichterungen zur Staerkung der Wirtschaft." },
+      "thesis-003": { position: "disagree", reasoning: "Die CDU fordert staerkere Anreize zur Arbeitsaufnahme statt hoeherer Transfers." },
+      "thesis-004": { position: "neutral", reasoning: "Die CDU ist gespalten zwischen traditionellem Familienbild und modernen Ansaetzen." },
+      "thesis-005": { position: "disagree", reasoning: "Die CDU haelt einen Kohleausstieg bis 2035 fuer wirtschaftlich unrealistisch." },
+      "thesis-006": { position: "disagree", reasoning: "Die CDU lehnt ein generelles Tempolimit ab und setzt auf Eigenverantwortung." },
+      "thesis-007": { position: "disagree", reasoning: "Die CDU fordert eine striktere Begrenzung der Zuwanderung." },
+      "thesis-008": { position: "agree", reasoning: "Die CDU fordert konsequente Durchsetzung des Aufenthaltsrechts." },
+      "thesis-009": { position: "agree", reasoning: "Die CDU steht fuer eine starke Bundeswehr und NATO-Verpflichtungen." },
+      "thesis-010": { position: "neutral", reasoning: "Die CDU haelt Studiengebuehren fuer Laendersache." },
+      "thesis-011": { position: "agree", reasoning: "Die CDU unterstuetzt die Digitalisierung der Schulen." },
+      "thesis-012": { position: "disagree", reasoning: "Die CDU lehnt eine vollstaendige Cannabis-Legalisierung ab." },
+      "thesis-013": { position: "disagree", reasoning: "Die CDU verteidigt das duale Krankenversicherungssystem." },
+      "thesis-014": { position: "disagree", reasoning: "Die CDU haelt kostenlosen Nahverkehr fuer nicht finanzierbar." },
+      "thesis-015": { position: "agree", reasoning: "Die CDU setzt auf den Ausbau der Verkehrsinfrastruktur inkl. Autobahnen." },
+    },
+    gruene: {
+      "thesis-001": { position: "agree", reasoning: "Die Gruenen fordern existenzsichernde Loehne und soziale Gerechtigkeit." },
+      "thesis-002": { position: "disagree", reasoning: "Die Gruenen setzen auf oekologisch-soziale Steuerpolitik statt Unternehmensentlastung." },
+      "thesis-003": { position: "agree", reasoning: "Die Gruenen fordern eine armutsfeste Grundsicherung." },
+      "thesis-004": { position: "agree", reasoning: "Die Gruenen kaempfen fuer volle Gleichstellung aller Familienformen." },
+      "thesis-005": { position: "agree", reasoning: "Der Kohleausstieg ist ein Kernthema der Gruenen fuer den Klimaschutz." },
+      "thesis-006": { position: "agree", reasoning: "Ein Tempolimit ist fuer die Gruenen ein einfacher Beitrag zum Klimaschutz." },
+      "thesis-007": { position: "agree", reasoning: "Die Gruenen stehen fuer eine offene und humanitaere Fluechtlingspolitik." },
+      "thesis-008": { position: "disagree", reasoning: "Die Gruenen kritisieren pauschale Abschiebeforderungen als unmenschlich." },
+      "thesis-009": { position: "disagree", reasoning: "Die Gruenen bevorzugen Abruestung und zivile Konfliktloesung." },
+      "thesis-010": { position: "agree", reasoning: "Bildungsgerechtigkeit erfordert kostenfreie Bildung fuer alle." },
+      "thesis-011": { position: "agree", reasoning: "Die Gruenen fordern nachhaltige Digitalisierung im Bildungsbereich." },
+      "thesis-012": { position: "agree", reasoning: "Die Gruenen haben die Cannabis-Legalisierung massgeblich vorangetrieben." },
+      "thesis-013": { position: "agree", reasoning: "Die Gruenen unterstuetzen eine solidarische Buergerversicherung." },
+      "thesis-014": { position: "agree", reasoning: "Kostenloser OEPNV ist ein zentrales Mobilitaetsziel der Gruenen." },
+      "thesis-015": { position: "disagree", reasoning: "Die Gruenen lehnen den Ausbau von Autobahnen zugunsten des Schienennetzes ab." },
+    },
+    fdp: {
+      "thesis-001": { position: "disagree", reasoning: "Die FDP warnt, dass zu hohe Mindestloehne Arbeitsplaetze gefaehrden." },
+      "thesis-002": { position: "agree", reasoning: "Steuersenkungen sind ein Kernanliegen der FDP fuer wirtschaftliches Wachstum." },
+      "thesis-003": { position: "disagree", reasoning: "Die FDP setzt auf Eigenverantwortung und Leistungsanreize statt hoeherer Transfers." },
+      "thesis-004": { position: "agree", reasoning: "Die FDP unterstuetzt individuelle Freiheit und gleiche Rechte fuer alle." },
+      "thesis-005": { position: "disagree", reasoning: "Die FDP haelt starre Ausstiegsdaten fuer wirtschaftsfeindlich und technologieoffen." },
+      "thesis-006": { position: "disagree", reasoning: "Die FDP lehnt ein Tempolimit als Eingriff in die individuelle Freiheit ab." },
+      "thesis-007": { position: "neutral", reasoning: "Die FDP differenziert zwischen qualifizierter Zuwanderung und Asylpolitik." },
+      "thesis-008": { position: "agree", reasoning: "Die FDP fordert konsequente Durchsetzung geltenden Rechts." },
+      "thesis-009": { position: "agree", reasoning: "Die FDP unterstuetzt das 2%-Ziel der NATO fuer Verteidigungsausgaben." },
+      "thesis-010": { position: "neutral", reasoning: "Die FDP ist offen fuer moderate Studiengebuehren nach internationalen Vorbildern." },
+      "thesis-011": { position: "agree", reasoning: "Die FDP setzt auf Digitalisierung und technologische Modernisierung." },
+      "thesis-012": { position: "agree", reasoning: "Die FDP hat die Cannabis-Legalisierung als liberale Drogenpolitik unterstuetzt." },
+      "thesis-013": { position: "disagree", reasoning: "Die FDP verteidigt den Wettbewerb zwischen gesetzlicher und privater Versicherung." },
+      "thesis-014": { position: "disagree", reasoning: "Die FDP haelt kostenlosen OEPNV fuer nicht nachhaltig finanzierbar." },
+      "thesis-015": { position: "neutral", reasoning: "Die FDP setzt auf technologieoffene Verkehrspolitik ohne ideologische Praeferenzen." },
+    },
+    afd: {
+      "thesis-001": { position: "disagree", reasoning: "Die AfD sieht zu hohe Mindestloehne als Gefahr fuer kleine Unternehmen." },
+      "thesis-002": { position: "agree", reasoning: "Die AfD setzt auf Wirtschaftsliberalismus und niedrigere Steuern." },
+      "thesis-003": { position: "disagree", reasoning: "Die AfD kritisiert das Buergergeld als Fehlanreiz gegen Arbeit." },
+      "thesis-004": { position: "disagree", reasoning: "Die AfD vertritt ein traditionelles Familienbild." },
+      "thesis-005": { position: "disagree", reasoning: "Die AfD lehnt den Kohleausstieg als wirtschaftsschaedigend ab." },
+      "thesis-006": { position: "disagree", reasoning: "Die AfD lehnt ein Tempolimit als Bevormundung ab." },
+      "thesis-007": { position: "disagree", reasoning: "Die AfD fordert eine stark restriktive Zuwanderungspolitik." },
+      "thesis-008": { position: "agree", reasoning: "Konsequente Abschiebungen sind ein Kernthema der AfD." },
+      "thesis-009": { position: "agree", reasoning: "Die AfD fordert eine starke nationale Verteidigung." },
+      "thesis-010": { position: "neutral", reasoning: "Die AfD sieht Bildungspolitik als Laendersache." },
+      "thesis-011": { position: "neutral", reasoning: "Die AfD unterstuetzt Digitalisierung, aber ohne ideologische Vorgaben." },
+      "thesis-012": { position: "disagree", reasoning: "Die AfD lehnt die Cannabis-Legalisierung ab." },
+      "thesis-013": { position: "disagree", reasoning: "Die AfD verteidigt das bestehende Versicherungssystem." },
+      "thesis-014": { position: "disagree", reasoning: "Die AfD lehnt kostenlosen OEPNV als nicht finanzierbar ab." },
+      "thesis-015": { position: "agree", reasoning: "Die AfD setzt auf Autobahnausbau und Individualverkehr." },
+    },
+    linke: {
+      "thesis-001": { position: "agree", reasoning: "Die Linke fordert einen Mindestlohn von mindestens 15 Euro." },
+      "thesis-002": { position: "disagree", reasoning: "Die Linke fordert hoehere Unternehmenssteuern fuer mehr Gerechtigkeit." },
+      "thesis-003": { position: "agree", reasoning: "Die Linke fordert eine deutliche Erhoehung der Grundsicherung." },
+      "thesis-004": { position: "agree", reasoning: "Die Linke kaempft fuer volle Gleichstellung aller Lebensformen." },
+      "thesis-005": { position: "agree", reasoning: "Die Linke fordert einen schnellstmoeglichen Kohleausstieg." },
+      "thesis-006": { position: "agree", reasoning: "Die Linke befuerwortet ein Tempolimit fuer Klimaschutz und Sicherheit." },
+      "thesis-007": { position: "agree", reasoning: "Die Linke steht fuer offene Grenzen und solidarische Fluechtlingspolitik." },
+      "thesis-008": { position: "disagree", reasoning: "Die Linke lehnt Massenabschiebungen grundsaetzlich ab." },
+      "thesis-009": { position: "disagree", reasoning: "Die Linke fordert Abruestung statt Aufruestung der Bundeswehr." },
+      "thesis-010": { position: "agree", reasoning: "Bildung muss komplett kostenfrei sein — von der Kita bis zur Uni." },
+      "thesis-011": { position: "agree", reasoning: "Die Linke unterstuetzt Digitalisierung mit Fokus auf Chancengleichheit." },
+      "thesis-012": { position: "agree", reasoning: "Die Linke befuerwortet die vollstaendige Entkriminalisierung von Cannabis." },
+      "thesis-013": { position: "agree", reasoning: "Die Linke fordert eine solidarische Buergerversicherung fuer alle." },
+      "thesis-014": { position: "agree", reasoning: "Kostenloser OEPNV ist eine zentrale Forderung der Linken." },
+      "thesis-015": { position: "disagree", reasoning: "Die Linke bevorzugt massiven Ausbau des Schienennetzes." },
+    },
+  };
+
+  let posCount = 0;
+  for (const [partyId, positions] of Object.entries(PARTY_POSITIONS)) {
+    for (const [thesisId, { position, reasoning }] of Object.entries(positions)) {
+      db.insert(schema.quizPartyPositions).values({
+        id: `pos-${partyId}-${thesisId}`,
+        thesisId,
+        partyId,
+        position,
+        reasoning,
+      }).run();
+      posCount++;
+    }
+  }
+
   console.log(`Seeded ${PARTIES.length} parties`);
   console.log(`Seeded ${fraktionCount} Fraktionen`);
   console.log(`Seeded initial government (Chancellor: ${chancellorName})`);
   console.log("Seeded initial national state");
   console.log("Seeded simulation meta (day 0)");
+  console.log(`Seeded ${QUIZ_THESES.length} quiz theses with ${posCount} party positions`);
 }

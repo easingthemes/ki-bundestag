@@ -653,6 +653,65 @@ export interface Sidejob {
   createdOnDay: number;
 }
 
+// ── Quiz types ──────────────────────────────────────────────────────────────
+
+export interface QuizThesis {
+  id: string;
+  text: string;
+  category: string;
+}
+
+export interface QuizResultItem {
+  partyId: string;
+  partyName: string;
+  color: string;
+  matchPercent: number;
+  categoryBreakdown: Record<string, number>;
+  agreements: number;
+  disagreements: number;
+}
+
+export interface QuizPartyPosition {
+  thesisId: string;
+  partyId: string;
+  position: string;
+  reasoning: string | null;
+}
+
+// ── Lobbying types ──────────────────────────────────────────────────────────
+
+export interface LobbyingEvent {
+  id: string;
+  organizationName: string;
+  sector: string;
+  targetPartyId: string;
+  targetBillId: string | null;
+  influence: "support" | "oppose";
+  intensity: number;
+  dayNumber: number;
+}
+
+// ── Party Donation types ────────────────────────────────────────────────────
+
+export interface PartyDonation {
+  id: string;
+  partyId: string;
+  donorName: string;
+  donorType: "individual" | "corporate" | "association";
+  amount: number;
+  dayNumber: number;
+  isPublic: boolean;
+}
+
+export interface DonationSummary {
+  partyId: string;
+  partyName: string;
+  color: string;
+  totalAmount: number;
+  donationCount: number;
+  publicDonationCount: number;
+}
+
 export interface MdbProfile {
   seat: BundestagSeat;
   party: { id: string; name: string; color: string } | null;
