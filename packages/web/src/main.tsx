@@ -37,6 +37,7 @@ import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Menu, Bell, Pencil, Check, X, Play, Pause, Square, Zap, Gauge, Timer, Snail } from "lucide-react";
+import { deriveState } from "@/components/dashboard/SimStatusPill";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import "./locales";
@@ -376,8 +377,6 @@ function UserMenu({ user }: { user: User }) {
 
 /* ── Simulation status indicator ───────────────────────────────── */
 
-type SimState = "running" | "paused" | "stopped";
-
 const PRESET_ICON: Record<string, typeof Zap> = {
   "ultra-fast": Zap, fast: Gauge, normal: Timer, slow: Snail,
 };
@@ -389,18 +388,6 @@ const PRESET_DAY_MS: Record<string, number> = {
   normal:     1_800_000,    // ~30 min
   slow:       5_400_000,    // ~1.5 hours
 };
-
-function deriveSimState(status: SimulationStatus, now: number): SimState {
-  const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
-  const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
-  if (started > completed) {
-    if (now - started < 900_000) return "running";
-    return completed > 0 ? "paused" : "stopped";
-  }
-  if (completed > 0 && now - completed < 120_000) return "running";
-  if (completed > 0) return "paused";
-  return "stopped";
-}
 
 function SimStatus() {
   const { t } = useTranslation();
@@ -451,7 +438,7 @@ function SimStatus() {
     return { running: false, pct: 0 };
   }, [status, now]);
 
-  const simState = useMemo(() => status ? deriveSimState(status, now) : "stopped", [status, now]);
+  const simState = useMemo(() => status ? deriveState(status, now) : "stopped", [status, now]);
 
   if (!status) return null;
 
