@@ -77,7 +77,7 @@ Open [http://localhost:5173](http://localhost:5173) and run `npm run simulate` t
 
 ## Built By
 
-**[Sasa Tatar](https://github.com/easingthemes)** — Full-stack engineer specializing in AI-integrated systems. This project demonstrates:
+**[Dragan Filipovic](https://github.com/easingthemes)** — Full-stack engineer specializing in AI-integrated systems. This project demonstrates:
 
 - Designing and orchestrating **multi-agent AI architectures** with structured output and fallback policies
 - Implementing **cost-optimized AI pipelines** (batch processing, token budgeting, multi-provider routing)
