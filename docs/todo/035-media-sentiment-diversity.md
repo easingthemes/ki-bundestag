@@ -1,6 +1,6 @@
 # 035 — Media Sentiment Stuck at +0.3 / Lacks Diversity
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Simulation
 **Priority**: Low
 

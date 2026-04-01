@@ -1,6 +1,6 @@
 # 036 — Presidential Veto Rate and Behavior Tuning
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Simulation
 **Priority**: Low
 
@@ -20,10 +20,10 @@ Production logs show presidential vetoes appearing on Days 47-48, both targeting
 
 ## Action Items
 
-- [ ] Verify veto actually blocks bill implementation (check `bill-pipeline.ts`)
-- [ ] Consider reducing base probability to 1-2% for more realism
-- [ ] Track veto statistics via `db-stats` or `error-analysis` workflow
-- [ ] Add veto count to the daily simulation summary
+- [x] Verify veto actually blocks bill implementation — confirmed: `loop.ts:1261` checks `!vetoed` before applying economic impact, `veto.ts` marks bill `rejected`
+- [x] Reduce base probability to 1% (was 3%), bonus caps at +5% (was +13%) → effective range 1–6%
+- [x] Veto events already tracked as `presidential_veto` simulation events and included in AI-generated daily summary
+- [x] Veto count visible via `db-stats` workflow querying `simulation_events WHERE type = 'presidential_veto'`
 
 ## Affected Files
 

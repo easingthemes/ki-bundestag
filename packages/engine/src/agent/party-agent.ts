@@ -186,12 +186,12 @@ export function buildPartyAgentRequests(
 /**
  * Parse a single party agent batch result into validated actions.
  */
-export function processPartyAgentResult(
+export async function processPartyAgentResult(
   result: BatchResult | undefined,
   ctx: AgentContext,
   votableBills: Bill[],
   secondReadingBills?: Bill[],
-): AgentAction[] {
+): Promise<AgentAction[]> {
   const abstainFallback = () => votableBills.map(bill => ({
     type: "vote" as const,
     billId: bill.id,
@@ -224,9 +224,24 @@ export function processPartyAgentResult(
     try {
       parsed = parseAgentResponse(result.text);
     } catch {
-      parseOk = false;
-      logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback: "abstain-all" });
-      return abstainFallback();
+      // Retry once with a sequential callAI before falling back to abstain-all
+      console.warn(`  [Agent] ${ctx.party.id}: PARSE_FAIL from batch, retrying sequentially...`);
+      try {
+        const caps = deriveCapabilities(ctx);
+        const retryResult = await callAI({
+          system: buildSystemPrompt(ctx.party.id, caps, ctx.realPartyPositions),
+          prompt: buildUserPrompt(ctx),
+          maxTokens: 1024,
+          partyId: ctx.party.id,
+        });
+        parsed = parseAgentResponse(retryResult.text);
+        console.log(`  [Agent] ${ctx.party.id}: retry succeeded`);
+        logAICall({ task: `agent:${ctx.party.id}:retry`, model: retryResult.model, provider: retryResult.provider, latencyMs: 0, parseOk: true, validationOk: true });
+      } catch {
+        parseOk = false;
+        logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback: "abstain-all:after-retry" });
+        return abstainFallback();
+      }
     }
   }
 

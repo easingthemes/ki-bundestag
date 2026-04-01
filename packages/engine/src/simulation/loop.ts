@@ -30,7 +30,7 @@ import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
-import { getRecentMedia, applyMediaSentiment, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
+import { getRecentMedia, applyMediaSentiment, applyMediaSentimentFromArticles, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
 import { maybeGenerateReferendum, resolveExpiredReferendums, buildReferendumBatchRequest, processReferendumBatchResult } from "./referendums.js";
 import { processInjections } from "./injections.js";
@@ -1043,7 +1043,7 @@ export async function runDay(): Promise<number> {
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
-      const actions = processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
+      const actions = await processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
       partyActions.set(ctx.party.id, actions);
     }
 
@@ -2105,12 +2105,17 @@ export async function runDay(): Promise<number> {
   heartbeat();
 
   // Process media results
+  let mediaArticles: Array<{ category: string; sentiment?: number }> = [];
   if (mediaReq) {
-    processMediaBatchResult(findResult(endOfDayResults, mediaReq.customId), currentDay);
+    mediaArticles = processMediaBatchResult(findResult(endOfDayResults, mediaReq.customId), currentDay);
   }
 
-  // 12c. Apply media sentiment influence
-  nationalState.publicSentiment = applyMediaSentiment(currentDay, nationalState.publicSentiment, state.id);
+  // 12c. Apply media sentiment influence (use AI-provided sentiment when available)
+  if (mediaArticles.length > 0) {
+    nationalState.publicSentiment = applyMediaSentimentFromArticles(mediaArticles, currentDay, nationalState.publicSentiment, state.id);
+  } else {
+    nationalState.publicSentiment = applyMediaSentiment(currentDay, nationalState.publicSentiment, state.id);
+  }
 
   // Process summary results
   const summaryResult = processSummaryBatchResult(findResult(endOfDayResults, summaryReq.customId));

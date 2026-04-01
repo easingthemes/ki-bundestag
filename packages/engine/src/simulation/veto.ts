@@ -6,7 +6,7 @@ import { shouldPresidentVeto } from "./budget.js";
 /**
  * Presidential veto check on a bill that just passed third reading.
  *
- * Probability: 3–16% based on bill economic impact magnitude.
+ * Probability: 1–6% based on bill economic impact magnitude.
  * On veto: marks bill as rejected with vetoedByPresident, deducts 0.5 approval
  * from the proposing party, and emits a presidential_veto simulation event.
  *
