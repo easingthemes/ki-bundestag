@@ -1,4 +1,4 @@
-import type { AgentContext, BillImpact } from "@ki-bundestag/types";
+import type { AgentContext, BillImpact, EraCaseFacts } from "@ki-bundestag/types";
 import type { ValidationError } from "./action-parser.js";
 import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
@@ -182,6 +182,32 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+/** Compact one-liner of structured case facts for an era. */
+function formatCaseFacts(facts: EraCaseFacts): string {
+  const parts: string[] = [];
+  parts.push(`Budget ${facts.economy.budget.toFixed(0)}B`);
+  parts.push(`Unemp ${facts.economy.unemployment.toFixed(1)}%`);
+  if (facts.coalitionPartyIds.length > 0) {
+    parts.push(`Coalition: ${facts.coalitionPartyIds.join("+")}`);
+  }
+  if (facts.government) {
+    parts.push(`Chancellor: ${facts.government.chancellorName} (${facts.government.chancellorPartyId})`);
+  }
+  if (facts.billsPassed.length > 0) {
+    parts.push(`${facts.billsPassed.length} bill${facts.billsPassed.length !== 1 ? "s" : ""} passed`);
+  }
+  if (facts.billsRejected.length > 0) {
+    parts.push(`${facts.billsRejected.length} rejected`);
+  }
+  if (facts.elections.length > 0) {
+    parts.push(`${facts.elections.length} election${facts.elections.length !== 1 ? "s" : ""}`);
+  }
+  if (facts.crises.length > 0) {
+    parts.push(`${facts.crises.length} ${facts.crises.length !== 1 ? "crises" : "crisis"}`);
+  }
+  return `    State: ${parts.join(", ")}`;
+}
+
 /** Default depth config (normal). Callers can override via depthConfig parameter. */
 const DEFAULT_DEPTH = getDepthConfig("normal");
 
@@ -320,7 +346,35 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
   let eraSummarySection = "";
   if (ctx.eraSummaries && ctx.eraSummaries.length > 0) {
-    eraSummarySection = `\nHISTORICAL CONTEXT (compressed summaries of past eras):\n${ctx.eraSummaries.map(e => `  [Days ${e.startDay}-${e.endDay}]: ${e.summary}`).join("\n")}\n`;
+    const maxTokens = depth.maxEraSummaryTokens;
+    let tokenBudgetLeft = maxTokens;
+
+    // Build lines: narrative always included, case facts trimmed from oldest first
+    const eraLines: string[] = [];
+    for (let i = 0; i < ctx.eraSummaries.length; i++) {
+      const e = ctx.eraSummaries[i];
+      let line = `  [Days ${e.startDay}-${e.endDay}]: ${e.summary}`;
+      const lineCost = estimateTokens(line);
+
+      // Include case facts if budget allows; prioritize most recent 3 eras
+      const isRecent = i >= ctx.eraSummaries.length - 3;
+      if (e.caseFacts) {
+        const factsLine = formatCaseFacts(e.caseFacts);
+        const factsCost = estimateTokens(factsLine);
+        if (isRecent || factsCost <= tokenBudgetLeft - lineCost) {
+          line += "\n" + factsLine;
+          tokenBudgetLeft -= lineCost + factsCost;
+        } else {
+          tokenBudgetLeft -= lineCost;
+        }
+      } else {
+        tokenBudgetLeft -= lineCost;
+      }
+
+      eraLines.push(line);
+    }
+
+    eraSummarySection = `\nHISTORICAL CONTEXT (compressed summaries of past eras):\n${eraLines.join("\n")}\n`;
   }
 
   // ── Priority 1.5: Briefing (always included if available) ──────────────
