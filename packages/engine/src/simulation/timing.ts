@@ -44,24 +44,37 @@ export const TIME_CONFIG = {
   nightEnd: 8,                  // 8 AM
 
   // Presets
+  //
+  // IMPORTANT: Wall-clock time per sim day is dominated by Anthropic batch API
+  // latency, NOT by the msPerDay delay. Each day submits 4-6 batches (briefing,
+  // party agents, interpellations, MdB seats, media+summary). Under normal API
+  // load, total batch time is ~10-15 min/day. When Anthropic is under load
+  // (observed 2026-04-01, days 84-85), batch time can balloon to 20-40 min/day.
+  //
+  // The msPerDay value is the ADDITIONAL delay after all batches complete.
+  // For ultra-fast (msPerDay=0), total day time = pure batch API wait time.
+  // For fast (msPerDay=420s), total = batch time + 7 min pause.
+  //
+  // termRealTime estimates include both batch time and delay.
+  // Ranges reflect normal API (low end) vs slow API (high end).
   presets: {
     "ultra-fast": {
-      msPerDay: 0,                        // AI-bound only, no additional delay
-                                          // Typical: 10-15 min/day (batch API)
-                                          // When Anthropic is slow: 20-40 min/day
+      msPerDay: 0,                        // No additional delay — total time = batch API only
+                                          // Normal API: ~10-15 min/day → ~10 days/term
+                                          // Slow API:   ~20-40 min/day → ~25 days/term
       participatory: false,
       nightMode: "none",
       label: "Ultra-Fast (Demo)",
-      termRealTime: "~10-25 days",        // varies with API latency
+      termRealTime: "~10-25 days",        // varies with Anthropic batch API latency
     },
     "fast": {
-      msPerDay: 420_000,                  // 7 min delay + batch API time
-                                          // Typical total: ~17-22 min/day
-                                          // When Anthropic is slow: ~30-50 min/day
+      msPerDay: 420_000,                  // 7 min pause between days + batch API time
+                                          // Normal API: ~17-22 min/day → ~2 weeks/term
+                                          // Slow API:   ~30-50 min/day → ~5 weeks/term
       participatory: false,
       nightMode: "none",
       label: "Fast (Weekly)",
-      termRealTime: "~2-5 weeks",         // varies with API latency
+      termRealTime: "~2-5 weeks",         // varies with Anthropic batch API latency
     },
     "normal": {
       msPerDayDay: 1_800_000,             // 30 min daytime
