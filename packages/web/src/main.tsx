@@ -382,6 +382,14 @@ const PRESET_ICON: Record<string, typeof Zap> = {
   "ultra-fast": Zap, fast: Gauge, normal: Timer, slow: Snail,
 };
 
+/** Expected wall-clock ms per sim day per preset (used for progress bar fill) */
+const PRESET_DAY_MS: Record<string, number> = {
+  "ultra-fast": 600_000,   // ~10 min (AI-bound, batch polling)
+  fast:         720_000,    // ~12 min (7 min delay + batch)
+  normal:     1_800_000,    // ~30 min
+  slow:       5_400_000,    // ~1.5 hours
+};
+
 function deriveSimState(status: SimulationStatus, now: number): SimState {
   const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
   const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
@@ -431,8 +439,9 @@ function SimStatus() {
         : (now - started) < 1_800_000; // fallback for old server without heartbeat
       if (isAlive) {
         const elapsed = now - started;
-        // Progress bar fills over ~5 min then holds at 95%
-        return { running: true, pct: Math.min(Math.round((elapsed / 300_000) * 95), 95) };
+        // Progress bar fills based on expected day duration for current preset
+        const expectedMs = PRESET_DAY_MS[status.timingPreset] ?? 600_000;
+        return { running: true, pct: Math.min(Math.round((elapsed / expectedMs) * 95), 95) };
       }
       return { running: false, pct: 0 };
     }
