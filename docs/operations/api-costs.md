@@ -112,7 +112,7 @@ Advancing between tiers is instant once deposit threshold is met.
 | Preset | Real Duration | Est. Cost (normal ctx) | Notes |
 |--------|--------------|----------------------|-------|
 | ultra-fast | **~10 days** | **~$41** | AI-bound, ~10 min/day (batch) |
-| fast | **~17 days** | ~$41 | 7 min delay + ~10 min batch |
+| fast | **~17–21 days** | ~$41 | 7 min delay + ~10 min batch |
 | normal | **~41 days** | ~$41 | 30 min delay absorbs batch |
 | slow | **~3.4 months** | ~$41 | 90 min delay absorbs batch |
 
