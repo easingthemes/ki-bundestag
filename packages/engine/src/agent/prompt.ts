@@ -1,4 +1,5 @@
 import type { AgentContext, BillImpact } from "@ki-bundestag/types";
+import type { ValidationError } from "./action-parser.js";
 import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
@@ -414,4 +415,29 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
   return `${coreLines}${eraSummarySection}${briefingSection}${optionalContext}
 
 Respond with your actions as JSON.`;
+}
+
+export function buildValidationRetryPrompt(
+  originalUserPrompt: string,
+  errors: ValidationError[],
+  autoAbstainBillIds: string[],
+): string {
+  const errorLines = errors.map(
+    e => `- [action #${e.actionIndex + 1}, type "${e.actionType}"] ${e.message}`,
+  );
+
+  if (autoAbstainBillIds.length > 0) {
+    errorLines.push(
+      `- Missing votes for bills: ${autoAbstainBillIds.join(", ")} (these will default to abstain if not provided)`,
+    );
+  }
+
+  return `${originalUserPrompt}
+
+--- VALIDATION ERRORS IN YOUR PREVIOUS RESPONSE ---
+Your previous response had the following errors:
+${errorLines.join("\n")}
+
+Re-generate your complete actions JSON. Keep actions that were valid, fix or remove the invalid ones. You MUST vote on all third-reading bills.
+---`;
 }
