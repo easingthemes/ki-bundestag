@@ -1,6 +1,6 @@
 # 033 — Reduce PARSE_FAIL and VALIDATION_FAIL Rates in Party Agents
 
-**Status**: mostly-done
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: High
 
@@ -33,7 +33,7 @@ Context size grows as simulation progresses. More bills accumulate in the pipeli
 - Add `YOU MUST VOTE ON: [bill-1, bill-2]` for mandatory third-reading votes
 - This reduces VALIDATION_FAIL from invalid bill references
 
-### 3. Retry on PARSE_FAIL before fallback ❌ (not yet implemented)
+### 3. Retry on PARSE_FAIL before fallback ✅ (done)
 - On first parse failure, retry with a simplified prompt (fewer events, smaller context)
 - Only fall back to abstain-all after retry also fails
 - Cost: ~$0.001 per retry (rare enough to be negligible)

@@ -156,11 +156,11 @@ export function applyBudgetEconomicEffect(
  */
 export function shouldPresidentVeto(bill: Bill): { veto: boolean; reason: string } {
   const impact = bill.impact as BillImpact | undefined;
-  let prob = 0.03;
+  let prob = 0.01;
 
-  if (Math.abs(impact?.publicSentiment ?? 0) > 1.5) prob += 0.05;
-  if (Math.abs(impact?.budget ?? 0) > 2) prob += 0.05;
-  if (Math.abs(impact?.gdpGrowth ?? 0) > 0.15) prob += 0.03;
+  if (Math.abs(impact?.publicSentiment ?? 0) > 1.5) prob += 0.02;
+  if (Math.abs(impact?.budget ?? 0) > 2) prob += 0.02;
+  if (Math.abs(impact?.gdpGrowth ?? 0) > 0.15) prob += 0.01;
 
   const veto = Math.random() < prob;
   const reason = VETO_REASONS[Math.floor(Math.random() * VETO_REASONS.length)];
