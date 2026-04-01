@@ -1,37 +1,42 @@
-# Progress: Semantic Retry-with-Feedback Loop
+# Progress: Progressive Summarization with Case Facts Preservation
 
-**Plan**: [docs/plans/semantic-retry-with-feedback.md](docs/plans/semantic-retry-with-feedback.md)
-**Goal**: When `validateActions()` finds fixable semantic errors, re-prompt the LLM once with error feedback instead of silently dropping actions. Only fall back to abstain if the retry also fails.
+**Plan**: [docs/plans/progressive-summarization.md](docs/plans/progressive-summarization.md)
+**Goal**: Extend the existing era summary system with structured case facts (coalition, economy, bills, elections, crises) that survive all summarization passes, so party agents retain access to specific historical facts as context compresses.
 **Validation**: `npm run typecheck && npm test`
 
 ---
 
-### Step 1: Define `ValidationError` type and `ValidationResult` interface
+### Step 1: Define `EraCaseFacts` type and widen `eraSummaries` on `AgentContext`
 
-- **Status**: done
-- **Files**: `packages/engine/src/agent/action-parser.ts`, `packages/engine/src/agent/index.ts`
-- **Result**: Added `ValidationError` and `ValidationResult` interfaces. Exported from `index.ts`. Typecheck passes (6/6).
+- **Status**: pending
+- **Files**: `packages/types/src/types/agent.ts`
 
-### Step 2: Refactor `validateActions()` to return `ValidationResult`
+### Step 2: Add `case_facts` column to `era_summaries` table + migration
 
-- **Status**: done
-- **Files**: `packages/engine/src/agent/action-parser.ts`, `packages/engine/src/agent/party-agent.ts`, `packages/engine/src/agent/action-parser.test.ts`
-- **Result**: Refactored `validateActions()` to return `ValidationResult`. Every validation branch pushes a `ValidationError` with fixable flag. Updated both call sites in party-agent to use `.valid`. Updated existing tests for new return type. Typecheck passes (6/6).
+- **Status**: pending
+- **Files**: `packages/engine/src/db/schema-sim.ts`, `packages/engine/src/db/ddl.ts`
 
-### Step 3: Build the retry feedback prompt
+### Step 3: Implement `extractCaseFacts()` function
 
-- **Status**: done
-- **Files**: `packages/engine/src/agent/prompt.ts`, `packages/engine/src/agent/index.ts`
-- **Result**: Added `buildValidationRetryPrompt()` that appends structured error feedback to original user prompt. Exported from index.ts. Typecheck passes (6/6).
+- **Status**: pending
+- **Files**: `packages/engine/src/simulation/era-summary.ts`
 
-### Step 4–6: Add semantic retry helper + integrate in both paths
+### Step 4: Update storage — `processEraSummaryResult` and `getEraSummaries`
 
-- **Status**: done
-- **Files**: `packages/engine/src/agent/party-agent.ts`
-- **Result**: Added `attemptSemanticRetry()` shared helper with fixable-error check, retry prompt, parse+validate, and fallback. Integrated into both `runPartyAgent()` and `processPartyAgentResult()`. Added `:semantic-retry` log tags. Typecheck passes (6/6).
+- **Status**: pending
+- **Files**: `packages/engine/src/simulation/era-summary.ts`
 
-### Step 7: Update existing tests
+### Step 5: Prompt integration — `formatCaseFacts` + P1.25 rendering
 
-- **Status**: done
-- **Files**: `packages/engine/src/agent/action-parser.test.ts`, `packages/engine/src/agent/party-agent.ts`
-- **Result**: Added 7 new tests: unknown action type fixable, non-existent bill fixable with IDs, non-opposition interpellation non-fixable, buildValidationRetryPrompt format/errors/abstains. Fixed lazy prompt building in batch path to avoid crash when retry not needed. All 187 tests pass, typecheck 6/6.
+- **Status**: pending
+- **Files**: `packages/engine/src/agent/prompt.ts`, `packages/engine/src/agent/context-depth.ts`
+
+### Step 6: Wire case facts through simulation loop
+
+- **Status**: pending
+- **Files**: `packages/engine/src/simulation/loop.ts`
+
+### Step 7: Enhance summarization prompt with case facts context
+
+- **Status**: pending
+- **Files**: `packages/engine/src/simulation/era-summary.ts`
