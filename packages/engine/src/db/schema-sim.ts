@@ -383,6 +383,15 @@ export const partyDonations = sqliteTable("party_donations", {
   isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false),
 });
 
+export const daySummaries = sqliteTable("day_summaries", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  dayNumber: integer("day_number").notNull().unique(),
+  narrative: text("narrative"),
+  mood: text("mood"),
+  preview: text("preview"),        // start-of-day preview (deterministic)
+  createdAt: text("created_at").notNull(),
+});
+
 export const eraSummaries = sqliteTable("era_summaries", {
   id: text("id").primaryKey(),
   startDay: integer("start_day").notNull(),

@@ -99,6 +99,17 @@ router.get("/api/simulation/status", (_req, res) => {
   const meta = metaRows[0];
   const stateRows = db.select().from(schema.nationalState).all();
   const stateRow = stateRows[0];
+  // Fetch current + previous day summaries from day_summaries table
+  const currentDaySummary = getSqlite().prepare(
+    "SELECT narrative, mood, preview FROM day_summaries WHERE day_number = ?"
+  ).get(meta.currentDay) as { narrative: string | null; mood: string | null; preview: string | null } | undefined;
+
+  const previousDaySummary = meta.currentDay > 1
+    ? getSqlite().prepare(
+        "SELECT day_number, narrative, mood FROM day_summaries WHERE day_number = ?"
+      ).get(meta.currentDay - 1) as { day_number: number; narrative: string | null; mood: string | null } | undefined
+    : undefined;
+
   res.json({
     currentDay: meta.currentDay,
     lastRunAt: meta.lastRunAt,
@@ -112,6 +123,12 @@ router.get("/api/simulation/status", (_req, res) => {
     timingPreset: (meta as any).timingPreset ?? "normal",
     contextDepth: (meta as any).contextDepth ?? "normal",
     startDate: (meta as any).startDate ?? null,
+    dayPreview: currentDaySummary?.preview ?? null,
+    previousDaySummary: previousDaySummary?.narrative ? {
+      dayNumber: previousDaySummary.day_number,
+      narrative: previousDaySummary.narrative,
+      mood: previousDaySummary.mood,
+    } : null,
   });
 });
 
@@ -141,10 +158,10 @@ router.get("/api/simulation/days", (_req, res) => {
   const rows = db.select().from(schema.simulationEvents).all();
 
   // Group by day
-  const dayMap = new Map<number, { dayNumber: number; eventCount: number; summary: string; simulatedAt: string | null }>();
+  const dayMap = new Map<number, { dayNumber: number; eventCount: number; summary: string; simulatedAt: string | null; narrative: string | null; mood: string | null; preview: string | null }>();
   for (const row of rows) {
     if (!dayMap.has(row.dayNumber)) {
-      dayMap.set(row.dayNumber, { dayNumber: row.dayNumber, eventCount: 0, summary: "", simulatedAt: row.createdAt ?? null });
+      dayMap.set(row.dayNumber, { dayNumber: row.dayNumber, eventCount: 0, summary: "", simulatedAt: row.createdAt ?? null, narrative: null, mood: null, preview: null });
     }
     const day = dayMap.get(row.dayNumber)!;
     day.eventCount++;
@@ -154,6 +171,19 @@ router.get("/api/simulation/days", (_req, res) => {
     // Use earliest timestamp for the day
     if (row.createdAt && (!day.simulatedAt || row.createdAt < day.simulatedAt)) {
       day.simulatedAt = row.createdAt;
+    }
+  }
+
+  // Enrich with day_summaries narratives
+  const summaryRows = getSqlite().prepare(
+    "SELECT day_number, narrative, mood, preview FROM day_summaries"
+  ).all() as { day_number: number; narrative: string | null; mood: string | null; preview: string | null }[];
+  for (const sr of summaryRows) {
+    const day = dayMap.get(sr.day_number);
+    if (day) {
+      day.narrative = sr.narrative;
+      day.mood = sr.mood;
+      day.preview = sr.preview;
     }
   }
 
@@ -213,7 +243,13 @@ router.get("/api/calendar", (req, res) => {
     dayMap.get(evt.dayNumber)!.push(evt);
   }
 
-  // Build response: top 3 important events per day + count
+  // Load day_summaries for the date range
+  const summaryRows = getSqlite().prepare(
+    "SELECT day_number, narrative, mood, preview FROM day_summaries WHERE day_number >= ? AND day_number <= ?"
+  ).all(minDay, maxDay) as { day_number: number; narrative: string | null; mood: string | null; preview: string | null }[];
+  const summaryMap = new Map(summaryRows.map(r => [r.day_number, r]));
+
+  // Build response: top 3 important events per day + count + narrative
   const days = Array.from(dayMap.entries()).map(([dayNumber, evts]) => {
     const dateObj = new Date(startDate.getTime() + dayNumber * 86400000);
     const date = dateObj.toISOString().split("T")[0];
@@ -227,7 +263,14 @@ router.get("/api/calendar", (req, res) => {
       id: e.id, type: e.type, title: e.title, actor: e.actor,
     }));
 
-    return { dayNumber, date, topEvents, totalCount: sorted.length };
+    const summary = summaryMap.get(dayNumber);
+
+    return {
+      dayNumber, date, topEvents, totalCount: sorted.length,
+      narrative: summary?.narrative ?? null,
+      mood: summary?.mood ?? null,
+      preview: summary?.preview ?? null,
+    };
   }).filter(d => d.totalCount > 0).sort((a, b) => a.dayNumber - b.dayNumber);
 
   res.json({

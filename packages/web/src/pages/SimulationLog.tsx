@@ -69,7 +69,12 @@ export function SimulationLog() {
                     </span>
                   </span>
                   <span className="ml-4">{t("simulationLog.events", { count: day.eventCount })}</span>
-                  {day.summary && <span className="text-muted-foreground ml-4">{day.summary}</span>}
+                  {day.mood && (
+                    <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      {day.mood}
+                    </span>
+                  )}
+                  {day.summary && !day.narrative && <span className="text-muted-foreground ml-4">{day.summary}</span>}
                   <span className="float-right flex items-center gap-3">
                     {day.simulatedAt && (
                       <span className="text-muted-foreground text-[0.8em] font-normal">
@@ -79,6 +84,9 @@ export function SimulationLog() {
                     {expanded === day.dayNumber ? "▼" : "▶"}
                   </span>
                 </div>
+                {day.narrative && (
+                  <p className="text-sm text-muted-foreground leading-relaxed px-3 pb-2">{day.narrative}</p>
+                )}
                 {expanded === day.dayNumber && (
                   <Card>
                     <CardContent className="p-5 divide-y divide-border">
