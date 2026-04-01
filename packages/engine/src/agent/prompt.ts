@@ -184,7 +184,7 @@ function estimateTokens(text: string): number {
 /** Default depth config (normal). Callers can override via depthConfig parameter. */
 const DEFAULT_DEPTH = getDepthConfig("normal");
 
-export function buildUserPrompt(ctx: AgentContext, depthConfig?: DepthConfig): string {
+export function buildUserPrompt(ctx: AgentContext, depthConfig?: DepthConfig, votingCalibration?: string): string {
   const depth = depthConfig ?? DEFAULT_DEPTH;
   const firstReadingBills = ctx.pendingBills.filter(b => b.status === "first_reading");
   const secondReadingBills = ctx.pendingBills.filter(b => b.status === "second_reading");
@@ -332,6 +332,12 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
     briefingSection += `\n${ctx.realWorldContext}\n`;
   }
 
+  // ── Voting calibration (early sim only, fades after 50 bills) ─────────
+  let votingCalibrationSection = "";
+  if (votingCalibration) {
+    votingCalibrationSection = `\n${votingCalibration}\n`;
+  }
+
   // ── Priority 2+3: Budget-trimmed optional sections ────────────────────
 
   // Priority 2: high-value context (events, media, proposals, recently proposed bills, own actions)
@@ -411,7 +417,7 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
   const optionalContext = includedSections.length > 0 ? "\n" + includedSections.join("\n\n") : "";
 
-  return `${coreLines}${eraSummarySection}${briefingSection}${optionalContext}
+  return `${coreLines}${eraSummarySection}${briefingSection}${votingCalibrationSection}${optionalContext}
 
 Respond with your actions as JSON.`;
 }

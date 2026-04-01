@@ -12,6 +12,8 @@ import { BundesadlerIcon } from "@/components/elections/BundesadlerIcon";
 import { VoteBarChart } from "@/components/elections/VoteBarChart";
 import { CoalitionChips } from "@/components/elections/CoalitionChips";
 import { CoalitionCalculator } from "@/components/elections/CoalitionCalculator";
+import { VotingAlignmentMatrix } from "@/components/VotingAlignmentMatrix";
+import { VotingComparisonChart } from "@/components/VotingComparisonChart";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
@@ -176,6 +178,13 @@ export function Elections() {
         </div>
 
         <CoalitionCalculator parties={parties} currentCoalitionIds={coalitionIds} />
+
+        <div className="mt-8">
+          <h2 className="section-title">Abstimmungsanalyse</h2>
+          <VotingAlignmentMatrix className="mb-6" />
+          <h2 className="section-title">Entwicklung seit Simulationsbeginn</h2>
+          <VotingComparisonChart />
+        </div>
       </div>
     );
   }
@@ -470,6 +479,13 @@ export function Elections() {
       {state && parties.length > 0 && (
         <CoalitionCalculator parties={parties} currentCoalitionIds={state.coalitionParties} />
       )}
+
+      <div className="mt-8">
+        <h2 className="section-title">Abstimmungsanalyse</h2>
+        <VotingAlignmentMatrix className="mb-6" />
+        <h2 className="section-title">Entwicklung seit Simulationsbeginn</h2>
+        <VotingComparisonChart />
+      </div>
     </div>
   );
 }

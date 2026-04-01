@@ -25,6 +25,8 @@ import {
   Budget,
   MediaArticle,
   AlignmentData,
+  VotingComparisonResponse,
+  VotingTendenciesResponse,
   PartyHistory,
   PartyVoteRecord,
   InternalProposal,
@@ -49,7 +51,10 @@ import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js
 // ── Parties & proposals ───────────────────────────────────────────────────────
 
 export const getParties = () => fetchJson<Party[]>("/parties");
-export const getAlignment = () => fetchJson<AlignmentData>("/parties/alignment");
+export const getAlignment = (window?: number) =>
+  fetchJson<AlignmentData>(`/parties/alignment${window ? `?window=${window}` : ""}`);
+export const getVotingComparison = () => fetchJson<VotingComparisonResponse>("/parties/voting-comparison");
+export const getVotingTendencies = () => fetchJson<VotingTendenciesResponse>("/parties/voting-tendencies");
 export const getParty = (id: string) => fetchJson<Party>(`/parties/${id}`);
 export const getPartyHistory = (id: string) => fetchJson<PartyHistory[]>(`/parties/${id}/history`);
 export const getPartyBills = (id: string) => fetchJson<Bill[]>(`/parties/${id}/bills`);
@@ -292,6 +297,8 @@ export const getMyCatchup = () => fetchJson<CatchupData>("/users/me/catchup");
 export const api = {
   getParties,
   getAlignment,
+  getVotingComparison,
+  getVotingTendencies,
   getParty,
   getPartyHistory,
   getPartyBills,

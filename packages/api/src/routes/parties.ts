@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, logUserAction, logger } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, logUserAction, logger, calculateVotingAlignment, calculateVotingTendencies, compareVotingPatterns } from "@ki-bundestag/engine";
 import { eq, gte, asc, and, inArray } from "drizzle-orm";
 import type { Bill, BillVote, PartyHistoryEntry, SimulationEvent } from "@ki-bundestag/types";
 import { mapParty, getMemberCounts, mapBill } from "../mappers/index.js";
@@ -59,36 +59,57 @@ router.get("/api/parties", (_req, res) => {
 
 // ── GET /api/parties/alignment ──────────────────────────────────────────────
 
-router.get("/api/parties/alignment", (_req, res) => {
+router.get("/api/parties/alignment", (req, res) => {
   const db = getDb();
-  const allParties = db.select().from(schema.parties).all();
-  const allBills = db.select().from(schema.bills).all();
+  const allParties = db.select().from(schema.parties).all() as unknown as import("@ki-bundestag/types").Party[];
+  const allBills = db.select().from(schema.bills).all().map(mapBill);
 
-  const partyIds = allParties.map(p => p.id as string);
-  const matrix: Record<string, Record<string, number | null>> = {};
+  const windowParam = req.query.window as string | undefined;
+  const windowDays = windowParam ? parseInt(windowParam) : undefined;
 
-  for (const a of partyIds) {
-    matrix[a] = {};
-    for (const b of partyIds) {
-      if (a === b) { matrix[a][b] = 100; continue; }
-      let shared = 0, agreed = 0;
-      for (const bill of allBills) {
-        const votes = (bill.votes as any) as Array<{ partyId: string; vote: string }>;
-        if (!Array.isArray(votes)) continue;
-        const vA = votes.find(v => v.partyId === a);
-        const vB = votes.find(v => v.partyId === b);
-        if (!vA || !vB) continue;
-        shared++;
-        if (vA.vote === vB.vote) agreed++;
-      }
-      matrix[a][b] = shared >= 3 ? Math.round((agreed / shared) * 100) : null;
-    }
+  let currentDay: number | undefined;
+  if (windowDays) {
+    const meta = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
+    currentDay = meta?.day;
+  }
+
+  const result = calculateVotingAlignment(allBills, allParties, windowDays, currentDay);
+  res.json(result);
+});
+
+// ── GET /api/parties/voting-comparison ──────────────────────────────────────
+
+router.get("/api/parties/voting-comparison", (_req, res) => {
+  const db = getDb();
+  const allParties = db.select().from(schema.parties).all() as unknown as import("@ki-bundestag/types").Party[];
+  const allBills = db.select().from(schema.bills).all().map(mapBill);
+
+  const comparison = compareVotingPatterns(allBills, allParties);
+  if (!comparison) {
+    res.json({ available: false });
+    return;
   }
 
   res.json({
-    parties: allParties.map(p => ({ id: p.id, name: p.name, color: p.color })),
-    matrix,
+    available: true,
+    ...comparison,
   });
+});
+
+// ── GET /api/parties/voting-tendencies ─────────────────────────────────────
+
+router.get("/api/parties/voting-tendencies", (_req, res) => {
+  const db = getDb();
+  const allParties = db.select().from(schema.parties).all() as unknown as import("@ki-bundestag/types").Party[];
+  const allBills = db.select().from(schema.bills).all().map(mapBill);
+
+  const stateRows = db.select().from(schema.nationalState).all();
+  const coalitionParties = stateRows[0]
+    ? (stateRows[0].coalitionParties as unknown as string[])
+    : [];
+
+  const tendencies = calculateVotingTendencies(allBills, allParties, coalitionParties);
+  res.json({ tendencies });
 });
 
 // ── GET /api/parties/:id ────────────────────────────────────────────────────

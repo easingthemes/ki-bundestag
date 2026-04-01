@@ -16,3 +16,5 @@ export { allocateSeats, resetAllSeats, getActiveSeats, getUserSeat, getOpenSeatC
 export { getHumanSeatRatio } from "./simulation/timing.js";
 export { dayToDate, isRealisticSessionDay, getHolidaysInRange, isWorkday, snapToNextWorkday, snapToNextSunday, isPollDay, isMonthlyDay, isBudgetDay, isSessionDay } from "./simulation/index.js";
 export type { PublicHoliday } from "./simulation/index.js";
+export { calculateVotingAlignment, calculateVotingTendencies, compareVotingPatterns, getVotingCalibrationContext } from "./simulation/voting-analysis.js";
+export type { AlignmentMatrix, PartyVotingTendency, VotingComparison } from "./simulation/voting-analysis.js";

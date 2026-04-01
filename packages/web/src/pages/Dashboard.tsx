@@ -20,6 +20,7 @@ import { CatchupCard } from "@/components/dashboard/CatchupCard";
 import { LiveEventTicker } from "@/components/dashboard/LiveEventTicker";
 import { AskPartyWidget } from "@/components/dashboard/AskPartyWidget";
 import { SimStatusPill } from "@/components/dashboard/SimStatusPill";
+import { VotingAlignmentMatrix } from "@/components/VotingAlignmentMatrix";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Berliner Tagesspiegel": { color: "#1d4ed8", label: "Tagesspiegel" },
@@ -509,6 +510,9 @@ export function Dashboard() {
 
           {/* My Impact card */}
           <MyImpactCard />
+
+          {/* Compact Voting Alignment */}
+          <VotingAlignmentMatrix compact />
         </div>
       </div>
 

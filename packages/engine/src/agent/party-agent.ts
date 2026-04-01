@@ -167,14 +167,16 @@ export function buildPartyAgentRequests(
   contexts: AgentContext[],
   currentDay: number,
   depthConfig?: DepthConfig,
+  votingCalibrations?: Record<string, string | null>,
 ): BatchRequest[] {
   return contexts.map(ctx => {
     const config = getPartyModel(ctx.party.id);
     const isAnthropic = config.provider === "anthropic";
+    const calibration = votingCalibrations?.[ctx.party.id] ?? undefined;
     return {
       customId: `agent-${ctx.party.id}-day${currentDay}`,
       system: buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions),
-      prompt: buildUserPrompt(ctx, depthConfig),
+      prompt: buildUserPrompt(ctx, depthConfig, calibration),
       maxTokens: 1024,
       partyId: ctx.party.id,
       // Only use structured output for Anthropic — xAI/Grok doesn't support it
