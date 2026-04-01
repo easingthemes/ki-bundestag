@@ -42,6 +42,7 @@ import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImp
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
+import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { checkPresidentialVeto } from "./veto.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
@@ -576,6 +577,13 @@ export async function runDay(): Promise<number> {
         userSqlite.prepare("UPDATE mdb_applications SET status = 'expired' WHERE status = 'pending'").run();
       } catch { /* table may not exist yet */ }
 
+      // Seed committees if needed and assign memberships
+      try {
+        if (shouldSeedCommittees()) seedCommittees(currentDay);
+        assignCommitteeMemberships(currentDay);
+        console.log(`  [Committees] Assigned memberships after emergency election`);
+      } catch (err) { console.warn(`  [Committees] Assignment failed:`, (err as Error).message); }
+
       console.log(`  [Election] Emergency fallback coalition: ${coalitionNames}`);
       activeElection = null;
     }
@@ -728,6 +736,13 @@ export async function runDay(): Promise<number> {
         const userSqlite = (await import("../db/index.js")).getUserSqlite();
         userSqlite.prepare("UPDATE mdb_applications SET status = 'expired' WHERE status = 'pending'").run();
       } catch { /* table may not exist yet */ }
+
+      // Seed committees if needed and assign memberships
+      try {
+        if (shouldSeedCommittees()) seedCommittees(currentDay);
+        assignCommitteeMemberships(currentDay);
+        console.log(`  [Committees] Assigned memberships after election`);
+      } catch (err) { console.warn(`  [Committees] Assignment failed:`, (err as Error).message); }
 
       console.log(`  [Election] New coalition: ${coalitionNames}`);
       activeElection = null;
@@ -948,6 +963,14 @@ export async function runDay(): Promise<number> {
         }
       }
     }
+
+    // Seed committees if table is empty (first run or after knowledge fetch)
+    try {
+      if (shouldSeedCommittees()) {
+        seedCommittees(currentDay);
+        console.log(`  [Committees] Seeded committee table`);
+      }
+    } catch (err) { console.warn(`  [Committees] Seed failed:`, (err as Error).message); }
 
     // Build real-world context for prompts (reads from DB, applies decay)
     const realWorldCtx = depthConfig.enableKnowledgeGrounding ? buildRealWorldContext(currentDay) : null;

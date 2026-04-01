@@ -304,6 +304,23 @@ export const bundestagSeats = sqliteTable("bundestag_seats", {
   allocatedOnDay: integer("allocated_on_day").notNull(),
 });
 
+export const committees = sqliteTable("committees", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  shortName: text("short_name"),
+  billCategory: text("bill_category"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdOnDay: integer("created_on_day"),
+});
+
+export const committeeMemberships = sqliteTable("committee_memberships", {
+  id: text("id").primaryKey(),
+  committeeId: text("committee_id").notNull(),
+  seatId: text("seat_id").notNull(),
+  role: text("role").notNull().default("member"),
+  assignedOnDay: integer("assigned_on_day").notNull(),
+});
+
 export const eraSummaries = sqliteTable("era_summaries", {
   id: text("id").primaryKey(),
   startDay: integer("start_day").notNull(),

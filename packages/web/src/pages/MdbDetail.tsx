@@ -40,7 +40,7 @@ export function MdbDetail() {
   if (loading) return <div className="py-8"><LoadingSkeleton lines={6} /></div>;
   if (!profile) return <p className="text-muted-foreground py-8 text-center">Abgeordneter nicht gefunden.</p>;
 
-  const { seat, party, application, votes, speeches } = profile;
+  const { seat, party, application, votes, speeches, committees } = profile;
   const displayName = seat.displayName ?? `Sitz ${seat.seatNumber}`;
 
   // Vote statistics
@@ -213,6 +213,30 @@ export function MdbDetail() {
               </dl>
             </CardContent>
           </Card>
+
+          {committees && committees.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-medium mb-2">Ausschüsse</h3>
+                <div className="space-y-2">
+                  {committees.map(c => (
+                    <div key={c.committeeId} className="flex items-center justify-between">
+                      <Link to={`/committees/${c.committeeId}`} className="text-sm text-foreground hover:text-primary no-underline">
+                        {c.committeeName}
+                      </Link>
+                      <Badge variant="outline" className={cn("text-xs",
+                        c.role === "chair" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                        c.role === "deputy_chair" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                        "bg-zinc-50 text-zinc-600 border-zinc-200"
+                      )}>
+                        {c.role === "chair" ? "Vorsitz" : c.role === "deputy_chair" ? "Stv. Vorsitz" : "Mitglied"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {application && (
             <Card>

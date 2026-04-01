@@ -556,6 +556,47 @@ export interface MdbVoteSummary {
   userVote: string | null;
 }
 
+// ── Committee types ─────────────────────────────────────────────────────────
+
+export interface CommitteeListItem {
+  id: string;
+  name: string;
+  shortName: string | null;
+  billCategory: string | null;
+  billCount: number;
+  memberCount: number;
+}
+
+export interface CommitteeMember {
+  seatId: string;
+  seatNumber: number;
+  partyId: string;
+  role: "chair" | "deputy_chair" | "member";
+  displayName: string | null;
+  controller: "human" | "ai";
+}
+
+export interface CommitteeDetail {
+  id: string;
+  name: string;
+  shortName: string | null;
+  billCategory: string | null;
+  bills: Array<{
+    id: string;
+    title: string;
+    status: string;
+    proposedBy: string;
+    committeeRecommendation: string | null;
+  }>;
+  members: CommitteeMember[];
+  stats: {
+    totalBillsReviewed: number;
+    passCount: number;
+    rejectCount: number;
+    amendCount: number;
+  };
+}
+
 // ── MdB Profile types ────────────────────────────────────────────────────────
 
 export interface MdbVoteRecord {
@@ -577,10 +618,18 @@ export interface MdbSpeechRecord {
   createdAt: number;
 }
 
+export interface MdbCommitteeMembership {
+  committeeId: string;
+  committeeName: string;
+  shortName: string | null;
+  role: "chair" | "deputy_chair" | "member";
+}
+
 export interface MdbProfile {
   seat: BundestagSeat;
   party: { id: string; name: string; color: string } | null;
   application: { motivation: string; policyFocus: string[] | null } | null;
   votes: MdbVoteRecord[];
   speeches: MdbSpeechRecord[];
+  committees?: MdbCommitteeMembership[];
 }
