@@ -47,7 +47,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 ## Group 1: MdB Profiles & Listing (High Impact)
 
 **Plan**: [group1-mdb-profiles.md](./group1-mdb-profiles.md)
-**Status**: Not started
+**Status**: Complete (PR #88)
 **Effort**: Medium
 **Backend data exists**: Yes — `bundestagSeats`, `mdbVotes`, `mdbSpeeches`, `mdbApplications`
 
@@ -78,7 +78,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 ## Group 2: Committee System (Medium Impact)
 
 **Plan**: [group2-committee-system.md](./group2-committee-system.md)
-**Status**: Not started
+**Status**: Complete
 **Effort**: Low–Medium
 **Backend data exists**: Partial — committee names on bills, now fetched from API. No membership tracking.
 
