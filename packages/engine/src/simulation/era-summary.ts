@@ -6,13 +6,14 @@
  * lookbacks in agent prompts, bounding prompt size as the simulation grows.
  */
 
-import { desc, gte, and } from "drizzle-orm";
+import { desc, gte, lte, and, eq, or } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type { BatchRequest } from "../agent/batch-client.js";
 import type { BatchResult } from "../agent/batch-client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import type { Provider } from "../agent/model-config.js";
 import type { DepthConfig } from "../agent/context-depth.js";
+import type { EraCaseFacts } from "@ki-bundestag/types";
 
 // ---------------------------------------------------------------------------
 // Query helpers
@@ -34,15 +35,166 @@ export function getLastEraSummaryEnd(): number {
 /**
  * Get all era summaries, ordered chronologically.
  */
-export function getEraSummaries(): Array<{ startDay: number; endDay: number; summary: string }> {
+export function getEraSummaries(): Array<{ startDay: number; endDay: number; summary: string; caseFacts?: EraCaseFacts }> {
   const db = getDb();
-  return db.select({
+  const rows = db.select({
     startDay: schema.eraSummaries.startDay,
     endDay: schema.eraSummaries.endDay,
     summary: schema.eraSummaries.summary,
+    caseFacts: schema.eraSummaries.caseFacts,
   }).from(schema.eraSummaries)
     .orderBy(schema.eraSummaries.startDay)
     .all();
+  return rows.map(r => ({
+    startDay: r.startDay,
+    endDay: r.endDay,
+    summary: r.summary,
+    caseFacts: r.caseFacts as EraCaseFacts | undefined ?? undefined,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Case facts extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract structured case facts from DB state at an era boundary.
+ * These facts are DB-sourced (not AI-generated) and survive all summarization.
+ */
+export function extractCaseFacts(startDay: number, endDay: number): EraCaseFacts {
+  const db = getDb();
+
+  // Economy + coalition from national_state (single row)
+  const ns = db.select().from(schema.nationalState).limit(1).all()[0];
+  const economy = ns ? {
+    budget: ns.budget,
+    unemployment: ns.unemployment,
+    inflation: ns.inflation,
+    gdpGrowth: ns.gdpGrowth,
+    publicSentiment: ns.publicSentiment,
+  } : { budget: 0, unemployment: 0, inflation: 0, gdpGrowth: 0, publicSentiment: 0 };
+
+  const coalitionPartyIds = ns ? (ns.coalitionParties as string[]) : [];
+
+  // Active government
+  const gov = db.select({
+    chancellorName: schema.government.chancellorName,
+    chancellorPartyId: schema.government.chancellorPartyId,
+  }).from(schema.government)
+    .where(eq(schema.government.active, true))
+    .limit(1)
+    .all()[0];
+
+  // Party approvals and seats
+  const parties = db.select({
+    id: schema.parties.id,
+    approvalRating: schema.parties.approvalRating,
+    seatCount: schema.parties.seatCount,
+  }).from(schema.parties).all();
+
+  const partyApprovals: Record<string, number> = {};
+  const partySeats: Record<string, number> = {};
+  for (const p of parties) {
+    partyApprovals[p.id] = p.approvalRating;
+    partySeats[p.id] = p.seatCount;
+  }
+
+  // Bills passed during era
+  const billsPassed = db.select({
+    id: schema.bills.id,
+    title: schema.bills.title,
+    category: schema.bills.category,
+  }).from(schema.bills)
+    .where(and(
+      eq(schema.bills.status, "passed"),
+      gte(schema.bills.statusChangedOnDay, startDay),
+      lte(schema.bills.statusChangedOnDay, endDay),
+    ))
+    .all();
+
+  // Bills rejected during era
+  const billsRejected = db.select({
+    id: schema.bills.id,
+    title: schema.bills.title,
+  }).from(schema.bills)
+    .where(and(
+      eq(schema.bills.status, "rejected"),
+      gte(schema.bills.statusChangedOnDay, startDay),
+      lte(schema.bills.statusChangedOnDay, endDay),
+    ))
+    .all();
+
+  // Elections during era
+  const electionRows = db.select({
+    triggerReason: schema.elections.triggerReason,
+    electionDay: schema.elections.electionDay,
+    status: schema.elections.status,
+    results: schema.elections.results,
+  }).from(schema.elections)
+    .where(and(
+      gte(schema.elections.electionDay, startDay),
+      lte(schema.elections.electionDay, endDay),
+    ))
+    .all();
+
+  const elections = electionRows.map(e => ({
+    reason: e.triggerReason,
+    day: e.electionDay,
+    outcome: e.status === "completed" ? "completed" : e.status,
+  }));
+
+  // Crises during era
+  const crisisRows = db.select({
+    name: schema.crises.name,
+    severity: schema.crises.severity,
+    resolved: schema.crises.resolved,
+  }).from(schema.crises)
+    .where(and(
+      gte(schema.crises.startDay, startDay),
+      lte(schema.crises.startDay, endDay),
+    ))
+    .all();
+
+  const crises = crisisRows.map(c => ({
+    name: c.name,
+    severity: c.severity,
+    resolved: c.resolved,
+  }));
+
+  // Government changes during era
+  const govRows = db.select({
+    chancellorName: schema.government.chancellorName,
+    chancellorPartyId: schema.government.chancellorPartyId,
+    formedOnDay: schema.government.formedOnDay,
+    dissolvedOnDay: schema.government.dissolvedOnDay,
+  }).from(schema.government)
+    .where(or(
+      and(gte(schema.government.formedOnDay, startDay), lte(schema.government.formedOnDay, endDay)),
+      and(gte(schema.government.dissolvedOnDay, startDay), lte(schema.government.dissolvedOnDay, endDay)),
+    ))
+    .all();
+
+  const governmentChanges = govRows.map(g => {
+    const formed = g.formedOnDay >= startDay && g.formedOnDay <= endDay;
+    return {
+      type: formed ? "formed" : "dissolved",
+      day: formed ? g.formedOnDay : g.dissolvedOnDay!,
+      description: `${g.chancellorName} (${g.chancellorPartyId})`,
+    };
+  });
+
+  return {
+    economy,
+    coalitionPartyIds,
+    government: gov ? { chancellorName: gov.chancellorName, chancellorPartyId: gov.chancellorPartyId } : undefined,
+    partyApprovals,
+    partySeats,
+    billsPassed,
+    billsRejected,
+    elections,
+    crises,
+    governmentChanges,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +241,7 @@ FORMAT (respond with ONLY valid JSON, all text in German):
 export function buildEraSummaryBatchRequest(
   currentDay: number,
   depthConfig: DepthConfig,
+  caseFacts?: EraCaseFacts,
 ): BatchRequest | null {
   const lastEnd = getLastEraSummaryEnd();
   const startDay = lastEnd + 1;
@@ -152,13 +305,39 @@ export function buildEraSummaryBatchRequest(
     .map(([id, t]) => `  ${id}: ${t.start}% → ${t.end}%`)
     .join("\n");
 
+  // Build optional case facts context for the AI to reference
+  let factsStr = "";
+  if (caseFacts) {
+    const lines: string[] = [];
+    lines.push(`  Economy: Budget ${caseFacts.economy.budget.toFixed(0)}B, Unemployment ${caseFacts.economy.unemployment.toFixed(1)}%, GDP Growth ${caseFacts.economy.gdpGrowth.toFixed(1)}%`);
+    if (caseFacts.coalitionPartyIds.length > 0) {
+      lines.push(`  Coalition: ${caseFacts.coalitionPartyIds.join(", ")}`);
+    }
+    if (caseFacts.government) {
+      lines.push(`  Chancellor: ${caseFacts.government.chancellorName} (${caseFacts.government.chancellorPartyId})`);
+    }
+    if (caseFacts.billsPassed.length > 0) {
+      lines.push(`  Bills passed: ${caseFacts.billsPassed.map(b => `"${b.title}"`).join(", ")}`);
+    }
+    if (caseFacts.billsRejected.length > 0) {
+      lines.push(`  Bills rejected: ${caseFacts.billsRejected.map(b => `"${b.title}"`).join(", ")}`);
+    }
+    if (caseFacts.elections.length > 0) {
+      lines.push(`  Elections: ${caseFacts.elections.map(e => `Day ${e.day} (${e.reason})`).join(", ")}`);
+    }
+    if (caseFacts.crises.length > 0) {
+      lines.push(`  Crises: ${caseFacts.crises.map(c => `${c.name} [${c.severity}${c.resolved ? ", resolved" : ""}]`).join(", ")}`);
+    }
+    factsStr = `\n\nSTATE AT ERA END:\n${lines.join("\n")}`;
+  }
+
   const prompt = `Summarize the political era from Day ${startDay} to Day ${endDay}:
 
 KEY EVENTS:
 ${eventStr}
 
 APPROVAL TRENDS:
-${trendStr || "  No trend data available."}`;
+${trendStr || "  No trend data available."}${factsStr}`;
 
   return {
     customId: `era-summary-${startDay}-${endDay}`,
@@ -180,6 +359,7 @@ ${trendStr || "  No trend data available."}`;
 export function processEraSummaryResult(
   result: BatchResult | undefined,
   currentDay: number,
+  caseFacts?: EraCaseFacts,
 ): boolean {
   const lastEnd = getLastEraSummaryEnd();
   const startDay = lastEnd + 1;
@@ -229,6 +409,7 @@ export function processEraSummaryResult(
     startDay,
     endDay,
     summary: parsed.summary,
+    caseFacts: caseFacts ?? null,
     createdAt: new Date().toISOString(),
   }).run();
 
