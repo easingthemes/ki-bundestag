@@ -45,6 +45,12 @@ import {
   Sidejob,
   TrendingTopic,
   QuestionSuggestion,
+  QuizThesis,
+  QuizResultItem,
+  QuizPartyPosition,
+  LobbyingEvent,
+  PartyDonation,
+  DonationSummary,
 } from "./types.js";
 import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js";
 
@@ -295,6 +301,29 @@ export const getMdbProfile = (seatId: string) => fetchJson<MdbProfile>(`/seats/$
 export const getMyImpact = () => fetchJson<ImpactData>("/users/me/impact");
 export const getMyCatchup = () => fetchJson<CatchupData>("/users/me/catchup");
 
+// ── Quiz ─────────────────────────────────────────────────────────────────────
+
+export const getQuizTheses = () => fetchJson<QuizThesis[]>("/quiz/theses");
+export const submitQuizAnswers = (answers: Record<string, string>) =>
+  postJson<{ results: QuizResultItem[] }>("/quiz/results", { answers });
+export const getQuizPartyPositions = () => fetchJson<QuizPartyPosition[]>("/quiz/party-positions");
+
+// ── Lobbying ─────────────────────────────────────────────────────────────────
+
+export const getLobbyingEvents = (partyId?: string, sector?: string) => {
+  const params = new URLSearchParams();
+  if (partyId) params.set("partyId", partyId);
+  if (sector) params.set("sector", sector);
+  const qs = params.toString();
+  return fetchJson<LobbyingEvent[]>(`/quiz/lobbying${qs ? `?${qs}` : ""}`);
+};
+
+// ── Donations ────────────────────────────────────────────────────────────────
+
+export const getPartyDonations = (partyId?: string) =>
+  fetchJson<PartyDonation[]>(`/quiz/donations${partyId ? `?partyId=${partyId}` : ""}`);
+export const getDonationSummary = () => fetchJson<DonationSummary[]>("/quiz/donations/summary");
+
 // ── Legacy `api` object — keeps all call sites that use `api.xxx()` working ───
 
 export const api = {
@@ -392,4 +421,10 @@ export const api = {
   getTrendingTopics,
   getQuestionSuggestions,
   useQuestionSuggestion,
+  getQuizTheses,
+  submitQuizAnswers,
+  getQuizPartyPositions,
+  getLobbyingEvents,
+  getPartyDonations,
+  getDonationSummary,
 };

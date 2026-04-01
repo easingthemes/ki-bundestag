@@ -345,6 +345,43 @@ export const sidejobs = sqliteTable("sidejobs", {
   active: integer("active", { mode: "boolean" }).notNull().default(true),
 });
 
+export const quizTheses = sqliteTable("quiz_theses", {
+  id: text("id").primaryKey(),
+  text: text("text").notNull(),
+  category: text("category").notNull(),
+  generatedOnDay: integer("generated_on_day").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+});
+
+export const quizPartyPositions = sqliteTable("quiz_party_positions", {
+  id: text("id").primaryKey(),
+  thesisId: text("thesis_id").notNull().references(() => quizTheses.id),
+  partyId: text("party_id").notNull().references(() => parties.id),
+  position: text("position").notNull(), // "agree" | "disagree" | "neutral"
+  reasoning: text("reasoning"),
+});
+
+export const lobbyingEvents = sqliteTable("lobbying_events", {
+  id: text("id").primaryKey(),
+  organizationName: text("organization_name").notNull(),
+  sector: text("sector").notNull(),
+  targetPartyId: text("target_party_id").notNull().references(() => parties.id),
+  targetBillId: text("target_bill_id"),
+  influence: text("influence").notNull(), // "support" | "oppose"
+  intensity: integer("intensity").notNull(), // 1-5
+  dayNumber: integer("day_number").notNull(),
+});
+
+export const partyDonations = sqliteTable("party_donations", {
+  id: text("id").primaryKey(),
+  partyId: text("party_id").notNull().references(() => parties.id),
+  donorName: text("donor_name").notNull(),
+  donorType: text("donor_type").notNull(), // "individual" | "corporate" | "association"
+  amount: real("amount").notNull(),
+  dayNumber: integer("day_number").notNull(),
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false),
+});
+
 export const eraSummaries = sqliteTable("era_summaries", {
   id: text("id").primaryKey(),
   startDay: integer("start_day").notNull(),

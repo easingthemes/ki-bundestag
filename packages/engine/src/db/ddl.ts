@@ -360,6 +360,47 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (seat_id) REFERENCES bundestag_seats(id)
   );
 
+  CREATE TABLE IF NOT EXISTS quiz_theses (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    category TEXT NOT NULL,
+    generated_on_day INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS quiz_party_positions (
+    id TEXT PRIMARY KEY,
+    thesis_id TEXT NOT NULL,
+    party_id TEXT NOT NULL,
+    position TEXT NOT NULL,
+    reasoning TEXT,
+    FOREIGN KEY (thesis_id) REFERENCES quiz_theses(id),
+    FOREIGN KEY (party_id) REFERENCES parties(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS lobbying_events (
+    id TEXT PRIMARY KEY,
+    organization_name TEXT NOT NULL,
+    sector TEXT NOT NULL,
+    target_party_id TEXT NOT NULL,
+    target_bill_id TEXT,
+    influence TEXT NOT NULL,
+    intensity INTEGER NOT NULL,
+    day_number INTEGER NOT NULL,
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS party_donations (
+    id TEXT PRIMARY KEY,
+    party_id TEXT NOT NULL,
+    donor_name TEXT NOT NULL,
+    donor_type TEXT NOT NULL,
+    amount REAL NOT NULL,
+    day_number INTEGER NOT NULL,
+    is_public INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (party_id) REFERENCES parties(id)
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -573,6 +614,12 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_committee_memberships_seat", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_seat ON committee_memberships(seat_id)" },
   { name: "idx_sidejobs_party", sql: "CREATE INDEX IF NOT EXISTS idx_sidejobs_party ON sidejobs(party_id)" },
   { name: "idx_sidejobs_seat", sql: "CREATE INDEX IF NOT EXISTS idx_sidejobs_seat ON sidejobs(seat_id)" },
+  { name: "idx_quiz_party_positions_thesis", sql: "CREATE INDEX IF NOT EXISTS idx_quiz_party_positions_thesis ON quiz_party_positions(thesis_id)" },
+  { name: "idx_quiz_party_positions_party", sql: "CREATE INDEX IF NOT EXISTS idx_quiz_party_positions_party ON quiz_party_positions(party_id)" },
+  { name: "idx_lobbying_events_day", sql: "CREATE INDEX IF NOT EXISTS idx_lobbying_events_day ON lobbying_events(day_number)" },
+  { name: "idx_lobbying_events_party", sql: "CREATE INDEX IF NOT EXISTS idx_lobbying_events_party ON lobbying_events(target_party_id)" },
+  { name: "idx_party_donations_party", sql: "CREATE INDEX IF NOT EXISTS idx_party_donations_party ON party_donations(party_id)" },
+  { name: "idx_party_donations_day", sql: "CREATE INDEX IF NOT EXISTS idx_party_donations_day ON party_donations(day_number)" },
 ];
 
 /** Index migrations for user DB */
