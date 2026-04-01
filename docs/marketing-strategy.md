@@ -16,6 +16,23 @@ Solo dev, minimal effort, maximum impact. Focus on dev Twitter/X, Hacker News, R
 
 ---
 
+## GitHub README Optimization
+
+The repo itself is the landing page for all social traffic. Every link points here.
+
+**Must-haves before posting:**
+
+- **Hero visual**: Hemicycle screenshot or animated GIF at the top of README. This is the first thing visitors see — it should immediately communicate "parliament simulation."
+- **One-liner**: "6 AI agents simulate the German Bundestag — debating bills, negotiating coalitions, and triggering crises for $0.03/day."
+- **Quick-start section**: Clone → `npm install` → `npm run seed` → `npm run dev:api` & `npm run dev:web`. Visitors should be running it locally in under 2 minutes.
+- **Architecture diagram**: Simple box diagram showing the 4-package monorepo + AI provider split (Claude for 5 parties, Grok for AfD).
+- **Badges**: TypeScript, license, build status. Dev audiences scan these first.
+- **"Why a different model for AfD?"** callout box — this is the hook that brought people here, answer it immediately in the README.
+
+The README is not documentation — it's a sales page. Lead with the screenshot, then the hook, then the tech.
+
+---
+
 ## Suggested Screenshots (from live app)
 
 Take these screenshots for maximum visual impact:
@@ -105,34 +122,19 @@ Take these screenshots for maximum visual impact:
 
 ---
 
-### Post 6 — Cost breakdown
+### Post 6 — Cost + scale
 
 > Running an entire AI parliament costs less than a coffee.
 >
-> Per simulation day:
-> - Low context: $0.02
-> - Normal: $0.03
-> - High: $0.04
+> $0.03/day. A full 4-year term (1461 days): ~$44.
 >
-> That's 14 AI calls across 12 features, 6 autonomous agents, 3 generated news articles, and a daily summary.
+> Secret: Anthropic Batch API (50% off) + Claude Haiku.
 >
-> Secret: Anthropic Batch API (50% off) + Claude Haiku (cheap & fast).
->
-> A full 4-year term (1461 days) costs ~$44.
-
----
-
-### Post 7 — Scale flex
-
-> The full stack:
->
-> - 199 TypeScript files, ~34k lines
+> The stack behind it:
 > - 25 pages (React 19 + Vite + Tailwind v4)
-> - 93+ API endpoints (Express)
+> - 93+ API endpoints
 > - 25 database tables (SQLite + Drizzle)
-> - 14 distinct AI call sites
-> - 8 crisis types
-> - 4 timing presets (from "watch AI go brrr" to "full citizen participation")
+> - 14 AI call sites, 8 crisis types
 > - 1 solo dev
 >
 > Built with Claude Code.
@@ -141,7 +143,7 @@ Take these screenshots for maximum visual impact:
 
 ---
 
-### Post 8 — Coalition negotiation deep dive
+### Post 7 — Coalition negotiation deep dive
 
 > How AI coalition negotiations work in KI Bundestag:
 >
@@ -165,11 +167,25 @@ Take these screenshots for maximum visual impact:
 
 **Body**: Focus on technical architecture, multi-agent design, cost optimization. Include 2-3 screenshots. Mention the AfD/different model angle as a technical design choice.
 
-### r/germany or r/de
+### r/de (German-language — high-value audience)
 
-**Title**: "KI Bundestag: Eine KI-Simulation des Deutschen Bundestags"
+**Title**: "KI Bundestag: Eine KI-Simulation des Deutschen Bundestags — 6 KI-Parteien debattieren, verhandeln Koalitionen und verabschieden Gesetze"
 
-**Body**: In German. Focus on political realism — 735 seats, 5% threshold, Brandmauer, Fraktionen, constitutional court. The German audience will appreciate the accuracy of the parliamentary mechanics.
+**Body**: Write in German. This audience will uniquely appreciate the parliamentary accuracy that international dev audiences won't notice. Lead with the mechanics:
+
+- 735 Sitze, 5%-Hürde, Überhangmandate
+- Brandmauer gegen die AfD funktioniert auch bei KI-Agenten
+- Fraktionen, Vertrauensfrage, Bundesverfassungsgericht
+- Konstruktives Misstrauensvotum, Haushaltszyklus
+- Snap elections when Kanzlerzufriedenheit drops below 25%
+
+This is the one post where political realism > technical architecture. Include hemicycle screenshot and a coalition negotiation screenshot. The German Reddit audience will stress-test the parliamentary accuracy — make sure the post invites that kind of feedback.
+
+### r/germany
+
+**Title**: "KI Bundestag: AI simulation of the German parliament"
+
+**Body**: English version for expats and international followers. Lighter on Bundestag-specific mechanics, heavier on the "AI agents simulate politics" hook.
 
 ### r/SideProject
 
@@ -181,9 +197,11 @@ Take these screenshots for maximum visual impact:
 
 ## LinkedIn Post
 
-> I built an AI-powered simulation of the German Bundestag as a side project.
+> Coalition negotiations that produce genuine disagreements. Crises that force unexpected alliances. A government that collapses because public sentiment dropped too low — triggering snap elections. None of it scripted.
 >
-> 6 political parties, each driven by a separate AI agent, autonomously propose legislation, negotiate coalitions, respond to crises, and form governments — day by day, for 4-year terms.
+> I built an AI-powered simulation of the German Bundestag. 6 political parties, each driven by a separate AI agent, autonomously propose legislation, negotiate coalitions, respond to crises, and form governments — day by day, for 4-year terms.
+>
+> The emergent political dynamics are the most interesting part. The AfD agent keeps proposing coalitions that every other party rejects. Constitutional court rulings reverse economic policy. Media bias shifts public opinion in ways that cascade into elections. It's the same multi-agent architecture patterns I apply in enterprise dev workflows — but here the agents are politicians.
 >
 > Some technical highlights:
 > • Multi-provider AI architecture (Anthropic Claude + xAI Grok)
@@ -192,13 +210,32 @@ Take these screenshots for maximum visual impact:
 > • 25-page React SPA with real-time parliament visualization
 > • Full economic simulation (GDP, inflation, budget cycles)
 >
-> What surprised me most: the emergent political dynamics. Coalition negotiations produce genuine disagreements. Crises force unexpected alliances. Low public sentiment triggers snap elections. None of it scripted.
->
 > Running an entire parliament costs $0.03/day.
 >
 > Tech stack: TypeScript, React 19, Vite, Express, SQLite, Drizzle, Vercel AI SDK, Claude Haiku, Grok.
 >
 > #AI #MultiAgent #TypeScript #SideProject
+
+---
+
+## Dev.to / Hashnode Article
+
+**Title**: "How I Built an AI Parliament for $0.03/Day"
+
+This is the canonical long-form reference. All social posts should link back here.
+
+**Structure:**
+1. **Hook**: "6 AI agents. One parliament. $0.03/day. Here's what happened."
+2. **The AfD decision**: Why multi-provider matters for ideological diversity. Technical framing, not political commentary.
+3. **Architecture walkthrough**: 4-package monorepo, simulation loop (13 steps), Vercel AI SDK v6, Drizzle + SQLite.
+4. **Cost optimization deep dive**: Batch API (50% savings), context depth tiers, token budgeting. Show the actual numbers.
+5. **Emergent dynamics**: The best stories from the simulation — confidence votes, constitutional court rulings, failed coalitions. Let the AI-generated drama sell itself.
+6. **Lessons learned**: The 5 dev learnings from the Twitter thread, expanded with code examples.
+7. **What's next**: Open questions, possible extensions.
+
+**SEO tags**: `ai`, `multiagent`, `typescript`, `simulation`, `llm`, `anthropic`, `claude`
+
+This article has a long tail — it'll rank for "multi-agent AI system" and "AI simulation" searches for months. Worth spending time on.
 
 ---
 
@@ -210,17 +247,38 @@ Take these screenshots for maximum visual impact:
 
 ---
 
+## Cross-Linking & Personal Brand
+
+Every post should reinforce your positioning as a multi-agent AI builder, not just "person who made a parliament sim."
+
+**In every post, include one line connecting to your broader work:**
+- "This is the same multi-agent architecture I use in dx-aem-flow for enterprise dev workflows"
+- "Building multi-agent systems at this scale taught me patterns I now apply professionally"
+
+**Cross-link strategy:**
+- Twitter bio → GitHub repo + Dev.to article
+- Dev.to article → GitHub repo + live app (if deployed)
+- GitHub README → Dev.to article (for the full story)
+- LinkedIn → Dev.to article + GitHub repo
+- Reddit posts → GitHub repo
+
+The goal: anyone who finds you through one channel can follow the trail to all the others. The project markets your capabilities, not just itself.
+
+---
+
 ## Posting Schedule (minimal effort)
 
 | Day | Platform | Content |
 |-----|----------|---------|
+| 0 | GitHub | README overhaul (hero image, one-liner, quick-start, architecture diagram) |
+| 0 | Dev.to | Publish "How I Built an AI Parliament for $0.03/Day" article |
 | 1 | Twitter/X | Post 1 (hook) + Post 2 (why different model) |
-| 1 | HN | Show HN submission |
+| 1 | HN | Show HN submission (link to repo + Dev.to article) |
 | 2 | Twitter/X | Post 3 (technical) + Post 4 (drama) |
-| 2 | Reddit | r/artificial post |
-| 3 | Twitter/X | Post 5 (dev learnings) + Post 6 (cost) |
+| 2 | Reddit | r/artificial post + r/de post |
+| 3 | Twitter/X | Post 5 (dev learnings) + Post 6 (cost + scale) |
 | 3 | LinkedIn | LinkedIn post |
-| 4 | Twitter/X | Post 7 (scale) + Post 8 (negotiations) |
+| 4 | Twitter/X | Post 7 (coalition negotiations) |
 | 4 | Reddit | r/SideProject post |
 | 5+ | | Engage with comments, share follow-up insights |
 
