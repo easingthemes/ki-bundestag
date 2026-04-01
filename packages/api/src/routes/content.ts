@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, logUserAction, logger } from "@ki-bundestag/engine";
-import { eq, and } from "drizzle-orm";
+import { getDb, getUserDb, schema, logUserAction, logger, QUESTION_TOPICS } from "@ki-bundestag/engine";
+import { eq, and, isNull } from "drizzle-orm";
 import type {
   Poll,
   MediaArticle,
@@ -60,6 +60,7 @@ function mapQuestion(
     respondedOnDay: row.respondedOnDay,
     createdOnDay: row.createdOnDay,
     status: row.status as CitizenQuestion["status"],
+    topic: (row as any).topic ?? null,
     voteScore,
     totalVotes,
     userVote: userVote ?? null,
@@ -180,9 +181,11 @@ router.get("/api/questions", (req, res) => {
   const allRows = db.select().from(schema.citizenQuestions).all();
   const partyFilter = req.query.partyId as string | undefined;
   const statusFilter = req.query.status as string | undefined;
+  const topicFilter = req.query.topic as string | undefined;
   let rows = allRows;
   if (partyFilter) rows = rows.filter((q: any) => q.targetPartyId === partyFilter);
   if (statusFilter) rows = rows.filter((q: any) => q.status === statusFilter);
+  if (topicFilter) rows = rows.filter((q: any) => q.topic === topicFilter);
 
   // Aggregate vote scores from user DB
   const allVotes = userDb.select().from(schema.questionVotes).all();
@@ -217,6 +220,81 @@ router.get("/api/questions", (req, res) => {
   res.json(questions);
 });
 
+// GET /api/questions/topics — static list of available topics
+router.get("/api/questions/topics", (_req, res) => {
+  res.json(QUESTION_TOPICS);
+});
+
+// GET /api/questions/trending-topics — real-world question topics from abgeordnetenwatch
+let trendingCache: { topics: Array<{ label: string; sampleQuestion: string; source: string }>; cachedAt: number } | null = null;
+router.get("/api/questions/trending-topics", (_req, res) => {
+  const now = Date.now();
+  if (trendingCache && now - trendingCache.cachedAt < 3600_000) {
+    res.json(trendingCache.topics);
+    return;
+  }
+
+  const db = getDb();
+  const rows = db.select().from(schema.realWorldKnowledge)
+    .all()
+    .filter(r => r.active && (r.digest.includes("abgeordnetenwatch") || r.category === "headline"))
+    .slice(0, 30);
+
+  // Extract topic labels and sample questions
+  const topicMap = new Map<string, string>();
+  for (const r of rows) {
+    // digest format varies; extract meaningful topic label
+    const label = r.partyId ? r.digest.slice(0, 60) : r.digest.slice(0, 60);
+    const topic = r.category === "headline" ? r.digest.slice(0, 40) : r.digest.slice(0, 40);
+    if (!topicMap.has(topic)) {
+      topicMap.set(topic, r.digest.slice(0, 150));
+    }
+  }
+
+  const topics = Array.from(topicMap.entries()).slice(0, 8).map(([label, sample]) => ({
+    label: label.replace(/\.\.\.$/, "").trim(),
+    sampleQuestion: sample,
+    source: "abgeordnetenwatch",
+  }));
+
+  trendingCache = { topics, cachedAt: now };
+  res.json(topics);
+});
+
+// GET /api/questions/suggestions — AI-generated question suggestions
+router.get("/api/questions/suggestions", (_req, res) => {
+  const db = getDb();
+  const rows = db.select().from(schema.questionSuggestions)
+    .where(isNull(schema.questionSuggestions.usedByUserId))
+    .all();
+  res.json(rows.slice(0, 5).map(r => ({
+    id: r.id,
+    question: r.question,
+    topic: r.topic,
+    targetPartyId: r.targetPartyId,
+    createdOnDay: r.createdOnDay,
+  })));
+});
+
+// POST /api/questions/suggestions/:id/use — mark a suggestion as used
+router.post("/api/questions/suggestions/:id/use", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Authentication required" }); return; }
+
+  const db = getDb();
+  const rows = db.select().from(schema.questionSuggestions)
+    .where(eq(schema.questionSuggestions.id, req.params.id))
+    .all();
+  if (rows.length === 0) { res.status(404).json({ error: "Suggestion not found" }); return; }
+
+  db.update(schema.questionSuggestions)
+    .set({ usedByUserId: token })
+    .where(eq(schema.questionSuggestions.id, req.params.id))
+    .run();
+
+  res.json({ success: true });
+});
+
 // GET /api/questions/:id
 router.get("/api/questions/:id", (req, res) => {
   const db = getDb();
@@ -237,7 +315,13 @@ router.get("/api/questions/:id", (req, res) => {
 router.post("/api/questions", (req, res) => {
   if (requireParticipatory(req, res, "ask_questions")) return;
   const db = getDb();
-  const { question, targetPartyId } = req.body;
+  const { question, targetPartyId, topic } = req.body;
+
+  // Validate topic if provided
+  if (topic && !QUESTION_TOPICS.includes(topic)) {
+    res.status(400).json({ error: "Invalid topic" });
+    return;
+  }
 
   // Per-user 24h rolling window cap
   const token = getUserToken(req);
@@ -283,6 +367,7 @@ router.post("/api/questions", (req, res) => {
     createdOnDay: currentDay,
     status: "pending",
     userId: token,
+    topic: topic || null,
   }).run();
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
