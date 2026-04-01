@@ -402,6 +402,15 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (party_id) REFERENCES parties(id)
   );
 
+  CREATE TABLE IF NOT EXISTS day_summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_number INTEGER NOT NULL UNIQUE,
+    narrative TEXT,
+    mood TEXT,
+    preview TEXT,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -588,6 +597,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "question_suggestions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS question_suggestions (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT, target_party_id TEXT NOT NULL REFERENCES parties(id), created_on_day INTEGER NOT NULL, used_by_user_id TEXT)" },
   { table: "era_summaries", column: "case_facts", sql: "ALTER TABLE era_summaries ADD COLUMN case_facts TEXT" },
   { table: "simulation_meta", column: "day_progress", sql: "ALTER TABLE simulation_meta ADD COLUMN day_progress INTEGER NOT NULL DEFAULT 0" },
+  { table: "day_summaries", column: "_table", sql: "CREATE TABLE IF NOT EXISTS day_summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, day_number INTEGER NOT NULL UNIQUE, narrative TEXT, mood TEXT, preview TEXT, created_at TEXT NOT NULL)" },
 ];
 
 /** Column migrations for user DB */
@@ -614,6 +624,7 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_ai_calls_task", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_task ON ai_calls(task)" },
   { name: "idx_ai_calls_created", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_created ON ai_calls(created_at)" },
   { name: "idx_era_summaries_days", sql: "CREATE INDEX IF NOT EXISTS idx_era_summaries_days ON era_summaries(start_day, end_day)" },
+  { name: "idx_day_summaries_day", sql: "CREATE INDEX IF NOT EXISTS idx_day_summaries_day ON day_summaries(day_number)" },
   { name: "idx_committee_memberships_committee", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_committee ON committee_memberships(committee_id)" },
   { name: "idx_committee_memberships_seat", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_seat ON committee_memberships(seat_id)" },
   { name: "idx_sidejobs_party", sql: "CREATE INDEX IF NOT EXISTS idx_sidejobs_party ON sidejobs(party_id)" },

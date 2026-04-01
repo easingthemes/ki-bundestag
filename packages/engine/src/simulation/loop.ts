@@ -246,6 +246,39 @@ export async function runDay(): Promise<number> {
     createdAt: new Date().toISOString(),
   }).run();
 
+  // 2b. Generate and persist start-of-day preview
+  const previewParts: string[] = [];
+  if (pendingBills.filter(b => b.status === "third_reading").length > 0) {
+    const count = pendingBills.filter(b => b.status === "third_reading").length;
+    previewParts.push(`${count} Gesetz${count > 1 ? "e" : ""} stehen zur dritten Lesung`);
+  }
+  if (pendingBills.filter(b => b.status === "committee").length > 0) {
+    const count = pendingBills.filter(b => b.status === "committee").length;
+    previewParts.push(`${count} Gesetz${count > 1 ? "e" : ""} im Ausschuss`);
+  }
+  const activeCrises = db.select().from(schema.crises).all()
+    .filter((c: any) => !c.resolved && c.endDay >= currentDay);
+  if (activeCrises.length > 0) {
+    previewParts.push(`${activeCrises.length} aktive Krise${activeCrises.length > 1 ? "n" : ""}`);
+  }
+  const activeElection = db.select().from(schema.elections).all()
+    .find((e: any) => e.status !== "completed" && e.status !== "invalidated");
+  if (activeElection) {
+    previewParts.push(`Wahl: ${(activeElection as any).status}`);
+  }
+  if (nationalState.provisionalBudget) {
+    previewParts.push("Vorläufige Haushaltsführung");
+  }
+  const dayPreview = previewParts.length > 0
+    ? previewParts.join(" · ")
+    : "Regulärer Sitzungstag";
+
+  // Upsert the day_summaries row with preview (narrative/mood filled later)
+  getSqlite().prepare(
+    `INSERT INTO day_summaries (day_number, preview, created_at) VALUES (?, ?, ?)
+     ON CONFLICT(day_number) DO UPDATE SET preview = excluded.preview`
+  ).run(currentDay, dayPreview, new Date().toISOString());
+
   // 3. Apply economic drift
   const driftedEconomy = applyEconomicDrift(nationalState.economy);
   nationalState.economy = driftedEconomy;
@@ -2203,6 +2236,13 @@ export async function runDay(): Promise<number> {
   const dailySummaryStr = summaryResult ? JSON.stringify(summaryResult) : null;
   if (dailySummaryStr) {
     console.log(`  [Summary] Generated daily narrative`);
+  }
+
+  // Persist narrative + mood into day_summaries table (preview already saved at day start)
+  if (summaryResult) {
+    getSqlite().prepare(
+      `UPDATE day_summaries SET narrative = ?, mood = ? WHERE day_number = ?`
+    ).run(summaryResult.narrative, summaryResult.mood, currentDay);
   }
 
   // 13. Check that the day produced meaningful content (not just system events)
