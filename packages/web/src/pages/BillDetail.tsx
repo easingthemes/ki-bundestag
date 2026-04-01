@@ -387,6 +387,34 @@ export function BillDetail() {
         </div>
       )}
 
+      {/* Per-MdB Vote Breakdown */}
+      {mdbVotes && mdbVotes.summary.total > 0 && (
+        <div className="mb-6">
+          <h2 className="section-title">MdB-Einzelstimmen ({mdbVotes.summary.total})</h2>
+          <Card><CardContent className="p-5">
+            <VoteBar yes={mdbVotes.summary.yes} no={mdbVotes.summary.no} abstain={mdbVotes.summary.abstain} total={mdbVotes.summary.total} showCounts />
+            <div className="mt-3 space-y-2">
+              {Object.entries(mdbVotes.byParty).map(([pId, counts]) => {
+                const p = partyMap.get(pId);
+                const partyTotal = counts.yes + counts.no + counts.abstain;
+                return (
+                  <div key={pId}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: p?.color ?? "#6b7280" }} />
+                      <Link to={`/parties/${pId}`} className="text-sm font-medium hover:underline">{p?.name ?? pId}</Link>
+                      <span className="text-xs text-muted-foreground">({partyTotal} Stimmen)</span>
+                    </div>
+                    <div className="ml-5">
+                      <VoteBar yes={counts.yes} no={counts.no} abstain={counts.abstain} total={partyTotal} height="h-2" showCounts />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent></Card>
+        </div>
+      )}
+
       {/* Constitutional Challenge */}
       {challenge && (
         <div className="mb-6">

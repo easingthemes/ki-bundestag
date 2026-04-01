@@ -555,3 +555,32 @@ export interface MdbVoteSummary {
   byParty: Record<string, { yes: number; no: number; abstain: number }>;
   userVote: string | null;
 }
+
+// ── MdB Profile types ────────────────────────────────────────────────────────
+
+export interface MdbVoteRecord {
+  billId: string;
+  billTitle: string;
+  billStatus: string;
+  vote: string;
+  createdAt: number;
+}
+
+export interface MdbSpeechRecord {
+  id: string;
+  billId: string;
+  billTitle: string;
+  reading: number;
+  content: string;
+  sentimentImpact: number | null;
+  dayNumber: number;
+  createdAt: number;
+}
+
+export interface MdbProfile {
+  seat: BundestagSeat;
+  party: { id: string; name: string; color: string } | null;
+  application: { motivation: string; policyFocus: string[] | null } | null;
+  votes: MdbVoteRecord[];
+  speeches: MdbSpeechRecord[];
+}

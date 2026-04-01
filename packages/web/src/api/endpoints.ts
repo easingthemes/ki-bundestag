@@ -37,6 +37,7 @@ import {
   MdbApplication,
   MdbSpeech,
   MdbVoteSummary,
+  MdbProfile,
   ImpactData,
   CatchupData,
 } from "./types.js";
@@ -250,6 +251,15 @@ export const getAvailableSeats = () =>
   fetchJson<Record<string, { open: number; humanTotal: number; total: number }>>("/seats/available");
 export const applyForSeat = (applicationText: string, policyFocus?: string) =>
   postJson<{ status: string }>("/seats/apply", { applicationText, policyFocus: policyFocus ? [policyFocus] : undefined });
+export const getSeatRoster = (partyId?: string, controller?: string, search?: string) => {
+  const params = new URLSearchParams();
+  if (partyId) params.set("partyId", partyId);
+  if (controller) params.set("controller", controller);
+  if (search) params.set("search", search);
+  const qs = params.toString();
+  return fetchJson<BundestagSeat[]>(`/seats/roster${qs ? `?${qs}` : ""}`);
+};
+export const getMdbProfile = (seatId: string) => fetchJson<MdbProfile>(`/seats/${seatId}/profile`);
 
 // ── MdB Parliamentary Actions ─────────────────────────────────────────────────
 
@@ -349,4 +359,6 @@ export const api = {
   getMyImpact,
   getMyCatchup,
   getLatestEvents,
+  getSeatRoster,
+  getMdbProfile,
 };
