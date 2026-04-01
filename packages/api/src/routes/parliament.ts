@@ -264,6 +264,56 @@ router.get("/api/crisis-templates", (_req, res) => {
   res.json(templates.map(t => ({ id: t.id, name: t.name, severity: t.severity, category: t.category })));
 });
 
+// GET /api/sidejobs
+router.get("/api/sidejobs", (req, res) => {
+  const db = getDb();
+  const allRows = db.select().from(schema.sidejobs)
+    .where(eq(schema.sidejobs.active, true))
+    .all();
+  const partyFilter = req.query.partyId as string | undefined;
+  const controversialFilter = req.query.controversial as string | undefined;
+  let rows = allRows;
+  if (partyFilter) rows = rows.filter(r => r.partyId === partyFilter);
+  if (controversialFilter === "true") rows = rows.filter(r => r.isControversial);
+  rows.sort((a, b) => b.createdOnDay - a.createdOnDay);
+  res.json(rows.map(r => ({
+    id: r.id,
+    seatId: r.seatId,
+    partyId: r.partyId,
+    politicianName: r.politicianName,
+    organization: r.organization,
+    role: r.role,
+    incomeLevel: r.incomeLevel,
+    category: r.category,
+    isControversial: r.isControversial,
+    createdOnDay: r.createdOnDay,
+  })));
+});
+
+// GET /api/sidejobs/seat/:seatId
+router.get("/api/sidejobs/seat/:seatId", (req, res) => {
+  const db = getDb();
+  const rows = db.select().from(schema.sidejobs)
+    .where(and(
+      eq(schema.sidejobs.seatId, req.params.seatId),
+      eq(schema.sidejobs.active, true),
+    ))
+    .all();
+  rows.sort((a, b) => b.createdOnDay - a.createdOnDay);
+  res.json(rows.map(r => ({
+    id: r.id,
+    seatId: r.seatId,
+    partyId: r.partyId,
+    politicianName: r.politicianName,
+    organization: r.organization,
+    role: r.role,
+    incomeLevel: r.incomeLevel,
+    category: r.category,
+    isControversial: r.isControversial,
+    createdOnDay: r.createdOnDay,
+  })));
+});
+
 // GET /api/committees
 router.get("/api/committees", (req, res) => {
   const db = getDb();
