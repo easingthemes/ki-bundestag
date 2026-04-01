@@ -74,6 +74,26 @@ function heartbeat(progress?: number): void {
   } catch { /* best-effort */ }
 }
 
+/**
+ * Tracks day progress as a fraction of total planned steps.
+ * Different days have different phase counts (election vs normal vs budget).
+ */
+class DayProgress {
+  private completed = 0;
+  private total: number;
+
+  constructor(totalSteps: number) {
+    this.total = Math.max(totalSteps, 1);
+  }
+
+  /** Mark one step done, write progress to DB. Progress range: 5–95% */
+  step(): void {
+    this.completed++;
+    const pct = Math.min(5 + Math.round((this.completed / this.total) * 90), 95);
+    heartbeat(pct);
+  }
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
@@ -492,6 +512,17 @@ export async function runDay(): Promise<number> {
   let skipPartyAgents = false;
   let briefingText: string | null = null;
 
+  // Predict which phases will run for progress tracking.
+  // Negotiation: AI call (1 step). Voting day: deterministic, no AI batch.
+  const willNegotiate = activeElection?.status === "negotiation";
+  const willSkipAgents = willNegotiate || activeElection?.status === "voting";
+  const progressSteps = 1 + // end-of-day batch (always)
+    (willSkipAgents ? 0 : 1) + // party agent batch
+    (willNegotiate ? 1 : 0) + // negotiation round
+    (isPollDay(currentDay, startDate) ? 1 : 0) + // mid-cycle batch
+    (shouldGenerateSidejobs(currentDay) ? 1 : 0); // sidejobs batch
+  const progress = new DayProgress(progressSteps);
+
   if (activeElection && activeElection.status === "negotiation") {
     skipPartyAgents = true;
 
@@ -759,6 +790,7 @@ export async function runDay(): Promise<number> {
         .run();
     }
     } // end inner negotiation guard
+    progress.step(); // negotiation round complete
   }
 
   // Advance election phase (for non-negotiation states)
@@ -1073,7 +1105,7 @@ export async function runDay(): Promise<number> {
       }
       // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
     }
-    heartbeat(40);
+    progress.step();
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
@@ -1874,7 +1906,6 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Mid-cycle] Batch failed, skipping polls/referendums:`, (err as Error).message);
         }
       }
-      heartbeat(65);
 
       // Process context poll result
       if (isWeekly) {
@@ -1912,6 +1943,7 @@ export async function runDay(): Promise<number> {
       });
       console.log(`  [Cycle] Weekly report — Day ${currentDay}`);
     }
+    if (isWeekly) progress.step();
   }
 
   // 11c. Monthly economic report
@@ -2118,8 +2150,8 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Sidejobs] Batch failed:`, (err as Error).message);
         }
       }
-      heartbeat(80);
     }
+    progress.step();
   }
 
   // 12. Save updated national state
@@ -2159,7 +2191,7 @@ export async function runDay(): Promise<number> {
     }
     // endOfDayResults stays [] — media and summary steps are silently skipped
   }
-  heartbeat(90);
+  progress.step();
 
   // Process media results
   let mediaArticles: Array<{ category: string; sentiment?: number }> = [];
