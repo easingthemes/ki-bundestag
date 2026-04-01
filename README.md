@@ -92,4 +92,4 @@ Open [http://localhost:5173](http://localhost:5173) and run `npm run simulate` t
 
 ## License
 
-Private.
+[MIT](LICENSE)
