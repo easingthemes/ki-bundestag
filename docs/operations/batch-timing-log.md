@@ -105,6 +105,50 @@ Days 9–12 ran continuously in ultra-fast mode. Per-day wall clock measured fro
 | **Estimated term (1461 days, ultra-fast)** | **~10 days** |
 | **Estimated term (fast, 7 min delay)** | **~17 days** |
 
+### 2026-04-01 — Ultra-fast, extended run (days 9–49)
+
+| Run | Preset | Context Depth | Mode |
+|-----|--------|---------------|------|
+| 4 | ultra-fast | low | `runner-auto.ts` (PM2) |
+
+Continuous ultra-fast run spanning 41 days of simulation. Key observations from production logs:
+
+**Per-day timing (sampled from logs)**:
+
+| Day Range | Avg per Day | Notes |
+|-----------|-------------|-------|
+| 9–15 | ~8–12 min | Typical batch completion, 3–4 batches/day |
+| 16–25 | ~8–15 min | Some days with slower batch completion (50+ polls) |
+| 26–35 | ~10–12 min | Stable pattern, occasional VALIDATION_FAIL retries |
+| 36–49 | ~8–15 min | Consistent with earlier days |
+
+**Batch completion variability**:
+- **Fast batches**: Complete in 2–3 polls (~20–30s each) — typically briefing and small mid-cycle batches
+- **Slow batches**: Occasionally take 50+ polls (~8+ minutes) — observed on party-agent batches
+- **Average**: 3–5 min per batch, 3–4 batches per sim day
+
+**Error rates observed**:
+- VALIDATION_FAIL: ~5–10% of AI responses required re-parsing or retry
+- PARSE_FAIL: Occasional JSON parsing failures, handled by `parseAIJson()` retry logic
+- No batch-level failures (all batches eventually completed)
+
+**Updated per-day estimate**: ~10 min (confirmed across 41-day sample, consistent with earlier 12-day measurement)
+
+### Updated Summary Statistics (as of 2026-04-01)
+
+| Metric | Value |
+|--------|-------|
+| Avg batch creation to completion | ~2–4 min |
+| Min observed | ~1 min (1 request) |
+| Max observed | ~8 min (slow batch, 50+ polls) |
+| Polling interval | 10s (reduced from 30s for faster detection) |
+| Batches per sim day | 3–4 (briefing, agents, mid-cycle, end-of-day) |
+| **Estimated time per sim day** | **~10 min** |
+| **Estimated term (1461 days, ultra-fast)** | **~10 days** |
+| **Estimated term (fast, 7 min delay)** | **~17–21 days** |
+| Error rate (VALIDATION_FAIL) | ~5–10% |
+| Error rate (PARSE_FAIL) | <2% |
+
 ## Future Observations
 
 Add new entries below as more data is collected:
