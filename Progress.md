@@ -1,49 +1,37 @@
-# Progress: Progressive Summarization with Case Facts Preservation
+# Progress: Server-Side Day Progress Bar
 
-**Plan**: [docs/plans/progressive-summarization.md](docs/plans/progressive-summarization.md)
-**Goal**: Extend the existing era summary system with structured case facts (coalition, economy, bills, elections, crises) that survive all summarization passes, so party agents retain access to specific historical facts as context compresses.
+**Plan**: [docs/plans/server-side-progress.md](docs/plans/server-side-progress.md)
+**Goal**: Replace the time-based progress bar with real server-side phase tracking. Engine writes completion percentages to `simulation_meta.day_progress` at AI batch milestones; frontend interpolates smoothly between updates with time-based fallback.
 **Validation**: `npm run typecheck && npm test`
 
 ---
 
-### Step 1: Define `EraCaseFacts` type and widen `eraSummaries` on `AgentContext`
-
-- **Status**: done
-- **Files**: `packages/types/src/types/agent.ts`
-- **Result**: Added `EraCaseFacts` interface and widened `eraSummaries` field on `AgentContext`. Typecheck passes (6/6).
-
-### Step 2: Add `case_facts` column to `era_summaries` table + migration
+### Step 1: Schema — Add `day_progress` column
 
 - **Status**: done
 - **Files**: `packages/engine/src/db/schema-sim.ts`, `packages/engine/src/db/ddl.ts`
-- **Result**: Added `caseFacts` JSON column to Drizzle schema, DDL, and column migration. Typecheck passes (6/6).
+- **Result**: Added `dayProgress` integer column to schema and DDL + column migration. Typecheck passes (6/6).
 
-### Step 3: Implement `extractCaseFacts()` function
-
-- **Status**: done
-- **Files**: `packages/engine/src/simulation/era-summary.ts`
-- **Result**: Added `extractCaseFacts()` querying economy, coalition, government, parties, bills, elections, crises, and government changes. Typecheck passes (6/6).
-
-### Step 4: Update storage — `processEraSummaryResult` and `getEraSummaries`
-
-- **Status**: done
-- **Files**: `packages/engine/src/simulation/era-summary.ts`
-- **Result**: `getEraSummaries` now returns `caseFacts?`, `processEraSummaryResult` accepts and persists `caseFacts`. Typecheck passes (6/6).
-
-### Step 5: Prompt integration — `formatCaseFacts` + P1.25 rendering
-
-- **Status**: done
-- **Files**: `packages/engine/src/agent/prompt.ts`, `packages/engine/src/agent/context-depth.ts`
-- **Result**: Added `formatCaseFacts` compact renderer, `maxEraSummaryTokens` config (500/1500/3000), and budget-aware P1.25 rendering with recent-3-eras priority. Typecheck passes (6/6).
-
-### Step 6: Wire case facts through simulation loop
+### Step 2: Engine — DayProgress helper + progress calls in loop.ts
 
 - **Status**: done
 - **Files**: `packages/engine/src/simulation/loop.ts`
-- **Result**: Extract case facts at era boundary and pass to `processEraSummaryResult`. Typecheck passes (6/6).
+- **Result**: Added `DayProgress` class with `set(pct)` + `complete()`. Placed 8 milestone calls: 0% (reset), 10% (init done), 15/50% (negotiation), 50% (agents), 60% (actions), 75% (interpellations), 80/95% (media+summary), 100% (final). Typecheck passes (6/6).
 
-### Step 7: Enhance summarization prompt with case facts context
+### Step 3: API — Expose `dayProgress` in status response
 
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/era-summary.ts`, `packages/engine/src/simulation/loop.ts`
-- **Result**: `buildEraSummaryBatchRequest` now accepts `caseFacts` and includes economy/coalition/bills/elections/crises in AI prompt context. Loop passes case facts to both builder and processor. Typecheck 6/6, all 187 tests pass.
+- **Files**: `packages/api/src/socket.ts`, `packages/api/src/routes/simulation.ts`
+- **Result**: Added `dayProgress` and `heartbeatAt` to socket `getSimStatus()` and REST `/api/simulation/status` endpoint. Typecheck passes (6/6).
+
+### Step 4: Frontend — Server-driven progress with smooth interpolation
+
+- **Status**: done
+- **Files**: `packages/web/src/api/types.ts`, `packages/web/src/main.tsx`
+- **Result**: Added `dayProgress` to `SimulationStatus` type. Replaced time-based progress calc with server-driven progress (uses `dayProgress` with +1%/10s drift interpolation, falls back to time-based for servers without the field). Typecheck 6/6, 187 tests pass.
+
+### Step 5: Reset progress on day start
+
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/loop.ts`
+- **Result**: Combined with Step 2 — `dayProgress: 0` set in the `dayStartedAt` update at the start of `runDay()`.
