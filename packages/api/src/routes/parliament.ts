@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, getCrisisTemplates, getUserSeat, getSqlite } from "@ki-bundestag/engine";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import type {
   BillImpact,
   BillVote,
@@ -262,6 +262,119 @@ router.get("/api/constitutional-court/:id", (req, res) => {
 router.get("/api/crisis-templates", (_req, res) => {
   const templates = getCrisisTemplates();
   res.json(templates.map(t => ({ id: t.id, name: t.name, severity: t.severity, category: t.category })));
+});
+
+// GET /api/committees
+router.get("/api/committees", (req, res) => {
+  const db = getDb();
+  const sqlite = getSqlite();
+  const committees = db.select().from(schema.committees)
+    .where(eq(schema.committees.active, true)).all();
+
+  const result = committees.map(c => {
+    const billCount = (sqlite.prepare(
+      "SELECT COUNT(*) as cnt FROM bills WHERE committee_name = ? AND status = 'committee'"
+    ).get(c.name) as { cnt: number })?.cnt ?? 0;
+
+    const memberCount = (sqlite.prepare(
+      "SELECT COUNT(*) as cnt FROM committee_memberships WHERE committee_id = ?"
+    ).get(c.id) as { cnt: number })?.cnt ?? 0;
+
+    return {
+      id: c.id,
+      name: c.name,
+      shortName: c.shortName,
+      billCategory: c.billCategory,
+      billCount,
+      memberCount,
+    };
+  });
+
+  res.json(result);
+});
+
+// GET /api/committees/:id
+router.get("/api/committees/:id", (req, res) => {
+  const db = getDb();
+  const sqlite = getSqlite();
+
+  const rows = db.select().from(schema.committees)
+    .where(eq(schema.committees.id, req.params.id)).all();
+  if (rows.length === 0) {
+    res.status(404).json({ error: "Committee not found" });
+    return;
+  }
+  const committee = rows[0];
+
+  // Bills assigned to this committee
+  const bills = db.select().from(schema.bills)
+    .where(eq(schema.bills.committeeName, committee.name)).all()
+    .map(b => ({
+      id: b.id,
+      title: b.title,
+      status: b.status,
+      proposedBy: b.proposedBy,
+      committeeRecommendation: b.committeeRecommendation,
+    }));
+
+  // Members via committee_memberships + bundestag_seats
+  const memberRows = sqlite.prepare(`
+    SELECT cm.seat_id, cm.role, bs.seat_number, bs.party_id, bs.controller, bs.user_id
+    FROM committee_memberships cm
+    JOIN bundestag_seats bs ON bs.id = cm.seat_id
+    WHERE cm.committee_id = ?
+    ORDER BY cm.role DESC, bs.seat_number ASC
+  `).all(committee.id) as Array<{
+    seat_id: string;
+    role: string;
+    seat_number: number;
+    party_id: string;
+    controller: string;
+    user_id: string | null;
+  }>;
+
+  // Look up display names for human members
+  let userNames: Record<string, string> = {};
+  const humanUserIds = memberRows.filter(m => m.user_id).map(m => m.user_id!);
+  if (humanUserIds.length > 0) {
+    try {
+      const userDb = getUserDb();
+      const userRows = userDb.select().from(schema.users).all()
+        .filter(u => humanUserIds.includes(u.id));
+      for (const u of userRows) {
+        userNames[u.id] = u.displayName;
+      }
+    } catch { /* user DB may not be available */ }
+  }
+
+  const members = memberRows.map(m => ({
+    seatId: m.seat_id,
+    seatNumber: m.seat_number,
+    partyId: m.party_id,
+    role: m.role,
+    displayName: m.user_id ? (userNames[m.user_id] ?? null) : null,
+    controller: m.controller,
+  }));
+
+  // Stats
+  const passCount = bills.filter(b => b.committeeRecommendation === "pass").length;
+  const rejectCount = bills.filter(b => b.committeeRecommendation === "reject").length;
+  const amendCount = bills.filter(b => b.committeeRecommendation === "amend").length;
+
+  res.json({
+    id: committee.id,
+    name: committee.name,
+    shortName: committee.shortName,
+    billCategory: committee.billCategory,
+    bills,
+    members,
+    stats: {
+      totalBillsReviewed: passCount + rejectCount + amendCount,
+      passCount,
+      rejectCount,
+      amendCount,
+    },
+  });
 });
 
 // ── POST routes ─────────────────────────────────────────────────────────────

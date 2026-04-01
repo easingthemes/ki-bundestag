@@ -259,6 +259,26 @@ router.get("/api/seats/:seatId/profile", (req, res) => {
     .where(eq(schema.parties.id, seat.partyId))
     .all()[0];
 
+  // Committee memberships for this seat
+  const sqlite = getSqlite();
+  const committeeRows = sqlite.prepare(`
+    SELECT cm.committee_id, cm.role, c.name, c.short_name
+    FROM committee_memberships cm
+    JOIN committees c ON c.id = cm.committee_id AND c.active = 1
+    WHERE cm.seat_id = ?
+  `).all(seat.id) as Array<{
+    committee_id: string;
+    role: string;
+    name: string;
+    short_name: string | null;
+  }>;
+  const committeeList = committeeRows.map(r => ({
+    committeeId: r.committee_id,
+    committeeName: r.name,
+    shortName: r.short_name,
+    role: r.role,
+  }));
+
   res.json({
     seat: { ...seat, displayName },
     party: party ? { id: party.id, name: party.name, color: party.color } : null,
@@ -268,6 +288,7 @@ router.get("/api/seats/:seatId/profile", (req, res) => {
     } : null,
     votes: enrichedVotes,
     speeches,
+    committees: committeeList,
   });
 });
 

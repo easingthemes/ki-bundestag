@@ -27,6 +27,8 @@ import { Notifications } from "./pages/Notifications";
 import { MyActivity } from "./pages/MyActivity";
 import { MdbList } from "./pages/MdbList";
 import { MdbDetail } from "./pages/MdbDetail";
+import { Committees } from "./pages/Committees";
+import { CommitteeDetail } from "./pages/CommitteeDetail";
 import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat, onSimStatus, onNotificationRefresh, isSocketConnected } from "./api";
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -135,6 +137,7 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileLink to="/" end>{t("nav.dashboard")}</MobileLink>
           <MobileGroupLabel>{t("nav.parlament")}</MobileGroupLabel>
           <MobileLink to="/mdb">{t("nav.mdb")}</MobileLink>
+          <MobileLink to="/committees">{t("nav.committees")}</MobileLink>
           <MobileLink to="/bills">{t("nav.bills")}</MobileLink>
           <MobileLink to="/motions">{t("nav.motions")}</MobileLink>
           <MobileLink to="/interpellations">{t("nav.interpellations")}</MobileLink>
@@ -603,6 +606,7 @@ function App() {
             </NavLink>
             <NavGroup label={t("nav.parlament")}>
               <DropdownLink to="/mdb">{t("nav.mdb")}</DropdownLink>
+              <DropdownLink to="/committees">{t("nav.committees")}</DropdownLink>
               <DropdownLink to="/bills">{t("nav.bills")}</DropdownLink>
               <DropdownLink to="/motions">{t("nav.motions")}</DropdownLink>
               <DropdownLink to="/interpellations">{t("nav.interpellations")}</DropdownLink>
@@ -664,6 +668,8 @@ function App() {
             <Route path="/bills/:id" element={<BillDetail />} />
             <Route path="/mdb" element={<MdbList />} />
             <Route path="/mdb/:seatId" element={<MdbDetail />} />
+            <Route path="/committees" element={<Committees />} />
+            <Route path="/committees/:id" element={<CommitteeDetail />} />
             <Route path="/elections" element={<Elections />} />
             <Route path="/news" element={<NewsFeed />} />
             <Route path="/polls" element={<Polls />} />
