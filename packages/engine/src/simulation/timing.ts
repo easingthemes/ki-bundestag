@@ -46,18 +46,22 @@ export const TIME_CONFIG = {
   // Presets
   presets: {
     "ultra-fast": {
-      msPerDay: 0,                        // AI-bound, no delay (batch API ~10 min/day)
+      msPerDay: 0,                        // AI-bound only, no additional delay
+                                          // Typical: 10-15 min/day (batch API)
+                                          // When Anthropic is slow: 20-40 min/day
       participatory: false,
       nightMode: "none",
       label: "Ultra-Fast (Demo)",
-      termRealTime: "~10 days",
+      termRealTime: "~10-25 days",        // varies with API latency
     },
     "fast": {
-      msPerDay: 420_000,                  // 7 minutes + batch API ~10 min
+      msPerDay: 420_000,                  // 7 min delay + batch API time
+                                          // Typical total: ~17-22 min/day
+                                          // When Anthropic is slow: ~30-50 min/day
       participatory: false,
       nightMode: "none",
       label: "Fast (Weekly)",
-      termRealTime: "~2-3 weeks",
+      termRealTime: "~2-5 weeks",         // varies with API latency
     },
     "normal": {
       msPerDayDay: 1_800_000,             // 30 min daytime

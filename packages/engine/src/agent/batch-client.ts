@@ -47,13 +47,23 @@ export interface BatchResult {
 // ---------------------------------------------------------------------------
 
 const BATCH_POLL_INTERVAL_BASE_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 60) * 1000;
-const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 3600) * 1000;
+const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 5400) * 1000;
 
-/** Adaptive poll interval: 15s for first 3 polls, 30s for polls 4-10, then base interval. */
+/**
+ * Adaptive poll interval: ramps up as batch takes longer.
+ *   polls 0-2:  15s  (fast check for small batches)
+ *   polls 3-9:  30s  (normal processing)
+ *   polls 10-19: 45s (Anthropic may be slow)
+ *   polls 20+:  base interval (60s default)
+ *
+ * When Anthropic is under load, batches can take 10-20+ minutes.
+ * The longer intervals avoid hammering the API during slow periods.
+ */
 function adaptivePollInterval(pollCount: number): number {
   if (BATCH_POLL_INTERVAL_BASE_MS < 30_000) return BATCH_POLL_INTERVAL_BASE_MS; // respect explicit short override
   if (pollCount < 3) return 15_000;
   if (pollCount < 10) return 30_000;
+  if (pollCount < 20) return 45_000;
   return BATCH_POLL_INTERVAL_BASE_MS;
 }
 
@@ -172,9 +182,14 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
       status = updated.processing_status;
       pollFailures = 0; // reset on success
       const counts = updated.request_counts;
+      const elapsedSec = Math.round((Date.now() - batchStartMs) / 1000);
       console.log(
         `  [Batch] ${batch.id}: ${counts.succeeded} succeeded, ${counts.processing} processing, ${counts.errored} errored`,
       );
+      // Warn when batch is taking unusually long (>5 min)
+      if (pollCount === 10) {
+        console.warn(`  [Batch] ${batch.id}: slow batch — ${elapsedSec}s elapsed, ${counts.processing} still processing (Anthropic may be under load)`);
+      }
     } catch (pollErr) {
       pollFailures++;
       console.warn(`  [Batch] Poll error for ${batch.id} (${pollFailures}/${MAX_POLL_FAILURES}):`, (pollErr as Error).message);
