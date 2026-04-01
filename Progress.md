@@ -1,67 +1,61 @@
-# Progress: Centralize UI Strings & Fix Untranslated English
+# Progress: Context & Memory Management for Long-Running Simulation
 
-**Plan**: [docs/plans/i18n-implementation.md](docs/plans/i18n-implementation.md)
-**Goal**: Centralize all UI strings into translation files, fix ~75 remaining English strings, use react-i18next as single-locale (de) string management.
-**Validation**: `npx tsc -p packages/web/tsconfig.json --noEmit`
+**Plan**: [docs/plans/context-memory-management.md](docs/plans/context-memory-management.md)
+**Goal**: Prevent AI response quality degradation as simulation days accumulate. Bound prompt size, add era summaries, structured output, and prompt hardening.
+**Validation**: `npx turbo run typecheck 2>&1 | tail -5` (engine typecheck has pre-existing errors from missing dev deps — check for NEW errors only)
 
 ---
 
-### Step 1: Install dependencies and configure i18next
+### Step 1: Phase 1a — Event query optimization (loop.ts)
 
 - **Status**: done
-- **Files**: `packages/web/package.json`, `packages/web/src/locales/index.ts`, `packages/web/src/locales/de/*.json` (11 files), `packages/web/src/main.tsx`
-- **Result**: Installed i18next + react-i18next, created i18n config with 11 namespaces (de only), imported locales in main.tsx.
+- **Files**: `packages/engine/src/simulation/loop.ts`
+- **Result**: Replaced unbounded `simulationEvents.all()` + `.slice(-20)` with Drizzle query bounded to last 7 days + `depthConfig.recentEventsMax` limit. Added `gte` import.
 
-### Step 2: Common namespace — nav, buttons, shared labels
-
-- **Status**: done
-- **Files**: `main.tsx`, `shared.tsx`, `colors.ts`, `timing.ts`, `locales/de/common.json`
-- **Result**: Extracted ~45 strings. Fixed English aria-labels, DISCIPLINE_LABEL, PRESET_LABEL, TERM_DURATION, user menu items.
-
-### Step 3: Legislation namespace — bills, amendments, votes
+### Step 2: Phase 1b — Bill ID enforcement in prompt (prompt.ts)
 
 - **Status**: done
-- **Files**: `Bills.tsx`, `BillDetail.tsx`, `VoteBar.tsx`, `SpeechDisplay.tsx`, `MdbVoteButtons.tsx`, `locales/de/legislation.json`
-- **Result**: ~80 translation keys. Fixed all English in BillDetail.tsx, consolidated duplicate STATUS_LABELS.
+- **Files**: `packages/engine/src/agent/prompt.ts`
+- **Result**: Added `VALID BILL IDs FOR VOTING` and `VALID BILL IDs FOR AMENDMENTS` sections after reading sections in `buildUserPrompt()`.
 
-### Step 4: Parliament namespace — motions, interpellations, court
-
-- **Status**: done
-- **Files**: `Motions.tsx`, `Interpellations.tsx`, `ConfidenceVotes.tsx`, `ConstitutionalCourt.tsx`, `locales/de/parliament.json`
-- **Result**: ~80 strings. Fixed English: "All" filters, "Struck Down"/"Upheld"/"Decision:", confidence vote labels.
-
-### Step 5: Media & news namespace
+### Step 3: Phase 1c — Briefing cap + DepthConfig additions (context-depth.ts, briefing.ts)
 
 - **Status**: done
-- **Files**: `Media.tsx`, `NewsFeed.tsx`, `locales/de/media.json`
-- **Result**: ~25 strings. Fixed BIAS_LABELS and EVENT_CATEGORIES.
+- **Files**: `packages/engine/src/agent/context-depth.ts`, `packages/engine/src/agent/briefing.ts`
+- **Result**: Added `briefingMaxEvents`, `enableEraSummaries`, `eraSummaryIntervalDays` to DepthConfig. Updated presets (normal lookback 30→7, high 60→14). Added `hasEraSummaries` flag to suppress older events section.
 
-### Step 6: Budget namespace
-
-- **Status**: done
-- **Files**: `Budget.tsx`, `locales/de/budget.json`
-- **Result**: ~35 strings. Fixed MINISTRY_LABELS, filter labels, description text.
-
-### Step 7: Notifications & activity namespace
+### Step 4: Phase 3a+3b — Prompt hardening (prompt.ts)
 
 - **Status**: done
-- **Files**: `Notifications.tsx`, `MyActivity.tsx`, `SimulationLog.tsx`, `locales/de/notifications.json`
-- **Result**: ~40 strings. Fixed TYPE_LABELS (15 notification types), "All" filter, activity types.
+- **Files**: `packages/engine/src/agent/prompt.ts`
+- **Result**: Added CANNOT list based on party capabilities, bill ID usage rule, and JSON schema reinforcement reminder at end of system prompt.
 
-### Step 8: Parties & citizens namespace
-
-- **Status**: done
-- **Files**: `Parties.tsx`, `PartyDetail.tsx`, `Questions.tsx`, `QuestionForm.tsx`, `ProposalForm.tsx`, `ApprovalChart.tsx`, `MdbRosterTable.tsx`, `locales/de/parties.json`
-- **Result**: Added useTranslation("parties") to 7 files, ~50+ t() replacements. Fixed English vote tooltips in Questions.tsx + ProposalForm.tsx, Fraktion English strings, vote table headers, MdB form, approval chart axes. Typecheck passes.
-
-### Step 9: Dashboard, calendar, elections, polls, admin namespaces
+### Step 5: Phase 4a-4c — Structured output (batch-client.ts, action-parser.ts, ai-json.ts)
 
 - **Status**: done
-- **Files**: `Dashboard.tsx`, `OnboardingOverlay.tsx`, `QuickActionsBar.tsx`, `CalendarWidget.tsx`, `AskPartyWidget.tsx`, `Elections.tsx`, `Polls.tsx`, `Referendums.tsx`, `ModelConfig.tsx`, `ActionsReference.tsx`, `locales/de/{dashboard,elections,polls,admin}.json`
-- **Result**: ~150 strings across 5 namespaces. Fixed "Select party", "Collapse"/"Expand", "Cast your vote", election/poll labels.
+- **Files**: `packages/engine/src/agent/batch-client.ts`, `packages/engine/src/agent/party-agent.ts`
+- **Result**: Added `outputSchema` to BatchRequest, `structuredOutput` to BatchResult. Anthropic batch requests include `output_config.format.json_schema`. Party agent requests auto-detect provider. `processPartyAgentResult` bypasses parse pipeline for structured output. Full pipeline preserved for xAI.
 
-### Step 10: Verify — audit for remaining inline strings
+### Step 6: Phase 2a — Era summaries table + schema (ddl.ts, schema-sim.ts, db/index.ts)
 
 - **Status**: done
-- **Files**: `parties.json` (fixed English: Bill→Gesetz, Day→Tag, Vote→Stimme, Outcome→Ergebnis, Fraktion strings), `admin.json` (fixed English: Model→Modell, Action→Aktion, etc.), `PartyBillsList.tsx`, `CalendarWidget.tsx`, `SimulationCosts.tsx`, `Parties.tsx`, `PartyDetail.tsx`, `OnboardingOverlay.tsx`, `CatchupCard.tsx`, `MyImpactCard.tsx`, `LiveEventTicker.tsx`, `Media.tsx`, `ProposalForm.tsx`
-- **Result**: Full audit complete. Fixed ~30 remaining English strings across locale files and components. Typecheck passes clean.
+- **Files**: `packages/engine/src/db/ddl.ts`, `packages/engine/src/db/schema-sim.ts`, `packages/types/src/types/agent.ts`
+- **Result**: Added `era_summaries` table DDL + index migration. Added Drizzle `eraSummaries` table definition (auto-exported via schema barrel). Added `eraSummaries` field to `AgentContext`.
+
+### Step 7: Phase 2b — Era summary module (era-summary.ts)
+
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/era-summary.ts`
+- **Result**: Created module with `shouldGenerateEraSummary()`, `buildEraSummaryBatchRequest()`, `processEraSummaryResult()`, `getEraSummaries()`, `getLastEraSummaryEnd()`. Uses simulation events + party history as input. Persists to DB with graceful failure handling.
+
+### Step 8: Phase 2c+2d+2e — Loop integration + prompt injection + briefing dedup
+
+- **Status**: done
+- **Files**: `packages/engine/src/simulation/loop.ts`, `packages/engine/src/agent/prompt.ts`
+- **Result**: Integrated era summary generation in loop before briefing. Passed `eraSummaries` to agent contexts. Added HISTORICAL CONTEXT section between P1 and P1.5. Passed `hasEraSummaries` to briefing builder to suppress older events section.
+
+### Step 9: Final validation + commit
+
+- **Status**: done
+- **Files**: (all 11 files)
+- **Result**: Typecheck passes (6/6 tasks). Committed and pushed to `claude/check-simulate-logs-TajdA`.

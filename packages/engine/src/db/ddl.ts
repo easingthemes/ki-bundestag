@@ -314,6 +314,14 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (party_id) REFERENCES parties(id),
     FOREIGN KEY (election_id) REFERENCES elections(id)
   );
+
+  CREATE TABLE IF NOT EXISTS era_summaries (
+    id TEXT PRIMARY KEY,
+    start_day INTEGER NOT NULL,
+    end_day INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `;
 
 /** User table DDL — lives in users.db */
@@ -513,6 +521,7 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_ai_calls_day", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_day ON ai_calls(day_number)" },
   { name: "idx_ai_calls_task", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_task ON ai_calls(task)" },
   { name: "idx_ai_calls_created", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_created ON ai_calls(created_at)" },
+  { name: "idx_era_summaries_days", sql: "CREATE INDEX IF NOT EXISTS idx_era_summaries_days ON era_summaries(start_day, end_day)" },
 ];
 
 /** Index migrations for user DB */
