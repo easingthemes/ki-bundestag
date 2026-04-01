@@ -315,6 +315,25 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (election_id) REFERENCES elections(id)
   );
 
+  CREATE TABLE IF NOT EXISTS committees (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    short_name TEXT,
+    bill_category TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_on_day INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS committee_memberships (
+    id TEXT PRIMARY KEY,
+    committee_id TEXT NOT NULL,
+    seat_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member',
+    assigned_on_day INTEGER NOT NULL,
+    FOREIGN KEY (committee_id) REFERENCES committees(id),
+    FOREIGN KEY (seat_id) REFERENCES bundestag_seats(id)
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -522,6 +541,8 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_ai_calls_task", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_task ON ai_calls(task)" },
   { name: "idx_ai_calls_created", sql: "CREATE INDEX IF NOT EXISTS idx_ai_calls_created ON ai_calls(created_at)" },
   { name: "idx_era_summaries_days", sql: "CREATE INDEX IF NOT EXISTS idx_era_summaries_days ON era_summaries(start_day, end_day)" },
+  { name: "idx_committee_memberships_committee", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_committee ON committee_memberships(committee_id)" },
+  { name: "idx_committee_memberships_seat", sql: "CREATE INDEX IF NOT EXISTS idx_committee_memberships_seat ON committee_memberships(seat_id)" },
 ];
 
 /** Index migrations for user DB */

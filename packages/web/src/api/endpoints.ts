@@ -40,6 +40,8 @@ import {
   MdbProfile,
   ImpactData,
   CatchupData,
+  CommitteeListItem,
+  CommitteeDetail,
 } from "./types.js";
 import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js";
 
@@ -159,6 +161,11 @@ export const getConstitutionalChallenges = (status?: string, billId?: string) =>
 };
 export const getConstitutionalChallenge = (id: string) =>
   fetchJson<ConstitutionalChallenge>(`/constitutional-court/${id}`);
+
+// ── Committees ───────────────────────────────────────────────────────────────
+
+export const getCommittees = () => fetchJson<CommitteeListItem[]>("/committees");
+export const getCommitteeDetail = (id: string) => fetchJson<CommitteeDetail>(`/committees/${id}`);
 
 // ── Content (media, questions, polls, referendums, crises) ───────────────────
 
@@ -361,4 +368,6 @@ export const api = {
   getLatestEvents,
   getSeatRoster,
   getMdbProfile,
+  getCommittees,
+  getCommitteeDetail,
 };

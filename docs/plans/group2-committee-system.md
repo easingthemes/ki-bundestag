@@ -2,7 +2,7 @@
 
 > Detailed implementation plan
 > Parent: [docs/plans/abgeordnetenwatch-feature-roadmap.md](./abgeordnetenwatch-feature-roadmap.md)
-> Status: Not started
+> Status: Complete
 
 ## Overview
 
