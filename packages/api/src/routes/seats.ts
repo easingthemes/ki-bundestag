@@ -137,6 +137,140 @@ router.get("/api/seats/party/:partyId", (req, res) => {
   res.json(enriched);
 });
 
+// GET /api/seats/roster — all active seats across all parties (public MdB listing)
+router.get("/api/seats/roster", (req, res) => {
+  const partyId = req.query.partyId as string | undefined;
+  const controller = req.query.controller as string | undefined;
+  const search = req.query.search as string | undefined;
+
+  let seats = getActiveSeats(partyId);
+
+  if (controller && (controller === "human" || controller === "ai")) {
+    seats = seats.filter(s => s.controller === controller);
+  }
+
+  // Enrich with user display names
+  const userDb = getUserDb();
+  const enriched = seats.map(seat => {
+    let displayName: string | null = null;
+    if (seat.userId) {
+      const user = userDb.select().from(schema.users)
+        .where(eq(schema.users.id, seat.userId))
+        .all()[0];
+      displayName = user?.displayName ?? null;
+    }
+    return { ...seat, displayName };
+  });
+
+  // Search filter (by display name or seat number)
+  if (search) {
+    const q = search.toLowerCase();
+    return res.json(enriched.filter(s =>
+      (s.displayName && s.displayName.toLowerCase().includes(q)) ||
+      String(s.seatNumber).includes(q)
+    ));
+  }
+
+  res.json(enriched);
+});
+
+// GET /api/seats/:seatId/profile — detailed MdB profile with votes and speeches
+router.get("/api/seats/:seatId/profile", (req, res) => {
+  const db = getDb();
+  const seat = db.select().from(schema.bundestagSeats)
+    .where(eq(schema.bundestagSeats.id, req.params.seatId))
+    .all()[0];
+  if (!seat) { res.status(404).json({ error: "Seat not found" }); return; }
+
+  // Display name
+  const userDb = getUserDb();
+  let displayName: string | null = null;
+  let application: typeof schema.mdbApplications.$inferSelect | null = null;
+  if (seat.userId) {
+    const user = userDb.select().from(schema.users)
+      .where(eq(schema.users.id, seat.userId))
+      .all()[0];
+    displayName = user?.displayName ?? null;
+
+    // Get approved application for this user+party (motivation & policy focus)
+    application = userDb.select().from(schema.mdbApplications)
+      .where(and(
+        eq(schema.mdbApplications.userId, seat.userId),
+        eq(schema.mdbApplications.partyId, seat.partyId),
+        eq(schema.mdbApplications.status, "approved"),
+      ))
+      .all()
+      .sort((a, b) => b.createdOnDay - a.createdOnDay)[0] ?? null;
+  }
+
+  // Votes cast by this seat
+  const votes = userDb.select().from(schema.mdbVotes)
+    .where(eq(schema.mdbVotes.seatId, seat.id))
+    .all();
+
+  // Enrich votes with bill info
+  const enrichedVotes = votes.map(v => {
+    const bill = db.select().from(schema.bills)
+      .where(eq(schema.bills.id, v.billId))
+      .all()[0];
+    return {
+      billId: v.billId,
+      billTitle: bill?.title ?? "Unbekannt",
+      billStatus: bill?.status ?? "unknown",
+      vote: v.vote,
+      createdAt: v.createdAt,
+    };
+  }).sort((a, b) => b.createdAt - a.createdAt);
+
+  // Speeches by this user
+  let speeches: Array<{
+    id: string;
+    billId: string;
+    billTitle: string;
+    reading: number;
+    content: string;
+    sentimentImpact: number | null;
+    dayNumber: number;
+    createdAt: number;
+  }> = [];
+  if (seat.userId) {
+    const rawSpeeches = userDb.select().from(schema.mdbSpeeches)
+      .where(eq(schema.mdbSpeeches.userId, seat.userId))
+      .all();
+    speeches = rawSpeeches.map(s => {
+      const bill = db.select().from(schema.bills)
+        .where(eq(schema.bills.id, s.billId))
+        .all()[0];
+      return {
+        id: s.id,
+        billId: s.billId,
+        billTitle: bill?.title ?? "Unbekannt",
+        reading: s.reading,
+        content: s.content,
+        sentimentImpact: s.sentimentImpact,
+        dayNumber: s.dayNumber,
+        createdAt: s.createdAt,
+      };
+    }).sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  // Party info
+  const party = db.select().from(schema.parties)
+    .where(eq(schema.parties.id, seat.partyId))
+    .all()[0];
+
+  res.json({
+    seat: { ...seat, displayName },
+    party: party ? { id: party.id, name: party.name, color: party.color } : null,
+    application: application ? {
+      motivation: application.applicationText,
+      policyFocus: application.policyFocus,
+    } : null,
+    votes: enrichedVotes,
+    speeches,
+  });
+});
+
 // GET /api/seats/available — open seat counts per party
 router.get("/api/seats/available", (_req, res) => {
   const openCounts = getOpenSeatCounts();
