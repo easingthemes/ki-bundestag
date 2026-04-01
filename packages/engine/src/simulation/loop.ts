@@ -256,15 +256,15 @@ export async function runDay(): Promise<number> {
     const count = pendingBills.filter(b => b.status === "committee").length;
     previewParts.push(`${count} Gesetz${count > 1 ? "e" : ""} im Ausschuss`);
   }
-  const activeCrises = db.select().from(schema.crises).all()
+  const previewCrises = db.select().from(schema.crises).all()
     .filter((c: any) => !c.resolved && c.endDay >= currentDay);
-  if (activeCrises.length > 0) {
-    previewParts.push(`${activeCrises.length} aktive Krise${activeCrises.length > 1 ? "n" : ""}`);
+  if (previewCrises.length > 0) {
+    previewParts.push(`${previewCrises.length} aktive Krise${previewCrises.length > 1 ? "n" : ""}`);
   }
-  const activeElection = db.select().from(schema.elections).all()
+  const previewElection = db.select().from(schema.elections).all()
     .find((e: any) => e.status !== "completed" && e.status !== "invalidated");
-  if (activeElection) {
-    previewParts.push(`Wahl: ${(activeElection as any).status}`);
+  if (previewElection) {
+    previewParts.push(`Wahl: ${(previewElection as any).status}`);
   }
   if (nationalState.provisionalBudget) {
     previewParts.push("Vorläufige Haushaltsführung");
