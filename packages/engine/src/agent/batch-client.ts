@@ -46,8 +46,16 @@ export interface BatchResult {
 // Config
 // ---------------------------------------------------------------------------
 
-const BATCH_POLL_INTERVAL_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 60) * 1000;
+const BATCH_POLL_INTERVAL_BASE_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 60) * 1000;
 const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 3600) * 1000;
+
+/** Adaptive poll interval: 15s for first 3 polls, 30s for polls 4-10, then base interval. */
+function adaptivePollInterval(pollCount: number): number {
+  if (BATCH_POLL_INTERVAL_BASE_MS < 30_000) return BATCH_POLL_INTERVAL_BASE_MS; // respect explicit short override
+  if (pollCount < 3) return 15_000;
+  if (pollCount < 10) return 30_000;
+  return BATCH_POLL_INTERVAL_BASE_MS;
+}
 
 // ---------------------------------------------------------------------------
 // Chunking helper
@@ -149,14 +157,16 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   }
   console.log(`  [Batch] Created batch ${batch.id} (status: ${batch.processing_status})`);
 
-  // Poll for completion
+  // Poll for completion (adaptive: 15s → 30s → 60s)
   const deadline = Date.now() + BATCH_TIMEOUT_MS;
   let status = batch.processing_status;
   let pollFailures = 0;
+  let pollCount = 0;
   const MAX_POLL_FAILURES = 3;
 
   while (status !== "ended" && Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, BATCH_POLL_INTERVAL_MS));
+    await new Promise(r => setTimeout(r, adaptivePollInterval(pollCount)));
+    pollCount++;
     try {
       const updated = await client.messages.batches.retrieve(batch.id);
       status = updated.processing_status;

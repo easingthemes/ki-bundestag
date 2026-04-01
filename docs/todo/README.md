@@ -62,8 +62,8 @@ Each item links to a detail file with full description, affected files, and impl
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
 | 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | open | Engine / Agent | — |
 | 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
-| 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | open | Engine / Agent | — |
-| 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | open | Engine / Simulation | — |
+| 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | done | Engine / Agent | — |
+| 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | done | Engine / Simulation | — |
 | 036 | [Presidential veto rate tuning](./036-presidential-veto-tuning.md) | done | Engine / Simulation | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
@@ -72,6 +72,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 31 of 36
+- **Done**: 33 of 36
 - **Postponed**: 2 (#022, #027)
-- **Open**: 5 remaining (#029, #031, #032, #034, #035)
+- **Open**: 3 remaining (#029, #031, #032)

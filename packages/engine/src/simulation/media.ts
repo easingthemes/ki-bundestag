@@ -14,6 +14,9 @@ const OUTLETS = [
   { name: "Berliner Tagesspiegel", bias: "center" },
   { name: "Volksstimme", bias: "left" },
   { name: "Wirtschaftswoche", bias: "right" },
+  { name: "Süddeutsche Zeitung", bias: "center-left" },
+  { name: "Frankfurter Allgemeine", bias: "center-right" },
+  { name: "taz", bias: "left" },
 ] as const;
 
 const NEWSWORTHY_TYPES = new Set([
@@ -52,15 +55,26 @@ export function getRecentMedia(limit = 3): MediaArticle[] {
 
 /**
  * Calculate sentiment impact from today's media articles.
- * Crisis articles: -0.2, positive government coverage: +0.1, capped at ±0.5/day.
+ * Uses AI-provided sentiment when available, falls back to category-based heuristic.
+ * Capped at ±0.5/day.
  */
-export function mediaSentimentImpact(articles: Array<{ category: string }>): number {
+export function mediaSentimentImpact(articles: Array<{ category: string; sentiment?: number }>): number {
   let delta = 0;
   for (const a of articles) {
-    if (a.category === "crisis") {
-      delta -= 0.2;
-    } else if (a.category === "economy" || a.category === "policy") {
-      delta += 0.1;
+    if (typeof a.sentiment === "number") {
+      // AI-provided sentiment: -1.0 to +1.0, scaled to ±0.2
+      delta += Math.max(-0.2, Math.min(0.2, a.sentiment * 0.2));
+    } else {
+      // Fallback: category-based heuristic
+      if (a.category === "crisis") {
+        delta -= 0.2;
+      } else if (a.category === "opinion") {
+        delta -= 0.1; // opinion pieces tend to be critical
+      } else if (a.category === "election") {
+        delta -= 0.05; // election coverage creates uncertainty
+      } else if (a.category === "economy" || a.category === "policy") {
+        delta += 0.1;
+      }
     }
   }
   return Math.max(-0.5, Math.min(0.5, Math.round(delta * 10) / 10));
@@ -83,31 +97,7 @@ export async function generateDailyMedia(
   const t0 = Date.now();
   try {
     const { text, model, provider } = await callAI({
-      system: `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
-
-OUTLETS:
-- "Berliner Tagesspiegel" (center): Balanced, factual reporting with moderate analysis
-- "Volksstimme" (left): Focuses on social justice, workers' rights, inequality angles
-- "Wirtschaftswoche" (right): Focuses on business impact, fiscal responsibility, market effects
-
-RESPONSE SCHEMA (JSON array of 2-3 articles):
-[
-  {
-    "headline": "<newspaper headline, punchy, max 100 chars>",
-    "summary": "<1-2 sentence summary>",
-    "content": "<2-3 paragraph article body>",
-    "outlet": "<exact outlet name from list above>",
-    "category": "policy" | "crisis" | "election" | "opinion" | "economy"
-  }
-]
-
-Rules:
-- Write 2-3 articles covering the most important events of the day
-- Each article MUST be from a different outlet
-- Headlines should be dramatic but realistic German political journalism style
-- Content should reflect the outlet's bias
-- Write in German (all headlines, summaries, and article content must be in German)
-- Category should match the primary topic`,
+      system: MEDIA_SYSTEM_PROMPT,
       prompt: `SIMULATION DAY ${currentDay}\n\nCURRENT PARTIES: ${partyNames}\n\nTODAY'S EVENTS:\n${eventSummaries}\n\nWrite 2-3 news articles covering today's most newsworthy political events, each from a different outlet with its bias. Respond as JSON array.`,
       maxTokens: 2048,
       roleKey: "daily",
@@ -183,16 +173,49 @@ export function applyMediaSentiment(currentDay: number, currentSentiment: number
   return newSentiment;
 }
 
+/**
+ * Apply sentiment from already-parsed articles (with AI-provided sentiment scores).
+ * Avoids re-reading from DB and uses richer sentiment data from the batch result.
+ */
+export function applyMediaSentimentFromArticles(
+  articles: Array<{ category: string; sentiment?: number }>,
+  currentDay: number,
+  currentSentiment: number,
+  stateId: number,
+): number {
+  if (articles.length === 0) return currentSentiment;
+
+  const mediaDelta = mediaSentimentImpact(articles);
+  if (mediaDelta === 0) return currentSentiment;
+
+  const db = getDb();
+  const newSentiment = Math.max(5, Math.min(75,
+    Math.round((currentSentiment + mediaDelta) * 10) / 10,
+  ));
+
+  db.update(schema.nationalState)
+    .set({ publicSentiment: newSentiment })
+    .where(eq(schema.nationalState.id, stateId))
+    .run();
+
+  console.log(`  [Media] Sentiment impact: ${mediaDelta > 0 ? "+" : ""}${mediaDelta}`);
+
+  return newSentiment;
+}
+
 // ---------------------------------------------------------------------------
 // Batch variants
 // ---------------------------------------------------------------------------
 
 const MEDIA_SYSTEM_PROMPT = `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
 
-OUTLETS:
+OUTLETS (pick 2-3 from this list):
 - "Berliner Tagesspiegel" (center): Balanced, factual reporting with moderate analysis
 - "Volksstimme" (left): Focuses on social justice, workers' rights, inequality angles
 - "Wirtschaftswoche" (right): Focuses on business impact, fiscal responsibility, market effects
+- "Süddeutsche Zeitung" (center-left): In-depth political analysis, progressive-leaning
+- "Frankfurter Allgemeine" (center-right): Conservative, establishment perspective
+- "taz" (left): Critical, investigative, counter-establishment
 
 RESPONSE SCHEMA (JSON array of 2-3 articles):
 [
@@ -201,17 +224,20 @@ RESPONSE SCHEMA (JSON array of 2-3 articles):
     "summary": "<1-2 sentence summary>",
     "content": "<2-3 paragraph article body>",
     "outlet": "<exact outlet name from list above>",
-    "category": "policy" | "crisis" | "election" | "opinion" | "economy"
+    "category": "policy" | "crisis" | "election" | "opinion" | "economy",
+    "sentiment": <number from -1.0 (very negative) to +1.0 (very positive), reflecting the article's tone>
   }
 ]
 
 Rules:
 - Write 2-3 articles covering the most important events of the day
-- Each article MUST be from a different outlet
+- Each article MUST be from a different outlet — vary which outlets you choose day to day
 - Headlines should be dramatic but realistic German political journalism style
-- Content should reflect the outlet's bias
+- Content should reflect the outlet's bias — critical outlets should write critical pieces
+- Not every day is good news: crises, vetoes, failed bills, and scandals should produce negative coverage
 - Write in German (all headlines, summaries, and article content must be in German)
-- Category should match the primary topic`;
+- Category should match the primary topic
+- Sentiment MUST honestly reflect whether the article is positive, negative, or neutral`;
 
 /**
  * Build a BatchRequest for daily media generation, or null if no newsworthy events.
@@ -244,21 +270,22 @@ export function buildMediaBatchRequest(
 export function processMediaBatchResult(
   result: BatchResult | undefined,
   currentDay: number,
-): void {
+): Array<{ category: string; sentiment?: number }> {
   if (!result || !result.text) {
     logAICall({ task: "media", model: result?.model ?? "unknown", provider: (result?.provider ?? "anthropic") as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
-    return;
+    return [];
   }
 
   const articles = safeParseJson<unknown[]>(result.text);
 
   if (!Array.isArray(articles) || articles.length === 0) {
     logAICall({ task: "media", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: false, validationOk: false, fallback: "skip" });
-    return;
+    return [];
   }
 
   const db = getDb();
   let inserted = 0;
+  const parsed: Array<{ category: string; sentiment?: number }> = [];
 
   for (const article of articles.slice(0, 3)) {
     const a = article as Record<string, unknown>;
@@ -278,7 +305,11 @@ export function processMediaBatchResult(
       dayNumber: currentDay,
     }).run();
     inserted++;
+
+    const sentiment = typeof a.sentiment === "number" ? a.sentiment : undefined;
+    parsed.push({ category: (a.category as string) || "policy", sentiment });
   }
 
   logAICall({ task: "media", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: true, validationOk: inserted > 0 });
+  return parsed;
 }
