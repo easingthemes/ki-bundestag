@@ -13,6 +13,9 @@ on:
           - simulate-logs
           - simulate-errors
           - cost-report
+          - timing-report
+          - model-performance
+          - error-analysis
           - disk-usage
           - db-stats
           - db-deep-debug
@@ -54,6 +57,42 @@ jobs:
               simulate-logs)
                 echo "==> Last $LINES lines of ki-simulate stdout:"
                 pm2 logs ki-simulate --lines $LINES --nostream --out 2>/dev/null || echo "ki-simulate not running"
+                echo ""
+                echo "=== PARSED LOG SUMMARY ==="
+                echo ""
+                # Extract timing lines from recent logs
+                TIMING_LINES=$(pm2 logs ki-simulate --lines $LINES --nostream --out 2>/dev/null | grep -E '\[Timing\]|\[AI\]|DAY.*COMPLETE|RUN SUMMARY|PERIODIC SUMMARY' || true)
+                if [ -n "$TIMING_LINES" ]; then
+                  echo "--- Day Timings ---"
+                  echo "$TIMING_LINES" | grep '\[Timing\]' | tail -20 || true
+                  echo ""
+                fi
+                # Count AI statuses
+                ALL_AI=$(pm2 logs ki-simulate --lines $LINES --nostream --out 2>/dev/null || true)
+                OK_COUNT=$(echo "$ALL_AI" | grep -c '\| OK$' || echo "0")
+                PARSE_FAIL=$(echo "$ALL_AI" | grep -c 'PARSE_FAIL' || echo "0")
+                VALIDATION_FAIL=$(echo "$ALL_AI" | grep -c 'VALIDATION_FAIL' || echo "0")
+                echo "--- AI Call Status (from logs) ---"
+                echo "  OK:              $OK_COUNT"
+                echo "  PARSE_FAIL:      $PARSE_FAIL"
+                echo "  VALIDATION_FAIL: $VALIDATION_FAIL"
+                if [ "$((PARSE_FAIL + VALIDATION_FAIL + OK_COUNT))" -gt 0 ]; then
+                  TOTAL=$((PARSE_FAIL + VALIDATION_FAIL + OK_COUNT))
+                  FAIL_PCT=$(awk "BEGIN {printf \"%.1f\", ($PARSE_FAIL + $VALIDATION_FAIL) * 100 / $TOTAL}")
+                  echo "  Fail rate:       ${FAIL_PCT}%"
+                fi
+                echo ""
+                # Count days completed
+                DAY_COUNT=$(echo "$ALL_AI" | grep -c 'DAY.*COMPLETE' || echo "0")
+                echo "--- Days in log window ---"
+                echo "  Completed: $DAY_COUNT"
+                # Show any warnings
+                WARNINGS=$(echo "$ALL_AI" | grep -i '\[WARNING\]' || true)
+                if [ -n "$WARNINGS" ]; then
+                  echo ""
+                  echo "--- Warnings ---"
+                  echo "$WARNINGS" | tail -10
+                fi
                 ;;
               simulate-errors)
                 echo "==> Last $LINES lines of ki-simulate stderr:"
@@ -70,7 +109,8 @@ jobs:
                     SUM(input_tokens) as input_tok,
                     SUM(output_tokens) as output_tok,
                     ROUND(SUM(cost_usd), 4) as cost_usd,
-                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
                   FROM ai_calls
                   GROUP BY day_number
                   ORDER BY day_number DESC
@@ -84,7 +124,10 @@ jobs:
                     SUM(input_tokens) as input_tok,
                     SUM(output_tokens) as output_tok,
                     ROUND(SUM(cost_usd), 4) as cost_usd,
-                    ROUND(AVG(latency_ms)) as avg_lat_ms
+                    ROUND(AVG(latency_ms)) as avg_lat_ms,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(AVG(input_tokens)) as avg_in_tok,
+                    ROUND(AVG(output_tokens)) as avg_out_tok
                   FROM ai_calls
                   GROUP BY task
                   ORDER BY cost_usd DESC
@@ -96,7 +139,9 @@ jobs:
                     COUNT(*) as calls,
                     SUM(input_tokens) as input_tok,
                     SUM(output_tokens) as output_tok,
-                    ROUND(SUM(cost_usd), 4) as cost_usd
+                    ROUND(SUM(cost_usd), 4) as cost_usd,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
                   FROM ai_calls
                   GROUP BY provider, model
                 "
@@ -110,8 +155,26 @@ jobs:
                     ROUND(SUM(cost_usd), 4) as total_cost_usd,
                     ROUND(SUM(cost_usd) * 1.0 / COUNT(DISTINCT day_number), 4) as avg_cost_per_day,
                     COUNT(DISTINCT day_number) as days_with_data,
-                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_calls
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_calls,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
                   FROM ai_calls
+                "
+                echo ""
+                echo "==> Cost trend (10-day rolling avg):"
+                sqlite3 -header -column data/simulation.db "
+                  WITH daily AS (
+                    SELECT day_number,
+                      ROUND(SUM(cost_usd), 4) as cost_usd,
+                      SUM(input_tokens) as input_tok
+                    FROM ai_calls GROUP BY day_number
+                  )
+                  SELECT day_number,
+                    cost_usd,
+                    ROUND(AVG(cost_usd) OVER (ORDER BY day_number ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 4) as rolling_avg_cost,
+                    ROUND(AVG(input_tok) OVER (ORDER BY day_number ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)) as rolling_avg_input
+                  FROM daily
+                  ORDER BY day_number DESC
+                  LIMIT 30
                 "
                 echo ""
                 echo "==> Batch timing (last 20 batches):"
@@ -119,14 +182,267 @@ jobs:
                   SELECT batch_id,
                     COUNT(*) as reqs,
                     MIN(created_at) as started,
-                    ROUND(SUM(cost_usd), 4) as cost
+                    ROUND(SUM(cost_usd), 4) as cost,
+                    ROUND(AVG(latency_ms) / 1000.0, 1) as batch_sec
                   FROM ai_calls
                   WHERE batch_id IS NOT NULL
                   GROUP BY batch_id
                   ORDER BY started DESC
                   LIMIT 20
                 "
+                echo ""
+                echo "==> Projected costs:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    ROUND(SUM(cost_usd), 4) as spent_so_far,
+                    COUNT(DISTINCT day_number) as days_done,
+                    ROUND(SUM(cost_usd) * 1.0 / COUNT(DISTINCT day_number), 4) as avg_per_day,
+                    ROUND(SUM(cost_usd) * 1.0 / COUNT(DISTINCT day_number) * 1461, 2) as est_full_term,
+                    ROUND(SUM(cost_usd) * 1.0 / COUNT(DISTINCT day_number) * 365, 2) as est_per_year
+                  FROM ai_calls
+                "
                 ;;
+              timing-report)
+                echo "==> Simulation state:"
+                sqlite3 -header -column data/simulation.db "SELECT current_day, timing_preset, context_depth, last_run_at FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "==> Per-day wall-clock timing (from ai_calls timestamps):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    day_number,
+                    MIN(created_at) as first_call,
+                    MAX(created_at) as last_call,
+                    ROUND((julianday(MAX(created_at)) - julianday(MIN(created_at))) * 86400) as wall_sec,
+                    COUNT(*) as ai_calls,
+                    ROUND(AVG(latency_ms) / 1000.0, 1) as avg_batch_sec
+                  FROM ai_calls
+                  GROUP BY day_number
+                  ORDER BY day_number DESC
+                  LIMIT 30
+                "
+                echo ""
+                echo "==> Timing statistics:"
+                sqlite3 -header -column data/simulation.db "
+                  WITH day_times AS (
+                    SELECT day_number,
+                      ROUND((julianday(MAX(created_at)) - julianday(MIN(created_at))) * 86400) as wall_sec
+                    FROM ai_calls GROUP BY day_number
+                  )
+                  SELECT
+                    COUNT(*) as total_days,
+                    ROUND(AVG(wall_sec), 1) as avg_sec_per_day,
+                    ROUND(MIN(wall_sec), 1) as min_sec,
+                    ROUND(MAX(wall_sec), 1) as max_sec,
+                    ROUND(AVG(wall_sec) / 60.0, 1) as avg_min_per_day
+                  FROM day_times
+                  WHERE wall_sec > 0
+                "
+                echo ""
+                echo "==> Batch duration distribution:"
+                sqlite3 -header -column data/simulation.db "
+                  WITH batch_times AS (
+                    SELECT batch_id,
+                      ROUND(AVG(latency_ms) / 1000.0) as batch_sec
+                    FROM ai_calls
+                    WHERE batch_id IS NOT NULL
+                    GROUP BY batch_id
+                  )
+                  SELECT
+                    CASE
+                      WHEN batch_sec < 60 THEN '< 1 min'
+                      WHEN batch_sec < 180 THEN '1-3 min'
+                      WHEN batch_sec < 300 THEN '3-5 min'
+                      WHEN batch_sec < 600 THEN '5-10 min'
+                      ELSE '> 10 min'
+                    END as duration_bucket,
+                    COUNT(*) as batch_count
+                  FROM batch_times
+                  GROUP BY duration_bucket
+                  ORDER BY MIN(batch_sec)
+                "
+                echo ""
+                echo "==> Throughput:"
+                sqlite3 -header -column data/simulation.db "
+                  WITH day_times AS (
+                    SELECT day_number,
+                      MIN(created_at) as started
+                    FROM ai_calls GROUP BY day_number
+                  ),
+                  hourly AS (
+                    SELECT
+                      substr(started, 1, 13) as hour,
+                      COUNT(*) as days_per_hour
+                    FROM day_times
+                    GROUP BY substr(started, 1, 13)
+                  )
+                  SELECT hour, days_per_hour
+                  FROM hourly
+                  ORDER BY hour DESC
+                  LIMIT 24
+                "
+                ;;
+
+              model-performance)
+                echo "==> Model Performance Comparison:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    provider || '/' || model as full_model,
+                    COUNT(*) as total_calls,
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as succeeded,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 1 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as success_pct,
+                    ROUND(AVG(input_tokens)) as avg_input_tok,
+                    ROUND(AVG(output_tokens)) as avg_output_tok,
+                    ROUND(AVG(input_tokens + output_tokens)) as avg_total_tok,
+                    ROUND(SUM(cost_usd), 4) as total_cost,
+                    ROUND(AVG(cost_usd), 6) as avg_cost_per_call
+                  FROM ai_calls
+                  GROUP BY provider, model
+                  ORDER BY total_cost DESC
+                "
+                echo ""
+                echo "==> Model Performance by Task:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    task,
+                    provider || '/' || substr(model, 1, 20) as model,
+                    COUNT(*) as calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(AVG(input_tokens)) as avg_in,
+                    ROUND(AVG(output_tokens)) as avg_out,
+                    ROUND(SUM(cost_usd), 4) as cost
+                  FROM ai_calls
+                  GROUP BY task, provider, model
+                  ORDER BY task, cost DESC
+                "
+                echo ""
+                echo "==> Token Usage Trend (input tokens growing = context bloat):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    day_number,
+                    ROUND(AVG(input_tokens)) as avg_input_tok,
+                    ROUND(AVG(output_tokens)) as avg_output_tok,
+                    MAX(input_tokens) as max_input_tok,
+                    COUNT(*) as calls
+                  FROM ai_calls
+                  WHERE task LIKE 'agent:%'
+                  GROUP BY day_number
+                  ORDER BY day_number DESC
+                  LIMIT 30
+                "
+                echo ""
+                echo "==> Model Cost Efficiency (cost per 1K output tokens):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    provider || '/' || model as full_model,
+                    ROUND(SUM(cost_usd) * 1000.0 / NULLIF(SUM(output_tokens), 0), 4) as cost_per_1k_out,
+                    ROUND(SUM(cost_usd) * 1000.0 / NULLIF(SUM(input_tokens), 0), 4) as cost_per_1k_in,
+                    COUNT(DISTINCT day_number) as days_active
+                  FROM ai_calls
+                  GROUP BY provider, model
+                "
+                ;;
+
+              error-analysis)
+                echo "==> Simulation state:"
+                sqlite3 -header -column data/simulation.db "SELECT current_day, timing_preset, context_depth FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "==> Failed AI calls by day (last 30 days):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    day_number,
+                    COUNT(*) as total_calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
+                  FROM ai_calls
+                  GROUP BY day_number
+                  HAVING failed > 0
+                  ORDER BY day_number DESC
+                  LIMIT 30
+                "
+                echo ""
+                echo "==> Failed calls by task:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    task,
+                    COUNT(*) as total_calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
+                  FROM ai_calls
+                  GROUP BY task
+                  HAVING failed > 0
+                  ORDER BY fail_pct DESC
+                "
+                echo ""
+                echo "==> Failed calls by model:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    provider || '/' || model as full_model,
+                    COUNT(*) as total_calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
+                  FROM ai_calls
+                  GROUP BY provider, model
+                  HAVING failed > 0
+                  ORDER BY fail_pct DESC
+                "
+                echo ""
+                echo "==> Failure trend (are errors increasing?):"
+                sqlite3 -header -column data/simulation.db "
+                  WITH day_stats AS (
+                    SELECT day_number,
+                      ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct,
+                      ROUND(AVG(input_tokens)) as avg_input_tok
+                    FROM ai_calls
+                    GROUP BY day_number
+                  )
+                  SELECT
+                    CASE
+                      WHEN day_number <= (SELECT MIN(day_number) + (MAX(day_number) - MIN(day_number)) / 3 FROM day_stats) THEN 'early'
+                      WHEN day_number <= (SELECT MIN(day_number) + 2 * (MAX(day_number) - MIN(day_number)) / 3 FROM day_stats) THEN 'middle'
+                      ELSE 'late'
+                    END as phase,
+                    COUNT(*) as days,
+                    ROUND(AVG(fail_pct), 1) as avg_fail_pct,
+                    ROUND(AVG(avg_input_tok)) as avg_input_tok
+                  FROM day_stats
+                  GROUP BY phase
+                "
+                echo ""
+                echo "==> Party agent failures (who fails most?):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    task,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
+                  FROM ai_calls
+                  WHERE task LIKE 'agent:%'
+                  GROUP BY task
+                  ORDER BY fail_pct DESC
+                "
+                echo ""
+                echo "==> Context size correlation (do bigger prompts fail more?):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    CASE
+                      WHEN input_tokens < 2000 THEN 'small (<2K)'
+                      WHEN input_tokens < 5000 THEN 'medium (2-5K)'
+                      WHEN input_tokens < 10000 THEN 'large (5-10K)'
+                      ELSE 'xlarge (>10K)'
+                    END as context_size,
+                    COUNT(*) as calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed,
+                    ROUND(SUM(CASE WHEN success = 0 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*), 1) as fail_pct
+                  FROM ai_calls
+                  GROUP BY context_size
+                  ORDER BY MIN(input_tokens)
+                "
+                echo ""
+                echo "==> Recent log errors (last 50 lines of stderr):"
+                pm2 logs ki-simulate --lines 50 --nostream --err 2>/dev/null || echo "ki-simulate not running"
+                ;;
+
               disk-usage)
                 echo "==> Disk usage:"
                 df -h /
