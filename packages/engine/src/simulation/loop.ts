@@ -54,6 +54,7 @@ import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
 import { shouldGenerateEraSummary, buildEraSummaryBatchRequest, processEraSummaryResult, getEraSummaries } from "./era-summary.js";
 import { shouldGenerateSidejobs, buildSidejobBatchRequest, processSidejobResult, applySidejobScandalImpact } from "./sidejobs.js";
+import { getVotingCalibrationContext } from "./voting-analysis.js";
 import {
   shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest,
   processKnowledgeDigestResult, getActiveShocks, buildRealWorldContext, getPartyPositions,
@@ -949,7 +950,7 @@ export async function runDay(): Promise<number> {
     // Real-world knowledge grounding (fetch + digest weekly)
     if (depthConfig.enableKnowledgeGrounding && shouldFetchKnowledge()) {
       try {
-        const rawData = await fetchAllSources();
+        const rawData = await fetchAllSources(currentDay);
         if (rawData.newsItems.length > 0 || rawData.parliamentaryItems.length > 0) {
           const activeShocks = getActiveShocks();
           const digestReq = buildKnowledgeDigestRequest(rawData, activeShocks);
@@ -1049,8 +1050,17 @@ export async function runDay(): Promise<number> {
       });
     }
 
+    // Voting calibration context (early sim only, fades after 50 bills)
+    const votingCalibrations: Record<string, string | null> = {};
+    if (contextDepth !== "low") {
+      const votedBillCount = allBills.filter(b => Array.isArray(b.votes) && (b.votes as any[]).length > 0).length;
+      for (const party of allParties) {
+        votingCalibrations[party.id] = getVotingCalibrationContext(party.id, votedBillCount);
+      }
+    }
+
     // Submit all 6 party agent calls as one batch (50% cost savings)
-    const agentRequests = buildPartyAgentRequests(agentContexts, currentDay, depthConfig);
+    const agentRequests = buildPartyAgentRequests(agentContexts, currentDay, depthConfig, votingCalibrations);
     console.log(`  [Batch] Submitting ${agentRequests.length} party agent requests...`);
     let agentResults: import("../agent/batch-client.js").BatchResult[] = [];
     try {

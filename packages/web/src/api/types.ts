@@ -457,6 +457,32 @@ export interface ConstitutionalChallenge {
 export interface AlignmentData {
   parties: { id: string; name: string; color: string }[];
   matrix: Record<string, Record<string, number | null>>;
+  billCount?: number;
+  windowDays?: number | null;
+}
+
+export interface VotingComparisonResponse {
+  available: boolean;
+  parties?: { id: string; name: string; color: string }[];
+  simulated?: Record<string, Record<string, number | null>>;
+  baseline?: Record<string, Record<string, number | null>>;
+  drift?: Record<string, Record<string, number | null>>;
+  baselineCapturedOnDay?: number;
+  baselinePollCount?: number;
+}
+
+export interface PartyVotingTendency {
+  partyId: string;
+  totalBillsVoted: number;
+  yesRate: number;
+  noRate: number;
+  abstainRate: number;
+  governmentBillSupport: number;
+  oppositionBillSupport: number;
+}
+
+export interface VotingTendenciesResponse {
+  tendencies: PartyVotingTendency[];
 }
 
 export interface ActivityItem {

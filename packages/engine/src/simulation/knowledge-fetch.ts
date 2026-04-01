@@ -16,6 +16,7 @@ import { eq, and, desc } from "drizzle-orm";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import type { Provider } from "../agent/model-config.js";
+import { buildVotingPatternDigest, storeVotingPatternBaseline } from "./voting-analysis.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -162,12 +163,17 @@ async function getCurrentParliamentPeriodId(): Promise<number> {
   return cachedPeriodId;
 }
 
-async function fetchAbgeordnetenwatchPolls(): Promise<RawParliamentaryItem[]> {
+interface PollFetchResult {
+  items: RawParliamentaryItem[];
+  breakdowns: string[];
+}
+
+async function fetchAbgeordnetenwatchPolls(): Promise<PollFetchResult> {
   const periodId = await getCurrentParliamentPeriodId();
   const text = await fetchWithTimeout(
     `${AW_BASE}/polls?sort_by=field_poll_date&sort_order=desc&range_end=10&parliament_period=${periodId}`,
   );
-  if (!text) return [];
+  if (!text) return { items: [], breakdowns: [] };
   try {
     const data = JSON.parse(text);
     const polls = (data.data ?? []) as Array<{
@@ -189,16 +195,21 @@ async function fetchAbgeordnetenwatchPolls(): Promise<RawParliamentaryItem[]> {
     const breakdowns = await Promise.all(
       toEnrich.map(p => fetchPollVoteBreakdown(p.pollId!)),
     );
+    const rawBreakdowns: string[] = [];
     for (let i = 0; i < toEnrich.length; i++) {
       if (breakdowns[i]) {
         toEnrich[i].detail = `${toEnrich[i].detail}\nAbstimmung: ${breakdowns[i]}`;
+        rawBreakdowns.push(breakdowns[i]!);
       }
     }
 
-    return enrichedPolls.map(({ pollId: _pollId, ...rest }) => rest);
+    return {
+      items: enrichedPolls.map(({ pollId: _pollId, ...rest }) => rest),
+      breakdowns: rawBreakdowns,
+    };
   } catch {
     console.warn("  [Knowledge] Failed to parse abgeordnetenwatch polls JSON");
-    return [];
+    return { items: [], breakdowns: [] };
   }
 }
 
@@ -360,6 +371,8 @@ async function fetchDIPBills(): Promise<RawParliamentaryItem[]> {
 export interface RawKnowledgeData {
   newsItems: RawNewsItem[];
   parliamentaryItems: RawParliamentaryItem[];
+  /** Raw vote breakdown strings from abgeordnetenwatch polls (for voting pattern baseline) */
+  pollBreakdowns: string[];
 }
 
 /**
@@ -397,10 +410,10 @@ function getNextGeneration(): number {
  * Fetch all raw data from external sources.
  * Each source is independent — failures are logged but don't block others.
  */
-export async function fetchAllSources(): Promise<RawKnowledgeData> {
+export async function fetchAllSources(currentDay?: number): Promise<RawKnowledgeData> {
   console.log("  [Knowledge] Fetching real-world data...");
 
-  const [tagesschau, welt, polls, bills, questions, sidejobs, committees] = await Promise.all([
+  const [tagesschau, welt, pollResult, bills, questions, sidejobs, committees] = await Promise.all([
     fetchTagesschauNews(),
     fetchWeltRSS(),
     fetchAbgeordnetenwatchPolls(),
@@ -415,11 +428,23 @@ export async function fetchAllSources(): Promise<RawKnowledgeData> {
     storeCommitteeNames(committees);
   }
 
-  console.log(`  [Knowledge] Fetched: ${tagesschau.length} tagesschau, ${welt.length} WELT, ${polls.length} abgeordnetenwatch polls (with vote breakdowns), ${bills.length} DIP bills, ${questions.length} citizen questions, ${sidejobs.length} sidejobs, ${committees.length} committees`);
+  // Store voting pattern baseline (frozen at first capture, never overwritten)
+  if (pollResult.breakdowns.length > 0) {
+    const digest = buildVotingPatternDigest(pollResult.breakdowns, currentDay ?? 0);
+    if (digest) {
+      const stored = storeVotingPatternBaseline(digest);
+      if (stored) {
+        console.log(`  [Knowledge] Stored voting pattern baseline (${digest.pollCount} polls, day ${digest.capturedOnDay})`);
+      }
+    }
+  }
+
+  console.log(`  [Knowledge] Fetched: ${tagesschau.length} tagesschau, ${welt.length} WELT, ${pollResult.items.length} abgeordnetenwatch polls (with vote breakdowns), ${bills.length} DIP bills, ${questions.length} citizen questions, ${sidejobs.length} sidejobs, ${committees.length} committees`);
 
   return {
     newsItems: [...tagesschau, ...welt],
-    parliamentaryItems: [...polls, ...bills, ...questions, ...sidejobs],
+    parliamentaryItems: [...pollResult.items, ...bills, ...questions, ...sidejobs],
+    pollBreakdowns: pollResult.breakdowns,
   };
 }
 
