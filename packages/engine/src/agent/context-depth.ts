@@ -41,6 +41,8 @@ export interface DepthConfig {
   enableEraSummaries: boolean;
   /** How often (in days) to generate era summaries. */
   eraSummaryIntervalDays: number;
+  /** Max tokens for the era summary section (case facts trimmed from oldest first). */
+  maxEraSummaryTokens: number;
   /** Display label. */
   label: string;
 }
@@ -61,6 +63,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     briefingMaxEvents: 20,
     enableEraSummaries: false,
     eraSummaryIntervalDays: 0,
+    maxEraSummaryTokens: 500,
     label: "Low",
   },
   normal: {
@@ -78,6 +81,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     briefingMaxEvents: 40,
     enableEraSummaries: true,
     eraSummaryIntervalDays: 60,
+    maxEraSummaryTokens: 1500,
     label: "Normal",
   },
   high: {
@@ -95,6 +99,7 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     briefingMaxEvents: 60,
     enableEraSummaries: true,
     eraSummaryIntervalDays: 60,
+    maxEraSummaryTokens: 3000,
     label: "High",
   },
 };

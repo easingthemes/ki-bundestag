@@ -387,5 +387,6 @@ export const eraSummaries = sqliteTable("era_summaries", {
   startDay: integer("start_day").notNull(),
   endDay: integer("end_day").notNull(),
   summary: text("summary").notNull(),
+  caseFacts: text("case_facts", { mode: "json" }),
   createdAt: text("created_at").notNull(),
 });

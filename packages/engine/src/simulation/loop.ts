@@ -52,7 +52,7 @@ import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
-import { shouldGenerateEraSummary, buildEraSummaryBatchRequest, processEraSummaryResult, getEraSummaries } from "./era-summary.js";
+import { shouldGenerateEraSummary, buildEraSummaryBatchRequest, processEraSummaryResult, getEraSummaries, extractCaseFacts, getLastEraSummaryEnd } from "./era-summary.js";
 import { shouldGenerateSidejobs, buildSidejobBatchRequest, processSidejobResult, applySidejobScandalImpact } from "./sidejobs.js";
 import {
   shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest,
@@ -979,11 +979,17 @@ export async function runDay(): Promise<number> {
     // Generate era summary if interval has elapsed (compressed historical narrative)
     let eraSummaryList = getEraSummaries();
     if (shouldGenerateEraSummary(currentDay, depthConfig)) {
-      const eraSummaryReq = buildEraSummaryBatchRequest(currentDay, depthConfig);
+      // Extract case facts before building request (used in both prompt and storage)
+      const lastEnd = getLastEraSummaryEnd();
+      const eraStartDay = lastEnd + 1;
+      const eraEndDay = currentDay - 1;
+      const caseFacts = extractCaseFacts(eraStartDay, eraEndDay);
+
+      const eraSummaryReq = buildEraSummaryBatchRequest(currentDay, depthConfig, caseFacts);
       if (eraSummaryReq) {
         try {
           const eraResults = await submitBatch([eraSummaryReq]);
-          processEraSummaryResult(findResult(eraResults, eraSummaryReq.customId), currentDay);
+          processEraSummaryResult(findResult(eraResults, eraSummaryReq.customId), currentDay, caseFacts);
           eraSummaryList = getEraSummaries(); // Refresh after insert
         } catch (err) {
           if (err instanceof AIProviderLimitError) {
