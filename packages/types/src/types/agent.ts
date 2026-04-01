@@ -30,6 +30,8 @@ export interface AgentContext {
   recentOwnActions?: Array<{ day: number; type: string; title: string }>;
   realWorldContext?: string;
   realPartyPositions?: string;
+  eraSummaries?: Array<{ startDay: number; endDay: number; summary: string }>;
+
 }
 
 export interface ProposeBillAction {

@@ -303,3 +303,11 @@ export const bundestagSeats = sqliteTable("bundestag_seats", {
   disciplineReason: text("discipline_reason"),
   allocatedOnDay: integer("allocated_on_day").notNull(),
 });
+
+export const eraSummaries = sqliteTable("era_summaries", {
+  id: text("id").primaryKey(),
+  startDay: integer("start_day").notNull(),
+  endDay: integer("end_day").notNull(),
+  summary: text("summary").notNull(),
+  createdAt: text("created_at").notNull(),
+});

@@ -38,7 +38,7 @@ const BRIEFING_EVENT_TYPES = new Set([
 /**
  * Query the last N days of significant events from the DB.
  */
-function getRecentSignificantEvents(currentDay: number, lookbackDays = 30): Array<{ day: number; type: string; actor: string; title: string }> {
+function getRecentSignificantEvents(currentDay: number, lookbackDays = 30, maxEvents = 60): Array<{ day: number; type: string; actor: string; title: string }> {
   const db = getDb();
   const minDay = Math.max(1, currentDay - lookbackDays);
 
@@ -53,7 +53,7 @@ function getRecentSignificantEvents(currentDay: number, lookbackDays = 30): Arra
       inArray(schema.simulationEvents.type, [...BRIEFING_EVENT_TYPES]),
     ))
     .orderBy(desc(schema.simulationEvents.dayNumber))
-    .limit(60)
+    .limit(maxEvents)
     .all();
 
   return rows.map(e => ({ day: e.dayNumber, type: e.type, actor: e.actor, title: e.title }));
@@ -112,6 +112,7 @@ function buildBriefingContext(
   coalitionPartyIds: string[],
   events: Array<{ day: number; type: string; actor: string; title: string }>,
   depthConfig?: DepthConfig,
+  hasEraSummaries = false,
 ): string {
   const depth = depthConfig ?? getDepthConfig("normal");
   const trends = getApprovalTrends(currentDay, depth.briefingTrendDays);
@@ -136,15 +137,19 @@ function buildBriefingContext(
 
   // Group events by period
   const recentEvents = events.filter(e => e.day >= currentDay - 7);
-  const olderEvents = events.filter(e => e.day < currentDay - 7);
-
   const recentStr = recentEvents.length > 0
     ? recentEvents.map(e => `  [Day ${e.day}] ${e.title}`).join("\n")
     : "  No significant events.";
 
-  const olderStr = olderEvents.length > 0
-    ? olderEvents.slice(0, 20).map(e => `  [Day ${e.day}] ${e.title}`).join("\n")
-    : "  No earlier events.";
+  // Suppress older events section when era summaries provide historical coverage
+  let olderSection = "";
+  if (!hasEraSummaries) {
+    const olderEvents = events.filter(e => e.day < currentDay - 7);
+    const olderStr = olderEvents.length > 0
+      ? olderEvents.slice(0, 20).map(e => `  [Day ${e.day}] ${e.title}`).join("\n")
+      : "  No earlier events.";
+    olderSection = `\n\nEVENTS — DAYS ${Math.max(1, currentDay - depth.briefingEventLookbackDays)} TO ${currentDay - 7}:\n${olderStr}`;
+  }
 
   return `CURRENT DAY: ${currentDay}
 COALITION: ${coalitionNames}
@@ -154,10 +159,7 @@ PARTY APPROVAL TRENDS (last 14 days):
 ${partyTrends}
 
 EVENTS — LAST 7 DAYS:
-${recentStr}
-
-EVENTS — DAYS ${Math.max(1, currentDay - 30)} TO ${currentDay - 7}:
-${olderStr}`;
+${recentStr}${olderSection}`;
 }
 
 const BRIEFING_SYSTEM_PROMPT = `You are a senior political analyst at the Bundestag. Write a concise daily briefing for party leaders summarizing the current political landscape. Write the briefing in German.
@@ -179,6 +181,7 @@ export function buildBriefingBatchRequest(
   allParties: Party[],
   coalitionPartyIds: string[],
   depthConfig?: DepthConfig,
+  hasEraSummaries = false,
 ): BatchRequest | null {
   const depth = depthConfig ?? getDepthConfig("normal");
 
@@ -187,10 +190,10 @@ export function buildBriefingBatchRequest(
   if (currentDay <= 2) return null;
 
   // Skip if no significant events in the lookback window
-  const events = getRecentSignificantEvents(currentDay, depth.briefingEventLookbackDays);
+  const events = getRecentSignificantEvents(currentDay, depth.briefingEventLookbackDays, depth.briefingMaxEvents);
   if (events.length === 0) return null;
 
-  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds, events, depth);
+  const context = buildBriefingContext(currentDay, allParties, coalitionPartyIds, events, depth, hasEraSummaries);
 
   return {
     customId: `briefing-day${currentDay}`,

@@ -27,6 +27,8 @@ export interface BatchRequest {
   partyId?: string;
   /** Role key for system-role model selection. */
   roleKey?: RoleKey;
+  /** JSON Schema for Anthropic structured output. Only used for Anthropic provider. */
+  outputSchema?: Record<string, unknown>;
 }
 
 export interface BatchResult {
@@ -36,6 +38,8 @@ export interface BatchResult {
   provider: Provider;
   inputTokens: number;
   outputTokens: number;
+  /** Whether this result used Anthropic structured output (guaranteed valid JSON). */
+  structuredOutput?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,17 +102,33 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
 
   const client = getAnthropicClient();
 
+  // Track which requests use structured output
+  const structuredIds = new Set<string>();
+
   const batchRequests = requests.map(req => {
     const config = resolveModel(req);
-    return {
-      custom_id: req.customId,
-      params: {
-        model: config.model,
-        max_tokens: req.maxTokens,
-        system: req.system,
-        messages: [{ role: "user" as const, content: req.prompt }],
-      },
+    const baseParams = {
+      model: config.model,
+      max_tokens: req.maxTokens,
+      system: req.system,
+      messages: [{ role: "user" as const, content: req.prompt }],
     };
+    if (req.outputSchema) {
+      structuredIds.add(req.customId);
+      return {
+        custom_id: req.customId,
+        params: {
+          ...baseParams,
+          output_config: {
+            format: {
+              type: "json_schema" as const,
+              schema: req.outputSchema,
+            },
+          },
+        },
+      };
+    }
+    return { custom_id: req.customId, params: baseParams };
   });
 
   console.log(`  [Batch] Submitting ${batchRequests.length} Anthropic requests...`);
@@ -196,6 +216,7 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
         provider: "anthropic",
         inputTokens,
         outputTokens,
+        structuredOutput: structuredIds.has(item.custom_id),
       });
     } else {
       console.warn(`  [Batch] Request ${item.custom_id} failed: ${item.result.type}`);
