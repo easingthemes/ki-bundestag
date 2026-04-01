@@ -2,6 +2,12 @@ name: Seed Demo Users
 
 on:
   workflow_dispatch:
+    inputs:
+      user_count:
+        description: 'Number of demo users to create'
+        required: false
+        default: '756'
+        type: string
 
 jobs:
   seed-demo-users:
@@ -20,6 +26,6 @@ jobs:
             cd /opt/ki-bundestag
             git pull origin main
             npm install --omit=dev
-            npm run seed:demo-users
+            npm run seed:demo-users -- ${{ github.event.inputs.user_count }}
             pm2 restart ki-api --update-env || pm2 start npx --name ki-api -- tsx packages/api/src/index.ts
             pm2 save
