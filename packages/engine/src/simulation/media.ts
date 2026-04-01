@@ -30,6 +30,7 @@ const NEWSWORTHY_TYPES = new Set([
   "government_formed",
   "negotiation_complete",
   "statement",
+  "sidejob_scandal",
 ]);
 
 /**
