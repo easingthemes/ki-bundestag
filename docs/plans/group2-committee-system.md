@@ -10,6 +10,8 @@ Add real Bundestag committee infrastructure: a `committees` table seeded from ab
 
 **Design constraint**: Committee names are structural data (stable across a legislative period), so they're safe to use directly from real-world API data. Committee membership is simulation-internal and generated algorithmically.
 
+**Sim time constraint**: Committee names from abgeordnetenwatch are structural and rarely change — safe to use directly. Committee membership and bill assignments are purely simulation-internal. No sim time vs real time issues for this group.
+
 ---
 
 ## Step 1: Committee schema & migration

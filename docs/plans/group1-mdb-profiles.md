@@ -8,6 +8,8 @@
 
 Add dedicated pages for browsing all Members of Bundestag (MdB) and viewing individual MdB profiles with voting history, speeches, and activity. This requires two new API endpoints, two new frontend pages, web API client additions, and navigation/linking updates across the app.
 
+**Sim time constraint**: This group uses only simulation-internal data (seats, votes, speeches). No real-world data is displayed, so there are no sim time vs real time issues.
+
 ---
 
 ## Step 1: New API endpoints for MdB data

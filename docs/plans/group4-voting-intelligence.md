@@ -12,10 +12,12 @@
 
 The simulation already fetches real Bundestag poll data from abgeordnetenwatch (per-party vote breakdowns) and stores it in the `real_world_knowledge` table. Simulated bills accumulate per-party vote records in the `bills.votes` JSON field. An alignment endpoint (`GET /api/parties/alignment`) already exists but is basic and not surfaced in the UI.
 
+**Critical constraint — Sim time vs real time**: Simulation days run much faster than real days. After a few sim weeks, the simulation's coalition, opposition, and political landscape may be completely different from reality. Real-world voting data is a **historical baseline** from the start of the simulation, NOT a live comparison. As the sim diverges, the comparison becomes a "how far has the simulation drifted from its starting point?" metric, not a correctness check. All UI and prompts must reflect this.
+
 This plan adds three capabilities:
-1. **Voting alignment matrix** -- party-to-party agreement percentages computed from simulation bill history, displayed as a heatmap widget.
-2. **Real vs simulated comparison** -- store structured real-world voting patterns from abgeordnetenwatch and compare them against simulation voting patterns.
-3. **Voting calibration** -- inject real voting pattern data into party agent prompts so AI parties vote with realistic cross-party agreement rates.
+1. **Voting alignment matrix** -- party-to-party agreement percentages computed from simulation bill history, displayed as a heatmap widget. (Pure simulation data, no constraint issues.)
+2. **Historical baseline comparison** -- store real-world voting patterns from abgeordnetenwatch as a one-time baseline snapshot and compare against simulation trends. Clearly labeled as "Ausgangslage" (starting point), NOT as "how things should be".
+3. **Voting tendency seeding** -- use real voting patterns as initial behavioral tendency for party agents, but ONLY early in the simulation. As sim history grows, simulation's own voting history takes precedence.
 
 ---
 
@@ -84,7 +86,9 @@ export { calculateVotingAlignment, calculateVotingTendencies } from "./simulatio
 
 ---
 
-## Step 2: Real vs Simulated Comparison Data
+## Step 2: Historical Baseline Data (Ausgangslage)
+
+**Critical constraint**: This data represents a **one-time snapshot** of real Bundestag voting patterns captured at (or near) the start of the simulation. It is NOT a live comparison. As the simulation progresses, this baseline becomes increasingly historical — it shows "where parties started" rather than "where they should be". All labels, API responses, and UI must use terms like "Ausgangslage" (starting point) or "Historische Vergleichsbasis", NEVER "Realität" vs "Simulation".
 
 ### 2.1 New Knowledge Category: `voting_pattern`
 
@@ -101,12 +105,13 @@ interface RealWorldVotingPattern {
   pollCount: number;
   pairwiseAgreement: Record<string, Record<string, number>>;  // party -> party -> % agreement
   partyDiscipline: Record<string, number>;  // party -> % voting unanimously
+  capturedOnDay: number;  // sim day when this baseline was captured
 }
 ```
 
 2. **Calculation**: For each poll, determine each party's majority vote (yes/no/abstain based on plurality). Two parties "agree" on a poll if their majority votes match. Agreement % = polls where they agree / total polls.
 
-3. **Storage**: Store as a single `real_world_knowledge` row with `category: "voting_pattern"`, `digest` containing the JSON string, replacing previous rows of this category each fetch cycle.
+3. **Storage**: Store as a single `real_world_knowledge` row with `category: "voting_pattern"`, `digest` containing the JSON string. **Only store once** — if a `voting_pattern` row already exists, do NOT replace it. The baseline is frozen at first capture. This prevents the comparison from "chasing" reality as the sim diverges.
 
 ### 2.2 Comparison Function
 
@@ -116,21 +121,23 @@ interface RealWorldVotingPattern {
 interface VotingComparison {
   parties: Array<{ id: string; name: string; color: string }>;
   simulated: Record<string, Record<string, number | null>>;  // from calculateVotingAlignment
-  real: Record<string, Record<string, number | null>>;        // from stored voting_pattern
-  divergence: Record<string, Record<string, number | null>>;  // sim - real (positive = more aligned in sim)
+  baseline: Record<string, Record<string, number | null>>;   // frozen starting-point snapshot
+  drift: Record<string, Record<string, number | null>>;      // sim - baseline (how far sim has drifted)
+  baselineCapturedOnDay: number;                              // when the baseline was recorded
 }
 
 function compareVotingPatterns(
   bills: Bill[],
   parties: Party[],
-): VotingComparison | null  // null if no real-world data available
+): VotingComparison | null  // null if no baseline data available
 ```
 
 **Logic**:
-- Load the active `voting_pattern` row from `real_world_knowledge`.
+- Load the `voting_pattern` row from `real_world_knowledge` (frozen baseline).
 - Compute simulated alignment via `calculateVotingAlignment`.
-- For each party pair, compute divergence = simulated% - real%.
-- Return null if no real-world voting pattern data exists.
+- For each party pair, compute drift = simulated% - baseline%.
+- Return null if no baseline data exists.
+- Include `baselineCapturedOnDay` so the UI can show "Ausgangslage vom Tag X".
 
 ### 2.3 Party Name Mapping
 
@@ -180,7 +187,7 @@ GET /api/parties/alignment?window=30
 
 ### 3.2 New: `GET /api/parties/voting-comparison`
 
-Returns real-world vs simulated voting patterns.
+Returns baseline (starting-point snapshot) vs current simulated voting patterns.
 
 **Response shape**:
 ```json
@@ -188,13 +195,14 @@ Returns real-world vs simulated voting patterns.
   "available": true,
   "parties": [{ "id": "spd", "name": "SPD", "color": "#E3000F" }, ...],
   "simulated": { "spd": { "cdu": 42, "gruene": 78, ... }, ... },
-  "real": { "spd": { "cdu": 35, "gruene": 82, ... }, ... },
-  "divergence": { "spd": { "cdu": 7, "gruene": -4, ... }, ... },
-  "realPollCount": 10
+  "baseline": { "spd": { "cdu": 35, "gruene": 82, ... }, ... },
+  "drift": { "spd": { "cdu": 7, "gruene": -4, ... }, ... },
+  "baselinePollCount": 10,
+  "baselineCapturedOnDay": 1
 }
 ```
 
-If no real-world data exists, return `{ "available": false }`.
+If no baseline data exists, return `{ "available": false }`.
 
 ### 3.3 New: `GET /api/parties/voting-tendencies`
 
@@ -294,18 +302,22 @@ Add `AlignmentMatrixResponse`, `VotingComparisonResponse`, `VotingTendenciesResp
 
 ---
 
-## Step 5: Real vs Simulated Comparison Widget
+## Step 5: Baseline Drift Comparison Widget
 
 **File**: `packages/web/src/components/VotingComparisonChart.tsx`
 
 ### 5.1 Component Design
 
-A side-by-side display of real-world and simulated voting alignment for selected party pairs.
+A side-by-side display of the frozen starting-point baseline and current simulated voting alignment for selected party pairs. This shows **how far the simulation has drifted from its initial conditions**, NOT a "correctness" comparison.
 
 **Primary view**: Grouped bar chart (horizontal bars) showing the top 6 most interesting party pairs:
-- For each pair, two bars: "Real Bundestag" (blue) and "Simulation" (amber/orange).
+- For each pair, two bars: "Ausgangslage" (muted blue) and "Simulation aktuell" (amber/orange).
 - Bar length = agreement percentage (0-100%).
-- Pairs sorted by absolute divergence (largest difference first) to highlight where the simulation deviates most.
+- Pairs sorted by absolute drift (largest difference first) to highlight where the simulation has diverged most from its starting point.
+
+**Header text**: "Wie hat sich das Abstimmungsverhalten seit Simulationsbeginn verändert?" (How has voting behavior changed since simulation start?)
+
+**Subheader**: "Ausgangslage basiert auf Bundestag-Daten vom Tag {baselineCapturedOnDay}" (Baseline based on Bundestag data from day X)
 
 **Implementation approach**: Use plain HTML/CSS bars (div with percentage width) rather than a charting library, consistent with the existing codebase which uses `VoteBar` and other custom bar components.
 
@@ -315,66 +327,79 @@ interface VotingComparisonChartProps {
 }
 ```
 
-### 5.2 Divergence Indicator
+### 5.2 Drift Indicator
 
-Below each pair's bars, show a small divergence label:
-- `+7%` (green text) = simulation more aligned than reality.
-- `-4%` (red text) = simulation less aligned than reality.
-- `0%` (gray text) = matches.
+Below each pair's bars, show a small drift label:
+- `+7%` (green text) = parties have grown closer in the simulation.
+- `-4%` (red text) = parties have grown apart in the simulation.
+- `0%` (gray text) = unchanged.
 
 ### 5.3 Unavailable State
 
-If `available: false` from the API, show an info card: "Keine realen Abstimmungsdaten verfugbar. Daten werden woechentlich von abgeordnetenwatch.de abgerufen." (using `ALERT_STYLES.info` from `src/lib/colors.ts`).
+If `available: false` from the API, show an info card: "Keine Ausgangsdaten verfügbar. Abstimmungsdaten werden beim ersten Wissensabruf als Baseline gespeichert." (using `ALERT_STYLES.info` from `src/lib/colors.ts`).
 
 ### 5.4 Integration Location
 
-Place on the **Elections page** below the VotingAlignmentMatrix, under a heading "Vergleich: Simulation vs. Bundestag". This keeps all voting analysis together.
+Place on the **Elections page** below the VotingAlignmentMatrix, under a heading "Entwicklung seit Simulationsbeginn" (Development since simulation start). This keeps all voting analysis together.
 
 ---
 
-## Step 6: Voting Calibration in Agent Prompts
+## Step 6: Voting Tendency Seeding in Agent Prompts
+
+**Critical constraint**: Real-world voting patterns are used ONLY as **initial behavioral tendencies** that **fade out** as the simulation builds its own history. After ~50 simulated bills, the simulation's own voting record is authoritative and the real-world seed becomes irrelevant. This prevents the sim from being permanently anchored to reality as it develops its own political dynamics.
 
 **File**: `packages/engine/src/agent/prompt.ts`
 
-### 6.1 Inject Real Voting Patterns into Agent Context
+### 6.1 Inject Voting Tendency Seed into Agent Context (Early Sim Only)
 
-In `buildUserPrompt()`, add a new optional section when real-world voting pattern data is available. This gives each party agent awareness of how the real party votes relative to other parties.
+In `buildUserPrompt()`, add a new optional section when real-world voting pattern data is available **AND the simulation is still young** (fewer than 50 bills voted on). This gives each party agent initial behavioral guidance that fades naturally.
 
-**New context section** (appended to the user prompt when data exists):
+**New context section** (appended to the user prompt when conditions met):
 
 ```
-ABSTIMMUNGSVERHALTEN IN DER REALITAT:
-Ihre Partei stimmt im echten Bundestag wie folgt ab:
-- Mit CDU/CSU: 35% Ubereinstimmung
-- Mit Grune: 82% Ubereinstimmung
-- Mit FDP: 45% Ubereinstimmung
-- Mit AfD: 12% Ubereinstimmung
-- Mit Die Linke: 58% Ubereinstimmung
-Berucksichtigen Sie diese Muster bei Ihren Abstimmungsentscheidungen.
+ABSTIMMUNGSTENDENZEN (Ausgangslage):
+Basierend auf historischen Bundestagsdaten tendiert Ihre Partei zu folgenden Übereinstimmungen:
+- Mit CDU/CSU: 35% Übereinstimmung
+- Mit Grüne: 82% Übereinstimmung
+- Mit FDP: 45% Übereinstimmung
+- Mit AfD: 12% Übereinstimmung
+- Mit Die Linke: 58% Übereinstimmung
+Diese Werte dienen als Orientierung. Ihre Abstimmungen sollten sich primär an der aktuellen Simulationslage orientieren.
 ```
 
-### 6.2 Data Flow
-
-1. `knowledge-fetch.ts` already runs weekly. After the new `voting_pattern` category is stored (Step 2), it becomes available.
-2. In `loop.ts`, when building agent prompts for each party, call a new helper:
+### 6.2 Fade-Out Logic
 
 **File**: `packages/engine/src/simulation/voting-analysis.ts`
 
 ```typescript
-function getVotingCalibrationContext(partyId: string): string | null
+function getVotingCalibrationContext(partyId: string, totalBillsVoted: number): string | null
 ```
 
 This function:
-- Loads the active `voting_pattern` row from `real_world_knowledge`.
-- Parses the JSON digest.
+- Returns `null` if `totalBillsVoted >= 50` (simulation has enough own history).
+- Returns `null` if no `voting_pattern` baseline exists in `real_world_knowledge`.
+- Otherwise, loads the frozen baseline, parses the JSON digest.
 - Formats the pairwise agreement data for the given `partyId` as a German-language string.
-- Returns `null` if no data available.
+- Adds a softening note: "Diese Werte dienen als Orientierung" (These values serve as guidance).
+
+The 50-bill threshold means the seed is active for roughly the first 1-2 simulation months (depending on bill frequency), then silently disappears. No configuration needed — the transition is natural.
+
+### 6.3 Data Flow
+
+1. `knowledge-fetch.ts` runs on first fetch. The `voting_pattern` category is stored once (Step 2) and frozen.
+2. In `loop.ts`, when building agent prompts for each party, call the helper with the current total bill count:
+
+```typescript
+const totalBills = db.select({ count: sql`count(*)` }).from(schema.bills)
+  .where(isNotNull(schema.bills.votes)).all()[0]?.count ?? 0;
+const votingCalibration = getVotingCalibrationContext(partyId, totalBills);
+```
 
 3. In `buildUserPrompt()`, accept an optional `votingCalibration?: string` parameter and append it to the prompt if present.
 
 ### 6.3 Prompt Token Budget
 
-The voting calibration section adds approximately 80-120 tokens per party prompt. At 6 parties per day, this is roughly 500-700 additional tokens/day, which is negligible relative to the existing prompt sizes (typically 2000-4000 tokens each).
+The voting calibration section adds approximately 80-120 tokens per party prompt. At 6 parties per day, this is roughly 500-700 additional tokens/day, which is negligible relative to the existing prompt sizes (typically 2000-4000 tokens each). And it disappears entirely after ~50 bills.
 
 ### 6.4 Context Depth Gating
 
@@ -383,7 +408,7 @@ Only include voting calibration at `normal` and `high` context depth (not `low`)
 ```typescript
 const depth = getDepthConfig();
 const votingCalibration = depth.contextDepth !== "low"
-  ? getVotingCalibrationContext(partyId)
+  ? getVotingCalibrationContext(partyId, totalBills)
   : null;
 ```
 

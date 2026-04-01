@@ -9,6 +9,8 @@
 
 Lower-priority features inspired by abgeordnetenwatch.de's Kandidierendencheck and transparency research tools. The quiz feature (Step 1) is the most concrete and self-contained; Steps 2 and 3 are lighter sketches for future expansion.
 
+**Critical constraint — Sim time vs real time**: The quiz party positions must derive **primarily from the simulation's own voting history and stated positions**, with real-world `party_position` data from abgeordnetenwatch used ONLY as a seed for the initial state (before the simulation has enough bills to establish patterns). As the simulation progresses, party positions may diverge significantly from reality — the quiz should reflect the simulation's political landscape, not the real world. Lobbying events and donations (Steps 2-3) are purely simulation-internal and have no real-world constraint issues.
+
 ---
 
 ## Step 1: "Welche Partei passt zu dir?" Quiz (`/quiz`)
@@ -63,10 +65,10 @@ export const quizPartyPositions = sqliteTable("quiz_party_positions", {
 
 **Thesis generation approach** (two options, pick one):
 
-- **Option A (static seed):** Hardcoded theses in `packages/engine/src/db/seed.ts`, party positions derived once from `real_world_knowledge` party_position entries via a one-time AI call during seed.
-- **Option B (dynamic):** New action in simulation loop generates fresh theses periodically (e.g. every 30 days) based on recent bill activity. Party positions computed from actual voting history on bills in each category. More complex but keeps quiz fresh.
+- **Option A (static seed):** Hardcoded theses in `packages/engine/src/db/seed.ts`, party positions derived once from `real_world_knowledge` party_position entries via a one-time AI call during seed. **Note**: These seed positions become increasingly stale as the simulation diverges from reality. Acceptable for MVP.
+- **Option B (dynamic, recommended for production):** New action in simulation loop generates fresh theses periodically (e.g. every 30 days) based on recent bill activity. **Party positions computed from actual simulation voting history** on bills in each category. This keeps the quiz aligned with the simulation's own political reality, not the real world. More complex but ensures the quiz remains accurate as the sim progresses.
 
-Recommendation: Start with **Option A** for simplicity. Option B can be layered on later.
+Recommendation: Start with **Option A** for simplicity, but plan to migrate to **Option B** once the simulation has sufficient bill history (50+ bills). Option B is the correct long-term approach because it matches the simulation's actual political landscape rather than a potentially stale real-world snapshot.
 
 ### 1.2 Match Calculation Logic
 
