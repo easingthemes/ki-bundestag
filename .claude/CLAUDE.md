@@ -109,6 +109,16 @@ Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `XAI_AP
 
 Open issues, bugs, and planned work are tracked in `docs/todo/README.md`. Each item has a detail file in `docs/todo/NNN-slug.md` with description, affected files, and fix notes. Check there first when asked about open todos, known issues, or what to work on next.
 
+## Pre-PR Quality Gates
+
+**Never skip pre-existing issues/errors.** Before opening a PR, ensure:
+
+1. **`npm run typecheck`** — must pass with zero errors (all packages)
+2. **`npm test`** — must pass with zero failures
+3. **`npm run build`** — must succeed
+
+If you find pre-existing errors unrelated to your changes, fix them in the same PR or flag them to the user. Do not open a PR with known failing CI.
+
 ## Debugging Tips
 
 - **Typecheck**: `npm run typecheck` — always run from monorepo root. If you see errors about missing modules (vitest, @types/node, react), run `npm install` first
