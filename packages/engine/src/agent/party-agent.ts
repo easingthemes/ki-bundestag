@@ -1,9 +1,10 @@
 import type { AgentAction, AgentContext, Bill } from "@ki-bundestag/types";
 import { callAI, AIProviderLimitError } from "./client.js";
 import { logAICall } from "./ai-json.js";
-import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
+import { buildSystemPrompt, buildUserPrompt, buildValidationRetryPrompt } from "./prompt.js";
 import type { PartyCapabilities } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
+import type { ValidationResult } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
 import { getPartyModel } from "./model-config.js";
 import type { Provider } from "./model-config.js";
@@ -84,6 +85,82 @@ function deriveCapabilities(ctx: AgentContext): PartyCapabilities {
   };
 }
 
+/**
+ * Attempt a single semantic retry when validation found fixable errors.
+ * Returns the original valid actions if no fixable errors or if the retry fails.
+ */
+async function attemptSemanticRetry(
+  ctx: AgentContext,
+  systemPrompt: string,
+  originalUserPrompt: string,
+  validationResult: ValidationResult,
+  votableBills: Bill[],
+  secondReadingBills: Bill[] | undefined,
+): Promise<{ actions: AgentAction[]; retried: boolean }> {
+  const hasFixable = validationResult.errors.some(e => e.fixable);
+  if (!hasFixable) {
+    return { actions: validationResult.valid, retried: false };
+  }
+
+  console.warn(`  [Agent] ${ctx.party.id}: ${validationResult.errors.length} validation error(s) (${validationResult.errors.filter(e => e.fixable).length} fixable), attempting semantic retry...`);
+
+  try {
+    const retryPrompt = buildValidationRetryPrompt(
+      originalUserPrompt,
+      validationResult.errors,
+      validationResult.autoAbstainBillIds,
+    );
+
+    const retryResult = await callAI({
+      system: systemPrompt,
+      prompt: retryPrompt,
+      maxTokens: 1024,
+      partyId: ctx.party.id,
+    });
+
+    const retryParsed = parseAgentResponse(retryResult.text);
+    const retryValidation = validateActions(
+      retryParsed.actions,
+      votableBills,
+      ctx.party.id,
+      ctx.activeElection,
+      ctx.hasFraktion ?? ctx.party.seatCount > 0,
+      secondReadingBills,
+      ctx.party.coalitionRole === "opposition",
+      ctx.party.coalitionRole === "leader",
+    );
+
+    const retryOk = retryValidation.errors.length === 0;
+    logAICall({
+      task: `agent:${ctx.party.id}:semantic-retry`,
+      model: retryResult.model,
+      provider: retryResult.provider,
+      latencyMs: 0,
+      parseOk: true,
+      validationOk: retryOk,
+      fallback: retryOk ? undefined : "semantic-retry:still-has-errors",
+    });
+
+    if (retryValidation.errors.length < validationResult.errors.length) {
+      console.log(`  [Agent] ${ctx.party.id}: semantic retry improved (${validationResult.errors.length} → ${retryValidation.errors.length} errors)`);
+    } else {
+      console.warn(`  [Agent] ${ctx.party.id}: semantic retry did not improve validation`);
+    }
+
+    return { actions: retryValidation.valid, retried: true };
+  } catch (err) {
+    console.warn(`  [Agent] ${ctx.party.id}: semantic retry failed (${(err as Error).message}), using original result`);
+    logAICall({
+      task: `agent:${ctx.party.id}:semantic-retry`,
+      latencyMs: 0,
+      parseOk: false,
+      validationOk: false,
+      fallback: "semantic-retry:failed",
+    });
+    return { actions: validationResult.valid, retried: false };
+  }
+}
+
 export async function runPartyAgent(
   ctx: AgentContext,
   votableBills: Bill[],
@@ -120,7 +197,7 @@ export async function runPartyAgent(
       }));
     }
 
-    const validated = validateActions(
+    const validationResult = validateActions(
       parsed.actions,
       votableBills,
       ctx.party.id,
@@ -131,12 +208,17 @@ export async function runPartyAgent(
       ctx.party.coalitionRole === "leader",
     );
 
-    if (validated.length < parsed.actions.length) {
-      validationOk = false; // some actions dropped
+    if (validationResult.errors.length > 0) {
+      validationOk = false;
     }
 
     logAICall({ task: `agent:${ctx.party.id}`, model, provider, latencyMs: Date.now() - t0, parseOk, validationOk });
-    return validated;
+
+    // Semantic retry: re-prompt once if there are fixable errors
+    const { actions: finalActions } = await attemptSemanticRetry(
+      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills,
+    );
+    return finalActions;
   } catch (error) {
     if (error instanceof AIProviderLimitError) {
       console.warn(`  [Agent] ${ctx.party.name}: skipped (${error.message})`);
@@ -245,7 +327,7 @@ export async function processPartyAgentResult(
     }
   }
 
-  const validated = validateActions(
+  const validationResult = validateActions(
     parsed.actions,
     votableBills,
     ctx.party.id,
@@ -256,8 +338,18 @@ export async function processPartyAgentResult(
     ctx.party.coalitionRole === "leader",
   );
 
-  if (validated.length < parsed.actions.length) validationOk = false;
+  if (validationResult.errors.length > 0) validationOk = false;
 
   logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk });
-  return validated;
+
+  // Semantic retry: re-prompt once if there are fixable errors
+  if (validationResult.errors.some(e => e.fixable)) {
+    const systemPrompt = buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions);
+    const userPrompt = buildUserPrompt(ctx);
+    const { actions: finalActions } = await attemptSemanticRetry(
+      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills,
+    );
+    return finalActions;
+  }
+  return validationResult.valid;
 }
