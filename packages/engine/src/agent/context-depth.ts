@@ -35,6 +35,12 @@ export interface DepthConfig {
   enrichSecondaryCalls: boolean;
   /** Whether to fetch and inject real-world knowledge (news, party positions, shocks). */
   enableKnowledgeGrounding: boolean;
+  /** Max significant events returned by briefing query. */
+  briefingMaxEvents: number;
+  /** Whether to generate era summaries (compressed historical narratives). */
+  enableEraSummaries: boolean;
+  /** How often (in days) to generate era summaries. */
+  eraSummaryIntervalDays: number;
   /** Display label. */
   label: string;
 }
@@ -52,11 +58,14 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     enableBriefing: false,
     enrichSecondaryCalls: false,
     enableKnowledgeGrounding: false,
+    briefingMaxEvents: 20,
+    enableEraSummaries: false,
+    eraSummaryIntervalDays: 0,
     label: "Low",
   },
   normal: {
     contextTokenBudget: 8000,
-    briefingEventLookbackDays: 30,
+    briefingEventLookbackDays: 7,
     briefingTrendDays: 14,
     ownActionsLookbackDays: 14,
     ownActionsMaxItems: 15,
@@ -66,11 +75,14 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     enableBriefing: true,
     enrichSecondaryCalls: true,
     enableKnowledgeGrounding: true,
+    briefingMaxEvents: 40,
+    enableEraSummaries: true,
+    eraSummaryIntervalDays: 60,
     label: "Normal",
   },
   high: {
     contextTokenBudget: 16000,
-    briefingEventLookbackDays: 60,
+    briefingEventLookbackDays: 14,
     briefingTrendDays: 30,
     ownActionsLookbackDays: 30,
     ownActionsMaxItems: 30,
@@ -80,6 +92,9 @@ export const DEPTH_CONFIGS: Record<ContextDepth, DepthConfig> = {
     enableBriefing: true,
     enrichSecondaryCalls: true,
     enableKnowledgeGrounding: true,
+    briefingMaxEvents: 60,
+    enableEraSummaries: true,
+    eraSummaryIntervalDays: 60,
     label: "High",
   },
 };

@@ -5,8 +5,70 @@ import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
 import type { PartyCapabilities } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
+import { getPartyModel } from "./model-config.js";
 import type { Provider } from "./model-config.js";
 import type { DepthConfig } from "./context-depth.js";
+
+/**
+ * JSON Schema for Anthropic structured output — agent response.
+ * Matches the AgentResponse type: { actions: AgentAction[] }.
+ * Passed directly as `output_config.format.schema` in the Anthropic API.
+ */
+const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string" },
+          billId: { type: "string" },
+          vote: { type: "string" },
+          reason: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          category: { type: "string" },
+          impact: {
+            type: "object",
+            properties: {
+              budget: { type: "number" },
+              unemployment: { type: "number" },
+              inflation: { type: "number" },
+              gdpGrowth: { type: "number" },
+              publicSentiment: { type: "number" },
+            },
+            additionalProperties: false,
+          },
+          impactChange: {
+            type: "object",
+            properties: {
+              budget: { type: "number" },
+              unemployment: { type: "number" },
+              inflation: { type: "number" },
+              gdpGrowth: { type: "number" },
+              publicSentiment: { type: "number" },
+            },
+            additionalProperties: false,
+          },
+          statement: { type: "string" },
+          motionType: { type: "string" },
+          interpellationType: { type: "string" },
+          question: { type: "string" },
+          targetMinistry: { type: "string" },
+          promise: { type: "string" },
+          arguments: { type: "string" },
+          proposedChancellor: { type: "string" },
+          proposedChancellorPartyId: { type: "string" },
+        },
+        required: ["type"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["actions"],
+  additionalProperties: false,
+};
 
 /** Derive capabilities from agent context for conditional system prompt. */
 function deriveCapabilities(ctx: AgentContext): PartyCapabilities {
@@ -106,13 +168,19 @@ export function buildPartyAgentRequests(
   currentDay: number,
   depthConfig?: DepthConfig,
 ): BatchRequest[] {
-  return contexts.map(ctx => ({
-    customId: `agent-${ctx.party.id}-day${currentDay}`,
-    system: buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions),
-    prompt: buildUserPrompt(ctx, depthConfig),
-    maxTokens: 1024,
-    partyId: ctx.party.id,
-  }));
+  return contexts.map(ctx => {
+    const config = getPartyModel(ctx.party.id);
+    const isAnthropic = config.provider === "anthropic";
+    return {
+      customId: `agent-${ctx.party.id}-day${currentDay}`,
+      system: buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions),
+      prompt: buildUserPrompt(ctx, depthConfig),
+      maxTokens: 1024,
+      partyId: ctx.party.id,
+      // Only use structured output for Anthropic — xAI/Grok doesn't support it
+      outputSchema: isAnthropic ? AGENT_RESPONSE_SCHEMA : undefined,
+    };
+  });
 }
 
 /**
@@ -140,12 +208,26 @@ export function processPartyAgentResult(
   let validationOk = true;
 
   let parsed;
-  try {
-    parsed = parseAgentResponse(result.text);
-  } catch {
-    parseOk = false;
-    logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback: "abstain-all" });
-    return abstainFallback();
+  if (result.structuredOutput) {
+    // Structured output — JSON is guaranteed valid by Anthropic, skip parse pipeline
+    try {
+      const obj = JSON.parse(result.text);
+      parsed = { actions: Array.isArray(obj.actions) ? obj.actions : [] };
+    } catch {
+      // Should never happen with structured output, but handle gracefully
+      parseOk = false;
+      logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback: "abstain-all" });
+      return abstainFallback();
+    }
+  } else {
+    // Full parse pipeline for xAI/Grok and non-structured responses
+    try {
+      parsed = parseAgentResponse(result.text);
+    } catch {
+      parseOk = false;
+      logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk, fallback: "abstain-all" });
+      return abstainFallback();
+    }
   }
 
   const validated = validateActions(

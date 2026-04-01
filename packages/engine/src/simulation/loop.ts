@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, inArray } from "drizzle-orm";
+import { and, desc, eq, ne, gte, inArray } from "drizzle-orm";
 import type {
   AgentContext,
   Bill,
@@ -51,6 +51,7 @@ import { processDaySpeeches } from "./speeches.js";
 import { processMdbActions } from "./mdb-actions.js";
 import { reviewPartyDiscipline } from "./discipline.js";
 import { buildBriefingBatchRequest, processBriefingResult, getPartyRecentActions } from "../agent/briefing.js";
+import { shouldGenerateEraSummary, buildEraSummaryBatchRequest, processEraSummaryResult, getEraSummaries } from "./era-summary.js";
 import {
   shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest,
   processKnowledgeDigestResult, getActiveShocks, buildRealWorldContext, getPartyPositions,
@@ -197,9 +198,14 @@ export async function runDay(): Promise<number> {
   const activeBillStatuses = ["proposed", "first_reading", "committee", "second_reading", "third_reading"];
   const pendingBills = allBills.filter(b => activeBillStatuses.includes(b.status));
 
-  const recentEvents = db.select().from(schema.simulationEvents).all() as unknown as SimulationEvent[];
-  // Only keep last 20 events for context
-  const recentForContext = recentEvents.slice(-20);
+  // Bounded event query: last 7 days, limited by depth config, chronological order
+  const eventLookbackDay = Math.max(1, currentDay - 7);
+  const recentForContext = (db.select().from(schema.simulationEvents)
+    .where(gte(schema.simulationEvents.dayNumber, eventLookbackDay))
+    .orderBy(desc(schema.simulationEvents.id))
+    .limit(depthConfig.recentEventsMax)
+    .all() as unknown as SimulationEvent[])
+    .reverse();
 
   const dayEvents: Array<Omit<SimulationEvent, "id">> = [];
 
@@ -946,8 +952,28 @@ export async function runDay(): Promise<number> {
     // Build real-world context for prompts (reads from DB, applies decay)
     const realWorldCtx = depthConfig.enableKnowledgeGrounding ? buildRealWorldContext(currentDay) : null;
 
+    // Generate era summary if interval has elapsed (compressed historical narrative)
+    let eraSummaryList = getEraSummaries();
+    if (shouldGenerateEraSummary(currentDay, depthConfig)) {
+      const eraSummaryReq = buildEraSummaryBatchRequest(currentDay, depthConfig);
+      if (eraSummaryReq) {
+        try {
+          const eraResults = await submitBatch([eraSummaryReq]);
+          processEraSummaryResult(findResult(eraResults, eraSummaryReq.customId), currentDay);
+          eraSummaryList = getEraSummaries(); // Refresh after insert
+        } catch (err) {
+          if (err instanceof AIProviderLimitError) {
+            console.warn(`  [EraSummary] Skipped — ${err.message}`);
+          } else {
+            console.warn(`  [EraSummary] Failed, continuing without era summary:`, (err as Error).message);
+          }
+        }
+      }
+    }
+    const hasEraSummaries = eraSummaryList.length > 0;
+
     // Generate daily briefing (cross-day narrative context, shared across all parties)
-    const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties, depthConfig);
+    const briefingReq = buildBriefingBatchRequest(currentDay, allParties, nationalState.coalitionParties, depthConfig, hasEraSummaries);
     if (briefingReq) {
       try {
         const briefingResults = await submitBatch([briefingReq]);
@@ -995,6 +1021,7 @@ export async function runDay(): Promise<number> {
         recentOwnActions: getPartyRecentActions(party.id, currentDay, depthConfig),
         realWorldContext: realWorldCtx ?? undefined,
         realPartyPositions: depthConfig.enableKnowledgeGrounding ? (getPartyPositions(party.id) ?? undefined) : undefined,
+        eraSummaries: hasEraSummaries ? eraSummaryList : undefined,
       });
     }
 

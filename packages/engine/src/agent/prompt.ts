@@ -92,10 +92,25 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
     rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires 368 seats. If successful, opposition takes power immediately. Max 1 per turn.`);
   }
 
+  // Negative capability instructions — prevent hallucinated actions
+  const cannotDo: string[] = [];
+  if (!caps.canVote) cannotDo.push("vote on bills");
+  if (!caps.canPropose) cannotDo.push("propose bills");
+  if (!caps.canAmend) cannotDo.push("propose amendments");
+  if (!caps.hasFraktion) cannotDo.push("submit motions", "file interpellations", "file constitutional challenges");
+  if (!caps.isOpposition || !caps.hasFraktion) cannotDo.push("file interpellations (opposition+Fraktion only)");
+  if (!caps.isCoalitionLeader) cannotDo.push("call Vertrauensfrage");
+  if (caps.hasActiveElection) cannotDo.push("file constitutional challenges during elections");
+
+  if (cannotDo.length > 0) {
+    rules.push(`You CANNOT: ${[...new Set(cannotDo)].join(", ")}. Do NOT include these action types in your response.`);
+  }
+
   rules.push("Do NOT wrap your JSON response in markdown code fences (\\`\\`\\`). Respond with raw JSON only.");
   rules.push("Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).");
   rules.push("Do NOT include trailing commas in JSON arrays or objects.");
   rules.push("ALL text content (bill titles, descriptions, statements, reasons, amendment descriptions) MUST be written in German. Do not use English for any user-visible text.");
+  rules.push("Use ONLY bill IDs explicitly listed in the prompt. Do NOT invent or guess bill IDs.");
 
   const numberedRules = rules.map((r, i) => `${i + 1}. ${r}`).join("\n");
 
@@ -156,7 +171,9 @@ ${numberedRules}
 RESPONSE SCHEMA:
 ${schema}
 
-${example}`;
+${example}
+
+REMINDER: Your entire response must be a single JSON object matching {"actions":[...]}. No text before or after. No markdown fences.`;
 }
 
 /** Rough token estimate: ~4 chars per token. */
@@ -249,6 +266,16 @@ ${thirdReadingBills.map(b => `  - "${b.title}" (${b.category}) proposed by ${b.p
     readingSections = "\nNO ACTIVE BILLS IN PARLIAMENT\n";
   }
 
+  // Explicit valid bill ID lists to reduce hallucinated IDs
+  const validBillIdLines: string[] = [];
+  if (thirdReadingBills.length > 0 && canAct) {
+    validBillIdLines.push(`VALID BILL IDs FOR VOTING: ${thirdReadingBills.map(b => b.id).join(", ")}`);
+  }
+  if (secondReadingBills.length > 0 && canAct) {
+    validBillIdLines.push(`VALID BILL IDs FOR AMENDMENTS: ${secondReadingBills.map(b => b.id).join(", ")}`);
+  }
+  const billIdReminder = validBillIdLines.length > 0 ? "\n" + validBillIdLines.join("\n") + "\n" : "";
+
   // ── Priority 1: Always included (core decision-making context) ──────────
 
   // Consolidated party table: YOUR PARTY marked with *, coalition/opposition roles shown inline
@@ -271,7 +298,7 @@ NATIONAL STATE:
 
 PARTIES:
 ${partyTable}
-${readingSections}
+${readingSections}${billIdReminder}
 ${ctx.activeElection ? `ELECTION STATUS:
   Status: ${ctx.activeElection.status}
   Election Day: Day ${ctx.activeElection.electionDay}
@@ -287,6 +314,13 @@ ${ctx.government ? `FEDERAL GOVERNMENT:
   Chancellor: ${ctx.government.chancellorName} (${ctx.government.chancellorPartyId})
   Ministers:
 ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyId})`).join("\n")}` : "NO ACTIVE GOVERNMENT"}`;
+
+  // ── Priority 1.25: Era summaries (compressed historical narratives) ────
+
+  let eraSummarySection = "";
+  if (ctx.eraSummaries && ctx.eraSummaries.length > 0) {
+    eraSummarySection = `\nHISTORICAL CONTEXT (compressed summaries of past eras):\n${ctx.eraSummaries.map(e => `  [Days ${e.startDay}-${e.endDay}]: ${e.summary}`).join("\n")}\n`;
+  }
 
   // ── Priority 1.5: Briefing (always included if available) ──────────────
 
@@ -377,7 +411,7 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
   const optionalContext = includedSections.length > 0 ? "\n" + includedSections.join("\n\n") : "";
 
-  return `${coreLines}${briefingSection}${optionalContext}
+  return `${coreLines}${eraSummarySection}${briefingSection}${optionalContext}
 
 Respond with your actions as JSON.`;
 }
