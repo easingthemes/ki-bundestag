@@ -2,7 +2,9 @@
 
 > Detailed implementation plan
 > Parent: docs/plans/abgeordnetenwatch-feature-roadmap.md
-> Status: Not started
+> Status: Done
+> Completed: 2026-04-01
+> PR: #88
 
 ## Overview
 
