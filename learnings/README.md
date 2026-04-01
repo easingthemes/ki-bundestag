@@ -9,7 +9,7 @@ The CCA Foundations exam is a **60-question proctored exam** across 5 domains, a
 | Domain | Weight | Coverage | File |
 |---|---|---|---|
 | Agentic Architecture & Orchestration | 27% | Excellent | [01-agentic-architecture.md](./01-agentic-architecture.md) |
-| Tool Design & MCP Integration | 18% | Partial (gap) | [02-tool-design-mcp.md](./02-tool-design-mcp.md) |
+| Tool Design & MCP Integration | 18% | Strong | [02-tool-design-mcp.md](./02-tool-design-mcp.md) |
 | Claude Code Configuration & Workflows | 20% | Strong | [03-claude-code-config.md](./03-claude-code-config.md) |
 | Prompt Engineering & Structured Output | 20% | Excellent | [04-prompt-engineering.md](./04-prompt-engineering.md) |
 | Context Management & Reliability | 15% | Excellent | [05-context-reliability.md](./05-context-reliability.md) |
@@ -20,19 +20,21 @@ The CCA Foundations exam is a **60-question proctored exam** across 5 domains, a
 |---|---|
 | Batch Processing & Cost Optimization | [06-batch-processing-costs.md](./06-batch-processing-costs.md) |
 | Multi-Provider Architecture | [07-multi-provider.md](./07-multi-provider.md) |
-| Study Gap: MCP Deep Dive | [08-study-gap-mcp.md](./08-study-gap-mcp.md) |
+| MCP Across Projects (Full Experience) | [08-mcp-experience.md](./08-mcp-experience.md) |
 
 ## Estimated Exam Readiness
 
 ```
 Domain 1 (Agentic Architecture)     ████████████████████░  ~95%
-Domain 2 (Tool Design & MCP)        ██████████░░░░░░░░░░░  ~50%
+Domain 2 (Tool Design & MCP)        █████████████████░░░░  ~85%
 Domain 3 (Claude Code Config)       ████████████████░░░░░  ~80%
 Domain 4 (Prompt Engineering)       ████████████████████░  ~95%
 Domain 5 (Context & Reliability)    ████████████████████░  ~95%
 ──────────────────────────────────────────────────────────
-Overall weighted estimate                               ~83%
+Overall weighted estimate                               ~91%
 ```
+
+**Note:** Domain 2 coverage includes MCP server development experience from two other projects: [aem-mcp-server](https://github.com/easingthemes/aem-mcp-server) (57 tools, resources, stdio+HTTP) and [moltbook-http-mcp](https://github.com/easingthemes/moltbook-http-mcp) (HTTP+stdio, multi-tenant auth), plus MCP consumer configuration in [dx-aem-flow](https://github.com/easingthemes/dx-aem-flow) (6 MCP servers across 3 plugins).
 
 ## Key Exam Insight
 
