@@ -1043,7 +1043,7 @@ export async function runDay(): Promise<number> {
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
-      const actions = processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
+      const actions = await processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
       partyActions.set(ctx.party.id, actions);
     }
 
