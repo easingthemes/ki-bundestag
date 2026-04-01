@@ -91,6 +91,7 @@ export const SIM_TABLE_DDL = `
     daily_summary TEXT,
     day_started_at TEXT,
     heartbeat_at TEXT,
+    day_progress INTEGER NOT NULL DEFAULT 0,
     timing_preset TEXT NOT NULL DEFAULT 'normal',
     context_depth TEXT NOT NULL DEFAULT 'normal',
     start_date TEXT
@@ -586,6 +587,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "citizen_questions", column: "topic", sql: "ALTER TABLE citizen_questions ADD COLUMN topic TEXT" },
   { table: "question_suggestions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS question_suggestions (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT, target_party_id TEXT NOT NULL REFERENCES parties(id), created_on_day INTEGER NOT NULL, used_by_user_id TEXT)" },
   { table: "era_summaries", column: "case_facts", sql: "ALTER TABLE era_summaries ADD COLUMN case_facts TEXT" },
+  { table: "simulation_meta", column: "day_progress", sql: "ALTER TABLE simulation_meta ADD COLUMN day_progress INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */

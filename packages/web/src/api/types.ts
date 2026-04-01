@@ -210,6 +210,7 @@ export interface SimulationStatus {
   lastRunAt: string | null;
   dayStartedAt: string | null;
   heartbeatAt: string | null;
+  dayProgress: number;
   nextElectionDay: number;
   budgetRetryDay: number | null;
   provisionalBudget: boolean;
