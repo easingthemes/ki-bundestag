@@ -43,7 +43,7 @@ Max per turn: 1 proposal + 1 amendment + 1 motion + 1 interpellation + 1 constit
 ## Key Modules
 
 - `bill-pipeline.ts` — 4 reading stages (proposed → 1st → committee → 2nd → 3rd)
-- `veto.ts` — Presidential veto check (3–16% based on impact magnitude)
+- `veto.ts` — Presidential veto check (1–6% based on impact magnitude)
 - `opinion.ts` — `applyDailyApprovalDrift()`, sentiment drift, membership bonus
 - `media.ts` — `buildMediaBatchRequest()` + `processMediaBatchResult()`, `applyMediaSentiment()`
 - `summary.ts` — `buildSummaryBatchRequest()` + `processSummaryBatchResult()`

@@ -66,27 +66,27 @@ function makeContext(overrides: Partial<AgentContext> = {}): AgentContext {
 describe("processPartyAgentResult", () => {
   const bills = [makeBill(), makeBill({ id: "bill-2", title: "Bill 2" })];
 
-  it("returns abstain for all bills when result is undefined", () => {
-    const actions = processPartyAgentResult(undefined, makeContext(), bills);
+  it("returns abstain for all bills when result is undefined", async () => {
+    const actions = await processPartyAgentResult(undefined, makeContext(), bills);
     expect(actions).toHaveLength(2);
     expect(actions.every(a => a.type === "vote" && a.vote === "abstain")).toBe(true);
   });
 
-  it("returns abstain for all bills when result text is empty", () => {
+  it("returns abstain for all bills when result text is empty", async () => {
     const emptyResult: BatchResult = { customId: "agent-spd-day10", text: "", model: "haiku", provider: "anthropic", inputTokens: 0, outputTokens: 0 };
-    const actions = processPartyAgentResult(emptyResult, makeContext(), bills);
+    const actions = await processPartyAgentResult(emptyResult, makeContext(), bills);
     expect(actions).toHaveLength(2);
     expect(actions.every(a => a.type === "vote" && a.vote === "abstain")).toBe(true);
   });
 
-  it("returns abstain when JSON is unparseable", () => {
+  it("returns abstain when JSON is unparseable", async () => {
     const badResult: BatchResult = { customId: "test", text: "not json at all", model: "haiku", provider: "anthropic", inputTokens: 0, outputTokens: 0 };
-    const actions = processPartyAgentResult(badResult, makeContext(), bills);
+    const actions = await processPartyAgentResult(badResult, makeContext(), bills);
     expect(actions).toHaveLength(2);
     expect(actions.every(a => a.type === "vote" && a.vote === "abstain")).toBe(true);
   });
 
-  it("parses valid agent response with votes", () => {
+  it("parses valid agent response with votes", async () => {
     const validResponse = JSON.stringify({
       actions: [
         { type: "vote", billId: "bill-1", vote: "yes", reason: "Good bill" },
@@ -94,7 +94,7 @@ describe("processPartyAgentResult", () => {
       ],
     });
     const result: BatchResult = { customId: "test", text: validResponse, model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 };
-    const actions = processPartyAgentResult(result, makeContext(), bills);
+    const actions = await processPartyAgentResult(result, makeContext(), bills);
 
     const votes = actions.filter(a => a.type === "vote");
     expect(votes.length).toBeGreaterThanOrEqual(2);
@@ -102,7 +102,7 @@ describe("processPartyAgentResult", () => {
     expect(votes.find(v => v.billId === "bill-2")?.vote).toBe("no");
   });
 
-  it("auto-abstains on bills not voted on in response", () => {
+  it("auto-abstains on bills not voted on in response", async () => {
     const partialResponse = JSON.stringify({
       actions: [
         { type: "vote", billId: "bill-1", vote: "yes", reason: "Good" },
@@ -110,7 +110,7 @@ describe("processPartyAgentResult", () => {
       ],
     });
     const result: BatchResult = { customId: "test", text: partialResponse, model: "haiku", provider: "anthropic", inputTokens: 100, outputTokens: 50 };
-    const actions = processPartyAgentResult(result, makeContext(), bills);
+    const actions = await processPartyAgentResult(result, makeContext(), bills);
 
     const bill2Vote = actions.find(a => a.type === "vote" && a.billId === "bill-2");
     expect(bill2Vote).toBeDefined();

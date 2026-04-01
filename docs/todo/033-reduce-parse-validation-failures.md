@@ -1,6 +1,6 @@
 # 033 — Reduce PARSE_FAIL and VALIDATION_FAIL Rates in Party Agents
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: High
 
@@ -23,25 +23,25 @@ Context size grows as simulation progresses. More bills accumulate in the pipeli
 
 ## Proposed Fixes
 
-### 1. Context windowing for party agent prompts
+### 1. Context windowing for party agent prompts ✅ (done in #037, PR #81)
 - Limit bill list to only **active bills** (not all historical)
 - Cap event history to last 7-14 days instead of 30
 - Summarize older events rather than listing them individually
 
-### 2. Explicit bill ID enumeration in prompt
+### 2. Explicit bill ID enumeration in prompt ✅ (done in #037, PR #81)
 - Include a clear `VALID_BILL_IDS: [...]` section
 - Add `YOU MUST VOTE ON: [bill-1, bill-2]` for mandatory third-reading votes
 - This reduces VALIDATION_FAIL from invalid bill references
 
-### 3. Retry on PARSE_FAIL before fallback
+### 3. Retry on PARSE_FAIL before fallback ✅ (done)
 - On first parse failure, retry with a simplified prompt (fewer events, smaller context)
 - Only fall back to abstain-all after retry also fails
 - Cost: ~$0.001 per retry (rare enough to be negligible)
 
-### 4. JSON output strengthening
+### 4. JSON output strengthening ✅ (done in #037, PR #81)
 - Add JSON schema example at end of prompt (not just beginning)
 - Use `"respond with ONLY valid JSON, no markdown"` reinforcement
-- Consider structured output / tool_use format if Anthropic supports it for batch
+- Structured output with `output_config.format.json_schema` for Anthropic batch requests
 
 ## Affected Files
 
