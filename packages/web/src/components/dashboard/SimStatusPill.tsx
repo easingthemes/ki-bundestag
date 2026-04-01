@@ -3,7 +3,7 @@ import { Play, Pause, Square, Zap, Gauge, Timer, Snail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SimulationStatus } from "../../api/types";
 
-type SimState = "running" | "paused" | "stopped";
+export type SimState = "running" | "paused" | "stopped";
 
 const PRESET_ICON: Record<string, typeof Zap> = {
   "ultra-fast": Zap,
@@ -22,7 +22,7 @@ const PRESET_LABEL: Record<string, string> = {
 /** How long without a heartbeat before we consider the sim dead (2 min) */
 const HEARTBEAT_STALE_MS = 120_000;
 
-function deriveState(status: SimulationStatus, now: number): SimState {
+export function deriveState(status: SimulationStatus, now: number): SimState {
   const started = status.dayStartedAt ? new Date(status.dayStartedAt).getTime() : 0;
   const completed = status.lastRunAt ? new Date(status.lastRunAt).getTime() : 0;
   const heartbeat = status.heartbeatAt ? new Date(status.heartbeatAt).getTime() : 0;
