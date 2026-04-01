@@ -5,6 +5,28 @@ import type { Election, Government, MinistryPortfolio, ConfidenceVote } from "./
 import type { MediaArticle, Interpellation, ConstitutionalChallenge, InterpellationType } from "./parliament.js";
 import type { SimulationEvent } from "./meta.js";
 
+export interface EraCaseFacts {
+  economy: {
+    budget: number;
+    unemployment: number;
+    inflation: number;
+    gdpGrowth: number;
+    publicSentiment: number;
+  };
+  coalitionPartyIds: string[];
+  government?: {
+    chancellorName: string;
+    chancellorPartyId: string;
+  };
+  partyApprovals: Record<string, number>;
+  partySeats: Record<string, number>;
+  billsPassed: Array<{ id: string; title: string; category: string }>;
+  billsRejected: Array<{ id: string; title: string }>;
+  elections: Array<{ reason: string; day: number; outcome?: string }>;
+  crises: Array<{ name: string; severity: string; resolved: boolean }>;
+  governmentChanges: Array<{ type: string; day: number; description: string }>;
+}
+
 export interface AgentContext {
   party: Party;
   allParties: Party[];
@@ -30,7 +52,7 @@ export interface AgentContext {
   recentOwnActions?: Array<{ day: number; type: string; title: string }>;
   realWorldContext?: string;
   realPartyPositions?: string;
-  eraSummaries?: Array<{ startDay: number; endDay: number; summary: string }>;
+  eraSummaries?: Array<{ startDay: number; endDay: number; summary: string; caseFacts?: EraCaseFacts }>;
 
 }
 
