@@ -31,6 +31,8 @@ Each item links to a detail file with full description, affected files, and impl
 | 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
 | 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
 | 030 | [Improve AI context quality (briefing + party profiles)](./030-improve-ai-context-quality.md) | done | Engine / Agent | #49 |
+| 033 | [Reduce PARSE_FAIL and VALIDATION_FAIL rates](./033-reduce-parse-validation-failures.md) | open | Engine / Agent | — |
+| 037 | [Context & memory management for long-running simulation](./037-context-memory-management.md) | open | Engine / Agent | — |
 
 ## Medium
 
@@ -60,6 +62,9 @@ Each item links to a detail file with full description, affected files, and impl
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
 | 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | open | Engine / Agent | — |
 | 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
+| 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | open | Engine / Agent | — |
+| 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | open | Engine / Simulation | — |
+| 036 | [Presidential veto rate tuning](./036-presidential-veto-tuning.md) | open | Engine / Simulation | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
@@ -67,6 +72,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 27 of 31
+- **Done**: 27 of 36
 - **Postponed**: 1 (#022)
-- **Open**: 4 remaining (#027, #029, #031, #032)
+- **Open**: 9 remaining (#027, #029, #031, #032, #033, #034, #035, #036, #037)
