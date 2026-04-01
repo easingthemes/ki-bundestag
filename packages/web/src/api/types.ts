@@ -218,6 +218,12 @@ export interface SimulationStatus {
   timingPreset: TimingPreset;
   contextDepth: ContextDepth;
   startDate: string | null;
+  dayPreview: string | null;
+  previousDaySummary: {
+    dayNumber: number;
+    narrative: string;
+    mood: string | null;
+  } | null;
 }
 
 export interface CalendarEvent {
@@ -232,6 +238,9 @@ export interface CalendarDay {
   date: string;
   topEvents: CalendarEvent[];
   totalCount: number;
+  narrative?: string | null;
+  mood?: string | null;
+  preview?: string | null;
 }
 
 export interface CalendarData {
@@ -260,6 +269,9 @@ export interface DaySummary {
   eventCount: number;
   summary: string;
   simulatedAt: string | null;
+  narrative?: string | null;
+  mood?: string | null;
+  preview?: string | null;
 }
 
 export interface PartyHistory {

@@ -144,9 +144,24 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Hero narrative */}
+      {/* Hero narrative — current day summary or previous day's if current not ready yet */}
       {narrative && (
-        <p className="text-sm text-muted-foreground leading-relaxed mb-5 max-w-3xl">{narrative}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-2 max-w-3xl">{narrative}</p>
+      )}
+
+      {/* Day preview (start-of-day) — shows pending bills, crises, etc. */}
+      {simStatus.dayPreview && (
+        <p className="text-xs text-muted-foreground/70 mb-2 max-w-3xl italic">{simStatus.dayPreview}</p>
+      )}
+
+      {/* Previous day summary — useful in fast/ultra-fast mode where days flip quickly */}
+      {simStatus.previousDaySummary && !narrative && (
+        <div className="bg-muted/50 rounded-lg p-3 mb-4 max-w-3xl">
+          <div className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">
+            Tag {simStatus.previousDaySummary.dayNumber}
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">{simStatus.previousDaySummary.narrative}</p>
+        </div>
       )}
 
       {/* Banners */}

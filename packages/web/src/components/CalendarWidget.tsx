@@ -226,6 +226,24 @@ export function CalendarWidget({ data, onMonthChange }: Props) {
             </DialogTitle>
             <DialogDescription className="sr-only">Ereignisse für diesen Simulationstag</DialogDescription>
           </DialogHeader>
+
+          {/* Day narrative summary */}
+          {selectedDay?.narrative && (
+            <div className="bg-muted/50 rounded-lg p-3 mb-2">
+              <p className="text-sm text-foreground leading-relaxed">{selectedDay.narrative}</p>
+              {selectedDay.mood && (
+                <span className="inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {selectedDay.mood}
+                </span>
+              )}
+            </div>
+          )}
+          {selectedDay?.preview && !selectedDay?.narrative && (
+            <div className="bg-muted/50 rounded-lg p-3 mb-2">
+              <p className="text-xs text-muted-foreground italic">{selectedDay.preview}</p>
+            </div>
+          )}
+
           <div className="max-h-[60vh] overflow-y-auto">
             {loadingEvents ? (
               <div className="text-sm text-muted-foreground py-4 text-center">Laden…</div>
