@@ -61,17 +61,17 @@ Every API response follows this format:
 | Related data info | `?related_data=show_information` |
 | Embed related data | `?related_data=votes` (for polls) |
 
-**Filter Operators** (for complex queries):
+**Filter Operators** (bracket syntax, e.g. `?year_of_birth[gt]=1983`):
 
-| Operator | Meaning |
-|----------|---------|
-| `eq` | equals |
-| `ne` | not equals |
-| `gt` / `gte` | greater than (or equal) |
-| `lt` / `lte` | less than (or equal) |
-| `sw` | starts with |
-| `cn` | contains |
-| `ew` | ends with |
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `eq` | equals (default) | `?sex=f` |
+| `ne` | not equals | `?type[ne]=election` |
+| `gt` / `gte` | greater than (or equal) | `?year_of_birth[gt]=1983` |
+| `lt` / `lte` | less than (or equal) | `?year_of_birth[lt]=1960` |
+| `sw` | starts with | `?label[sw]=Ausschuss` |
+| `cn` | contains (substring) | `?name[cn]=Hessen` |
+| `ew` | ends with | `?label[ew]=ausschuss` |
 
 ### Rate Limits
 
@@ -522,3 +522,32 @@ To be populated dynamically from API. Historical reference (20th Bundestag):
 | Abstimmungen | `https://www.abgeordnetenwatch.de/bundestag/abstimmungen` |
 | Ausschüsse | `https://www.abgeordnetenwatch.de/bundestag/{period}/ausschuesse` |
 | Kandidierendencheck | `https://www.kandidierendencheck.de/` |
+
+---
+
+## Entity Relationships
+
+```
+Parliament ──→ ParliamentPeriod (via related_data=legislatures)
+ParliamentPeriod ──→ Parliament (via parliament field)
+Politician ──→ Party (via party field)
+Politician ──→ CandidacyMandate (via related_data)
+CandidacyMandate ──→ Politician, ParliamentPeriod, Party
+CandidacyMandate ──→ FractionMembership[], ElectoralData (sub-entities)
+Vote ──→ CandidacyMandate (via mandate), Poll (via poll)
+Poll ──→ Vote[] (via related_data=votes), ParliamentPeriod, Committee, Topic[]
+CommitteeMembership ──→ Committee, CandidacyMandate
+Sidejob ──→ SidejobOrganization, CandidacyMandate[], City, Country, Topic[]
+Constituency ──→ bound to specific election period (different IDs across elections)
+```
+
+---
+
+## Important Notes
+
+- **No OpenAPI/Swagger spec** — documentation is custom HTML only
+- **Constituency IDs change** between elections — same geographic area gets new ID each period
+- **Sidejob data** is only available for Bundestag members, not state parliaments
+- **`robots.txt`** suggests crawl limit of 1 request per 10 seconds for web scraping
+- **API version history**: 2.0-alpha → 2.0 → 2.1 → ... → 2.8 (current)
+- **Vote entities** link to CandidacyMandate (not directly to Politician) — need mandate→politician lookup for party aggregation
