@@ -1,0 +1,25 @@
+name: Seed Demo Users
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed-demo-users:
+    name: Seed Demo Users
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Seed demo users on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd /opt/ki-bundestag
+            git pull origin main
+            npm install --omit=dev
+            npm run seed:demo-users
+            pm2 restart ki-api --update-env || pm2 start npx --name ki-api -- tsx packages/api/src/index.ts
+            pm2 save

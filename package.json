@@ -25,6 +25,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:model": "vitest run packages/engine/src/agent/client.test.ts packages/engine/src/agent/batch-client-e2e.test.ts packages/engine/src/agent/briefing.test.ts",
+    "seed:demo-users": "tsx scripts/seed-demo-users.ts",
     "kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; echo 'Killed servers on ports 3001 and 5173'"
   },
   "overrides": {
