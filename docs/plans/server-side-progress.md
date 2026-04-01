@@ -86,21 +86,21 @@ Then insert `progress.set(N)` calls at these points in `runDay()`:
 
 | Call site | Value | After what |
 |-----------|-------|------------|
-| Day start (after `dayStartedAt` write) | `0` | Reset progress |
+| Day start (after `dayStartedAt` write) | `5` | Avoids "reset flash" |
 | After election/negotiation check (step 4) | `10` | Init phase done |
 | After `submitBatch(agentRequests)` returns | `50` | Party agents complete (biggest batch) |
-| After processing all actions (steps 7-10e) | `65` | Actions processed |
+| After processing all actions (steps 7-10e) | `60` | Actions processed |
 | After interpellation batch | `75` | Interpellations answered |
-| After media batch | `90` | Media generated |
-| After summary batch | `95` | Summary done |
+| Before media+summary batch | `80` | Starting end-of-day batch |
+| After media+summary batch | `95` | End-of-day batch complete |
 | After final state persist | `100` | Day complete |
 
 For **negotiation days** (skipPartyAgents = true):
 | Call site | Value |
 |-----------|-------|
-| Day start | `0` |
-| After negotiation round submitted | `50` |
-| After synthesis (if max rounds) | `80` |
+| Day start | `5` |
+| Before negotiation round | `15` |
+| After negotiation round | `50` |
 | Final persist | `100` |
 
 ### Step 3: API — Expose `dayProgress` in status response
