@@ -364,8 +364,8 @@ describe("submitBatch — Anthropic batch", () => {
     const batchPromise = submitBatch(anthropicRequests);
     // Attach .catch immediately to prevent unhandled rejection warning before assertion
     const settled = batchPromise.catch(e => e);
-    // Advance beyond default BATCH_TIMEOUT_MS (3600s) + extra headroom
-    await vi.advanceTimersByTimeAsync(4_000_000);
+    // Advance beyond default BATCH_TIMEOUT_MS (5400s) + extra headroom
+    await vi.advanceTimersByTimeAsync(6_000_000);
 
     const error = await settled;
     expect(error).toBeInstanceOf(Error);
