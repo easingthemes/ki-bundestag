@@ -1,6 +1,6 @@
 # 031 — Explore abgeordnetenwatch API for deeper integration
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: Low
 
