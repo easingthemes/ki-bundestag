@@ -2,7 +2,7 @@
 
 > Detailed implementation plan
 > Parent: docs/plans/abgeordnetenwatch-feature-roadmap.md
-> Status: Not started
+> Status: Complete
 > Priority: Lowest (Group 6 of 6)
 
 ## Overview

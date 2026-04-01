@@ -21,6 +21,9 @@ import { About } from "./pages/About";
 import { SimulationInfo } from "./pages/SimulationInfo";
 import { Impressum } from "./pages/Impressum";
 import { Datenschutz } from "./pages/Datenschutz";
+import { Quiz } from "./pages/Quiz";
+import { Lobbying } from "./pages/Lobbying";
+import { PartyFinance } from "./pages/PartyFinance";
 import { Login } from "./pages/Login";
 import { BillDetail } from "./pages/BillDetail";
 import { Notifications } from "./pages/Notifications";
@@ -151,6 +154,10 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileGroupLabel>{t("nav.participate")}</MobileGroupLabel>
           <MobileLink to="/questions">{t("nav.citizenQuestions")}</MobileLink>
           <MobileLink to="/referendums">{t("nav.referendums")}</MobileLink>
+          <MobileLink to="/quiz">{t("nav.quiz")}</MobileLink>
+          <MobileGroupLabel>{t("nav.transparency")}</MobileGroupLabel>
+          <MobileLink to="/lobbyismus">{t("nav.lobbying")}</MobileLink>
+          <MobileLink to="/parteifinanzen">{t("nav.partyFinance")}</MobileLink>
           <MobileGroupLabel>{t("nav.news")}</MobileGroupLabel>
           <MobileLink to="/news">{t("nav.newsTicker")}</MobileLink>
           <MobileLink to="/media">{t("nav.press")}</MobileLink>
@@ -622,6 +629,11 @@ function App() {
             <NavGroup label={t("nav.participate")}>
               <DropdownLink to="/questions">{t("nav.citizenQuestions")}</DropdownLink>
               <DropdownLink to="/referendums">{t("nav.referendums")}</DropdownLink>
+              <DropdownLink to="/quiz">{t("nav.quiz")}</DropdownLink>
+            </NavGroup>
+            <NavGroup label={t("nav.transparency")}>
+              <DropdownLink to="/lobbyismus">{t("nav.lobbying")}</DropdownLink>
+              <DropdownLink to="/parteifinanzen">{t("nav.partyFinance")}</DropdownLink>
             </NavGroup>
             <NavGroup label={t("nav.news")}>
               <DropdownLink to="/news">{t("nav.newsTicker")}</DropdownLink>
@@ -681,6 +693,9 @@ function App() {
             <Route path="/constitutional-court" element={<ConstitutionalCourt />} />
             <Route path="/budget" element={<Budget />} />
             <Route path="/referendums" element={<Referendums />} />
+            <Route path="/quiz" element={<Quiz />} />
+            <Route path="/lobbyismus" element={<Lobbying />} />
+            <Route path="/parteifinanzen" element={<PartyFinance />} />
             <Route path="/log" element={<SimulationLog />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/my-activity" element={<MyActivity />} />
