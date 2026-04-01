@@ -1,6 +1,6 @@
 # 027 — Scalability: User Load Testing & Architecture Improvements
 
-**Status**: open
+**Status**: postponed
 **Area**: Engine / API / DB
 **Priority**: Medium
 
