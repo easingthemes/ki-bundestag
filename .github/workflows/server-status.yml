@@ -11,10 +11,17 @@ on:
           - pm2-status
           - api-logs
           - simulate-logs
+          - simulate-errors
+          - cost-report
           - disk-usage
           - db-stats
           - db-deep-debug
           - full-health
+      lines:
+        description: "Log lines to retrieve (default 80, max 5000)"
+        required: false
+        type: string
+        default: "80"
 
 jobs:
   run:
@@ -32,18 +39,93 @@ jobs:
           script: |
             cd /opt/ki-bundestag
             CHECK="${{ inputs.check }}"
+            LINES="${{ inputs.lines }}"
+            # Clamp lines to 1-5000
+            LINES=$((LINES > 5000 ? 5000 : LINES < 1 ? 80 : LINES))
 
             case "$CHECK" in
               pm2-status)
                 pm2 status
                 ;;
               api-logs)
-                echo "==> Last 80 lines of ki-api logs:"
-                pm2 logs ki-api --lines 80 --nostream
+                echo "==> Last $LINES lines of ki-api logs:"
+                pm2 logs ki-api --lines $LINES --nostream
                 ;;
               simulate-logs)
-                echo "==> Last 80 lines of ki-simulate logs:"
-                pm2 logs ki-simulate --lines 80 --nostream 2>/dev/null || echo "ki-simulate not running"
+                echo "==> Last $LINES lines of ki-simulate stdout:"
+                pm2 logs ki-simulate --lines $LINES --nostream --out 2>/dev/null || echo "ki-simulate not running"
+                ;;
+              simulate-errors)
+                echo "==> Last $LINES lines of ki-simulate stderr:"
+                pm2 logs ki-simulate --lines $LINES --nostream --err 2>/dev/null || echo "ki-simulate not running"
+                ;;
+              cost-report)
+                echo "==> Simulation state:"
+                sqlite3 -header -column data/simulation.db "SELECT current_day, timing_preset, context_depth, last_run_at FROM simulation_meta LIMIT 1"
+                echo ""
+                echo "==> Per-day AI cost (last 30 days with data):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT day_number,
+                    COUNT(*) as calls,
+                    SUM(input_tokens) as input_tok,
+                    SUM(output_tokens) as output_tok,
+                    ROUND(SUM(cost_usd), 4) as cost_usd,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed
+                  FROM ai_calls
+                  GROUP BY day_number
+                  ORDER BY day_number DESC
+                  LIMIT 30
+                "
+                echo ""
+                echo "==> Cost by task (all time):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT task,
+                    COUNT(*) as calls,
+                    SUM(input_tokens) as input_tok,
+                    SUM(output_tokens) as output_tok,
+                    ROUND(SUM(cost_usd), 4) as cost_usd,
+                    ROUND(AVG(latency_ms)) as avg_lat_ms
+                  FROM ai_calls
+                  GROUP BY task
+                  ORDER BY cost_usd DESC
+                "
+                echo ""
+                echo "==> Cost by model (all time):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT provider, model,
+                    COUNT(*) as calls,
+                    SUM(input_tokens) as input_tok,
+                    SUM(output_tokens) as output_tok,
+                    ROUND(SUM(cost_usd), 4) as cost_usd
+                  FROM ai_calls
+                  GROUP BY provider, model
+                "
+                echo ""
+                echo "==> Totals:"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT
+                    COUNT(*) as total_calls,
+                    SUM(input_tokens) as total_input,
+                    SUM(output_tokens) as total_output,
+                    ROUND(SUM(cost_usd), 4) as total_cost_usd,
+                    ROUND(SUM(cost_usd) * 1.0 / COUNT(DISTINCT day_number), 4) as avg_cost_per_day,
+                    COUNT(DISTINCT day_number) as days_with_data,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_calls
+                  FROM ai_calls
+                "
+                echo ""
+                echo "==> Batch timing (last 20 batches):"
+                sqlite3 -header -column data/simulation.db "
+                  SELECT batch_id,
+                    COUNT(*) as reqs,
+                    MIN(created_at) as started,
+                    ROUND(SUM(cost_usd), 4) as cost
+                  FROM ai_calls
+                  WHERE batch_id IS NOT NULL
+                  GROUP BY batch_id
+                  ORDER BY started DESC
+                  LIMIT 20
+                "
                 ;;
               disk-usage)
                 echo "==> Disk usage:"
