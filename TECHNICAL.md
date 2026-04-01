@@ -72,6 +72,17 @@ Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of wo
 | `constitutional_challenges` | Court challenges |
 | `budgets` | Budget cycles |
 | `bundestag_seats` | Seat allocation map |
+| `committees` | Bundestag committees |
+| `committee_memberships` | MdB-to-committee assignments |
+| `sidejobs` | MdB side jobs (Nebentätigkeiten) |
+| `quiz_theses` | Policy quiz theses |
+| `quiz_party_positions` | Per-party quiz positions |
+| `lobbying_events` | Lobbying activity register |
+| `party_donations` | Party donation records |
+| `question_suggestions` | AI-generated question prompts |
+| `era_summaries` | Compressed political history |
+| `real_world_knowledge` | Fetched real-world data digests |
+| `ai_calls` | AI usage tracking |
 
 ### Users DB Tables
 
@@ -105,10 +116,11 @@ All under `/api/` prefix, served from `packages/api/src/routes/`:
 | `/api/seats` | MdB seat applications, roster, availability |
 | `/api/budgets` | Budget listings |
 | `/api/admin` | Timing preset, context depth, analytics, costs |
+| `/api/quiz` | Policy quiz, lobbying events, party donations |
 
-## Web Pages (24 routes)
+## Web Pages (30 routes)
 
-Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo, Impressum, Datenschutz.
+Dashboard, Parties, PartyDetail, Bills, BillDetail, MdbList, MdbDetail, Committees, CommitteeDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Quiz, Lobbying, PartyFinance, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo, Impressum, Datenschutz.
 
 Routes defined in `packages/web/src/main.tsx`, API client in `packages/web/src/api/`.
 
@@ -173,3 +185,5 @@ See [Hosting Plan](docs/Hosting_Plan.md) for full setup guide.
 | [Bundestag Details](docs/bundestag-details.md) | German parliamentary rules and structure |
 | [Hosting Plan](docs/Hosting_Plan.md) | Deployment, CI/CD, Hetzner setup |
 | [Runbook](docs/operations/runbook.md) | Operational commands and troubleshooting |
+| [Abgeordnetenwatch Features](docs/abgeordnetenwatch-features.md) | MdB profiles, committees, side jobs, Q&A, quiz, lobbying, donations |
+| [Abgeordnetenwatch API Reference](docs/abgeordnetenwatch-api-reference.md) | External API endpoints and integration guide |

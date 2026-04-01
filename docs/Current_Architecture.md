@@ -60,6 +60,17 @@ Both are accessed via engine helpers (`getDb()/getSqlite()` and `getUserDb()/get
 | `budgets` | Budget cycles | cycle_number, allocations, votes, yes/no seats, economic_effect, revision_attempt |
 | `event_queue` | Night-mode queued events | event_type, event_data, scheduled_for_day, status |
 | `bundestag_seats` | Seat allocation map | seat_number, party_id, controller (`human/ai`), user_id, discipline/proxy fields |
+| `committees` | Bundestag committees | name, short_name, bill_category, active |
+| `committee_memberships` | MdB committee assignments | committee_id, seat_id, role (chair/deputy_chair/member) |
+| `sidejobs` | MdB side jobs | seat_id, party_id, politician_name, organization, role, income_level, category, is_controversial |
+| `quiz_theses` | Policy quiz theses | text, category, generated_on_day, active |
+| `quiz_party_positions` | Party quiz positions | thesis_id, party_id, position (agree/disagree/neutral), reasoning |
+| `lobbying_events` | Lobbying activity | organization_name, sector, target_party_id, target_bill_id, influence, intensity, day_number |
+| `party_donations` | Party donations | party_id, donor_name, donor_type, amount, day_number, is_public |
+| `question_suggestions` | AI question prompts | question, topic, target_party_id, created_on_day |
+| `era_summaries` | Compressed political history | start_day, end_day, summary |
+| `real_world_knowledge` | Real-world data digests | generation, category, party_id, digest, source_urls, active |
+| `ai_calls` | AI usage/cost tracking | day_number, task, provider, model, tokens, cost_usd, batch_id |
 
 ### `users.db` tables
 
@@ -225,7 +236,7 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 
 ## API Surface (current)
 
-`packages/api/src/` uses 11 domain routers in `src/routes/` (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin) with shared middleware in `src/middleware/` and mappers in `src/mappers/`. `src/index.ts` is a ~84-line bootstrap with session, Passport OAuth, and CORS setup. 93+ REST routes (including health), grouped as:
+`packages/api/src/` uses 12 domain routers in `src/routes/` (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin) with shared middleware in `src/middleware/` and mappers in `src/mappers/`. `src/index.ts` is a ~84-line bootstrap with session, Passport OAuth, and CORS setup. 93+ REST routes (including health), grouped as:
 
 - Health: `/api/health`
 - Parties: `/api/parties`, `/api/parties/alignment`, `/api/parties/:id`, `/api/parties/:id/history`, `/api/parties/:id/bills`, `/api/parties/:id/votes`, `/api/parties/:id/statements`, `/api/parties/:id/proposals`, `POST /api/parties/:id/proposals`
@@ -246,14 +257,23 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 - Notifications: `/api/notifications`, `/api/notifications/unread-count`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`
 - Admin: `/api/admin/analytics`
 - Simulation events (extras): `/api/simulation/events/latest`
+- Committees: `/api/committees`, `/api/committees/:id`
+- Sidejobs: `/api/sidejobs`, `/api/sidejobs/seat/:seatId`
+- Seat roster/profile: `/api/seats/roster`, `/api/seats/:seatId/profile`
+- Quiz: `/api/quiz/theses`, `POST /api/quiz/results`, `/api/quiz/party-positions`
+- Lobbying: `/api/quiz/lobbying`
+- Donations: `/api/quiz/donations`, `/api/quiz/donations/summary`
+- Question suggestions: `/api/questions/topics`, `/api/questions/trending-topics`, `/api/questions/suggestions`, `POST /api/questions/suggestions/:id/use`
 
 ## Web Routes
 
-`packages/web/src/main.tsx` currently wires 23 routes:
+`packages/web/src/main.tsx` currently wires 30 routes:
 
 - `/` (Dashboard)
 - `/parties`, `/parties/:id`
 - `/bills`, `/bills/:id`
+- `/mdb`, `/mdb/:seatId`
+- `/committees`, `/committees/:id`
 - `/elections`
 - `/news`
 - `/polls`
@@ -265,14 +285,9 @@ Feature gates are preset-specific (poll voting, questions, referendums, proposal
 - `/constitutional-court`
 - `/budget`
 - `/referendums`
-- `/log`
-- `/notifications`
-- `/my-activity`
-- `/login`
-- `/about`
-- `/simulation-info`
-
-Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admin actions are now handled via GitHub Actions workflows.
+- `/quiz`, `/lobbyismus`, `/parteifinanzen`
+- `/log`, `/notifications`, `/my-activity`
+- `/login`, `/about`, `/simulation-info`, `/impressum`, `/datenschutz`
 
 ## Key Constants (verified)
 
@@ -304,6 +319,10 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 - Seat allocation: [packages/engine/src/simulation/seats.ts](packages/engine/src/simulation/seats.ts)
 - Event queue + notifications: [packages/engine/src/simulation/event-queue.ts](packages/engine/src/simulation/event-queue.ts)
 - Committee assignment: [packages/engine/src/simulation/committees.ts](packages/engine/src/simulation/committees.ts)
+- Side job generation: [packages/engine/src/simulation/sidejobs.ts](packages/engine/src/simulation/sidejobs.ts)
+- Quiz match calculation: [packages/engine/src/simulation/quiz-match.ts](packages/engine/src/simulation/quiz-match.ts)
+- Era summaries: [packages/engine/src/simulation/era-summary.ts](packages/engine/src/simulation/era-summary.ts)
+- Knowledge fetching: [packages/engine/src/simulation/knowledge-fetch.ts](packages/engine/src/simulation/knowledge-fetch.ts)
 
 **Engine — AI**:
 - AI routing + circuit breaker + retry: [packages/engine/src/agent/client.ts](packages/engine/src/agent/client.ts)
@@ -324,7 +343,7 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 - Bootstrap: [packages/api/src/index.ts](packages/api/src/index.ts) (~84 lines, session + Passport + CORS)
 - OAuth config: [packages/api/src/passport-config.ts](packages/api/src/passport-config.ts) (Google, GitHub strategies)
 - Session store: [packages/api/src/session-store.ts](packages/api/src/session-store.ts) (SQLite-backed sessions)
-- Domain routers: [packages/api/src/routes/](packages/api/src/routes/) (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin)
+- Domain routers: [packages/api/src/routes/](packages/api/src/routes/) (auth, parties, bills, elections, simulation, parliament, content, users, seats, budget, admin, quiz)
 - Middleware: [packages/api/src/middleware/](packages/api/src/middleware/) (auth, session, participatory gate)
 - Mappers: [packages/api/src/mappers/](packages/api/src/mappers/) (party, bill)
 
@@ -343,4 +362,6 @@ Admin pages (`/admin`, `/admin/costs`, `/admin/analytics`) were removed — admi
 - `docs/AI_Engine.md`
 - `docs/Hosting_Plan.md`
 - `docs/operations/runbook.md`
-- `docs/todo/README.md` — Issue tracker (26/28 done)
+- `docs/abgeordnetenwatch-features.md` — Abgeordnetenwatch feature implementation record
+- `docs/abgeordnetenwatch-api-reference.md` — External API reference
+- `docs/todo/README.md` — Issue tracker
