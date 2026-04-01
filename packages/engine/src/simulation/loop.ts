@@ -72,7 +72,8 @@ function heartbeat(): void {
 
 /** Track day progress (0-100) so the frontend shows real phase completion */
 class DayProgress {
-  /** Set progress to a specific percentage and write to DB */
+  /** Set progress to a specific percentage and write to DB.
+   *  Also updates heartbeat_at, so standalone heartbeat() calls are not needed alongside set(). */
   set(pct: number): void {
     try {
       getSqlite().prepare("UPDATE simulation_meta SET day_progress = ?, heartbeat_at = ?")
@@ -191,7 +192,7 @@ export async function runDay(): Promise<number> {
   const now = new Date().toISOString();
   const progress = new DayProgress();
   db.update(schema.simulationMeta)
-    .set({ dayStartedAt: now, heartbeatAt: now, dayProgress: 0 } as any)
+    .set({ dayStartedAt: now, heartbeatAt: now, dayProgress: 5 } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
 
@@ -1091,7 +1092,6 @@ export async function runDay(): Promise<number> {
       }
       // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
     }
-    heartbeat();
     progress.set(50); // Party agents batch complete
 
     for (const ctx of agentContexts) {
@@ -2183,7 +2183,6 @@ export async function runDay(): Promise<number> {
     }
     // endOfDayResults stays [] — media and summary steps are silently skipped
   }
-  heartbeat();
   progress.set(95); // Media + summary complete
 
   // Process media results

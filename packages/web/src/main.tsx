@@ -424,13 +424,18 @@ function SimStatus() {
       const isAlive = heartbeat > 0
         ? (now - heartbeat) < 120_000
         : (now - started) < 1_800_000; // fallback for old server without heartbeat
-      if (!isAlive) return { running: false, pct: 0 };
+      if (!isAlive) {
+        // If progress was near-complete before heartbeat went stale, treat as done
+        const lastPct = status.dayProgress ?? 0;
+        if (lastPct >= 95) return { running: false, pct: 100 };
+        return { running: false, pct: 0 };
+      }
 
       const serverPct = status.dayProgress ?? 0;
       if (serverPct > 0) {
         // Server-side progress available — smooth interpolation between updates
         const sinceBeat = heartbeat > 0 ? now - heartbeat : 0;
-        const drift = Math.min(2, Math.round(sinceBeat / 10_000)); // +1% per 10s
+        const drift = Math.min(2, Math.round(sinceBeat / 10_000)); // +1% per 10s, max 2%
         return { running: true, pct: Math.min(serverPct + drift, 99) };
       }
 
