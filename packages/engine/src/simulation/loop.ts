@@ -2100,7 +2100,7 @@ export async function runDay(): Promise<number> {
   }
 
   // 14. Save all day events (skip day_start — already flushed early for frontend visibility)
-  const now = new Date().toISOString();
+  const endNow = new Date().toISOString();
   let skippedFirst = false;
   for (const ev of dayEvents) {
     if (!skippedFirst && ev === dayStartEvent) {
@@ -2111,7 +2111,7 @@ export async function runDay(): Promise<number> {
       id: generateId(),
       ...ev,
       data: ev.data as any ?? null,
-      createdAt: now,
+      createdAt: endNow,
     }).run();
   }
 
