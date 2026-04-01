@@ -9,6 +9,8 @@
 
 Enhance the citizen Q&A system with topic categorization sourced from real abgeordnetenwatch data, trending topic suggestions, topic-based filtering, AI-generated question suggestions, and a better question submission form. All changes build on existing infrastructure — no new DB connections or AI call patterns needed.
 
+**Critical constraint — Sim time vs real time**: Real citizen questions from abgeordnetenwatch are a **historical snapshot**, not live data. They are fetched once per ~7 real days, but the simulation may advance 30+ sim days in that time. Trending topics must be labeled as "Was Bürger im echten Bundestag fragen" (what citizens ask in the real Bundestag) — a timeless inspiration source, NOT dated current events. Never present real-world question timestamps or imply these questions are happening "now" in simulation time. The AI-generated suggestions (Step 4) should draw primarily from **simulation events** (recent bills, crises, media) with real-world questions as secondary creative inspiration only.
+
 ---
 
 ## Step 1: Question topics/categories
@@ -106,9 +108,11 @@ Limit to 5-8 items. Cache in memory (refresh every hour or on knowledge fetch).
 ### 2.3 Trending topics sidebar on Questions page
 
 **`packages/web/src/pages/Questions.tsx`** — add a sidebar/card section:
-- Title: "Was Buerger wirklich fragen" (or i18n key `questions.trendingTopics`)
+- Title: "Was Bürger im echten Bundestag fragen" (i18n key `questions.trendingTopics`)
+- Subtitle (muted): "Themen von abgeordnetenwatch.de — zur Inspiration"
 - Show 5 topic pills with sample question text from abgeordnetenwatch
 - Clicking a topic pre-fills the question form with that topic selected
+- **No timestamps shown** — topics are presented as timeless themes, not dated events
 
 **New API endpoint** in `packages/web/src/api/endpoints.ts`:
 ```typescript
@@ -193,12 +197,14 @@ Compute `topicCounts` client-side from the loaded questions array.
 ```typescript
 export function buildQuestionSuggestionPrompt(
   topics: string[],
-  recentHeadlines: string[],
-  realQuestions: string[],
+  recentSimEvents: string[],    // PRIMARY: recent simulation events (bills, crises, media)
+  realQuestions: string[],       // SECONDARY: real-world inspiration only
 ): BatchRequest
 ```
 
-System prompt instructs AI to generate 5 suggested citizen questions in German, inspired by current political events and real abgeordnetenwatch questions. Returns JSON: `{ suggestions: Array<{ question: string; topic: string; targetPartyId: string }> }`.
+System prompt instructs AI to generate 5 suggested citizen questions in German, based **primarily on recent simulation events** (bills introduced, crises, media articles) with real abgeordnetenwatch questions as secondary creative inspiration for question style and framing. Returns JSON: `{ suggestions: Array<{ question: string; topic: string; targetPartyId: string }> }`.
+
+**Important**: The prompt must NOT reference real-world dates or events. It should say "Basierend auf der aktuellen Simulationslage..." (Based on the current simulation situation).
 
 ### 4.2 Generate suggestions during simulation
 

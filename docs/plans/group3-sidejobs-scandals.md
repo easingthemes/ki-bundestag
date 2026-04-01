@@ -10,6 +10,8 @@ Add a side job (Nebentätigkeiten) system for AI-controlled MdBs. Side jobs are 
 
 **Design constraint**: Side jobs are simulation-internal fiction. Real-world sidejob data from abgeordnetenwatch is used ONLY as creative inspiration for the AI generator (organization types, income levels, categories). Never present real politician names or real side jobs as simulation facts.
 
+**Sim time constraint**: All sidejobs are generated within the simulation and tied to sim days. Real-world sidejob data is used only as structural inspiration (types of organizations, income levels, categories) — not as dated events. No sim time vs real time issues for this group.
+
 ---
 
 ## Step 1: Sidejobs schema
