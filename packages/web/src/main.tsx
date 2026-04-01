@@ -424,27 +424,20 @@ function SimStatus() {
       const isAlive = heartbeat > 0
         ? (now - heartbeat) < 120_000
         : (now - started) < 1_800_000; // fallback for old server without heartbeat
-      if (isAlive) {
-        // Use server-reported progress (0–100) from engine heartbeat phases.
-        // Between heartbeat updates, interpolate smoothly using time since last heartbeat.
-        const serverPct = status.dayProgress ?? 0;
-        if (serverPct >= 100) {
-          // Day complete server-side but lastRunAt not yet propagated
-          return { running: false, pct: 100 };
-        }
-        if (serverPct > 0) {
-          // Server provides real progress — smooth-fill between heartbeat updates
-          const sinceBeat = heartbeat > 0 ? now - heartbeat : 0;
-          // Interpolate up to +10% over 2 minutes between beats, never exceeding 95
-          const interp = Math.min(Math.round((sinceBeat / 120_000) * 10), 10);
-          return { running: true, pct: Math.min(serverPct + interp, 95) };
-        }
-        // Fallback for servers without day_progress: time-based estimate
-        const expectedMs = PRESET_DAY_MS[status.timingPreset] ?? 600_000;
-        const elapsed = now - started;
-        return { running: true, pct: Math.min(Math.round((elapsed / expectedMs) * 95), 95) };
+      if (!isAlive) return { running: false, pct: 0 };
+
+      const serverPct = status.dayProgress ?? 0;
+      if (serverPct > 0) {
+        // Server-side progress available — smooth interpolation between updates
+        const sinceBeat = heartbeat > 0 ? now - heartbeat : 0;
+        const drift = Math.min(2, Math.round(sinceBeat / 10_000)); // +1% per 10s
+        return { running: true, pct: Math.min(serverPct + drift, 99) };
       }
-      return { running: false, pct: 0 };
+
+      // Fallback: time-based estimate (for servers without day_progress)
+      const elapsed = now - started;
+      const expectedMs = PRESET_DAY_MS[status.timingPreset] ?? 600_000;
+      return { running: true, pct: Math.min(Math.round((elapsed / expectedMs) * 95), 95) };
     }
 
     const sinceCompleted = now - completed;

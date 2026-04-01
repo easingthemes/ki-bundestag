@@ -63,34 +63,27 @@ import type { TimingPreset } from "./timing.js";
 import type { ContextDepth } from "../agent/context-depth.js";
 import { getDepthConfig, isValidContextDepth } from "../agent/context-depth.js";
 
-/** Update heartbeat timestamp and day progress so the frontend can show real progress */
-function heartbeat(progress?: number): void {
+/** Update heartbeat timestamp so the frontend knows the sim process is alive */
+function heartbeat(): void {
   try {
-    if (progress !== undefined) {
-      getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?, day_progress = ?").run(new Date().toISOString(), progress);
-    } else {
-      getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?").run(new Date().toISOString());
-    }
+    getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?").run(new Date().toISOString());
   } catch { /* best-effort */ }
 }
 
-/**
- * Tracks day progress as a fraction of total planned steps.
- * Different days have different phase counts (election vs normal vs budget).
- */
+/** Track day progress (0-100) so the frontend shows real phase completion */
 class DayProgress {
-  private completed = 0;
-  private total: number;
-
-  constructor(totalSteps: number) {
-    this.total = Math.max(totalSteps, 1);
+  /** Set progress to a specific percentage and write to DB */
+  set(pct: number): void {
+    try {
+      getSqlite().prepare("UPDATE simulation_meta SET day_progress = ?, heartbeat_at = ?")
+        .run(Math.min(pct, 99), new Date().toISOString());
+    } catch { /* best-effort */ }
   }
 
-  /** Mark one step done, write progress to DB. Progress range: 5–95% */
-  step(): void {
-    this.completed++;
-    const pct = Math.min(5 + Math.round((this.completed / this.total) * 90), 95);
-    heartbeat(pct);
+  complete(): void {
+    try {
+      getSqlite().prepare("UPDATE simulation_meta SET day_progress = 100").run();
+    } catch { /* best-effort */ }
   }
 }
 
@@ -196,8 +189,9 @@ export async function runDay(): Promise<number> {
   // currentDay is only committed at the end of a successful day to prevent
   // advancing the counter when AI calls fail mid-day.
   const now = new Date().toISOString();
+  const progress = new DayProgress();
   db.update(schema.simulationMeta)
-    .set({ dayStartedAt: now, heartbeatAt: now, dayProgress: 5 } as any)
+    .set({ dayStartedAt: now, heartbeatAt: now, dayProgress: 0 } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
 
@@ -512,17 +506,6 @@ export async function runDay(): Promise<number> {
   let skipPartyAgents = false;
   let briefingText: string | null = null;
 
-  // Predict which phases will run for progress tracking.
-  // Negotiation: AI call (1 step). Voting day: deterministic, no AI batch.
-  const willNegotiate = activeElection?.status === "negotiation";
-  const willSkipAgents = willNegotiate || activeElection?.status === "voting";
-  const progressSteps = 1 + // end-of-day batch (always)
-    (willSkipAgents ? 0 : 1) + // party agent batch
-    (willNegotiate ? 1 : 0) + // negotiation round
-    (isPollDay(currentDay, startDate) ? 1 : 0) + // mid-cycle batch
-    (shouldGenerateSidejobs(currentDay) ? 1 : 0); // sidejobs batch
-  const progress = new DayProgress(progressSteps);
-
   if (activeElection && activeElection.status === "negotiation") {
     skipPartyAgents = true;
 
@@ -626,6 +609,7 @@ export async function runDay(): Promise<number> {
 
     if (activeElection && activeElection.status === "negotiation") {
       console.log(`  [Negotiation] Day ${currentDay}: Running negotiation round ${roundNumber}...`);
+      progress.set(15); // Negotiation round starting
 
     const roundResults = await runNegotiationRound(
       activeElection.results!,
@@ -635,6 +619,7 @@ export async function runDay(): Promise<number> {
       currentDay,
     );
 
+    progress.set(50); // Negotiation round complete
     const allRounds = [...previousRounds, roundResults];
 
     // Add negotiation events
@@ -790,7 +775,6 @@ export async function runDay(): Promise<number> {
         .run();
     }
     } // end inner negotiation guard
-    progress.step(); // negotiation round complete
   }
 
   // Advance election phase (for non-negotiation states)
@@ -853,6 +837,8 @@ export async function runDay(): Promise<number> {
       console.log(`  [Election] Entering negotiation phase...`);
     }
   }
+
+  progress.set(10); // Init + elections phase done
 
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
@@ -1105,7 +1091,8 @@ export async function runDay(): Promise<number> {
       }
       // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
     }
-    progress.step();
+    heartbeat();
+    progress.set(50); // Party agents batch complete
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
@@ -1769,6 +1756,8 @@ export async function runDay(): Promise<number> {
     }
   }
 
+  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes)
+
   // 10a2. Process MdB speeches (AI-evaluated: +0.1 / 0 / -0.1)
   try {
     const speechSentimentDelta = await processDaySpeeches(currentDay);
@@ -1846,6 +1835,8 @@ export async function runDay(): Promise<number> {
       data: { interpellationId: expired.id, targetPartyId: expired.targetPartyId },
     });
   }
+
+  progress.set(75); // Interpellations + user-driven batches done
 
   // 11. Apply approval drift to all parties + sentiment drift
   applyDailyApprovalDrift(allParties);
@@ -1943,7 +1934,6 @@ export async function runDay(): Promise<number> {
       });
       console.log(`  [Cycle] Weekly report — Day ${currentDay}`);
     }
-    if (isWeekly) progress.step();
   }
 
   // 11c. Monthly economic report
@@ -2150,7 +2140,7 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Sidejobs] Batch failed:`, (err as Error).message);
         }
       }
-      progress.step();
+      heartbeat();
     }
   }
 
@@ -2179,6 +2169,8 @@ export async function runDay(): Promise<number> {
   );
   endOfDayRequests.push(summaryReq);
 
+  progress.set(80); // Starting media + summary batch
+
   console.log(`  [Batch] Submitting ${endOfDayRequests.length} end-of-day requests (media+summary)...`);
   let endOfDayResults: import("../agent/batch-client.js").BatchResult[] = [];
   try {
@@ -2191,7 +2183,8 @@ export async function runDay(): Promise<number> {
     }
     // endOfDayResults stays [] — media and summary steps are silently skipped
   }
-  progress.step();
+  heartbeat();
+  progress.set(95); // Media + summary complete
 
   // Process media results
   let mediaArticles: Array<{ category: string; sentiment?: number }> = [];
@@ -2248,6 +2241,7 @@ export async function runDay(): Promise<number> {
     } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
+  progress.complete();
 
   console.log(`=== DAY ${currentDay} COMPLETE ===\n`);
   return currentDay;
