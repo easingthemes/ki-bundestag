@@ -8,7 +8,7 @@
  *   - shock: major global disruptions (persist until resolved)
  *   - headline: specific dated items (one sim day only)
  *
- * @see docs/plans/real-world-knowledge-grounding.md
+ * @see docs/abgeordnetenwatch-features.md
  */
 
 import { getDb, getSqlite, schema } from "../db/index.js";
