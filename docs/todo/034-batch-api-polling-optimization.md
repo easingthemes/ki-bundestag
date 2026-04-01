@@ -1,6 +1,6 @@
 # 034 — Batch API Polling Optimization
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: Medium
 
