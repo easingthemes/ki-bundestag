@@ -16,24 +16,71 @@ Data licensed under **CC0 1.0** (public domain).
 
 **Base URL**: `https://www.abgeordnetenwatch.de/api/v2/`
 
+### Response Structure
+
+Every API response follows this format:
+
+```json
+{
+  "meta": {
+    "abgeordnetenwatch_api": { "version": "2.0", "documentation": "..." },
+    "status": "ok",
+    "status_message": "",
+    "result": {
+      "count": 100,       // returned count
+      "total": 5432,      // total matching
+      "range_start": 0,
+      "range_end": 100
+    }
+  },
+  "data": [ ... ]          // array for lists, object for single entity
+}
+```
+
 ### Pagination & Filtering
+
+**Pagination** (two modes):
 
 | Parameter | Description |
 |-----------|-------------|
 | `range_start` | Offset (default 0) |
 | `range_end` | Number of results (default 100, max 1000) |
+| `page` | Page number (alternative to range) |
+| `pager_limit` | Results per page (max 1000) |
 | `sort_by` | Field to sort by |
 | `sort_order` / `sort_direction` | `asc` or `desc` |
-| `related_data=show_information` | Reveals available supplementary inline data |
-| Nested filters | e.g. `?politician[entity.party.entity.short_name]=SPD` |
+
+**Filtering**:
+
+| Syntax | Example |
+|--------|---------|
+| Simple field | `?parliament=5` |
+| Referenced entity ID | `?politician=12345` |
+| Referenced entity field | `?politician[entity.sex]=f` |
+| Chained references | `?politician[entity.party.entity.short_name]=SPD` |
+| Related data info | `?related_data=show_information` |
+| Embed related data | `?related_data=votes` (for polls) |
+
+**Filter Operators** (for complex queries):
+
+| Operator | Meaning |
+|----------|---------|
+| `eq` | equals |
+| `ne` | not equals |
+| `gt` / `gte` | greater than (or equal) |
+| `lt` / `lte` | less than (or equal) |
+| `sw` | starts with |
+| `cn` | contains |
+| `ew` | ends with |
 
 ### Rate Limits
 
-No official documentation on rate limits. Our current implementation uses a 15s fetch timeout and 7-day cooldown between fetches. Be conservative.
+No official documented rate limits. Practical limits: max 1,000 results per request, default 100.
+Our implementation uses a 15s fetch timeout and 7-day cooldown between fetches.
 
 ### Authentication
 
-No API key required. Public access.
+No API key required. Fully public and open. Current API version: **2.8**.
 
 ---
 
@@ -189,6 +236,7 @@ MdB-to-committee assignments.
 | `id` | int | Unique identifier |
 | `committee` | ref | → Committee |
 | `candidacy_mandate` | ref | → CandidacyMandate |
+| `committee_role` | string | Role (e.g., "Vorsitzende/r", "Mitglied") |
 
 ### 11. Topic (`/api/v2/topics`)
 
@@ -199,19 +247,25 @@ Policy topic tags used across polls, sidejobs, and questions.
 | `id` | int | Unique identifier |
 | `label` | string | Topic name (e.g., "Klimaschutz", "Migration") |
 
-### 12. Question (no official endpoint path documented)
+### 12. Question (`/api/v2/questions`)
 
 Citizen questions to politicians — the core "Bürger fragen — Politiker antworten" feature.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | int | Unique identifier |
-| `text` | string | Question text |
+| `body` | string | Question text |
 | `topic` | ref | → Topic |
 | `politician` | ref | → Politician |
 | `answer_text` | string | Politician's answer (if any) |
 | `answer_date` | date | When answered |
-| `status` | string | answered/unanswered |
+| `created` | date | When question was submitted |
+
+**Filtering**: `?politician=79137` or `?parliament_period=165`
+
+**Note**: The Politician entity also has `statistic_questions` and `statistic_questions_answered` fields.
+Some tools (e.g., `abgeordnetenwatch-python`) scrape Q&A from the HTML profile pages at
+`/profile/.../fragen-antworten/` for richer data (question additions, answer formatting).
 
 **Integration idea**: Model for our citizen questions feature — real questions inspire realistic user Q&A.
 
@@ -325,12 +379,14 @@ Each profile contains:
 
 ---
 
-## Existing Client Libraries
+## Existing Client Libraries & Tools
 
-| Library | Language | Link |
-|---------|----------|------|
-| `@malereg/aowatch-client` | TypeScript | npm |
-| `abgeoRdnetenwatchr` | R | github.com/untergeekDE/abgeoRdnetenwatchr |
+| Library | Language | Link | Notes |
+|---------|----------|------|-------|
+| `@malereg/aowatch-client` | TypeScript | [GitHub](https://github.com/maschinenlesbareregierung/aowatch-client) | Complete type definitions, partial endpoint impl |
+| `abgeoRdnetenwatchr` | R | [GitHub](https://github.com/untergeekDE/abgeoRdnetenwatchr) | Auto-pagination support |
+| `abgeordnetenwatch-python` | Python | [GitHub](https://github.com/Bluemi/abgeordnetenwatch-python) | Q&A scraper (HTML + API) |
+| `fds-polls-scraper` | Python | [GitHub](https://github.com/okfde/fds-abgeordnetenwatch_polls_scraper) | Outputs votes.json/csv |
 
 ---
 
@@ -387,6 +443,72 @@ To be populated dynamically from API. Historical reference (20th Bundestag):
 23. Ausschuss für Wahlprüfung, Immunität und Geschäftsordnung
 24. Ausschuss für wirtschaftliche Zusammenarbeit und Entwicklung
 25. Wirtschaftsausschuss
+
+---
+
+## Example API Calls
+
+```bash
+# Current Bundestag legislature period (discover dynamically)
+/api/v2/parliament-periods?parliament=5&type=legislature&sort_by=id&sort_order=desc&range_end=1
+
+# Recent polls with embedded votes
+/api/v2/polls/3602?related_data=votes
+
+# Polls for 20th Bundestag
+/api/v2/polls?field_legislature[entity.id]=132&range_end=1000
+
+# All votes on a specific poll
+/api/v2/votes?poll=4926&range_end=800
+
+# SPD mandates in current period
+/api/v2/candidacies-mandates?parliament_period=165&politician[entity.party.entity.short_name]=SPD
+
+# Female politicians
+/api/v2/candidacies-mandates?politician[entity.sex]=f
+
+# Questions for a specific politician
+/api/v2/questions?politician=79137
+
+# Available related data for a politician
+/api/v2/politicians/79137?related_data=show_information
+
+# Recent sidejobs
+/api/v2/sidejobs?sort_by=created&sort_order=desc&range_end=10
+
+# Committees for current period
+/api/v2/committees?parliament_period=165&range_end=50
+
+# All Bundestag election periods
+/api/v2/parliament-periods?parliament=5&type=election
+```
+
+---
+
+## Known Parliament Period IDs
+
+| ID | Period |
+|----|--------|
+| 5 | Bundestag (parliament entity, NOT a period) |
+| 111 | 19. Bundestag (2017–2021) |
+| 132 | 20. Bundestag (2021–2025) |
+| 165 | 21. Bundestag (2025–) |
+
+---
+
+## Documentation URLs
+
+| What | URL |
+|------|-----|
+| API overview | `https://www.abgeordnetenwatch.de/api` |
+| Response format | `https://www.abgeordnetenwatch.de/api/response` |
+| Changelog | `https://www.abgeordnetenwatch.de/api/version-changelog/aktuell` |
+| Entity: Politician | `https://www.abgeordnetenwatch.de/api/entitaeten/politician` |
+| Entity: Poll | `https://www.abgeordnetenwatch.de/api/entitaeten/poll` |
+| Entity: Vote | `https://www.abgeordnetenwatch.de/api/entitaeten/vote` |
+| Entity: Sidejob | `https://www.abgeordnetenwatch.de/api/entitaeten/sidejob` |
+| Entity: ParliamentPeriod | `https://www.abgeordnetenwatch.de/api/entitaeten/parliament-period` |
+| Entity: CandidacyMandate | `https://www.abgeordnetenwatch.de/api/entitaeten/candidacy-mandate` |
 
 ---
 
