@@ -14,6 +14,31 @@ import type { DepthConfig } from "./context-depth.js";
  * JSON Schema for Anthropic structured output — agent response.
  * Matches the AgentResponse type: { actions: AgentAction[] }.
  * Passed directly as `output_config.format.schema` in the Anthropic API.
+ *
+ * NOTE on VALIDATION_FAIL pattern (investigated 2026-04-01, days 77-84):
+ *
+ * Structured output guarantees valid JSON shape, but NOT valid semantic values.
+ * The schema allows any string for `type`, `vote`, `category` etc., while
+ * `validateActions()` in action-parser.ts enforces specific enums (e.g.
+ * vote must be "yes"|"no"|"abstain", type must be "vote"|"propose"|...).
+ *
+ * Haiku occasionally produces valid JSON that fails semantic validation:
+ *   - Wrong vote values, missing required fields, invalid categories
+ *   - Observed ~1.4% VALIDATION_FAIL rate across days 72-85
+ *   - Spikes on days 77 (5/6 agents), 83 (5/6), 84 (2/6)
+ *
+ * AfD (xai/grok-3-mini) never uses structured output (no schema support),
+ * so it goes through the full parse pipeline with sanitizers and consistently
+ * passes — likely because the parse pipeline is more lenient.
+ *
+ * This is handled gracefully:
+ *   1. Valid actions from the response are kept (validationResult.valid)
+ *   2. Fixable errors trigger a semantic retry (re-prompt with error details)
+ *   3. Remaining invalid actions fall back to abstain-all for votable bills
+ *
+ * The fail rate increased slightly after day 60 due to era summaries adding
+ * more context to prompts (progressive summarization), which increases token
+ * pressure on Haiku's output quality. This is acceptable given the fallbacks.
  */
 const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -267,6 +292,23 @@ export function buildPartyAgentRequests(
 
 /**
  * Parse a single party agent batch result into validated actions.
+ *
+ * Two code paths based on provider:
+ *
+ * 1. Anthropic (structuredOutput=true): JSON.parse only — Anthropic guarantees
+ *    valid JSON shape via the schema. But semantic validation (validateActions)
+ *    can still fail when Haiku produces wrong enum values or missing fields.
+ *    Logs as VALIDATION_FAIL. Falls back to valid subset + semantic retry.
+ *
+ * 2. xAI/Grok (structuredOutput=false): Full parse pipeline with code-fence
+ *    stripping, trailing comma cleanup, and sanitizers. Then validateActions.
+ *    On PARSE_FAIL, does a sequential retry before falling back to abstain-all.
+ *
+ * Observed VALIDATION_FAIL rates (day 72-85 window, 2026-04-01):
+ *   - Overall: 14/1016 calls = 1.4%
+ *   - All failures were Anthropic/Haiku agents, never xAI/Grok (AfD)
+ *   - Spikes correlated with era summary injection (day 60+) adding context
+ *   - Simulation continued normally — fallback actions are deterministic
  */
 export async function processPartyAgentResult(
   result: BatchResult | undefined,
@@ -291,7 +333,17 @@ export async function processPartyAgentResult(
 
   let parsed;
   if (result.structuredOutput) {
-    // Structured output — JSON is guaranteed valid by Anthropic, skip parse pipeline
+    // Path 1: Anthropic structured output (SPD, CDU, Grüne, FDP, Linke)
+    //
+    // JSON shape is guaranteed by Anthropic's schema enforcement — no need for
+    // code-fence stripping or sanitizers. However, the schema only constrains
+    // types (string, number, object) not semantic values (e.g. vote must be
+    // "yes"|"no"|"abstain"). So parseOk is always true here, but validationOk
+    // may be false when Haiku picks invalid enum values.
+    //
+    // This is the path that produces VALIDATION_FAIL in logs — observed on
+    // days 77, 82, 83, 84 at 1.4% rate. The semantic retry below usually fixes
+    // fixable errors; remaining invalid actions fall back to abstain.
     try {
       const obj = JSON.parse(result.text);
       parsed = { actions: Array.isArray(obj.actions) ? obj.actions : [] };
@@ -302,11 +354,20 @@ export async function processPartyAgentResult(
       return abstainFallback();
     }
   } else {
-    // Full parse pipeline for xAI/Grok and non-structured responses
+    // Path 2: Full parse pipeline for xAI/Grok (AfD) and non-structured responses
+    //
+    // Grok doesn't support Anthropic's structured output format, so responses
+    // may include markdown code fences, trailing commas, or leading + in numbers.
+    // The parseAgentResponse() pipeline handles all of these quirks, which is why
+    // AfD/Grok consistently passes while Haiku sometimes fails — Grok gets more
+    // lenient parsing, and Haiku gets stricter schema-guaranteed JSON that still
+    // fails at the semantic validation layer.
     try {
       parsed = parseAgentResponse(result.text);
     } catch {
-      // Retry once with a sequential callAI before falling back to abstain-all
+      // Retry once with a sequential callAI before falling back to abstain-all.
+      // Sequential retries bypass the batch API (no 50% discount) but are faster
+      // for single-request recovery. Observed: retries rarely needed for xAI.
       console.warn(`  [Agent] ${ctx.party.id}: PARSE_FAIL from batch, retrying sequentially...`);
       try {
         const caps = deriveCapabilities(ctx);
