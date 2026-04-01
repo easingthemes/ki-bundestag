@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 KI Bundestag is an AI-powered simulation of the German parliament. Six political parties, each driven by Claude Haiku, propose bills, debate, vote, and issue statements day by day. After elections, parties negotiate coalition terms over multiple rounds. Results are stored in SQLite and served via a REST API to a React frontend with news feed, polls, and party profiles.
 
+## Setup (MANDATORY before any work)
+
+**Always run `npm install` from the monorepo root before starting any task.** This ensures all workspace dependencies, dev dependencies (vitest, @types/node, @types/react, etc.), and cross-package links are properly resolved. Without it, typecheck and tests will show false errors about missing modules.
+
+```bash
+npm install               # MUST run first — installs all workspace deps
+```
+
 ## Commands (run from monorepo root)
 
 ```bash
@@ -102,7 +110,7 @@ Open issues, bugs, and planned work are tracked in `docs/todo/README.md`. Each i
 
 ## Debugging Tips
 
-- **Typecheck**: `npm run typecheck` — always run from monorepo root
+- **Typecheck**: `npm run typecheck` — always run from monorepo root. If you see errors about missing modules (vitest, @types/node, react), run `npm install` first
 - **DB inspection**: `sqlite3 -header -column data/simulation.db "<query>"` (see `/db-query` command)
 - **Simulation state**: `sqlite3 data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"`
 - **Event trace**: `sqlite3 data/simulation.db "SELECT type, actor, title FROM simulation_events WHERE day_number = N"`
