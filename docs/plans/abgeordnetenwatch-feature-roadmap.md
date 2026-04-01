@@ -46,6 +46,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 1: MdB Profiles & Listing (High Impact)
 
+**Plan**: [group1-mdb-profiles.md](./group1-mdb-profiles.md)
 **Status**: Not started
 **Effort**: Medium
 **Backend data exists**: Yes — `bundestagSeats`, `mdbVotes`, `mdbSpeeches`, `mdbApplications`
@@ -76,6 +77,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 2: Committee System (Medium Impact)
 
+**Plan**: [group2-committee-system.md](./group2-committee-system.md)
 **Status**: Not started
 **Effort**: Low–Medium
 **Backend data exists**: Partial — committee names on bills, now fetched from API. No membership tracking.
@@ -105,6 +107,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 3: Side Jobs & Scandals (Medium Impact)
 
+**Plan**: [group3-sidejobs-scandals.md](./group3-sidejobs-scandals.md)
 **Status**: Not started
 **Effort**: Medium
 **Backend data exists**: No — new tables needed. Real sidejob data now fetched from API.
@@ -133,6 +136,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 4: Enhanced Voting Intelligence (Medium Impact)
 
+**Plan**: [group4-voting-intelligence.md](./group4-voting-intelligence.md)
 **Status**: Partially started (API fetching done in #031)
 **Effort**: Low–Medium
 
@@ -158,6 +162,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 5: Citizen Q&A Enhancement (Lower Impact)
 
+**Plan**: [group5-qa-enhancement.md](./group5-qa-enhancement.md)
 **Status**: Partially started (API fetching done in #031)
 **Effort**: Low
 
@@ -180,6 +185,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 
 ## Group 6: Transparency & Matching Tools (Lower Impact)
 
+**Plan**: [group6-transparency-tools.md](./group6-transparency-tools.md)
 **Status**: Not started
 **Effort**: Medium–High
 
