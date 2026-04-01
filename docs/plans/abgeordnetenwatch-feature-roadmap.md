@@ -108,7 +108,7 @@ Abgeordnetenwatch.de centers on **individual politician transparency** — votin
 ## Group 3: Side Jobs & Scandals (Medium Impact)
 
 **Plan**: [group3-sidejobs-scandals.md](./group3-sidejobs-scandals.md)
-**Status**: Not started
+**Status**: Complete
 **Effort**: Medium
 **Backend data exists**: No — new tables needed. Real sidejob data now fetched from API.
 
