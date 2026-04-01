@@ -159,7 +159,7 @@ function weightedParty(): string {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
-  const TOTAL_USERS = 756;
+  const TOTAL_USERS = parseInt(process.argv[2] || "756", 10);
 
   // Ensure data directory exists
   for (const dbPath of [USER_DB_PATH, SIM_DB_PATH]) {
