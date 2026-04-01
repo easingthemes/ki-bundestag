@@ -69,9 +69,9 @@ jobs:
                 fi
                 # Count AI statuses
                 ALL_AI=$(pm2 logs ki-simulate --lines $LINES --nostream --out 2>/dev/null || true)
-                OK_COUNT=$(echo "$ALL_AI" | grep -c '\| OK$' || echo "0")
-                PARSE_FAIL=$(echo "$ALL_AI" | grep -c 'PARSE_FAIL' || echo "0")
-                VALIDATION_FAIL=$(echo "$ALL_AI" | grep -c 'VALIDATION_FAIL' || echo "0")
+                OK_COUNT=$(echo "$ALL_AI" | grep -c '\| OK$' || true)
+                PARSE_FAIL=$(echo "$ALL_AI" | grep -c 'PARSE_FAIL' || true)
+                VALIDATION_FAIL=$(echo "$ALL_AI" | grep -c 'VALIDATION_FAIL' || true)
                 echo "--- AI Call Status (from logs) ---"
                 echo "  OK:              $OK_COUNT"
                 echo "  PARSE_FAIL:      $PARSE_FAIL"
@@ -83,7 +83,7 @@ jobs:
                 fi
                 echo ""
                 # Count days completed
-                DAY_COUNT=$(echo "$ALL_AI" | grep -c 'DAY.*COMPLETE' || echo "0")
+                DAY_COUNT=$(echo "$ALL_AI" | grep -c 'DAY.*COMPLETE' || true)
                 echo "--- Days in log window ---"
                 echo "  Completed: $DAY_COUNT"
                 # Show any warnings
