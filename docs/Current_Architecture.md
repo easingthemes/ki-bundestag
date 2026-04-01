@@ -68,7 +68,7 @@ Both are accessed via engine helpers (`getDb()/getSqlite()` and `getUserDb()/get
 | `lobbying_events` | Lobbying activity | organization_name, sector, target_party_id, target_bill_id, influence, intensity, day_number |
 | `party_donations` | Party donations | party_id, donor_name, donor_type, amount, day_number, is_public |
 | `question_suggestions` | AI question prompts | question, topic, target_party_id, created_on_day |
-| `era_summaries` | Compressed political history | start_day, end_day, summary |
+| `era_summaries` | Compressed political history | start_day, end_day, summary, case_facts (JSON: economy, coalition, government, bills, elections, crises) |
 | `real_world_knowledge` | Real-world data digests | generation, category, party_id, digest, source_urls, active |
 | `ai_calls` | AI usage/cost tracking | day_number, task, provider, model, tokens, cost_usd, batch_id |
 

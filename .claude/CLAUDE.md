@@ -98,6 +98,7 @@ AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (s
 - Per-role: `MODEL_DAILY`, `MODEL_NEGOTIATION` (both Haiku), `MODEL_SYNTHESIS` (Sonnet)
 - Override via env vars: `MODEL_PARTY_<ID>`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`
 - Context depth: `low` ($0.03/day), `normal` ($0.055/day, default), `high` ($0.09/day) — configurable via GitHub workflow, admin API, or DB
+- Era summaries: every 60 days (normal/high), compressed narratives + structured case facts (economy, coalition, bills, elections, crises). Token budget per depth: low 500, normal 1500, high 3000
 - API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`
 
 ## Environment
