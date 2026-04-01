@@ -3,6 +3,29 @@
  *
  * Submits multiple AI prompts as a single batch, polls for completion,
  * and returns all results. Saves 50% on token costs vs synchronous calls.
+ *
+ * ## Observed latency (2026-04-01, day 84-85 investigation)
+ *
+ * Anthropic's batch API latency varies significantly with server load:
+ *   - Normal load: 2-4 poll cycles (1-3 min per batch)
+ *   - High load:   10-16 poll cycles (10-20+ min per batch)
+ *   - MdB seat batches observed: 242s, 306s, 483s, 1025s (17 min!)
+ *
+ * This makes the simulation appear "stuck" even though it's just waiting
+ * for the Anthropic API to finish processing. The sim continues normally
+ * once the batch completes.
+ *
+ * ## Timeout/polling design decisions
+ *
+ * - Default timeout raised from 3600s → 5400s (90 min) to handle worst-case
+ *   API slowdowns without killing the sim. A single day can have 4-6 batches,
+ *   each potentially slow. 3600s was too tight for consecutive slow batches.
+ *
+ * - Adaptive poll intervals (15s → 30s → 45s → 60s) avoid hammering the API
+ *   when it's already under load, while still detecting fast completions early.
+ *
+ * - A warning log at poll #10 (~5 min elapsed) helps operators distinguish
+ *   "slow but working" from "actually stuck" in the PM2 logs.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -47,14 +70,44 @@ export interface BatchResult {
 // ---------------------------------------------------------------------------
 
 const BATCH_POLL_INTERVAL_BASE_MS = Number(process.env.BATCH_POLL_INTERVAL ?? 60) * 1000;
-const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 3600) * 1000;
 
-/** Adaptive poll interval: 15s for first 3 polls, 30s for polls 4-10, then base interval. */
+/**
+ * Maximum time to wait for a single batch to complete.
+ *
+ * Raised from 3600s → 5400s (90 min) on 2026-04-01 after observing batches
+ * take 10-17 min each when Anthropic is under load. A typical day submits
+ * 4-6 batches (briefing, agents, interpellations, MdB, media+summary),
+ * so worst-case total can exceed 60 min. The old 3600s timeout risked
+ * killing the runner mid-day during API slowdowns.
+ *
+ * Override via env: BATCH_TIMEOUT=7200 (seconds)
+ */
+const BATCH_TIMEOUT_MS = Number(process.env.BATCH_TIMEOUT ?? 5400) * 1000;
+
+/**
+ * Adaptive poll interval: ramps up as batch takes longer.
+ *
+ *   Tier       Polls   Interval   Cumulative wait at tier end
+ *   ─────────  ──────  ─────────  ───────────────────────────
+ *   Quick      0-2     15s        ~45s    — catches fast 1-request batches
+ *   Normal     3-9     30s        ~4 min  — typical agent batch completion
+ *   Slow       10-19   45s        ~11 min — API under moderate load
+ *   Fallback   20+     60s        open    — heavy load, just wait patiently
+ *
+ * The 45s tier (polls 10-19) was added on 2026-04-01 after observing that
+ * during Anthropic API slowdowns, batches frequently completed between
+ * polls 10-16. The old 15s → 30s → 60s ramp jumped too aggressively from
+ * 30s to 60s, wasting time on batches that would finish at ~7-8 min.
+ *
+ * If BATCH_POLL_INTERVAL env is set to <30s, all adaptive tiers are bypassed
+ * and the override is used as a flat interval (useful for testing).
+ */
 function adaptivePollInterval(pollCount: number): number {
   if (BATCH_POLL_INTERVAL_BASE_MS < 30_000) return BATCH_POLL_INTERVAL_BASE_MS; // respect explicit short override
-  if (pollCount < 3) return 15_000;
-  if (pollCount < 10) return 30_000;
-  return BATCH_POLL_INTERVAL_BASE_MS;
+  if (pollCount < 3) return 15_000;   // quick: small batches finish in <1 min
+  if (pollCount < 10) return 30_000;  // normal: most batches complete here
+  if (pollCount < 20) return 45_000;  // slow: API under load, observed on day 84-85
+  return BATCH_POLL_INTERVAL_BASE_MS; // fallback: heavy load, wait patiently
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +210,10 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
   }
   console.log(`  [Batch] Created batch ${batch.id} (status: ${batch.processing_status})`);
 
-  // Poll for completion (adaptive: 15s → 30s → 60s)
+  // Poll for completion with adaptive intervals (15s → 30s → 45s → 60s).
+  // Most batches complete in 1-4 polls under normal load.
+  // Under high API load (observed 2026-04-01), batches can take 10-16+ polls.
+  // The ramping interval reduces API pressure during slow periods.
   const deadline = Date.now() + BATCH_TIMEOUT_MS;
   let status = batch.processing_status;
   let pollFailures = 0;
@@ -172,9 +228,17 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
       status = updated.processing_status;
       pollFailures = 0; // reset on success
       const counts = updated.request_counts;
+      const elapsedSec = Math.round((Date.now() - batchStartMs) / 1000);
       console.log(
         `  [Batch] ${batch.id}: ${counts.succeeded} succeeded, ${counts.processing} processing, ${counts.errored} errored`,
       );
+      // Warn when batch exceeds ~5 min (poll #10 at 15s×3 + 30s×7 = 255s).
+      // This helps operators distinguish "slow API" from "stuck sim" in PM2 logs.
+      // Observed on day 84-85: agent batches routinely hit 10-16 polls during
+      // Anthropic API slowdowns, but always completed successfully.
+      if (pollCount === 10) {
+        console.warn(`  [Batch] ${batch.id}: slow batch — ${elapsedSec}s elapsed, ${counts.processing} still processing (Anthropic may be under load)`);
+      }
     } catch (pollErr) {
       pollFailures++;
       console.warn(`  [Batch] Poll error for ${batch.id} (${pollFailures}/${MAX_POLL_FAILURES}):`, (pollErr as Error).message);
