@@ -18,3 +18,5 @@ export { dayToDate, isRealisticSessionDay, getHolidaysInRange, isWorkday, snapTo
 export { QUESTION_TOPICS, type QuestionTopic } from "./simulation/index.js";
 export { generateQuestionSuggestions } from "./simulation/index.js";
 export type { PublicHoliday } from "./simulation/index.js";
+export { calculateMatch, calculateAllMatches } from "./simulation/index.js";
+export type { QuizAnswer, QuizResult } from "./simulation/index.js";
