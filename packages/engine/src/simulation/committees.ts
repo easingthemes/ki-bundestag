@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import type { Bill, BillCategory, BillImpact, CommitteeRecommendation, Party } from "@ki-bundestag/types";
+import { getDb, getSqlite, schema } from "../db/index.js";
 import { getStoredCommitteeNames } from "./knowledge-fetch.js";
 
 /**
@@ -28,6 +30,10 @@ const FALLBACK_MAP: Record<BillCategory, string> = {
   infrastructure: "Verkehr und digitale Infrastruktur",
 };
 
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
 /**
  * Assign a committee to a bill based on its category.
  * Uses real Bundestag committee names from abgeordnetenwatch when available,
@@ -47,6 +53,122 @@ export function assignCommittee(category: BillCategory): string {
     return realNames[Math.floor(Math.random() * realNames.length)];
   }
   return FALLBACK_MAP[category] ?? "Allgemeiner Ausschuss";
+}
+
+/**
+ * Find the bill category that best matches a committee name via keyword matching.
+ */
+function findCategoryForCommittee(name: string): string | null {
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => name.toLowerCase().includes(kw.toLowerCase()))) {
+      return category;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract a short name from a full committee name.
+ * e.g., "Ausschuss für Verteidigung" → "Verteidigung"
+ */
+function extractShortName(name: string): string {
+  const m = name.match(/(?:Ausschuss\s+(?:für|des)\s+)?(.+)/i);
+  return m ? m[1].trim() : name;
+}
+
+/**
+ * Seed committees from stored real names (or fallback).
+ * Deactivates old committees and inserts new ones.
+ */
+export function seedCommittees(currentDay: number): void {
+  const db = getDb();
+  const sqlite = getSqlite();
+  const names = getStoredCommitteeNames();
+  const committeeNames = names.length > 0 ? names : Object.values(FALLBACK_MAP);
+
+  // Deactivate old
+  sqlite.prepare("UPDATE committees SET active = 0").run();
+
+  for (const name of committeeNames) {
+    const category = findCategoryForCommittee(name);
+    db.insert(schema.committees).values({
+      id: `committee-${generateId()}`,
+      name,
+      shortName: extractShortName(name),
+      billCategory: category,
+      active: true,
+      createdOnDay: currentDay,
+    }).run();
+  }
+}
+
+/**
+ * Check if committees need seeding (table empty or no active committees).
+ */
+export function shouldSeedCommittees(): boolean {
+  const sqlite = getSqlite();
+  const row = sqlite.prepare("SELECT COUNT(*) as cnt FROM committees WHERE active = 1").get() as { cnt: number } | undefined;
+  return !row || row.cnt === 0;
+}
+
+/**
+ * Assign MdBs to committees proportionally after an election.
+ * Clears old memberships and creates new ones.
+ */
+export function assignCommitteeMemberships(currentDay: number): void {
+  const db = getDb();
+  const sqlite = getSqlite();
+
+  // Clear old memberships
+  sqlite.prepare("DELETE FROM committee_memberships").run();
+
+  const activeCommittees = db.select().from(schema.committees)
+    .where(eq(schema.committees.active, true)).all();
+  const activeSeats = db.select().from(schema.bundestagSeats)
+    .where(eq(schema.bundestagSeats.active, true)).all();
+
+  if (activeCommittees.length === 0 || activeSeats.length === 0) return;
+
+  // Group seats by party
+  const seatsByParty: Record<string, typeof activeSeats> = {};
+  for (const seat of activeSeats) {
+    (seatsByParty[seat.partyId] ??= []).push(seat);
+  }
+
+  const totalSeats = activeSeats.length;
+  const COMMITTEE_SIZE = 20;
+
+  for (const committee of activeCommittees) {
+    const members: Array<{ seatId: string; role: string; partyId: string }> = [];
+
+    // Proportional allocation per party
+    for (const [partyId, seats] of Object.entries(seatsByParty)) {
+      const share = Math.max(1, Math.round((seats.length / totalSeats) * COMMITTEE_SIZE));
+      const shuffled = [...seats].sort(() => Math.random() - 0.5);
+      for (let i = 0; i < Math.min(share, shuffled.length); i++) {
+        members.push({ seatId: shuffled[i].id, role: "member", partyId });
+      }
+    }
+
+    // Assign chair to first member, deputy to member from a different party
+    if (members.length > 0) members[0].role = "chair";
+    if (members.length > 1) {
+      const chairParty = members[0].partyId;
+      const deputy = members.find((m, i) => i > 0 && m.partyId !== chairParty);
+      if (deputy) deputy.role = "deputy_chair";
+    }
+
+    // Insert memberships
+    for (const m of members) {
+      db.insert(schema.committeeMemberships).values({
+        id: `cm-${generateId()}`,
+        committeeId: committee.id,
+        seatId: m.seatId,
+        role: m.role,
+        assignedOnDay: currentDay,
+      }).run();
+    }
+  }
 }
 
 /**

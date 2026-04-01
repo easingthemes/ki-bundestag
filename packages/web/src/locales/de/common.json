@@ -8,6 +8,7 @@
     "interpellations": "Anfragen",
     "confidenceVotes": "Vertrauensvoten",
     "constitutionalCourt": "Verfassungsgericht",
+    "committees": "Ausschüsse",
     "budget": "Haushalt",
     "partiesAndElections": "Parteien & Wahlen",
     "parties": "Parteien",
@@ -62,6 +63,30 @@
     "fast": "Schnell",
     "normal": "Normal",
     "slow": "Langsam"
+  },
+  "committees": {
+    "title": "Ausschüsse des Bundestages",
+    "billsInReview": "Gesetzentwürfe in Beratung",
+    "members": "Mitglieder",
+    "empty": "Keine Ausschüsse vorhanden. Ausschüsse werden nach der nächsten Wahl eingerichtet.",
+    "bills": "Gesetzentwürfe",
+    "stats": "Statistik",
+    "noBills": "Keine Gesetzentwürfe zugewiesen.",
+    "noMembers": "Keine Mitglieder zugewiesen.",
+    "noStats": "Noch keine Empfehlungen abgegeben.",
+    "totalReviewed": "Gesetzentwürfe begutachtet",
+    "partyLabel": "Partei",
+    "roleLabel": "Rolle",
+    "role": {
+      "chair": "Vorsitz",
+      "deputy_chair": "Stv. Vorsitz",
+      "member": "Mitglied"
+    },
+    "recommendation": {
+      "pass": "Annahme",
+      "amend": "Änderung",
+      "reject": "Ablehnung"
+    }
   },
   "termDuration": {
     "ultra-fast": "~10 Tage",

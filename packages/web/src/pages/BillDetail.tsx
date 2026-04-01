@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type Bill, type Party, type ConstitutionalChallenge, type MdbVoteSummary, type MdbSpeech, type BundestagSeat } from "../api";
+import { api, type Bill, type Party, type ConstitutionalChallenge, type MdbVoteSummary, type MdbSpeech, type BundestagSeat, type CommitteeListItem } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,7 @@ export function BillDetail() {
   const [speeches, setSpeeches] = useState<MdbSpeech[]>([]);
   const [mdbError, setMdbError] = useState<string | null>(null);
   const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
+  const [committees, setCommittees] = useState<CommitteeListItem[]>([]);
 
   useEffect(() => {
     if (user) api.getMySeat().then(r => setMySeat(r.seat)).catch(() => {});
@@ -70,6 +71,7 @@ export function BillDetail() {
     api.getConstitutionalChallenges(undefined, id).then(list => {
       setChallenge(list[0] ?? null);
     }).catch(console.error);
+    api.getCommittees().then(setCommittees).catch(() => {});
   }, [id]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -304,7 +306,14 @@ export function BillDetail() {
         <div className="mb-6">
           <h2 className="section-title">{t("committeeReview")}</h2>
           <Card><CardContent className="p-5">
-            <div style={{ fontWeight: 600 }}>{bill.committeeName}</div>
+            {(() => {
+              const match = committees.find(c => c.name === bill.committeeName);
+              return match ? (
+                <Link to={`/committees/${match.id}`} className="font-semibold text-foreground hover:text-primary no-underline">{bill.committeeName}</Link>
+              ) : (
+                <div style={{ fontWeight: 600 }}>{bill.committeeName}</div>
+              );
+            })()}
             {bill.committeeRecommendation && (
               <div style={{ marginTop: "0.25rem", fontSize: "0.9rem" }}>
                 {t("committeeRecommendation")}:{" "}
