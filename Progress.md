@@ -1,61 +1,37 @@
-# Progress: Context & Memory Management for Long-Running Simulation
+# Progress: Semantic Retry-with-Feedback Loop
 
-**Plan**: [docs/plans/context-memory-management.md](docs/plans/context-memory-management.md)
-**Goal**: Prevent AI response quality degradation as simulation days accumulate. Bound prompt size, add era summaries, structured output, and prompt hardening.
-**Validation**: `npx turbo run typecheck 2>&1 | tail -5` (engine typecheck has pre-existing errors from missing dev deps — check for NEW errors only)
+**Plan**: [docs/plans/semantic-retry-with-feedback.md](docs/plans/semantic-retry-with-feedback.md)
+**Goal**: When `validateActions()` finds fixable semantic errors, re-prompt the LLM once with error feedback instead of silently dropping actions. Only fall back to abstain if the retry also fails.
+**Validation**: `npm run typecheck && npm test`
 
 ---
 
-### Step 1: Phase 1a — Event query optimization (loop.ts)
+### Step 1: Define `ValidationError` type and `ValidationResult` interface
 
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/loop.ts`
-- **Result**: Replaced unbounded `simulationEvents.all()` + `.slice(-20)` with Drizzle query bounded to last 7 days + `depthConfig.recentEventsMax` limit. Added `gte` import.
+- **Files**: `packages/engine/src/agent/action-parser.ts`, `packages/engine/src/agent/index.ts`
+- **Result**: Added `ValidationError` and `ValidationResult` interfaces. Exported from `index.ts`. Typecheck passes (6/6).
 
-### Step 2: Phase 1b — Bill ID enforcement in prompt (prompt.ts)
-
-- **Status**: done
-- **Files**: `packages/engine/src/agent/prompt.ts`
-- **Result**: Added `VALID BILL IDs FOR VOTING` and `VALID BILL IDs FOR AMENDMENTS` sections after reading sections in `buildUserPrompt()`.
-
-### Step 3: Phase 1c — Briefing cap + DepthConfig additions (context-depth.ts, briefing.ts)
+### Step 2: Refactor `validateActions()` to return `ValidationResult`
 
 - **Status**: done
-- **Files**: `packages/engine/src/agent/context-depth.ts`, `packages/engine/src/agent/briefing.ts`
-- **Result**: Added `briefingMaxEvents`, `enableEraSummaries`, `eraSummaryIntervalDays` to DepthConfig. Updated presets (normal lookback 30→7, high 60→14). Added `hasEraSummaries` flag to suppress older events section.
+- **Files**: `packages/engine/src/agent/action-parser.ts`, `packages/engine/src/agent/party-agent.ts`, `packages/engine/src/agent/action-parser.test.ts`
+- **Result**: Refactored `validateActions()` to return `ValidationResult`. Every validation branch pushes a `ValidationError` with fixable flag. Updated both call sites in party-agent to use `.valid`. Updated existing tests for new return type. Typecheck passes (6/6).
 
-### Step 4: Phase 3a+3b — Prompt hardening (prompt.ts)
-
-- **Status**: done
-- **Files**: `packages/engine/src/agent/prompt.ts`
-- **Result**: Added CANNOT list based on party capabilities, bill ID usage rule, and JSON schema reinforcement reminder at end of system prompt.
-
-### Step 5: Phase 4a-4c — Structured output (batch-client.ts, action-parser.ts, ai-json.ts)
+### Step 3: Build the retry feedback prompt
 
 - **Status**: done
-- **Files**: `packages/engine/src/agent/batch-client.ts`, `packages/engine/src/agent/party-agent.ts`
-- **Result**: Added `outputSchema` to BatchRequest, `structuredOutput` to BatchResult. Anthropic batch requests include `output_config.format.json_schema`. Party agent requests auto-detect provider. `processPartyAgentResult` bypasses parse pipeline for structured output. Full pipeline preserved for xAI.
+- **Files**: `packages/engine/src/agent/prompt.ts`, `packages/engine/src/agent/index.ts`
+- **Result**: Added `buildValidationRetryPrompt()` that appends structured error feedback to original user prompt. Exported from index.ts. Typecheck passes (6/6).
 
-### Step 6: Phase 2a — Era summaries table + schema (ddl.ts, schema-sim.ts, db/index.ts)
-
-- **Status**: done
-- **Files**: `packages/engine/src/db/ddl.ts`, `packages/engine/src/db/schema-sim.ts`, `packages/types/src/types/agent.ts`
-- **Result**: Added `era_summaries` table DDL + index migration. Added Drizzle `eraSummaries` table definition (auto-exported via schema barrel). Added `eraSummaries` field to `AgentContext`.
-
-### Step 7: Phase 2b — Era summary module (era-summary.ts)
+### Step 4–6: Add semantic retry helper + integrate in both paths
 
 - **Status**: done
-- **Files**: `packages/engine/src/simulation/era-summary.ts`
-- **Result**: Created module with `shouldGenerateEraSummary()`, `buildEraSummaryBatchRequest()`, `processEraSummaryResult()`, `getEraSummaries()`, `getLastEraSummaryEnd()`. Uses simulation events + party history as input. Persists to DB with graceful failure handling.
+- **Files**: `packages/engine/src/agent/party-agent.ts`
+- **Result**: Added `attemptSemanticRetry()` shared helper with fixable-error check, retry prompt, parse+validate, and fallback. Integrated into both `runPartyAgent()` and `processPartyAgentResult()`. Added `:semantic-retry` log tags. Typecheck passes (6/6).
 
-### Step 8: Phase 2c+2d+2e — Loop integration + prompt injection + briefing dedup
-
-- **Status**: done
-- **Files**: `packages/engine/src/simulation/loop.ts`, `packages/engine/src/agent/prompt.ts`
-- **Result**: Integrated era summary generation in loop before briefing. Passed `eraSummaries` to agent contexts. Added HISTORICAL CONTEXT section between P1 and P1.5. Passed `hasEraSummaries` to briefing builder to suppress older events section.
-
-### Step 9: Final validation + commit
+### Step 7: Update existing tests
 
 - **Status**: done
-- **Files**: (all 11 files)
-- **Result**: Typecheck passes (6/6 tasks). Committed and pushed to `claude/check-simulate-logs-TajdA`.
+- **Files**: `packages/engine/src/agent/action-parser.test.ts`, `packages/engine/src/agent/party-agent.ts`
+- **Result**: Added 7 new tests: unknown action type fixable, non-existent bill fixable with IDs, non-opposition interpellation non-fixable, buildValidationRetryPrompt format/errors/abstains. Fixed lazy prompt building in batch path to avoid crash when retry not needed. All 187 tests pass, typecheck 6/6.
