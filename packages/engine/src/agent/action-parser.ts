@@ -1,6 +1,26 @@
 import type { AgentAction, AgentResponse, Bill, BillCategory, Election, InterpellationType, MinistryPortfolio, MotionType } from "@ki-bundestag/types";
 import { extractJson, stripLeadingPlusInJsonNumbers, stripTrailingCommasInJson } from "./ai-json.js";
 
+export interface ValidationError {
+  /** Index of the action in the original actions array */
+  actionIndex: number;
+  /** The action type that failed (or "unknown" for unrecognized types) */
+  actionType: string;
+  /** Human-readable error message describing what went wrong */
+  message: string;
+  /** Whether this error is fixable by the LLM on retry */
+  fixable: boolean;
+}
+
+export interface ValidationResult {
+  /** Actions that passed validation */
+  valid: AgentAction[];
+  /** Structured errors for actions that failed */
+  errors: ValidationError[];
+  /** Bills that were auto-filled with abstain (missing votes) */
+  autoAbstainBillIds: string[];
+}
+
 const VALID_CATEGORIES: BillCategory[] = [
   "economy", "social", "environment", "immigration",
   "defense", "education", "healthcare", "infrastructure",
@@ -55,8 +75,10 @@ export function validateActions(
   secondReadingBills?: Bill[],
   isOpposition: boolean = false,
   isCoalitionLeader: boolean = false,
-): AgentAction[] {
+): ValidationResult {
   const validated: AgentAction[] = [];
+  const errors: ValidationError[] = [];
+  const autoAbstainBillIds: string[] = [];
   let proposalCount = 0;
   let statementCount = 0;
   let campaignCount = 0;
@@ -69,20 +91,23 @@ export function validateActions(
   const votedBills = new Set<string>();
   const inParliament = hasFraktion;
 
-  for (const action of actions) {
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
     switch (action.type) {
       case "vote": {
-        // Parliamentary action: requires seats
         if (!inParliament) {
           console.warn(`[${partyId}] Vote without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "vote", message: "Vote requires Fraktion (party has no seats in parliament)", fixable: false });
           continue;
         }
         if (!action.billId || !VALID_VOTES.includes(action.vote)) {
           console.warn(`[${partyId}] Invalid vote action, skipping`);
+          errors.push({ actionIndex: i, actionType: "vote", message: `Invalid vote — billId or vote value missing/invalid (valid votes: ${VALID_VOTES.join(", ")})`, fixable: true });
           continue;
         }
         if (votedBills.has(action.billId)) {
           console.warn(`[${partyId}] Duplicate vote for ${action.billId}, skipping`);
+          errors.push({ actionIndex: i, actionType: "vote", message: `Duplicate vote for bill ${action.billId}`, fixable: true });
           continue;
         }
         const billExists = votableBills.some(b => b.id === action.billId);
@@ -90,8 +115,10 @@ export function validateActions(
           const inSecondReading = secondReadingBills?.some(b => b.id === action.billId);
           if (inSecondReading) {
             console.warn(`[${partyId}] Vote for second-reading bill ${action.billId} (not yet in third reading), skipping`);
+            errors.push({ actionIndex: i, actionType: "vote", message: `Bill ${action.billId} is in second reading, not third reading — valid bill IDs for voting: ${votableBills.map(b => b.id).join(", ") || "none"}`, fixable: true });
           } else {
             console.warn(`[${partyId}] Vote for non-existent bill ${action.billId}, skipping`);
+            errors.push({ actionIndex: i, actionType: "vote", message: `Bill ${action.billId} does not exist — valid bill IDs for voting: ${votableBills.map(b => b.id).join(", ") || "none"}`, fixable: true });
           }
           continue;
         }
@@ -101,21 +128,24 @@ export function validateActions(
       }
 
       case "propose_bill": {
-        // Parliamentary action: requires seats
         if (!inParliament) {
           console.warn(`[${partyId}] Bill proposal without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_bill", message: "Bill proposals require Fraktion", fixable: false });
           continue;
         }
         if (proposalCount >= 1) {
           console.warn(`[${partyId}] More than 1 proposal, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_bill", message: "Maximum 1 bill proposal per turn", fixable: true });
           continue;
         }
         if (!action.title || !action.description) {
           console.warn(`[${partyId}] Proposal missing title/description, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_bill", message: "Proposal missing required title or description", fixable: false });
           continue;
         }
         if (!VALID_CATEGORIES.includes(action.category)) {
           console.warn(`[${partyId}] Invalid category ${action.category}, defaulting to economy`);
+          errors.push({ actionIndex: i, actionType: "propose_bill", message: `Invalid category "${action.category}" — valid: ${VALID_CATEGORIES.join(", ")}. Defaulted to "economy"`, fixable: true });
           action.category = "economy";
         }
         proposalCount++;
@@ -124,27 +154,30 @@ export function validateActions(
       }
 
       case "propose_amendment": {
-        // Parliamentary action: requires Fraktion
         if (!inParliament) {
           console.warn(`[${partyId}] Amendment without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_amendment", message: "Amendments require Fraktion", fixable: false });
           continue;
         }
         if (amendmentCount >= 1) {
           console.warn(`[${partyId}] More than 1 amendment, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_amendment", message: "Maximum 1 amendment per turn", fixable: true });
           continue;
         }
         if (!action.billId || !action.title || !action.description) {
           console.warn(`[${partyId}] Amendment missing fields, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_amendment", message: "Amendment missing required billId, title, or description", fixable: false });
           continue;
         }
         if (!isBillImpact((action as any).impactChange)) {
           console.warn(`[${partyId}] Amendment missing/invalid impactChange, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_amendment", message: "Amendment missing or invalid impactChange object", fixable: true });
           continue;
         }
-        // Must target a second_reading bill
         const targetBill = secondReadingBills?.some(b => b.id === action.billId);
         if (!targetBill) {
           console.warn(`[${partyId}] Amendment for non-second-reading bill ${action.billId}, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_amendment", message: `Bill ${action.billId} is not in second reading — valid bill IDs for amendments: ${secondReadingBills?.map(b => b.id).join(", ") || "none"}`, fixable: true });
           continue;
         }
         amendmentCount++;
@@ -153,13 +186,14 @@ export function validateActions(
       }
 
       case "statement": {
-        // Public action: any party can make statements
         if (statementCount >= 1) {
           console.warn(`[${partyId}] More than 1 statement, skipping`);
+          errors.push({ actionIndex: i, actionType: "statement", message: "Maximum 1 statement per turn", fixable: true });
           continue;
         }
         if (!action.title || !action.statement) {
           console.warn(`[${partyId}] Statement missing fields, skipping`);
+          errors.push({ actionIndex: i, actionType: "statement", message: "Statement missing required title or statement text", fixable: false });
           continue;
         }
         statementCount++;
@@ -168,17 +202,19 @@ export function validateActions(
       }
 
       case "campaign_statement": {
-        // Public action: any party can campaign
         if (campaignCount >= 1) {
           console.warn(`[${partyId}] More than 1 campaign statement, skipping`);
+          errors.push({ actionIndex: i, actionType: "campaign_statement", message: "Maximum 1 campaign statement per turn", fixable: true });
           continue;
         }
         if (!activeElection || activeElection.status !== "campaign") {
           console.warn(`[${partyId}] Campaign statement outside campaign phase, skipping`);
+          errors.push({ actionIndex: i, actionType: "campaign_statement", message: "Campaign statements only allowed during active campaign phase", fixable: false });
           continue;
         }
         if (!action.title || !action.promise) {
           console.warn(`[${partyId}] Campaign statement missing fields, skipping`);
+          errors.push({ actionIndex: i, actionType: "campaign_statement", message: "Campaign statement missing required title or promise", fixable: false });
           continue;
         }
         campaignCount++;
@@ -187,21 +223,24 @@ export function validateActions(
       }
 
       case "submit_motion": {
-        // Parliamentary action: requires Fraktion
         if (!inParliament) {
           console.warn(`[${partyId}] Motion without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "submit_motion", message: "Motions require Fraktion", fixable: false });
           continue;
         }
         if (motionCount >= 1) {
           console.warn(`[${partyId}] More than 1 motion, skipping`);
+          errors.push({ actionIndex: i, actionType: "submit_motion", message: "Maximum 1 motion per turn", fixable: true });
           continue;
         }
         if (!VALID_MOTION_TYPES.includes(action.motionType)) {
           console.warn(`[${partyId}] Invalid motionType ${action.motionType}, skipping`);
+          errors.push({ actionIndex: i, actionType: "submit_motion", message: `Invalid motionType "${action.motionType}" — valid: ${VALID_MOTION_TYPES.join(", ")}`, fixable: true });
           continue;
         }
         if (!action.title || !action.description) {
           console.warn(`[${partyId}] Motion missing title/description, skipping`);
+          errors.push({ actionIndex: i, actionType: "submit_motion", message: "Motion missing required title or description", fixable: false });
           continue;
         }
         motionCount++;
@@ -210,29 +249,34 @@ export function validateActions(
       }
 
       case "file_interpellation": {
-        // Requires Fraktion + opposition
         if (!inParliament) {
           console.warn(`[${partyId}] Interpellation without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: "Interpellations require Fraktion", fixable: false });
           continue;
         }
         if (!isOpposition) {
           console.warn(`[${partyId}] Interpellation from non-opposition party, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: "Interpellations are only available to opposition parties", fixable: false });
           continue;
         }
         if (interpellationCount >= 1) {
           console.warn(`[${partyId}] More than 1 interpellation, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: "Maximum 1 interpellation per turn", fixable: true });
           continue;
         }
         if (!VALID_INTERPELLATION_TYPES.includes(action.interpellationType)) {
           console.warn(`[${partyId}] Invalid interpellationType ${action.interpellationType}, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: `Invalid interpellationType "${action.interpellationType}" — valid: ${VALID_INTERPELLATION_TYPES.join(", ")}`, fixable: true });
           continue;
         }
         if (!action.title || !action.question) {
           console.warn(`[${partyId}] Interpellation missing title/question, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: "Interpellation missing required title or question", fixable: false });
           continue;
         }
         if (!VALID_MINISTRY_PORTFOLIOS.includes(action.targetMinistry)) {
           console.warn(`[${partyId}] Invalid targetMinistry ${action.targetMinistry}, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_interpellation", message: `Invalid targetMinistry "${action.targetMinistry}" — valid: ${VALID_MINISTRY_PORTFOLIOS.join(", ")}`, fixable: true });
           continue;
         }
         interpellationCount++;
@@ -243,22 +287,27 @@ export function validateActions(
       case "call_vertrauensfrage": {
         if (!inParliament) {
           console.warn(`[${partyId}] Vertrauensfrage without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "call_vertrauensfrage", message: "Vertrauensfrage requires Fraktion", fixable: false });
           continue;
         }
         if (!isCoalitionLeader) {
           console.warn(`[${partyId}] Vertrauensfrage from non-coalition-leader, skipping`);
+          errors.push({ actionIndex: i, actionType: "call_vertrauensfrage", message: "Only the coalition leader may call a Vertrauensfrage", fixable: false });
           continue;
         }
         if (activeElection) {
           console.warn(`[${partyId}] Vertrauensfrage during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "call_vertrauensfrage", message: "Vertrauensfrage not allowed during active election", fixable: false });
           continue;
         }
         if (vertrauensfrageCount >= 1) {
           console.warn(`[${partyId}] More than 1 Vertrauensfrage, skipping`);
+          errors.push({ actionIndex: i, actionType: "call_vertrauensfrage", message: "Maximum 1 Vertrauensfrage per turn", fixable: true });
           continue;
         }
         if (!action.title || !action.description) {
           console.warn(`[${partyId}] Vertrauensfrage missing title/description, skipping`);
+          errors.push({ actionIndex: i, actionType: "call_vertrauensfrage", message: "Vertrauensfrage missing required title or description", fixable: false });
           continue;
         }
         vertrauensfrageCount++;
@@ -269,22 +318,27 @@ export function validateActions(
       case "file_misstrauensvotum": {
         if (!inParliament) {
           console.warn(`[${partyId}] Misstrauensvotum without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_misstrauensvotum", message: "Misstrauensvotum requires Fraktion", fixable: false });
           continue;
         }
         if (!isOpposition) {
           console.warn(`[${partyId}] Misstrauensvotum from non-opposition party, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_misstrauensvotum", message: "Misstrauensvotum is only available to opposition parties", fixable: false });
           continue;
         }
         if (activeElection) {
           console.warn(`[${partyId}] Misstrauensvotum during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_misstrauensvotum", message: "Misstrauensvotum not allowed during active election", fixable: false });
           continue;
         }
         if (misstrauensvotumCount >= 1) {
           console.warn(`[${partyId}] More than 1 Misstrauensvotum, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_misstrauensvotum", message: "Maximum 1 Misstrauensvotum per turn", fixable: true });
           continue;
         }
         if (!action.title || !action.description || !action.proposedChancellor || !action.proposedChancellorPartyId) {
           console.warn(`[${partyId}] Misstrauensvotum missing required fields, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_misstrauensvotum", message: "Misstrauensvotum missing required fields (title, description, proposedChancellor, proposedChancellorPartyId)", fixable: false });
           continue;
         }
         misstrauensvotumCount++;
@@ -295,18 +349,22 @@ export function validateActions(
       case "file_constitutional_challenge": {
         if (!inParliament) {
           console.warn(`[${partyId}] Constitutional challenge without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_constitutional_challenge", message: "Constitutional challenges require Fraktion", fixable: false });
           continue;
         }
         if (activeElection) {
           console.warn(`[${partyId}] Constitutional challenge during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_constitutional_challenge", message: "Constitutional challenges not allowed during active election", fixable: false });
           continue;
         }
         if (constitutionalChallengeCount >= 1) {
           console.warn(`[${partyId}] More than 1 constitutional challenge, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_constitutional_challenge", message: "Maximum 1 constitutional challenge per turn", fixable: true });
           continue;
         }
         if (!action.billId || !action.arguments) {
           console.warn(`[${partyId}] Constitutional challenge missing billId/arguments, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_constitutional_challenge", message: "Constitutional challenge missing required billId or arguments", fixable: false });
           continue;
         }
         constitutionalChallengeCount++;
@@ -320,6 +378,7 @@ export function validateActions(
 
       default:
         console.warn(`[${partyId}] Unknown action type, skipping`);
+        errors.push({ actionIndex: i, actionType: (action as any).type ?? "unknown", message: `Unknown action type "${(action as any).type ?? "undefined"}"`, fixable: true });
     }
   }
 
@@ -328,6 +387,7 @@ export function validateActions(
     for (const bill of votableBills) {
       if (!votedBills.has(bill.id)) {
         console.warn(`[${partyId}] Missing vote for ${bill.id}, adding abstain`);
+        autoAbstainBillIds.push(bill.id);
         validated.push({
           type: "vote",
           billId: bill.id,
@@ -338,5 +398,5 @@ export function validateActions(
     }
   }
 
-  return validated;
+  return { valid: validated, errors, autoAbstainBillIds };
 }
