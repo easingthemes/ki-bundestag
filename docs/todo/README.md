@@ -59,6 +59,7 @@ Each item links to a detail file with full description, affected files, and impl
 | 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
 | 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | open | Engine / Agent | — |
+| 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
 | 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
 | 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
@@ -66,6 +67,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 27 of 30
+- **Done**: 27 of 31
 - **Postponed**: 1 (#022)
-- **Open**: 3 remaining (#027, #029, #031)
+- **Open**: 4 remaining (#027, #029, #031, #032)
