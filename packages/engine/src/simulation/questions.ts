@@ -1,13 +1,35 @@
 import type { Party } from "@ki-bundestag/types";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { logAICall, parseAIJson } from "../agent/ai-json.js";
 import { submitBatch, chunkItems, type BatchResult } from "../agent/batch-client.js";
-import { buildQuestionBatchPrompt, preFilterQuestions, type QuestionItem, type PartyContext } from "../agent/group-prompts.js";
+import { buildQuestionBatchPrompt, buildQuestionSuggestionPrompt, preFilterQuestions, type QuestionItem, type PartyContext } from "../agent/group-prompts.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
+import { logger } from "../logger.js";
 
 const MAX_ANSWERS_PER_DAY = 50;
 const QUESTION_EXPIRY_DAYS = 14;
+
+export const QUESTION_TOPICS = [
+  "Klimaschutz",
+  "Migration",
+  "Bildung",
+  "Wirtschaft",
+  "Soziales",
+  "Gesundheit",
+  "Innere Sicherheit",
+  "Verteidigung",
+  "Digitalisierung",
+  "Verkehr",
+  "Finanzen",
+  "Arbeit",
+  "Wohnen",
+  "Außenpolitik",
+  "Landwirtschaft",
+  "Justiz",
+  "Sonstiges",
+] as const;
+export type QuestionTopic = (typeof QUESTION_TOPICS)[number];
 
 /**
  * Answer pending citizen questions and expire old ones.
@@ -158,5 +180,88 @@ async function answerQuestionsBatch(
         } catch {}
       }
     }
+  }
+}
+
+/**
+ * Generate AI-powered question suggestions every 3 simulation days.
+ * Draws primarily from recent simulation events with real-world questions as inspiration.
+ */
+export async function generateQuestionSuggestions(
+  allParties: Party[],
+  currentDay: number,
+): Promise<void> {
+  if (currentDay % 3 !== 0) return;
+
+  const db = getDb();
+
+  // Check if we already have enough unused suggestions
+  const existing = db.select().from(schema.questionSuggestions)
+    .where(isNull(schema.questionSuggestions.usedByUserId))
+    .all();
+  if (existing.length >= 5) return;
+
+  // Gather recent simulation events for context
+  const recentEvents = db.select().from(schema.simulationEvents)
+    .all()
+    .filter(e => e.dayNumber >= currentDay - 5)
+    .slice(0, 15)
+    .map(e => `[Tag ${e.dayNumber}] ${e.type}: ${e.title}`);
+
+  // Gather real-world questions from abgeordnetenwatch for inspiration
+  const realQuestions = db.select().from(schema.realWorldKnowledge)
+    .all()
+    .filter(r => r.digest.includes("abgeordnetenwatch") || r.category === "headline")
+    .slice(0, 10)
+    .map(r => r.digest.slice(0, 200));
+
+  if (recentEvents.length === 0 && realQuestions.length === 0) return;
+
+  const partyIds = allParties.map(p => p.id);
+  const topics = [...QUESTION_TOPICS].filter(t => t !== "Sonstiges");
+
+  const req = buildQuestionSuggestionPrompt(topics, recentEvents, realQuestions, partyIds);
+
+  try {
+    const t0 = Date.now();
+    const results = await submitBatch([req]);
+    logAICall({ task: "question-suggestions", latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
+
+    const result = results.find(r => r.customId === req.customId);
+    if (!result?.text) return;
+
+    const parsed = parseAIJson<{ suggestions: Array<{ question: string; topic: string; targetPartyId: string }> }>(
+      result.text,
+      (v: unknown) => {
+        const o = v as Record<string, unknown>;
+        if (!Array.isArray(o.suggestions)) return null;
+        const suggestions = (o.suggestions as unknown[]).filter((s: unknown) => {
+          const item = s as Record<string, unknown>;
+          return typeof item.question === "string" && typeof item.topic === "string" && typeof item.targetPartyId === "string";
+        }) as Array<{ question: string; topic: string; targetPartyId: string }>;
+        return { suggestions };
+      },
+      "QuestionSuggestions",
+    );
+
+    if (!parsed) return;
+
+    for (const s of parsed.suggestions.slice(0, 5)) {
+      // Validate party ID
+      if (!partyIds.includes(s.targetPartyId)) continue;
+      const id = `qsug-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+      db.insert(schema.questionSuggestions).values({
+        id,
+        question: s.question.slice(0, 500),
+        topic: QUESTION_TOPICS.includes(s.topic as QuestionTopic) ? s.topic : "Sonstiges",
+        targetPartyId: s.targetPartyId,
+        createdOnDay: currentDay,
+        usedByUserId: null,
+      }).run();
+    }
+
+    logger.info(`[questions] Generated ${parsed.suggestions.length} question suggestions on day ${currentDay}`);
+  } catch (err) {
+    logger.error("[questions] Failed to generate suggestions:", err);
   }
 }

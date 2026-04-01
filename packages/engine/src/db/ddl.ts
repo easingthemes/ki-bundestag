@@ -145,6 +145,17 @@ export const SIM_TABLE_DDL = `
     responded_on_day INTEGER,
     created_on_day INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    topic TEXT,
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS question_suggestions (
+    id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    topic TEXT,
+    target_party_id TEXT NOT NULL,
+    created_on_day INTEGER NOT NULL,
+    used_by_user_id TEXT,
     FOREIGN KEY (target_party_id) REFERENCES parties(id)
   );
 
@@ -530,6 +541,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "context_depth", sql: "ALTER TABLE simulation_meta ADD COLUMN context_depth TEXT NOT NULL DEFAULT 'normal'" },
   { table: "bundestag_seats", column: "unique_active_user", sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_bundestag_seats_active_user ON bundestag_seats(user_id) WHERE active = 1 AND user_id IS NOT NULL" },
   { table: "simulation_meta", column: "heartbeat_at", sql: "ALTER TABLE simulation_meta ADD COLUMN heartbeat_at TEXT" },
+  { table: "citizen_questions", column: "topic", sql: "ALTER TABLE citizen_questions ADD COLUMN topic TEXT" },
+  { table: "question_suggestions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS question_suggestions (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT, target_party_id TEXT NOT NULL REFERENCES parties(id), created_on_day INTEGER NOT NULL, used_by_user_id TEXT)" },
 ];
 
 /** Column migrations for user DB */

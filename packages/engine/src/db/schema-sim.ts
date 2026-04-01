@@ -115,6 +115,16 @@ export const citizenQuestions = sqliteTable("citizen_questions", {
   createdOnDay: integer("created_on_day").notNull(),
   status: text("status").notNull().default("pending"),
   userId: text("user_id"),
+  topic: text("topic"),
+});
+
+export const questionSuggestions = sqliteTable("question_suggestions", {
+  id: text("id").primaryKey(),
+  question: text("question").notNull(),
+  topic: text("topic"),
+  targetPartyId: text("target_party_id").notNull().references(() => parties.id),
+  createdOnDay: integer("created_on_day").notNull(),
+  usedByUserId: text("used_by_user_id"),
 });
 
 export const mediaArticles = sqliteTable("media_articles", {

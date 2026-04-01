@@ -293,9 +293,24 @@ export interface CitizenQuestion {
   respondedOnDay: number | null;
   createdOnDay: number;
   status: "pending" | "answered";
+  topic?: string | null;
   voteScore: number;
   totalVotes: number;
   userVote?: 1 | -1 | null;
+}
+
+export interface TrendingTopic {
+  label: string;
+  sampleQuestion: string;
+  source: string;
+}
+
+export interface QuestionSuggestion {
+  id: string;
+  question: string;
+  topic: string | null;
+  targetPartyId: string;
+  createdOnDay: number;
 }
 
 export interface Referendum {

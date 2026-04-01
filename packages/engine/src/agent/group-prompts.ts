@@ -205,6 +205,51 @@ Accept exactly ${selectCount} proposal${selectCount !== 1 ? "s" : ""} (or fewer 
 }
 
 // ---------------------------------------------------------------------------
+// Question Suggestion Generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a prompt that generates citizen question suggestions based on
+ * recent simulation events (primary) and real-world inspiration (secondary).
+ */
+export function buildQuestionSuggestionPrompt(
+  topics: string[],
+  recentSimEvents: string[],
+  realQuestions: string[],
+  partyIds: string[],
+): BatchRequest {
+  const eventContext = recentSimEvents.length > 0
+    ? `\nAKTUELLE SIMULATIONSEREIGNISSE (Hauptquelle):\n${recentSimEvents.join("\n")}`
+    : "";
+  const inspirationContext = realQuestions.length > 0
+    ? `\nREALE BÜRGERFRAGEN (nur zur Inspiration für Stil und Themen):\n${realQuestions.join("\n")}`
+    : "";
+
+  return {
+    customId: `question-suggestions-${Date.now()}`,
+    system: `Du bist ein Redakteur für eine Parlamentssimulation. Generiere 5 Bürgerfragen auf Deutsch, die Bürger an Parteien im Bundestag stellen könnten.
+
+Basierend auf der aktuellen Simulationslage, erstelle Fragen die:
+- Sich auf aktuelle Ereignisse in der Simulation beziehen (Gesetze, Krisen, Medienberichte)
+- Verschiedene Themen abdecken
+- An verschiedene Parteien gerichtet sind
+- Authentisch und bürgernah formuliert sind
+- Jeweils 20-200 Zeichen lang sind
+
+Verfügbare Themen: ${topics.join(", ")}
+Verfügbare Partei-IDs: ${partyIds.join(", ")}
+
+Antworte NUR mit validem JSON:
+{"suggestions": [{"question": "<Frage auf Deutsch>", "topic": "<Thema aus der Liste>", "targetPartyId": "<Partei-ID>"}]}
+
+Generiere genau 5 Vorschläge. Verwende NUR Themen und Partei-IDs aus den Listen oben.`,
+    prompt: `Generiere 5 Bürgerfragen basierend auf folgenden Informationen:${eventContext}${inspirationContext}\n\nErstelle die Vorschläge:`,
+    maxTokens: 600,
+    roleKey: "daily" as const,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Pre-filters (reduce input before sending to AI)
 // ---------------------------------------------------------------------------
 

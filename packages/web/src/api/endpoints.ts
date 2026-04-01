@@ -43,6 +43,8 @@ import {
   CommitteeListItem,
   CommitteeDetail,
   Sidejob,
+  TrendingTopic,
+  QuestionSuggestion,
 } from "./types.js";
 import { fetchJson, postJson, deleteJson, patchJson, getBase } from "./client.js";
 
@@ -181,16 +183,22 @@ export const getMedia = (day?: number) =>
   fetchJson<MediaArticle[]>(`/media${day != null ? `?day=${day}` : ""}`);
 export const getMediaArticle = (id: string) => fetchJson<MediaArticle>(`/media/${id}`);
 
-export const getQuestions = (partyId?: string, status?: string) => {
+export const getQuestions = (partyId?: string, status?: string, topic?: string) => {
   const params = new URLSearchParams();
   if (partyId) params.set("partyId", partyId);
   if (status) params.set("status", status);
+  if (topic) params.set("topic", topic);
   const qs = params.toString();
   return fetchJson<CitizenQuestion[]>(`/questions${qs ? `?${qs}` : ""}`);
 };
 export const getQuestion = (id: string) => fetchJson<CitizenQuestion>(`/questions/${id}`);
-export const submitQuestion = (question: string, targetPartyId: string) =>
-  postJson<CitizenQuestion>("/questions", { question, targetPartyId });
+export const submitQuestion = (question: string, targetPartyId: string, topic?: string) =>
+  postJson<CitizenQuestion>("/questions", { question, targetPartyId, topic });
+export const getQuestionTopics = () => fetchJson<string[]>("/questions/topics");
+export const getTrendingTopics = () => fetchJson<TrendingTopic[]>("/questions/trending-topics");
+export const getQuestionSuggestions = () => fetchJson<QuestionSuggestion[]>("/questions/suggestions");
+export const useQuestionSuggestion = (id: string) =>
+  postJson<{ success: boolean }>(`/questions/suggestions/${id}/use`, {});
 export const voteOnQuestion = (id: string, vote: 1 | -1) =>
   postJson<CitizenQuestion>(`/questions/${id}/vote`, { vote });
 export const retractQuestionVote = (id: string) =>
@@ -380,4 +388,8 @@ export const api = {
   getCommitteeDetail,
   getSidejobs,
   getSeatSidejobs,
+  getQuestionTopics,
+  getTrendingTopics,
+  getQuestionSuggestions,
+  useQuestionSuggestion,
 };
