@@ -63,10 +63,14 @@ import type { TimingPreset } from "./timing.js";
 import type { ContextDepth } from "../agent/context-depth.js";
 import { getDepthConfig, isValidContextDepth } from "../agent/context-depth.js";
 
-/** Update heartbeat timestamp so the frontend knows the sim process is alive */
-function heartbeat(): void {
+/** Update heartbeat timestamp and day progress so the frontend can show real progress */
+function heartbeat(progress?: number): void {
   try {
-    getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?").run(new Date().toISOString());
+    if (progress !== undefined) {
+      getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?, day_progress = ?").run(new Date().toISOString(), progress);
+    } else {
+      getSqlite().prepare("UPDATE simulation_meta SET heartbeat_at = ?").run(new Date().toISOString());
+    }
   } catch { /* best-effort */ }
 }
 
@@ -173,7 +177,7 @@ export async function runDay(): Promise<number> {
   // advancing the counter when AI calls fail mid-day.
   const now = new Date().toISOString();
   db.update(schema.simulationMeta)
-    .set({ dayStartedAt: now, heartbeatAt: now } as any)
+    .set({ dayStartedAt: now, heartbeatAt: now, dayProgress: 5 } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();
 
@@ -1069,7 +1073,7 @@ export async function runDay(): Promise<number> {
       }
       // agentResults stays [] — processPartyAgentResult(undefined, ...) auto-abstains on all bills
     }
-    heartbeat();
+    heartbeat(40);
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
@@ -1870,7 +1874,7 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Mid-cycle] Batch failed, skipping polls/referendums:`, (err as Error).message);
         }
       }
-      heartbeat();
+      heartbeat(65);
 
       // Process context poll result
       if (isWeekly) {
@@ -2114,7 +2118,7 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Sidejobs] Batch failed:`, (err as Error).message);
         }
       }
-      heartbeat();
+      heartbeat(80);
     }
   }
 
@@ -2155,7 +2159,7 @@ export async function runDay(): Promise<number> {
     }
     // endOfDayResults stays [] — media and summary steps are silently skipped
   }
-  heartbeat();
+  heartbeat(90);
 
   // Process media results
   let mediaArticles: Array<{ category: string; sentiment?: number }> = [];
@@ -2208,6 +2212,7 @@ export async function runDay(): Promise<number> {
       lastRunAt: new Date().toISOString(),
       lowSentimentStreak,
       dailySummary: dailySummaryStr,
+      dayProgress: 100,
     } as any)
     .where(eq(schema.simulationMeta.id, meta.id))
     .run();

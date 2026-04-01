@@ -438,9 +438,19 @@ function SimStatus() {
         ? (now - heartbeat) < 120_000
         : (now - started) < 1_800_000; // fallback for old server without heartbeat
       if (isAlive) {
-        const elapsed = now - started;
-        // Progress bar fills based on expected day duration for current preset
+        // Use server-reported progress (0–100) from engine heartbeat phases.
+        // Between heartbeat updates, interpolate smoothly using time since last heartbeat.
+        const serverPct = status.dayProgress ?? 0;
+        if (serverPct > 0) {
+          // Server provides real progress — smooth-fill between heartbeat updates
+          const sinceBeat = heartbeat > 0 ? now - heartbeat : 0;
+          // Interpolate up to +10% over 2 minutes between beats, never exceeding 95
+          const interp = Math.min(Math.round((sinceBeat / 120_000) * 10), 10);
+          return { running: true, pct: Math.min(serverPct + interp, 95) };
+        }
+        // Fallback for servers without day_progress: time-based estimate
         const expectedMs = PRESET_DAY_MS[status.timingPreset] ?? 600_000;
+        const elapsed = now - started;
         return { running: true, pct: Math.min(Math.round((elapsed / expectedMs) * 95), 95) };
       }
       return { running: false, pct: 0 };
