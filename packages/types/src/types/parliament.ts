@@ -55,6 +55,7 @@ export interface CitizenQuestion {
   respondedOnDay: number | null;
   createdOnDay: number;
   status: "pending" | "answered";
+  topic?: string | null;
   voteScore: number;
   totalVotes: number;
   userVote?: 1 | -1 | null;

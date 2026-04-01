@@ -9,7 +9,7 @@ export { shouldTriggerElection, announceElection, advanceElectionPhase, calculat
 export { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
 export { generateWeeklyPolls, resolveExpiredPolls } from "./polls.js";
 export { generateDailyMedia, getRecentMedia, mediaSentimentImpact } from "./media.js";
-export { answerPendingQuestions } from "./questions.js";
+export { answerPendingQuestions, generateQuestionSuggestions, QUESTION_TOPICS, type QuestionTopic } from "./questions.js";
 export { maybeGenerateReferendum, resolveExpiredReferendums } from "./referendums.js";
 export { processInjections } from "./injections.js";
 export { getActiveGovernment, MINISTER_CANDIDATES, MINISTRY_NAMES, formCabinet, dissolveGovernment } from "./government.js";
