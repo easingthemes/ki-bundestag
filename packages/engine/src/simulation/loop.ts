@@ -2150,8 +2150,8 @@ export async function runDay(): Promise<number> {
           console.warn(`  [Sidejobs] Batch failed:`, (err as Error).message);
         }
       }
+      progress.step();
     }
-    progress.step();
   }
 
   // 12. Save updated national state

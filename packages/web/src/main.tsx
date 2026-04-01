@@ -428,6 +428,10 @@ function SimStatus() {
         // Use server-reported progress (0–100) from engine heartbeat phases.
         // Between heartbeat updates, interpolate smoothly using time since last heartbeat.
         const serverPct = status.dayProgress ?? 0;
+        if (serverPct >= 100) {
+          // Day complete server-side but lastRunAt not yet propagated
+          return { running: false, pct: 100 };
+        }
         if (serverPct > 0) {
           // Server provides real progress — smooth-fill between heartbeat updates
           const sinceBeat = heartbeat > 0 ? now - heartbeat : 0;
