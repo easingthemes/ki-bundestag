@@ -31,8 +31,8 @@ Each item links to a detail file with full description, affected files, and impl
 | 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
 | 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
 | 030 | [Improve AI context quality (briefing + party profiles)](./030-improve-ai-context-quality.md) | done | Engine / Agent | #49 |
-| 033 | [Reduce PARSE_FAIL and VALIDATION_FAIL rates](./033-reduce-parse-validation-failures.md) | open | Engine / Agent | — |
-| 037 | [Context & memory management for long-running simulation](./037-context-memory-management.md) | open | Engine / Agent | — |
+| 033 | [Reduce PARSE_FAIL and VALIDATION_FAIL rates](./033-reduce-parse-validation-failures.md) | mostly-done | Engine / Agent | #81 |
+| 037 | [Context & memory management for long-running simulation](./037-context-memory-management.md) | done | Engine / Agent | #81 |
 
 ## Medium
 
@@ -72,6 +72,7 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 27 of 36
+- **Done**: 28 of 36
+- **Mostly done**: 1 (#033 — 3/4 fixes shipped in #037, retry-on-parse-fail remains)
 - **Postponed**: 1 (#022)
-- **Open**: 9 remaining (#027, #029, #031, #032, #033, #034, #035, #036, #037)
+- **Open**: 7 remaining (#027, #029, #031, #032, #034, #035, #036)

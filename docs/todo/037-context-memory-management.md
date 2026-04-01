@@ -1,6 +1,6 @@
 # 037 — Context & Memory Management Strategy for Long-Running Simulation
 
-**Status**: open
+**Status**: done
 **Area**: Engine / Agent
 **Priority**: High
 
