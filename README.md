@@ -86,9 +86,9 @@ Open [http://localhost:5173](http://localhost:5173) and run `npm run simulate` t
 
 ## Documentation
 
-- [Technical Details](TECHNICAL.md) — Architecture, database schema, API reference, environment setup
-- [AI Engine](docs/AI_Engine.md) — Model routing, circuit breaker, agent system
-- [Bundestag Details](docs/bundestag-details.md) — German parliamentary rules and structure
+- [Technical Reference](TECHNICAL.md) — Architecture, AI system, database, simulation flow, deployment
+- [Bundestag Reference](docs/research/bundestag-reference.md) — German parliamentary rules and structure
+- [Operations](docs/operations/) — Hosting, costs, batch timing, production analysis
 
 ## License
 

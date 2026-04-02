@@ -42,9 +42,9 @@ Initial cost analysis from a 12-day run (Mar 30–31, 2026) revealed that real c
 
 ## Affected Files
 
-- `docs/operations/real-cost-analysis.md` — add new data sections
-- `docs/operations/api-costs.md` — refine estimates
-- `docs/operations/batch-timing-log.md` — add new timing observations
+- `docs/operations/analysis.md` — add new data sections
+- `docs/operations/costs.md` — refine estimates
+- `docs/operations/timing.md` — add new timing observations
 - `packages/web/src/pages/SimulationCosts.tsx` — update displayed numbers
 
 ## Notes
