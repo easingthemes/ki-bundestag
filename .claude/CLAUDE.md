@@ -62,7 +62,7 @@ Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. See `.env.example
 When creating or updating documentation, place files in the correct category:
 
 - **`TECHNICAL.md`** — Single canonical technical reference (architecture, AI system, DB, simulation flow). Update this for architectural changes.
-- **`docs/operations/`** — Hosting, costs, timing data, production analysis
+- **`docs/operations/`** — Costs, timing data, production analysis
 - **`docs/research/`** — External references, API docs, domain knowledge (e.g., Bundestag rules, abgeordnetenwatch)
 - **`docs/marketing/`** — Launch strategy, social media plans
 - **`docs/todo/`** — Roadmap + open item detail files

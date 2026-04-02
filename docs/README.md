@@ -4,7 +4,7 @@
 
 ```
 docs/
-  operations/     — Hosting, costs, timing data, production analysis
+  operations/     — Costs, timing data, production analysis
   research/       — Bundestag reference, abgeordnetenwatch integration
   marketing/      — Launch strategy
   todo/           — Roadmap + open items
@@ -13,7 +13,6 @@ docs/
 ## Quick Links
 
 - [Technical Reference](../TECHNICAL.md) — Architecture, AI system, database, simulation flow
-- [Hosting & Deployment](operations/hosting.md) — Hetzner setup, Caddy, PM2, CI/CD
 - [API Costs](operations/costs.md) — Pricing tiers, cost estimates, optimization
 - [Batch Timing](operations/timing.md) — Observed batch API latency
 - [Cost Analysis](operations/analysis.md) — Measured data from production runs
