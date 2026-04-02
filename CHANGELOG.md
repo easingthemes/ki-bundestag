@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/easingthemes/ki-bundestag/compare/v1.1.0...v1.1.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **ci:** make pre-deploy backup script resilient to missing file ([8eb6655](https://github.com/easingthemes/ki-bundestag/commit/8eb66558c2b7b50dd90679971b127d9b56798edf))
+
 # [1.1.0](https://github.com/easingthemes/ki-bundestag/compare/v1.0.1...v1.1.0) (2026-04-02)
 
 
