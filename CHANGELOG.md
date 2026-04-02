@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/easingthemes/ki-bundestag/compare/v1.0.1...v1.1.0) (2026-04-02)
+
+
+### Features
+
+* **web:** add static landing page at /landing for SEO ([b86ee02](https://github.com/easingthemes/ki-bundestag/commit/b86ee021dfa30ea742585e77bc43f6d0933c8230))
+* **web:** improve landing page SEO — disclaimer, breadcrumbs, contextual links ([dc825a3](https://github.com/easingthemes/ki-bundestag/commit/dc825a34e04be3c447b0407d23d784178a91ad37))
+
 ## [1.0.1](https://github.com/easingthemes/ki-bundestag/compare/v1.0.0...v1.0.1) (2026-04-02)
 
 
