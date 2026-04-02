@@ -69,6 +69,10 @@ jobs:
             cd /opt/ki-bundestag
             npm ci
             npm run migrate
+            # Update Caddy config if sudoers rule exists (see update-caddy workflow)
+            if sudo -n true 2>/dev/null; then
+              sudo tee /etc/caddy/Caddyfile < packages/web/Caddyfile > /dev/null && sudo systemctl reload caddy && echo "==> Caddy config updated"
+            fi
             pm2 restart ki-api --update-env
             echo "==> Deployment complete!"
             pm2 status
