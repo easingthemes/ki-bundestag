@@ -4,6 +4,25 @@
 ### Bug Fixes
 
 * **ci:** make pre-deploy backup script resilient to missing file ([8eb6655](https://github.com/easingthemes/ki-bundestag/commit/8eb66558c2b7b50dd90679971b127d9b56798edf))
+* **web:** restore original landing page at /landing ([db11284](https://github.com/easingthemes/ki-bundestag/commit/db11284f7f7f5e45fdac605de49fe33fb1d2673b))
+
+
+### Features
+
+* **seo:** add BreadcrumbList JSON-LD to prerendered subpages ([f36a4dc](https://github.com/easingthemes/ki-bundestag/commit/f36a4dc1b6d66acb83eb70e732ddcb7fcf833ee5))
+
+
+### Reverts
+
+* Revert "feat(web): add static landing page at /landing for SEO" ([bc1571e](https://github.com/easingthemes/ki-bundestag/commit/bc1571ec30bb14a31075a4fc900b5ee6176fb2fe))
+* Revert "feat(web): improve landing page SEO — disclaimer, breadcrumbs, contextual links" ([6316f45](https://github.com/easingthemes/ki-bundestag/commit/6316f45f15a9b30894a5fa0635dab1f52c0ba43d))
+
+# [1.2.0](https://github.com/easingthemes/ki-bundestag/compare/v1.1.0...v1.2.0) (2026-04-02)
+
+
+### Bug Fixes
+
+* **ci:** make pre-deploy backup script resilient to missing file ([8eb6655](https://github.com/easingthemes/ki-bundestag/commit/8eb66558c2b7b50dd90679971b127d9b56798edf))
 
 
 ### Features
