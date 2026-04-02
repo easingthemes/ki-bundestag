@@ -42,7 +42,7 @@ jobs:
       # API + engine run from source via tsx — no dist/ needed for them.
       # Server only runs npm ci (for native deps like better-sqlite3).
       - name: Deploy via ssh-deploy
-        uses: easingthemes/ssh-deploy@v5.1.1
+        uses: easingthemes/ssh-deploy@v6
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ secrets.DEPLOY_HOST }}

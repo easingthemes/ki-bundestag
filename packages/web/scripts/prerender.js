@@ -342,6 +342,32 @@ function prerender() {
       `$1${escapeAttr(page.description)}$2`
     );
 
+    // Inject BreadcrumbList JSON-LD for subpages
+    if (route !== "/") {
+      const breadcrumbLd = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "KAI Bundestag",
+            "item": BASE_URL + "/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": page.title,
+            "item": BASE_URL + route + "/"
+          }
+        ]
+      });
+      html = html.replace(
+        "</head>",
+        `  <script type="application/ld+json">${breadcrumbLd}</script>\n  </head>`
+      );
+    }
+
     // Inject content into <div id="root">
     html = html.replace(
       '<div id="root"></div>',
