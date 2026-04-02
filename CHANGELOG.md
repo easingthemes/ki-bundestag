@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/easingthemes/ki-bundestag/compare/v1.2.1...v1.3.0) (2026-04-02)
+
+
+### Bug Fixes
+
+* **engine:** detect auth/billing errors and stop sim immediately ([faea5f9](https://github.com/easingthemes/ki-bundestag/commit/faea5f91982882f5b896c2d898b6745ec7ebfcfd))
+* **engine:** translate negotiation prompts and event titles to German ([e2d3593](https://github.com/easingthemes/ki-bundestag/commit/e2d359323480c518902d73b1315907251beff0d0))
+
+
+### Features
+
+* **scripts:** add rollback-to-day script for simulation recovery ([c81acfb](https://github.com/easingthemes/ki-bundestag/commit/c81acfbef8a1d2c67b405e71204b98df1a6c2887))
+
 ## [1.2.1](https://github.com/easingthemes/ki-bundestag/compare/v1.2.0...v1.2.1) (2026-04-02)
 
 
