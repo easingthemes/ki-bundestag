@@ -27,56 +27,57 @@ export function buildNegotiationPrompt(
   const partyResult = electionResults.find(r => r.partyId === party.id);
   const sortedResults = [...electionResults].sort((a, b) => b.seatsWon - a.seatsWon);
 
-  const system = `You are the negotiation team for ${party.name} in German Bundestag coalition negotiations.
-You must negotiate in character, reflecting your party's ideology and priorities.
+  const system = `Du bist das Verhandlungsteam der ${party.name} in den Koalitionsverhandlungen des Deutschen Bundestags.
+Du verhandelst im Charakter deiner Partei, entsprechend ihrer Ideologie und Prioritäten.
 
-RULES:
-1. Respond with ONLY valid JSON. No other text. Do NOT wrap in markdown code fences.
-2. You must provide exactly one action of type "negotiation_position".
-3. Be strategic: consider which partners are ideologically compatible.
-4. Consider previous rounds when making concessions.
-5. A coalition needs 368+ seats (majority of 735).
-6. acceptablePartners must only contain valid party IDs from the list provided.
+REGELN:
+1. Antworte NUR mit validem JSON. Kein anderer Text. KEINE Markdown-Code-Blöcke.
+2. Genau eine Aktion vom Typ "negotiation_position".
+3. Sei strategisch: berücksichtige ideologische Kompatibilität.
+4. Berücksichtige vorherige Runden bei Zugeständnissen.
+5. Eine Koalition braucht 368+ Sitze (Mehrheit von 735).
+6. acceptablePartners darf nur gültige Partei-IDs aus der Liste enthalten.
+7. Antworte auf Deutsch.
 
 RESPONSE SCHEMA:
 {
   "actions": [
     {
       "type": "negotiation_position",
-      "position": "<1-2 sentence summary of your negotiation stance>",
+      "position": "<1-2 Sätze zu deiner Verhandlungsposition>",
       "acceptablePartners": ["<party_id>", ...],
-      "concession": "<1 sentence: what you'd concede to form a coalition>"
+      "concession": "<1 Satz: was du für eine Koalition zugestehen würdest>"
     }
   ]
 }`;
 
   const previousContext = previousRounds.length > 0
-    ? `\nPREVIOUS NEGOTIATION ROUNDS:\n${previousRounds.map((round, i) =>
-        `Round ${i + 1}:\n${round.map(r => {
+    ? `\nBISHERIGE VERHANDLUNGSRUNDEN:\n${previousRounds.map((round, i) =>
+        `Runde ${i + 1}:\n${round.map(r => {
           const p = allParties.find(pp => pp.id === r.partyId);
-          return `  ${p?.name || r.partyId}: Position: ${r.position} | Concession: ${r.concession} | Partners: ${r.acceptablePartners.join(", ")}`;
+          return `  ${p?.name || r.partyId}: Position: ${r.position} | Zugeständnis: ${r.concession} | Partner: ${r.acceptablePartners.join(", ")}`;
         }).join("\n")}`
       ).join("\n\n")}`
     : "";
 
-  const user = `COALITION NEGOTIATION — Round ${roundNumber} of ${MAX_NEGOTIATION_ROUNDS}
+  const user = `KOALITIONSVERHANDLUNG — Runde ${roundNumber} von ${MAX_NEGOTIATION_ROUNDS}
 
-YOUR PARTY: ${party.name}
-  Ideology: ${party.ideology}
-  Policy Priorities: ${JSON.stringify(party.policyPriorities)}
-  Election Result: ${partyResult?.votesPercent}% (${partyResult?.seatsWon} seats)
+DEINE PARTEI: ${party.name}
+  Ideologie: ${party.ideology}
+  Politische Prioritäten: ${JSON.stringify(party.policyPriorities)}
+  Wahlergebnis: ${partyResult?.votesPercent}% (${partyResult?.seatsWon} Sitze)
 
-ELECTION RESULTS:
+WAHLERGEBNISSE:
 ${sortedResults.map(r => {
   const p = allParties.find(pp => pp.id === r.partyId);
-  return `  ${p?.name || r.partyId}: ${r.votesPercent}% (${r.seatsWon} seats)`;
+  return `  ${p?.name || r.partyId}: ${r.votesPercent}% (${r.seatsWon} Sitze)`;
 }).join("\n")}
 
-ALL PARTIES:
-${allParties.map(p => `  ${p.name} (${p.id}): ${p.ideology}, Priorities: ${JSON.stringify(p.policyPriorities)}`).join("\n")}
+ALLE PARTEIEN:
+${allParties.map(p => `  ${p.name} (${p.id}): ${p.ideology}, Prioritäten: ${JSON.stringify(p.policyPriorities)}`).join("\n")}
 ${previousContext}
 
-Respond with your negotiation position as JSON.`;
+Antworte mit deiner Verhandlungsposition als JSON.`;
 
   return { system, user };
 }
@@ -180,39 +181,40 @@ export async function synthesizeAgreement(
   const lastRound = allRounds[allRounds.length - 1];
   const sortedResults = [...results].sort((a, b) => b.seatsWon - a.seatsWon);
 
-  const system = `You are a political analyst synthesizing coalition negotiation results for the German Bundestag.
-Analyze the negotiation rounds and determine the most viable coalition.
+  const system = `Du bist ein politischer Analyst, der die Ergebnisse der Koalitionsverhandlungen im Deutschen Bundestag zusammenfasst.
+Analysiere die Verhandlungsrunden und bestimme die tragfähigste Koalition.
 
-RULES:
-1. Respond with ONLY valid JSON. Do NOT wrap in markdown code fences.
-2. A coalition needs 368+ seats (majority of 735).
-3. Prefer coalitions where parties mutually accept each other.
-4. Consider ideological compatibility and concessions made.
-5. All party IDs in the response must match the IDs from ELECTION RESULTS.
+REGELN:
+1. Antworte NUR mit validem JSON. KEINE Markdown-Code-Blöcke.
+2. Eine Koalition braucht 368+ Sitze (Mehrheit von 735).
+3. Bevorzuge Koalitionen, in denen sich die Parteien gegenseitig akzeptieren.
+4. Berücksichtige ideologische Kompatibilität und gemachte Zugeständnisse.
+5. Alle Partei-IDs in der Antwort müssen den IDs aus den WAHLERGEBNISSEN entsprechen.
+6. Antworte auf Deutsch.
 
 RESPONSE SCHEMA:
 {
   "parties": ["<party_id>", ...],
-  "keyPolicies": ["<policy agreement 1>", ...],
-  "summary": "<2-3 sentence summary of the coalition agreement>",
-  "concessions": { "<party_id>": "<what they conceded>", ... }
+  "keyPolicies": ["<Politikvereinbarung 1>", ...],
+  "summary": "<2-3 Sätze Zusammenfassung des Koalitionsvertrags>",
+  "concessions": { "<party_id>": "<Zugeständnis der Partei>", ... }
 }`;
 
-  const user = `ELECTION RESULTS:
+  const user = `WAHLERGEBNISSE:
 ${sortedResults.map(r => {
   const p = allParties.find(pp => pp.id === r.partyId);
-  return `  ${p?.name} (${r.partyId}): ${r.votesPercent}% — ${r.seatsWon} seats`;
+  return `  ${p?.name} (${r.partyId}): ${r.votesPercent}% — ${r.seatsWon} Sitze`;
 }).join("\n")}
 
-NEGOTIATION ROUNDS:
+VERHANDLUNGSRUNDEN:
 ${allRounds.map((round, i) =>
-  `Round ${i + 1}:\n${round.map(r => {
+  `Runde ${i + 1}:\n${round.map(r => {
     const p = allParties.find(pp => pp.id === r.partyId);
-    return `  ${p?.name}: Position: ${r.position} | Concession: ${r.concession} | Acceptable partners: ${r.acceptablePartners.join(", ")}`;
+    return `  ${p?.name}: Position: ${r.position} | Zugeständnis: ${r.concession} | Akzeptable Partner: ${r.acceptablePartners.join(", ")}`;
   }).join("\n")}`
 ).join("\n\n")}
 
-Determine the coalition agreement. Respond as JSON.`;
+Bestimme den Koalitionsvertrag. Antworte als JSON.`;
 
   const t0 = Date.now();
   try {
@@ -282,7 +284,7 @@ export function buildNegotiationEvents(
       dayNumber: currentDay,
       type: "negotiation_round",
       actor: round.partyId,
-      title: `${party?.name || round.partyId} — Negotiation Round ${roundNumber}`,
+      title: `${party?.name || round.partyId} — Verhandlungsrunde ${roundNumber}`,
       description: round.position,
       data: {
         roundNumber,
