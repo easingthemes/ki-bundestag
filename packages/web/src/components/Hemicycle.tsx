@@ -82,11 +82,18 @@ export function Hemicycle({ seats, coalitionIds = [], totalSeats, size = "md", s
     },
   }), [sorted, total]);
 
+  const srDescription = useMemo(() => {
+    if (sorted.length === 0) return "";
+    const parts = sorted.map(g => `${g.name}: ${g.count} Sitze`);
+    return `Sitzverteilung im Bundestag — ${total} Sitze gesamt. ${parts.join(", ")}.`;
+  }, [sorted, total]);
+
   if (total === 0) return null;
 
   return (
-    <div className={className} style={{ width: "100%", maxWidth: MAX_WIDTH[size] }}>
+    <div className={className} style={{ width: "100%", maxWidth: MAX_WIDTH[size] }} role="figure" aria-label={srDescription}>
       <HighchartsReact highcharts={Highcharts} options={options} />
+      <span className="sr-only">{srDescription}</span>
       {showLegend && sorted.length > 0 && (
         <div className="grid grid-cols-2 gap-x-6 mt-1 px-2">
           <LegendColumn label="Koalition" parties={coalition} />

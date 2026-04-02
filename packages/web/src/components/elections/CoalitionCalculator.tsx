@@ -56,9 +56,8 @@ export function CoalitionCalculator({ parties, currentCoalitionIds }: CoalitionC
               const isSelected = selected.has(p.id);
               const barWidth = (p.seatCount / totalSeats) * 100;
               return (
-                <div
+                <label
                   key={p.id}
-                  onClick={() => toggle(p.id)}
                   className="flex items-center gap-2.5 cursor-pointer px-2 py-1.5 rounded"
                   style={{
                     background: isSelected ? `${color}18` : "transparent",
@@ -70,20 +69,20 @@ export function CoalitionCalculator({ parties, currentCoalitionIds }: CoalitionC
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggle(p.id)}
-                    onClick={e => e.stopPropagation()}
                     className="cursor-pointer size-3.5"
+                    aria-label={`${p.name} — ${p.seatCount} Sitze`}
                   />
-                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="size-2.5 rounded-full shrink-0" aria-hidden="true" style={{ backgroundColor: color }} />
                   <span className="font-semibold text-sm min-w-20">{p.name}</span>
                   <span className="text-sm text-muted-foreground tabular-nums min-w-16">{p.seatCount} Sitze</span>
-                  <div className="flex-1 bg-muted rounded h-2.5 max-w-48">
+                  <div className="flex-1 bg-muted rounded h-2.5 max-w-48" aria-hidden="true">
                     <div className="h-full rounded" style={{ width: `${barWidth}%`, backgroundColor: color }} />
                   </div>
-                </div>
+                </label>
               );
             })}
           </div>
-          <div className="mt-3.5 pt-3 border-t border-border flex gap-5 flex-wrap items-center">
+          <div className="mt-3.5 pt-3 border-t border-border flex gap-5 flex-wrap items-center" role="status" aria-live="polite">
             <div className="font-bold text-sm">
               <span style={{ color: hasMajority ? SEMANTIC_HEX.positive : SEMANTIC_HEX.negative }}>
                 {selectedSeats} / {totalSeats} Sitze
