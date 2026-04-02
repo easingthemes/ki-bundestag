@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 const SITE_NAME = "KAI Bundestag";
-const BASE_URL = "https://kai-bundestag.de";
+const BASE_URL = "https://bundestag.easingthemes.com";
 
 interface PageMeta {
   title: string;
