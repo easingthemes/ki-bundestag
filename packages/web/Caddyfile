@@ -1,0 +1,17 @@
+:80 {
+    handle /api/* {
+        reverse_proxy localhost:3001
+    }
+    handle /socket.io/* {
+        reverse_proxy localhost:3001
+    }
+    handle /app/* {
+        root * /opt/ki-bundestag/packages/web/dist
+        try_files {path} /app/index.html
+        file_server
+    }
+    handle {
+        root * /opt/ki-bundestag/packages/web/dist
+        file_server
+    }
+}
