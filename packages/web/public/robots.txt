@@ -1,0 +1,51 @@
+# KAI Bundestag — AI Crawler Policy
+# https://github.com/easingthemes/ki-bundestag
+
+# Default: allow all
+User-agent: *
+Allow: /
+
+# AI training crawlers — block (protect content from training use)
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+# AI search & retrieval bots — allow (so content appears in AI search)
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# LLM-friendly content
+# See /llms.txt for a Markdown site map optimized for AI consumption
+# See /llms-full.txt for full page content in Markdown
