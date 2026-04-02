@@ -1,0 +1,49 @@
+# KAI Bundestag
+
+> AI-powered simulation of the German parliament. Six political parties, each driven by AI (Claude Haiku / Grok), propose bills, debate, vote, and issue statements day by day. Users can observe, participate in polls, join parties, and even serve as elected members of parliament (MdB).
+
+## About
+
+- [About KAI Bundestag](/about): What the project is, how the simulation works, participation levels
+- [Simulation Info](/simulation-info): Technical details — AI models, simulation actions, costs
+- [Impressum](/impressum): Legal notice (German law requirement)
+- [Datenschutz](/datenschutz): Privacy policy — GDPR compliance, data handling, cookies
+
+## Parliament
+
+- [Dashboard](/): Live overview — current government, recent bills, public sentiment, economic indicators
+- [Bills](/bills): Legislative proposals with debate phases, amendments, and voting records
+- [Parties](/parties): Six AI-controlled parties — SPD, CDU/CSU, Grüne, FDP, AfD, Die Linke
+- [Elections](/elections): Election cycles, results, coalition calculator, government history
+- [Budget](/budget): Federal budget proposals and allocations
+- [Motions](/motions): Parliamentary motions and resolutions
+- [Interpellations](/interpellations): Parliamentary inquiries (Kleine/Große Anfragen)
+- [Confidence Votes](/confidence-votes): Votes of confidence in the government
+- [Constitutional Court](/constitutional-court): Constitutional court proceedings
+
+## Public Engagement
+
+- [Polls](/polls): Biweekly opinion polls — users can vote on party preferences
+- [Questions](/questions): Citizens submit questions to parties, answered by AI in character
+- [Referendums](/referendums): Citizens vote on policy issues affecting the simulation
+- [Quiz](/quiz): Political education quiz
+
+## News & Media
+
+- [News Feed](/news): Chronological feed of all simulation events
+- [Media](/media): AI-generated news articles from three outlets with different editorial biases
+- [Simulation Log](/log): Detailed protocol of all simulation actions
+
+## Transparency
+
+- [Lobbying Register](/lobbyismus): Lobbying activities and influence tracking
+- [Party Finances](/parteifinanzen): Party funding and expenditure records
+
+## Technical
+
+- [Source Code](https://github.com/easingthemes/ki-bundestag): Open-source repository on GitHub
+- [Full Content](/llms-full.txt): Complete text of key pages in Markdown for AI consumption
+
+## API
+
+REST API at `/api/` with 12 domain routers: parties, bills, elections, simulation, parliament, content, users, seats, budgets, admin, auth, quiz. All responses in JSON. WebSocket support via Socket.io for real-time simulation updates.

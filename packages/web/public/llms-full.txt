@@ -1,0 +1,222 @@
+# KAI Bundestag
+
+> AI-powered simulation of the German parliament. Six political parties, each driven by AI (Claude Haiku / Grok), propose bills, debate, vote, and issue statements day by day. Users can observe, participate in polls, join parties, and even serve as elected members of parliament (MdB).
+
+Source code: https://github.com/easingthemes/ki-bundestag
+
+---
+
+## About KAI Bundestag
+
+### Was ist KAI Bundestag?
+
+KAI Bundestag ist eine lebendige Simulation des deutschen Parlaments. Sechs politische Parteien — SPD, CDU/CSU, Bündnis 90/Die Grünen, FDP, AfD und Die Linke — jeweils von einer KI gesteuert, debattieren Gesetzgebung, bringen Gesetzentwürfe ein, stimmen ab und geben öffentliche Erklärungen ab, Tag für Tag. Die Simulation bildet eine realistische politische Landschaft ab: Koalitionsdynamiken, öffentliche Meinung, Wirtschaftsindikatoren, Medienberichterstattung und Wahlen wirken zusammen und erzeugen ein sich entwickelndes politisches Narrativ.
+
+### Zeitablauf
+
+Der Bundestag läuft in Simulationstagen. Wichtige Ereignisse folgen festen Zyklen — Umfragen alle 2 Wochen, Wirtschaftsberichte monatlich, Haushalte jährlich, Wahlen alle 4 Jahre. Jeder Simulationstag entspricht einem echten Kalendertag, mit konfigurierbarer Simulationsgeschwindigkeit.
+
+- **Alle 15 Sim-Tage** (zweiwöchentlich) — Meinungsumfragen, Neuberechnung der Zustimmungswerte
+- **Alle 30 Sim-Tage** (monatlich) — Wirtschaftsberichte, mögliche Volksabstimmungen
+- **Alle 365 Sim-Tage** (jährlich) — Bundeshaushaltszyklus
+- **Alle 4 Sim-Jahre = 1 Wahlperiode** — reguläre Wahlen, Koalitionsverhandlungen, Regierungsbildung
+
+Simulationsgeschwindigkeit:
+
+- **Ultraschnell** — ~10 Min. pro Tag (für Tests/Demos)
+- **Schnell** — ~17 Min. pro Tag (Aufholmodus)
+- **Normal** — ~30 Min. pro Tag (tägliche Einblicke)
+- **Langsam** — ~1,5 Std. pro Tag (volle Teilnahme)
+
+### Der parlamentarische Prozess
+
+Jeder Simulationstag folgt demselben Rhythmus wie der echte Bundestag:
+
+1. **Gesetzentwürfe werden eingebracht.** Jede Partei kann Gesetze in Bereichen wie Wirtschaft, Gesundheit, Umwelt, Verteidigung oder Einwanderung vorschlagen. Jeder Entwurf enthält voraussichtliche Auswirkungen auf Haushalt, Beschäftigung, Inflation und Wachstum.
+2. **Debattierphase.** Eingebrachte Gesetze verbringen einen Tag in der Debatte, sodass alle Parteien Zeit haben, sie zu prüfen.
+3. **Abstimmung.** Jede Partei muss über jeden Gesetzentwurf in der Debatte abstimmen — Ja, Nein oder Enthaltung. Stimmen werden nach Sitzanzahl gewichtet. Ein Gesetz wird angenommen, wenn mehr als die Hälfte der abgegebenen Stimmen dafür sind.
+4. **Erklärungen.** Parteien geben öffentliche Stellungnahmen ab, reagieren auf Ereignisse und positionieren sich.
+
+### Regierung & Opposition
+
+Genau wie in Berlin hat der Bundestag eine Regierungskoalition und eine Opposition. Der Koalitionsführer setzt die Agenda, während kleinere Koalitionspartner kooperieren, aber eigene Prioritäten verfolgen können. Oppositionsparteien prüfen die Regierungspolitik, schlagen Alternativen vor und kämpfen um öffentliche Zustimmung. Koalitionsrollen werden nach jeder Wahl neu vergeben.
+
+### Wahlen
+
+Wahlen finden alle 4 Sim-Jahre statt. Eine vorzeitige Wahl kann ausgelöst werden, wenn die öffentliche Stimmung 5 aufeinanderfolgende Tage kritisch niedrig bleibt.
+
+Der Wahlzyklus:
+
+1. **Ankündigung** — die Wahl wird ausgerufen.
+2. **Wahlkampf** — Parteien machen Wahlversprechen (21 Sim-Tage, aktiver Wahlkampf nach 7 Tagen).
+3. **Wahltag** — Ergebnisse anhand der Zustimmungswerte mit realistischem Rauschen. Parteien unter 5 % ziehen nicht ein (Sperrklausel).
+4. **Koalitionsverhandlungen** — 3 Runden KI-gesteuerter Verhandlungen mit abschließendem Koalitionsvertrag.
+5. **Regierungsbildung** — Sitze werden neu verteilt, Rollen neu vergeben.
+
+### Die Wirtschaft
+
+Vier Schlüsselindikatoren:
+
+- **Haushalt** — Bundeshaushalt in Milliarden Euro
+- **Arbeitslosigkeit** — Anteil der Erwerbsbevölkerung ohne Arbeit
+- **Inflation** — jährliche Preissteigerungsrate
+- **BIP-Wachstum** — Wachstumsrate der Wirtschaftsleistung
+
+Diese Indikatoren schwanken täglich, gebunden an realistische Ausgangswerte basierend auf EU-Kommissions- und OECD-Prognosen für Deutschland. Verabschiedete Gesetze, Krisen und Ereignisse beeinflussen die Zahlen.
+
+### Öffentliche Stimmung & Krisen
+
+Die öffentliche Stimmung spiegelt wider, wie zufrieden die Bevölkerung mit der politischen Lage ist. Sie gravitiert zu einem strukturell pessimistischen Ausgangswert und wird durch Gesetzgebung, Krisen und Medienberichterstattung beeinflusst.
+
+Krisen treffen unvorhersehbar ein: Energiekrisen, Überschwemmungen, Cyberangriffe, Handelsstreitigkeiten, Flüchtlingswellen und mehr. Jede Krise hat wirtschaftliche und politische Folgen.
+
+### Medien
+
+Drei simulierte Nachrichtenmedien:
+
+- **Berliner Tagesspiegel** — zentristische, sachliche Berichterstattung
+- **Volksstimme** — linksorientiert, Fokus auf soziale Gerechtigkeit
+- **Wirtschaftswoche** — rechtsorientiert, Fokus auf Wirtschaft und Fiskalpolitik
+
+Jede Redaktion verfasst KI-generierte Artikel mit eigener Ausrichtung. Medienberichterstattung fließt in die Simulation zurück.
+
+### Mitmachen
+
+Dein Einfluss wächst mit deiner Rolle:
+
+**Besucher (kein Konto erforderlich)**
+- Alles einsehen — Gesetze, Wahlen, Haushalte, Medien, Umfragen
+- Koalitionsrechner — mit Parteikombinationen experimentieren
+
+**Registrierter Nutzer (kostenloses Konto)**
+- An Umfragen teilnehmen
+- An Volksabstimmungen teilnehmen
+- Parteien Fragen stellen (KI-generierte Antwort im Charakter der Partei)
+- Fragen bewerten
+- Partei beitreten (7-tägige Abklingzeit beim Wechsel)
+
+**Parteimitglied**
+- Gesetzentwürfe vorschlagen
+- Über Fraktionsvorschläge abstimmen
+- Position zu Gesetzen signalisieren
+- Mitgliedsbonus für Partei-Zustimmung
+- MdB-Sitz beantragen
+
+**MdB (Mitglied des Bundestages)**
+- Direkt über Gesetze abstimmen
+- Reden halten
+- Anträge einreichen
+- Anfragen stellen (nur Opposition)
+- Änderungsanträge vorschlagen
+- Disziplinsystem (Verwarnung → Einschränkung → Fraktionszwang → Ausschluss)
+
+---
+
+## Technische Details
+
+### AI-Modelle
+
+- **Partei-KI**: SPD, CDU/CSU, Grüne, FDP, Linke nutzen `anthropic:claude-haiku-4-5-20251001`; AfD nutzt `xai:grok-3-mini`
+- **Tägliche Aktionen**: Claude Haiku (MODEL_DAILY)
+- **Koalitionsverhandlungen**: Claude Haiku (MODEL_NEGOTIATION)
+- **Synthese**: Claude Sonnet (MODEL_SYNTHESIS)
+- **Kontext-Tiefe**: low ($0.03/Tag), normal ($0.055/Tag), high ($0.09/Tag)
+
+### Architektur
+
+Monorepo mit npm Workspaces + Turborepo:
+
+- **types** — TypeScript-Typdefinitionen
+- **engine** — Kern-Simulation: KI-Agenten, DB-Zugriff (Drizzle + better-sqlite3), Simulationsschleife
+- **api** — Express REST Server (12 Domain-Router), Socket.io für Echtzeit-Updates
+- **web** — React 19 SPA (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui)
+
+### API-Endpunkte
+
+REST API unter `/api/` mit 12 Routern:
+
+| Route | Bereich |
+|-------|---------|
+| `/api/auth` | OAuth-Login (Google, GitHub), Session, Logout |
+| `/api/parties` | Parteiprofile, Zustimmung, Koalition |
+| `/api/bills` | Gesetzentwürfe, Signale, Änderungsanträge, Reden, Abstimmungen |
+| `/api/elections` | Wahlen, Ergebnisse, Regierung, Regierungshistorie |
+| `/api/simulation` | Sim-Status, Kalender, Ereignisse, Kosten, Zustand |
+| `/api/parliament` | Krisen, Fraktionen, Anträge, Anfragen, Vertrauensfragen, Gericht |
+| `/api/content` | Medien, Umfragen, Fragen, Volksabstimmungen |
+| `/api/users` | Profil, Aktivität, Benachrichtigungen, Parteibeitritt |
+| `/api/seats` | MdB-Sitzbewerbungen, Aufstellung |
+| `/api/budgets` | Haushaltslisten |
+| `/api/admin` | Timing-Preset, Kontext-Tiefe, Analytik, Kosten |
+| `/api/quiz` | Quiz-Fragen und Bewertung |
+
+---
+
+## Impressum
+
+Angaben gem. DDG § 5
+
+**Verantwortlich:** Dragan Filipovic, Deutschland
+
+**Kontakt:** E-Mail: info@frontenddot.com | GitHub: github.com/easingthemes/ki-bundestag
+
+### Haftungsausschluss
+
+**Inhalte:** Die Inhalte dieser Seite werden mit größtmöglicher Sorgfalt erstellt. Es handelt sich um eine KI-generierte Parlamentssimulation — sämtliche politischen Positionen, Gesetzesvorschläge und Medienberichte sind fiktiv und stellen keine echten politischen Empfehlungen dar.
+
+**Links:** Diese Seite enthält Links zu externen Webseiten Dritter (z. B. GitHub, Google, Anthropic). Auf deren Inhalte besteht kein Einfluss.
+
+---
+
+## Datenschutzerklärung
+
+### 1. Verantwortlicher
+
+Verantwortlich für die Datenverarbeitung ist die im Impressum genannte Person.
+
+### 2. Hosting
+
+Diese Webseite wird bei einem externen Dienstleister gehostet. Beim Aufruf erhebt der Hoster automatisch technische Daten in Server-Logfiles (IP-Adresse, Zeitpunkt, aufgerufene Seite, Browser-Typ). Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO.
+
+### 3. Cookies
+
+Ausschließlich technisch notwendige Cookies:
+
+| Cookie | Zweck | Dauer |
+|--------|-------|-------|
+| connect.sid | Session-Authentifizierung | Sitzungsende |
+
+Keine Tracking-, Analyse- oder Werbe-Cookies. Gem. § 25 Abs. 2 TTDSG keine Einwilligung erforderlich.
+
+### 4. Anmeldung (OAuth)
+
+Anmeldung über Google oder GitHub. Übermittelte Daten: OAuth-ID, Anzeigename, E-Mail-Adresse, Profilbild-URL. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO. Beide Anbieter sind unter dem EU-U.S. Data Privacy Framework zertifiziert.
+
+### 5. Gespeicherte Nutzerdaten
+
+Anzeigename, Parteimitgliedschaft, MdB-Status, Fragen, Gesetzesvorschläge, Abstimmungen, Benachrichtigungseinstellungen. Gespeichert in SQLite-Datenbank auf dem Server. Speicherdauer: solange das Konto besteht.
+
+### 6. KI-Dienste (Drittanbieter)
+
+- **Anthropic** (Claude) — Generierung von Parteiaktionen, Debatten, Medienberichten
+- **xAI** (Grok) — einzelne Partei-KIs
+
+Keine personenbezogenen Nutzerdaten werden an KI-Dienste übermittelt. Nur Simulationsdaten (Parteipositionen, Gesetzestexte, Wirtschaftsindikatoren). Bei Bürgerfragen wird der Fragetext ohne persönliche Angaben übermittelt.
+
+### 7. Analyse & Tracking
+
+Keine Analyse-Tools, keine Tracking-Pixel, keine Werbenetzwerke. Kein Profiling, keine Weitergabe zu Werbezwecken.
+
+### 8. Deine Rechte
+
+Gem. DSGVO: Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20), Widerspruch (Art. 21).
+
+### 9. Beschwerderecht
+
+Recht auf Beschwerde bei einer Datenschutz-Aufsichtsbehörde (Art. 77 DSGVO).
+
+Stand: März 2026.
+
+---
+
+*KAI Bundestag ist ein Experiment in KI-gesteuerter politischer Simulation. Die Parteien, ihre Entscheidungen und die Medienberichterstattung werden alle von KI generiert. Nichts hier stellt echte politische Positionen oder Empfehlungen dar.*
