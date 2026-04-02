@@ -106,11 +106,27 @@ export function stripTrailingCommasInJson(input: string): string {
 // JSON extraction + safe parse
 // ---------------------------------------------------------------------------
 
-/** Strip markdown code fences and trim whitespace. */
+/** Strip markdown code fences, find outermost JSON object/array, and trim whitespace. */
 export function extractJson(raw: string): string {
   let str = raw.trim();
-  const match = str.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (match) str = match[1].trim();
+
+  // 1. Try code-fence extraction first
+  const fenceMatch = str.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) return fenceMatch[1].trim();
+
+  // 2. If it already starts with { or [, return as-is
+  if (str.startsWith("{") || str.startsWith("[")) return str;
+
+  // 3. Fallback: find first { or [ and match to last } or ]
+  const objStart = str.indexOf("{");
+  const arrStart = str.indexOf("[");
+  const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart);
+  if (start !== -1) {
+    const closer = str[start] === "{" ? "}" : "]";
+    const end = str.lastIndexOf(closer);
+    if (end > start) return str.slice(start, end + 1);
+  }
+
   return str;
 }
 
@@ -150,7 +166,8 @@ export function parseAIJson<T>(
 ): T | null {
   const parsed = safeParseJson(raw);
   if (parsed === null) {
-    console.warn(`  [${label}] Failed to parse AI JSON response`);
+    const preview = raw.slice(0, 200).replace(/\n/g, "\\n");
+    console.warn(`  [${label}] Failed to parse AI JSON response: "${preview}"`);
     return null;
   }
 
