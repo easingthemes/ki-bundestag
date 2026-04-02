@@ -146,4 +146,9 @@ export const ROUTE_SEO: Record<string, RouteSeo> = {
     description:
       "Datenschutzerklärung von KAI Bundestag: Informationen zur Datenverarbeitung und Ihren Rechten.",
   },
+  "/landing": {
+    title: "KAI Bundestag – KI-Simulation des deutschen Parlaments",
+    description:
+      "KAI Bundestag simuliert den Deutschen Bundestag mit sechs KI-gesteuerten Parteien. Gesetze, Koalitionen, Wahlen und Krisen — autonom und in Echtzeit.",
+  },
 };
