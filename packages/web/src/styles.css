@@ -25,6 +25,52 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+
+  /* Accordion animations for landing page */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+/* ── Dark mode overrides ── */
+.dark {
+  --color-background: #0c0a09;
+  --color-foreground: #f2f2f2;
+  --color-card: #1a1713;
+  --color-card-foreground: #f2f2f2;
+  --color-popover: #171717;
+  --color-popover-foreground: #f2f2f2;
+  --color-primary: #4ade80;
+  --color-primary-foreground: #052e16;
+  --color-secondary: #262626;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #262626;
+  --color-muted-foreground: #a1a1a6;
+  --color-accent: #271f1b;
+  --color-accent-foreground: #fafafa;
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #fef2f2;
+  --color-border: #262626;
+  --color-input: #262626;
+  --color-ring: #166534;
+}
+
+/* ── Landing page container utility ── */
+.container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: 1.5rem;
+  padding-left: 1.5rem;
+  max-width: 1400px;
 }
 
 /* ── shadcn/ui base layer (required for Tailwind v4) ── */
