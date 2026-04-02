@@ -19,7 +19,9 @@ export function usePageMeta({ title, description, ogType }: PageMeta) {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    const fullTitle = title === SITE_NAME ? title : `${title} — ${SITE_NAME}`;
+    const fullTitle = title === SITE_NAME
+      ? `${SITE_NAME} – KI-Simulation des deutschen Parlaments`
+      : `${title} — ${SITE_NAME}`;
     document.title = fullTitle;
 
     setMeta("description", description);

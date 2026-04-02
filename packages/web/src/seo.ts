@@ -12,9 +12,9 @@ export interface RouteSeo {
 
 export const ROUTE_SEO: Record<string, RouteSeo> = {
   "/": {
-    title: "Dashboard",
+    title: "KAI Bundestag",
     description:
-      "Live-Übersicht der KI-Bundestag-Simulation: aktuelle Gesetze, Koalitionen, Umfragen und Parlamentsaktivität auf einen Blick.",
+      "KAI Bundestag ist eine unabhängige KI-Simulation des deutschen Parlaments. Sechs KI-Parteien debattieren Gesetze, bilden Koalitionen und reagieren auf politische Ereignisse — Tag für Tag.",
   },
   "/parties": {
     title: "Parteien",
