@@ -44,7 +44,10 @@
     "userMenu": "Benutzermenü",
     "save": "Speichern",
     "cancel": "Abbrechen",
-    "editName": "Name bearbeiten"
+    "editName": "Name bearbeiten",
+    "skipToContent": "Zum Hauptinhalt springen",
+    "mainNavigation": "Hauptnavigation",
+    "loading": "Inhalt wird geladen"
   },
   "footer": {
     "tagline": "KAI Bundestag — KI-gestützte Parlamentssimulation"

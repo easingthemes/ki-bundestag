@@ -69,6 +69,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
               value={propTitle}
               onChange={e => setPropTitle(e.target.value)}
               placeholder={t("proposalForm.titlePlaceholder")}
+              aria-label={t("proposalForm.titlePlaceholder")}
               maxLength={120}
               className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2"
             />
@@ -76,6 +77,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
               value={propDesc}
               onChange={e => setPropDesc(e.target.value)}
               placeholder={t("proposalForm.descPlaceholder")}
+              aria-label={t("proposalForm.descPlaceholder")}
               maxLength={300}
               rows={3}
               className="w-full px-2.5 py-2 rounded border border-input text-sm mb-2 resize-y"
@@ -84,6 +86,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
               <select
                 value={propCategory}
                 onChange={e => setPropCategory(e.target.value)}
+                aria-label={t("proposalForm.category")}
                 className={SELECT_CLS}
               >
                 {["economy","social","environment","immigration","defense","education","healthcare","infrastructure"].map(c => (
@@ -121,7 +124,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
               >
                 {t("proposalForm.cancel")}
               </button>
-              {propMsg && <span className={`text-xs ${propMsg.includes("fehlgeschlagen") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
+              {propMsg && <span role="status" aria-live="polite" className={`text-xs ${propMsg.includes("fehlgeschlagen") ? "text-destructive" : "text-emerald-500"}`}>{propMsg}</span>}
             </div>
           </CardContent>
         </Card>
@@ -186,6 +189,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                               onProposalsChange(proposals.map(x => x.id === p.id ? updated : x));
                             }}
                             title={p.userVote === 1 ? t("proposalForm.retractUpvote") : t("proposalForm.upvote")}
+                            aria-label={p.userVote === 1 ? t("proposalForm.retractUpvote") : t("proposalForm.upvote")}
                             className="border-none bg-transparent cursor-pointer text-lg p-0"
                             style={{ color: p.userVote === 1 ? SEMANTIC_HEX.positive : "#aaa" }}
                           >▲</button>
@@ -200,6 +204,7 @@ export function ProposalForm({ partyId, displayColor, proposals, simCurrentDay, 
                               onProposalsChange(proposals.map(x => x.id === p.id ? updated : x));
                             }}
                             title={p.userVote === -1 ? t("proposalForm.retractDownvote") : t("proposalForm.downvote")}
+                            aria-label={p.userVote === -1 ? t("proposalForm.retractDownvote") : t("proposalForm.downvote")}
                             className="border-none bg-transparent cursor-pointer text-lg p-0"
                             style={{ color: p.userVote === -1 ? SEMANTIC_HEX.negative : "#aaa" }}
                           >▼</button>

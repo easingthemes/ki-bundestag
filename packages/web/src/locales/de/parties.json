@@ -160,7 +160,8 @@
     "billSubmitted": "Im Bundestag eingereicht —",
     "proposerAI": "AI",
     "proposerMember": "Mitglied",
-    "declineReason": "Partei: \"{{reason}}\""
+    "declineReason": "Partei: \"{{reason}}\"",
+    "category": "Kategorie"
   },
   "approvalChart": {
     "xLabel": "Tag",
