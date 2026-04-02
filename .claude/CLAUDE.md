@@ -57,6 +57,19 @@ Detailed rules are in `.claude/rules/` (auto-loaded when working on matching pat
 
 Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. See `.env.example` for all optional vars.
 
+## Documentation Structure
+
+When creating or updating documentation, place files in the correct category:
+
+- **`TECHNICAL.md`** — Single canonical technical reference (architecture, AI system, DB, simulation flow). Update this for architectural changes.
+- **`docs/operations/`** — Hosting, costs, timing data, production analysis
+- **`docs/research/`** — External references, API docs, domain knowledge (e.g., Bundestag rules, abgeordnetenwatch)
+- **`docs/marketing/`** — Launch strategy, social media plans
+- **`docs/todo/`** — Roadmap + open item detail files
+- **`docs/plans/`** — Implementation plans (delete after completion)
+
+Never create loose docs at `docs/` root. Never duplicate content across docs — update the canonical source.
+
 ## Roadmap
 
 Project roadmap in `docs/todo/README.md`. Check there for open todos or what to work on next.
