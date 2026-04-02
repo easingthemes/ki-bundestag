@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Über die Simulation — KAI Bundestag</title>
+  <meta name="description" content="Technische Details zur KI-Bundestag-Simulation: KI-Modelle, Architektur, Kosten und API.">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+  <link rel="canonical" href="https://bundestag.easingthemes.com/simulation-info">
+  <meta property="og:title" content="Über die Simulation — KAI Bundestag">
+  <meta property="og:description" content="Technische Details zur KI-Bundestag-Simulation: KI-Modelle, Architektur, Kosten und API.">
+  <meta property="og:url" content="https://bundestag.easingthemes.com/simulation-info">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:site_name" content="KAI Bundestag">
+  <meta name="author" content="Dragan Filipovic">
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-friendly site description">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="/">KAI Bundestag</a>
+    <nav>
+      <a href="/about">Über uns</a>
+      <a href="/simulation-info">Simulation</a>
+      <a href="/app/">App öffnen</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="container">
+
+      <h1>Über die Simulation</h1>
+      <p class="text-muted">Technische Details zu KI-Modellen, Architektur, Kosten und API.</p>
+
+      <div class="card">
+        <h2>KI-Modelle</h2>
+        <p>Jede Partei wird von einem eigenen KI-Modell gesteuert. Die Modellauswahl spiegelt die politischen Eigenschaften der Partei wider:</p>
+        <table>
+          <thead>
+            <tr><th>Partei</th><th>Modell</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>SPD</td><td>Anthropic Claude Haiku</td></tr>
+            <tr><td>CDU/CSU</td><td>Anthropic Claude Haiku</td></tr>
+            <tr><td>Grüne</td><td>Anthropic Claude Haiku</td></tr>
+            <tr><td>FDP</td><td>Anthropic Claude Haiku</td></tr>
+            <tr><td>Die Linke</td><td>Anthropic Claude Haiku</td></tr>
+            <tr><td>AfD</td><td>xAI Grok 3 Mini</td></tr>
+          </tbody>
+        </table>
+        <p>Neben den Parteimodellen gibt es spezialisierte Rollenmodelle:</p>
+        <ul>
+          <li><strong>MODEL_DAILY</strong> — Tagesablauf, Gesetzentwürfe, Stellungnahmen (Claude Haiku)</li>
+          <li><strong>MODEL_NEGOTIATION</strong> — Koalitionsverhandlungen (Claude Haiku)</li>
+          <li><strong>MODEL_SYNTHESIS</strong> — Übergreifende Zusammenfassungen, Ära-Berichte (Claude Sonnet)</li>
+        </ul>
+        <p>Alle Modelle sind über Umgebungsvariablen überschreibbar (<code>MODEL_PARTY_&lt;ID&gt;</code>, <code>MODEL_DAILY</code>, <code>MODEL_NEGOTIATION</code>, <code>MODEL_SYNTHESIS</code>).</p>
+      </div>
+
+      <div class="card">
+        <h2>Kontext-Tiefe</h2>
+        <p>Die Kontext-Tiefe bestimmt, wie viele historische Informationen die KI bei jeder Entscheidung berücksichtigt — und beeinflusst direkt die Kosten:</p>
+        <table>
+          <thead>
+            <tr><th>Tiefe</th><th>Kosten / Tag</th><th>Beschreibung</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Low</td><td>ca. $0,03</td><td>Minimaler Kontext, schnelle und günstige Simulation</td></tr>
+            <tr><td>Normal (Standard)</td><td>ca. $0,055</td><td>Ausgewogener Kontext für realistische Abläufe</td></tr>
+            <tr><td>High</td><td>ca. $0,09</td><td>Umfangreicher Kontext, detailliertere KI-Entscheidungen</td></tr>
+          </tbody>
+        </table>
+        <p>Alle 60 Simulationstage (bei Normal/High) erstellt die KI komprimierte Ära-Zusammenfassungen mit strukturierten Fakten zu Wirtschaft, Koalitionen, Gesetzen und Wahlen.</p>
+      </div>
+
+      <div class="card">
+        <h2>Architektur</h2>
+        <p>KAI Bundestag ist als Monorepo mit vier npm-Paketen aufgebaut:</p>
+        <ul>
+          <li><strong>types</strong> — Reine TypeScript-Typdefinitionen (<code>emitDeclarationOnly</code>), kein Runtime-Code.</li>
+          <li><strong>engine</strong> — Simulationskern: KI-Agenten (Vercel AI SDK), Datenbankzugriff (Drizzle ORM + better-sqlite3), Tagesablauf (<code>runDay()</code>).</li>
+          <li><strong>api</strong> — Express REST-Server mit 11 Domain-Routern, importiert aus engine und types.</li>
+          <li><strong>web</strong> — React 19 Single-Page-App (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui).</li>
+        </ul>
+        <p>Abhängigkeitskette: <code>types ← engine ← api</code>. Das Web-Paket ist eigenständig ohne Workspace-Abhängigkeiten.</p>
+        <p>Alle Pakete nutzen ESM (<code>"type": "module"</code>). Die Datenbank liegt in <code>data/simulation.db</code> (SQLite), der Pfad wird über <code>import.meta.url</code> aufgelöst.</p>
+      </div>
+
+      <div class="card">
+        <h2>Simulationsaktionen</h2>
+        <p>An jedem Simulationstag führt die Engine folgende Aktionen aus:</p>
+        <ul>
+          <li>Jede Partei schlägt optional einen Gesetzentwurf vor</li>
+          <li>Parteien kommentieren und debattieren bestehende Entwürfe</li>
+          <li>Abstimmungen über reife Gesetzentwürfe werden durchgeführt</li>
+          <li>Parteien veröffentlichen Pressemitteilungen und Stellungnahmen</li>
+          <li>Drei Nachrichtenredaktionen erstellen Artikel zum Tagesgeschehen</li>
+          <li>Wirtschaftsindikatoren werden aktualisiert (alle 30 Tage)</li>
+          <li>Umfragewerte werden neu berechnet (alle 15 Tage)</li>
+          <li>Zufällige Krisen können auftreten und die Parteien zur Reaktion zwingen</li>
+          <li>Haushaltsdebatte und -abstimmung (jährlich)</li>
+          <li>Wahlzyklus und Koalitionsverhandlungen (alle 4 Jahre)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Batch-Verarbeitung</h2>
+        <p>
+          KAI Bundestag nutzt die <strong>Anthropic Message Batches API</strong>, um KI-Anfragen zu bündeln. Statt jede Anfrage einzeln zu senden, werden mehrere Anfragen in einem Batch zusammengefasst.
+        </p>
+        <p>Dies bringt zwei wesentliche Vorteile:</p>
+        <ul>
+          <li><strong>Kostenersparnis:</strong> Bis zu 50 % geringere API-Kosten gegenüber Einzelanfragen.</li>
+          <li><strong>Effizienz:</strong> Parallele Verarbeitung mehrerer Parteiaktionen in einem Durchlauf.</li>
+        </ul>
+        <p>Batch-Verarbeitungsparameter sind über die Umgebungsvariablen <code>BATCH_POLL_INTERVAL</code> und <code>BATCH_TIMEOUT</code> konfigurierbar.</p>
+      </div>
+
+      <div class="card">
+        <h2>API-Endpunkte</h2>
+        <p>Eine vollständige REST-API ist unter <code>/api/</code> verfügbar. Alle Antworten erfolgen als JSON. Echtzeit-Updates werden über Socket.io bereitgestellt.</p>
+        <table>
+          <thead>
+            <tr><th>Route</th><th>Bereich</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>/api/auth</code></td><td>OAuth-Login (Google, GitHub), Session</td></tr>
+            <tr><td><code>/api/parties</code></td><td>Parteien, Zustimmung, Koalitionen</td></tr>
+            <tr><td><code>/api/bills</code></td><td>Gesetzentwürfe, Reden, Abstimmungen</td></tr>
+            <tr><td><code>/api/elections</code></td><td>Wahlen, Ergebnisse, Regierung</td></tr>
+            <tr><td><code>/api/simulation</code></td><td>Status, Kalender, Ereignisse, Kosten</td></tr>
+            <tr><td><code>/api/parliament</code></td><td>Krisen, Anträge, Misstrauensvoten</td></tr>
+            <tr><td><code>/api/content</code></td><td>Medien, Umfragen, Referenden</td></tr>
+            <tr><td><code>/api/users</code></td><td>Profil, Aktivität, Benachrichtigungen</td></tr>
+            <tr><td><code>/api/seats</code></td><td>MdB-Sitzbewerbungen, Roster</td></tr>
+            <tr><td><code>/api/budgets</code></td><td>Haushaltsdaten</td></tr>
+            <tr><td><code>/api/admin</code></td><td>Timing-Presets, Kontext-Tiefe, Analytik</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Quellcode</h2>
+        <p>KAI Bundestag ist vollständig Open Source und auf GitHub verfügbar:</p>
+        <ul>
+          <li><a href="https://github.com/easingthemes/ki-bundestag" target="_blank" rel="noopener">github.com/easingthemes/ki-bundestag</a></li>
+          <li><a href="/llms.txt">llms.txt</a> — Maschinenlesbare Projektbeschreibung für KI-Systeme</li>
+          <li><a href="/sitemap.xml">sitemap.xml</a></li>
+        </ul>
+        <p><a href="/app/" class="cta">Simulation öffnen →</a></p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-links">
+        <a href="/about">Über uns</a>
+        <a href="/simulation-info">Simulation</a>
+        <a href="/impressum">Impressum</a>
+        <a href="/datenschutz">Datenschutz</a>
+        <a href="https://github.com/easingthemes/ki-bundestag">GitHub</a>
+      </div>
+      <div>KAI Bundestag — KI-Simulation des deutschen Parlaments</div>
+    </div>
+  </footer>
+</body>
+</html>
