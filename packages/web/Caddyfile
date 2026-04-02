@@ -1,4 +1,4 @@
-:80 {
+{$SITE_ADDRESS:localhost} {
     root * /opt/ki-bundestag/packages/web/dist
 
     handle /api/* {
