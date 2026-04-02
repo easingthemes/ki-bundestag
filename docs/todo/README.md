@@ -1,86 +1,81 @@
-# Issue Tracker
+# KI Bundestag — Roadmap
 
-All known issues, improvements, and feature requests for KI Bundestag.
+## Completed (37 items)
 
-Each item links to a detail file with full description, affected files, and implementation notes.
+### Foundation & Quality
+- Real user authentication (OAuth Google/GitHub, sessions, bearer tokens)
+- Missing database indexes, foreign key constraints
+- Silent error handling, global Express error handler, consistent error format
+- Input validation and rate limiting
+- Unsafe type assertions cleaned up
+- Test suite (Vitest), linting (ESLint), formatting (Prettier)
+- Console.log cleanup, React hook dependency fixes
+- localStorage XSS fix, hardcoded URLs/config externalized
+- Missing loading/empty states, mobile view fixes
 
-## Status Legend
+### Simulation Engine
+- All content in German
+- Media system: 3 outlets, sentiment diversity, feedback loop
+- Polls: weekly generation, user voting, 7-day expiry
+- Bürgerfragen: user questions to parties, AI answers, upvote/downvote
+- Referendums: AI-generated, user voting, quorum, economic impact
+- Event injection: crises, snap elections, economic shocks
+- Fraktionen: parliamentary groups, 5% threshold
+- Multi-stage bills: 5-reading pipeline with amendments
+- Motions & resolutions: non-legislative actions
+- Chancellor + 8 Ministers: coalition cabinet formation
+- Interpellations: Kleine/Große Anfrage, minister AI answers
+- Vertrauensfrage + Konstruktives Misstrauensvotum
+- Constitutional Court (Bundesverfassungsgericht)
+- Annual budget cycle with provisional budget fallback
+- Bundespräsident veto on passed bills
+- Sentiment model: mean-reversion, per-bill impact, membership bonus
 
-| Status | Meaning |
-|--------|---------|
-| `open` | Not started |
-| `in-progress` | Work underway |
-| `done` | Completed |
-| `wontfix` | Decided against |
+### AI & Context
+- Improve AI context quality (briefing + party profiles)
+- Reduce PARSE_FAIL and VALIDATION_FAIL rates
+- Context & memory management (era summaries with case facts)
+- Semantic retry-with-feedback loop for invalid actions
+- Batch API cost savings, polling optimization
+- Real-world news grounding (knowledge-fetch + abgeordnetenwatch)
+- Batch API latency monitoring (timeout tuning, slow-batch warnings)
 
-## Critical
+### User Engagement
+- User identity + membership (join/leave party, 7-day cooldown)
+- Internal proposals + member voting + party decision engine
+- Member bill signals (YES/NO on readings)
+- MdB system (seats, applications, voting, speeches, discipline)
+- Timing presets (ultra-fast → slow), event queue, notifications
 
-| # | Title | Status | Area | PR |
-|---|-------|--------|------|----|
-| 001 | [Real user authentication](./001-real-user-auth.md) | done | API / Web | — |
-| 002 | [Missing database indexes](./002-missing-db-indexes.md) | done | Engine / DB | #15 |
-| 003 | [Silent error handling (empty catch blocks)](./003-silent-error-handling.md) | done | API | #13 |
+### Tooling
+- dx-core plugin installed (replaces custom plan workflow skills)
 
-## High
+### Postponed
+- Broader OAuth providers (Apple, Microsoft) — low demand
+- Scalability load testing — premature until user base grows
 
-| # | Title | Status | Area | PR |
-|---|-------|--------|------|----|
-| 004 | [All content must be German](./004-german-content.md) | done | Web | #25 |
-| 005 | [Mobile view broken on some pages](./005-mobile-view-fixes.md) | done | Web | — |
-| 006 | [/me endpoint issues](./006-me-endpoint-issues.md) | done | API / Web | #20 |
-| 007 | [Missing input validation and rate limiting](./007-input-validation.md) | done | API | #16 |
-| 008 | [Unsafe type assertions (as unknown as)](./008-unsafe-type-assertions.md) | done | Engine / API | #22 |
-| 030 | [Improve AI context quality (briefing + party profiles)](./030-improve-ai-context-quality.md) | done | Engine / Agent | #49 |
-| 033 | [Reduce PARSE_FAIL and VALIDATION_FAIL rates](./033-reduce-parse-validation-failures.md) | done | Engine / Agent | #81 |
-| 037 | [Context & memory management for long-running simulation](./037-context-memory-management.md) | done | Engine / Agent | #81 |
+---
 
-## Medium
+## Open (4 items)
 
-| # | Title | Status | Area | PR |
-|---|-------|--------|------|----|
-| 009 | [No global Express error handler](./009-global-error-handler.md) | done | API | #14 |
-| 010 | [Missing loading and empty states](./010-loading-empty-states.md) | done | Web | #23 |
-| 011 | [Hardcoded external URLs (avatars, images)](./011-hardcoded-external-urls.md) | done | Web | #17 |
-| 012 | [Hardcoded validation limits and polling intervals](./012-hardcoded-config.md) | done | API / Web | #21 |
-| 013 | [Admin pages unreachable (routes removed)](./013-admin-pages-unreachable.md) | done | Web | — |
-| 014 | [Seat allocation race condition](./014-seat-race-condition.md) | done | API / Engine | #24 |
-| 015 | [localStorage auth vulnerable to XSS](./015-localstorage-xss.md) | done | Web | — |
+### 032 — Collect Real-World Cost & Timing Data
+**Area**: Operations  
+Gather more data points across context depths, election cycles, and active users to validate cost projections. Current data: 12-day sample at $0.028/day (normal depth).  
+[Details →](./032-collect-real-cost-data.md)
 
-## Low
+### 040 — Timeline Scrubber with Playback Controls
+**Area**: Web  
+Horizontal slider from day 1 to current day. Drag to preview events, click for full day view. Playback controls (1x/2x/5x/10x). Key event markers (elections, crises, coalitions). URL-based day navigation.  
+[Details →](./040-prominent-timeline-scrubber.md)
 
-| # | Title | Status | Area | PR |
-|---|-------|--------|------|----|
-| 016 | [No test suite](./016-no-tests.md) | done | All | — |
-| 017 | [No linting or formatting](./017-no-linting.md) | done | All | — |
-| 018 | [Console.log in production code](./018-console-logs.md) | done | Engine | #18 |
-| 019 | [Inconsistent API error response format](./019-inconsistent-error-format.md) | done | API | #14 |
-| 020 | [React hook dependency warnings suppressed](./020-react-hook-deps.md) | done | Web | #19 |
-| 021 | [Missing foreign key constraints](./021-missing-fk-constraints.md) | done | Engine / DB | — |
-| 022 | [Add broader OAuth providers (Apple, Microsoft)](./022-broader-oauth-providers.md) | postponed | API / Web | — |
-| 027 | [Scalability: user load testing & architecture improvements](./027-scalability-user-loads.md) | postponed | Engine / API / DB | — |
-| 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
-| 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
-| 040 | [Prominent timeline scrubber with playback controls](./040-prominent-timeline-scrubber.md) | open | Web | — |
-| 041 | [Make debates visible and prominent](./041-debate-visibility.md) | open | Web / API / Engine | — |
-| 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | done | Engine / Agent | — |
-| 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
-| 038 | [Batch API latency monitoring](./038-batch-api-latency-monitoring.md) | open | Engine / Operations | — |
-| 034 | [Batch API polling optimization](./034-batch-api-polling-optimization.md) | done | Engine / Agent | — |
-| 035 | [Media sentiment stuck / lacks diversity](./035-media-sentiment-diversity.md) | done | Engine / Simulation | — |
-| 036 | [Presidential veto rate tuning](./036-presidential-veto-tuning.md) | done | Engine / Simulation | — |
-| 023 | [Allow users to change display name after OAuth login](./023-change-display-name.md) | done | API / Web | — |
-| 024 | [Blank page after joining party](./024-blank-page-join-party.md) | done | Web | — |
-| 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
-| 026 | [Remove legacy nickname auth and backward-compatibility shims](./026-legacy-auth-cleanup.md) | done | API / Web | — |
+### 041 — Make Debates Visible and Prominent
+**Area**: Web / API / Engine  
+Phase 1: Surface existing speeches in News Feed + dedicated /debates page.  
+Phase 2: AI parties generate debate arguments during bill readings.  
+Phase 3: Threaded debate conversations, user responses.  
+[Details →](./041-debate-visibility.md)
 
-## Tooling
-
-| # | Title | Status | Area | PR |
-|---|-------|--------|------|----|
-| 039 | [Install dx-aem-flow plugins](./039-install-dx-plugins.md) | open | Tooling / Claude Code | — |
-
-## Summary
-
-- **Done**: 34 of 40
-- **Postponed**: 2 (#022, #027)
-- **Open**: 6 remaining (#029, #032, #038, #039, #040, #041)
+### 022 — Broader OAuth Providers
+**Area**: API / Web  
+Add Apple and Microsoft OAuth. Postponed — revisit when user demand warrants it.  
+[Details →](./022-broader-oauth-providers.md)
