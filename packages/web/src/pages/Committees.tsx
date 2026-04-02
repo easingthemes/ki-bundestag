@@ -7,8 +7,11 @@ import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { EmptyState } from "../components/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 export function Committees() {
+  usePageMeta(ROUTE_SEO["/committees"] ?? { title: "Ausschüsse" });
   const { t } = useTranslation();
   const [committees, setCommittees] = useState<CommitteeListItem[] | null>(null);
 

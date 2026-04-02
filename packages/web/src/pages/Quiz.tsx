@@ -3,6 +3,8 @@ import { api, type QuizThesis, type QuizResultItem, type QuizPartyPosition } fro
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const CATEGORY_LABELS: Record<string, string> = {
   economy: "Wirtschaft",
@@ -30,6 +32,7 @@ type QuizPhase = "intro" | "questions" | "results";
 type Answer = "agree" | "disagree" | "neutral";
 
 export function Quiz() {
+  usePageMeta(ROUTE_SEO["/quiz"] ?? { title: "Quiz" });
   const [phase, setPhase] = useState<QuizPhase>("intro");
   const [theses, setTheses] = useState<QuizThesis[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);

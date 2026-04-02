@@ -10,6 +10,8 @@ import { NOTIFICATION_TYPE_BADGE } from "@/lib/colors";
 import { ShowMoreButton } from "../components/shared";
 import { EmptyState } from "../components/EmptyState";
 import { FilterPills } from "@/components/FilterPills";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const TYPE_FILTERS = [
   "all", "morning_summary", "event_queued", "event_ready",
@@ -20,6 +22,7 @@ const TYPE_FILTERS = [
 ] as const;
 
 export function Notifications() {
+  usePageMeta(ROUTE_SEO["/notifications"] ?? { title: "Benachrichtigungen" });
   const { t } = useTranslation("notifications");
   const { user } = useUser();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);

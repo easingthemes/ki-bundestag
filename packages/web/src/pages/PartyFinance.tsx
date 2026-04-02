@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FilterPills } from "@/components/FilterPills";
 import { cn } from "@/lib/utils";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const DONOR_TYPE_LABELS: Record<string, string> = {
   individual: "Privatperson",
@@ -13,6 +15,7 @@ const DONOR_TYPE_LABELS: Record<string, string> = {
 };
 
 export function PartyFinance() {
+  usePageMeta(ROUTE_SEO["/parteifinanzen"] ?? { title: "Parteifinanzen" });
   const [partyFilter, setPartyFilter] = useState<string>("all");
   const { data: summary } = useApiData<DonationSummary[]>(() => api.getDonationSummary(), { interval: 15000 });
   const { data: donations } = useApiData<PartyDonation[]>(() => api.getPartyDonations(), { interval: 15000 });

@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FilterPills } from "@/components/FilterPills";
 import { cn } from "@/lib/utils";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const SECTOR_LABELS: Record<string, string> = {
   energy: "Energie",
@@ -18,6 +20,7 @@ const SECTOR_LABELS: Record<string, string> = {
 };
 
 export function Lobbying() {
+  usePageMeta(ROUTE_SEO["/lobbyismus"] ?? { title: "Lobbyismus" });
   const [partyFilter, setPartyFilter] = useState<string>("all");
   const { data: events } = useApiData<LobbyingEvent[]>(() => api.getLobbyingEvents(), { interval: 15000 });
   const { data: parties } = useApiData<Party[]>(() => api.getParties(), { interval: 30000 });

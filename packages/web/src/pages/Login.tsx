@@ -3,10 +3,13 @@ import { useSearchParams, Link } from "react-router-dom";
 import { api } from "../api";
 import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const API_BASE = "/api";
 
 export function Login() {
+  usePageMeta(ROUTE_SEO["/login"] ?? { title: "Anmelden" });
   const { user } = useUser();
   const [searchParams] = useSearchParams();
   const error = searchParams.get("error");

@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { STATUS_BADGE, VOTE_COLORS, GOVT_BILL_BADGE, MEMBER_INITIATIVE_BADGE, PRESIDENTIAL_VETO_BADGE, ALERT_STYLES } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { useTranslation } from "react-i18next";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const GROUP_INITIAL = 5;
 
@@ -21,6 +23,7 @@ const BILL_CATEGORIES = ["economy", "social", "environment", "immigration", "def
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Bills() {
+  usePageMeta(ROUTE_SEO["/bills"] ?? { title: "Gesetzentwürfe" });
   const { t } = useTranslation("legislation");
   const { user } = useUser();
   const [bills, setBills] = useState<Bill[]>([]);

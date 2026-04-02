@@ -5,6 +5,8 @@ import { usePolling } from "../usePolling";
 import { ShowMoreButton } from "../components/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { EVENT_TYPE_LABEL } from "@/lib/colors";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 function formatRealDate(iso: string | null): string {
   if (!iso) return "";
@@ -23,6 +25,7 @@ function bundestagDayLabel(dayNumber: number): string {
 }
 
 export function SimulationLog() {
+  usePageMeta(ROUTE_SEO["/log"] ?? { title: "Protokoll" });
   const { t } = useTranslation("notifications");
   const [days, setDays] = useState<DaySummary[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
