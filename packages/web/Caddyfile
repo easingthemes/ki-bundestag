@@ -5,9 +5,9 @@
     handle /socket.io/* {
         reverse_proxy localhost:3001
     }
-    handle /app/* {
-        root * /opt/ki-bundestag/packages/web/dist
-        try_files {path} /app/index.html
+    handle_path /app* {
+        root * /opt/ki-bundestag/packages/web/dist/app
+        try_files {path} /index.html
         file_server
     }
     handle {
