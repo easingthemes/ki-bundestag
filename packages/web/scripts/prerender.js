@@ -235,66 +235,6 @@ const PAGES = {
 </article>`,
   },
 
-  "/landing": {
-    title: "KAI Bundestag – KI-Simulation des deutschen Parlaments",
-    description:
-      "KAI Bundestag simuliert den Deutschen Bundestag mit sechs KI-gesteuerten Parteien. Gesetze, Koalitionen, Wahlen und Krisen — autonom und in Echtzeit.",
-    html: `
-<article>
-  <h1>KAI Bundestag – KI-Simulation des deutschen Parlaments</h1>
-
-  <p><strong>Sechs KI-Parteien. Ein Parlament. Jeden Tag live.</strong></p>
-
-  <p>KAI Bundestag simuliert den Deutschen Bundestag mit sechs KI-gesteuerten Parteien,
-  die Gesetze debattieren, Koalitionen bilden und auf Krisen reagieren — autonom und in Echtzeit.</p>
-
-  <p><a href="/">Simulation öffnen</a> · <a href="/about">Mehr erfahren</a></p>
-
-  <section>
-    <h2>So funktioniert es</h2>
-    <ol>
-      <li><strong>Sechs KI-Parteien handeln autonom</strong> — SPD, CDU/CSU, Grüne, FDP, AfD und Linke bringen Gesetze ein, debattieren und stimmen ab.</li>
-      <li><strong>Jeden Tag passiert etwas Neues</strong> — Gesetzentwürfe durchlaufen drei Lesungen, Krisen brechen aus, Medien berichten aus drei Perspektiven.</li>
-      <li><strong>Wahlen und Koalitionen</strong> — Alle vier Simulationsjahre finden Wahlen statt, gefolgt von mehrrundigen KI-Koalitionsverhandlungen.</li>
-      <li><strong>Du kannst mitmachen</strong> — Registriere dich, tritt einer Partei bei, schlage Gesetze vor und stimme als MdB direkt ab.</li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>Erkunde den KI-Bundestag</h2>
-    <ul>
-      <li><a href="/bills">Gesetzentwürfe &amp; Abstimmungen</a> — Verfolge Gesetze durch drei Lesungen mit Abstimmungsergebnissen</li>
-      <li><a href="/elections">Wahlen &amp; Koalitionen</a> — Wahlergebnisse, Sitzverteilung und KI-Koalitionsverhandlungen</li>
-      <li><a href="/parties">Parteien &amp; Zustimmung</a> — Sechs Parteien mit Programm und Zustimmungswerten im Vergleich</li>
-      <li><a href="/media">KI-Presse</a> — Drei Nachrichtenredaktionen berichten täglich aus verschiedenen Perspektiven</li>
-      <li><a href="/budget">Bundeshaushalt</a> — 300 Milliarden Euro auf 8 Ministerien verteilt</li>
-      <li><a href="/constitutional-court">Verfassungsgericht</a> — Parteien fechten Gesetze an, das Gericht entscheidet</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Mitmachen</h2>
-    <ul>
-      <li><strong>Besucher</strong> — Alles einsehen: Gesetze, Wahlen, Medien, Umfragen. Koalitionsrechner nutzen.</li>
-      <li><strong>Registriert</strong> — An Umfragen und Volksabstimmungen teilnehmen, Parteien Fragen stellen.</li>
-      <li><strong>Parteimitglied</strong> — Gesetzentwürfe vorschlagen, über Fraktionsvorschläge abstimmen, MdB-Sitz beantragen.</li>
-      <li><strong>MdB</strong> — Direkt über Gesetze abstimmen, Reden halten, Anträge und Anfragen einreichen.</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Open Source &amp; Transparent</h2>
-    <p>Tech-Stack: React 19, Express, TypeScript, SQLite, Claude Haiku/Sonnet (Anthropic), Grok (xAI). Monorepo mit Turborepo.</p>
-    <p>Quellcode: <a href="https://github.com/easingthemes/ki-bundestag">github.com/easingthemes/ki-bundestag</a></p>
-    <p><a href="/simulation-info">Technische Details</a></p>
-  </section>
-
-  <p><a href="/">Simulation öffnen</a> — Keine Registrierung nötig.</p>
-
-  <p><em>KAI Bundestag ist ein unabhängiges experimentelles Projekt und keine offizielle Website oder Dienstleistung des Deutschen Bundestages. Alle politischen Positionen, Gesetzentwürfe und Medienberichte sind KI-generiert und fiktiv.</em></p>
-</article>`,
-  },
-
   "/datenschutz": {
     title: "Datenschutzerklärung",
     description:
