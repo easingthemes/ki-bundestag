@@ -56,7 +56,7 @@
 
 ---
 
-## Open (4 items)
+## Open (5 items)
 
 ### 032 — Collect Real-World Cost & Timing Data
 **Area**: Operations  
@@ -74,6 +74,11 @@ Phase 1: Surface existing speeches in News Feed + dedicated /debates page.
 Phase 2: AI parties generate debate arguments during bill readings.  
 Phase 3: Threaded debate conversations, user responses.  
 [Details →](./041-debate-visibility.md)
+
+### 042 — Fix Deploy Workflow Not Triggering on Release
+**Area**: CI/CD  
+GitHub's `GITHUB_TOKEN` events don't trigger other workflows. Semantic-release creates the release with `GITHUB_TOKEN`, so the `release: published` event never fires the Deploy workflow. Fix: use a PAT secret (`RELEASE_TOKEN`) in `release.yml`, or chain deploy via `workflow_dispatch`.  
+**Workaround**: Run `gh workflow run deploy.yml` manually after each release.
 
 ### 022 — Broader OAuth Providers
 **Area**: API / Web  
