@@ -56,6 +56,7 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
                   value={questionText}
                   onChange={e => setQuestionText(e.target.value)}
                   placeholder={t("questionForm.placeholder")}
+                  aria-label={t("questionForm.placeholder")}
                   maxLength={500}
                   className="flex-1 px-3 py-2 rounded border border-input text-sm"
                   onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
@@ -77,7 +78,7 @@ export function QuestionForm({ partyId, partyName, displayColor, questions }: Qu
             </>
           )}
           {submitMsg && (
-            <div className={`text-sm mt-1.5 ${submitMsg.includes("fehlgeschlagen") || submitMsg.includes("limit") ? "text-destructive" : "text-emerald-500"}`}>
+            <div role="status" aria-live="polite" className={`text-sm mt-1.5 ${submitMsg.includes("fehlgeschlagen") || submitMsg.includes("limit") ? "text-destructive" : "text-emerald-500"}`}>
               {submitMsg}
             </div>
           )}
