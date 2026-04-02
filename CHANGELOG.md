@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/easingthemes/ki-bundestag/compare/v1.2.0...v1.2.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **engine:** harden AI JSON extraction with brace-matching fallback ([6b5d6fc](https://github.com/easingthemes/ki-bundestag/commit/6b5d6fcaa194427c746f12e9c2de2813a3614a1a))
+
 # [1.2.0](https://github.com/easingthemes/ki-bundestag/compare/v1.1.0...v1.2.0) (2026-04-02)
 
 
