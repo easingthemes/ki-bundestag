@@ -5,17 +5,16 @@ const router = Router();
 
 // Frontend URL to redirect to after OAuth completes
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-const APP_PATH = process.env.APP_PATH || "/app";
 
 // ── Google OAuth ────────────────────────────────────────────────────────────
 
 router.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
 router.get("/api/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: `${FRONTEND_URL}${APP_PATH}/login?error=google` }),
+  passport.authenticate("google", { failureRedirect: `${FRONTEND_URL}/login?error=google` }),
   (req, res) => {
     // Ensure session is persisted before redirecting — prevents blank-state on first login
-    req.session.save(() => { res.redirect(`${FRONTEND_URL}${APP_PATH}?auth=success`); });
+    req.session.save(() => { res.redirect(`${FRONTEND_URL}/?auth=success`); });
   },
 );
 
@@ -24,10 +23,10 @@ router.get("/api/auth/google/callback",
 router.get("/api/auth/github", passport.authenticate("github", { scope: ["user:email"] }));
 
 router.get("/api/auth/github/callback",
-  passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}${APP_PATH}/login?error=github` }),
+  passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}/login?error=github` }),
   (req, res) => {
     // Ensure session is persisted before redirecting — prevents blank-state on first login
-    req.session.save(() => { res.redirect(`${FRONTEND_URL}${APP_PATH}?auth=success`); });
+    req.session.save(() => { res.redirect(`${FRONTEND_URL}/?auth=success`); });
   },
 );
 
