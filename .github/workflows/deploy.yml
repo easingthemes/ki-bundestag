@@ -61,7 +61,7 @@ jobs:
             data/*.db-wal,
             data/*.db-shm
           SCRIPT_BEFORE: |
-            bash /opt/ki-bundestag/scripts/backup.sh
+            test -f /opt/ki-bundestag/scripts/backup.sh && bash /opt/ki-bundestag/scripts/backup.sh || echo "backup.sh not found, skipping"
           SCRIPT_BEFORE_REQUIRED: "false"
           SCRIPT_AFTER: |
             bash /opt/ki-bundestag/scripts/post-deploy.sh
