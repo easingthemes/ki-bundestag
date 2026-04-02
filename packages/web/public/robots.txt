@@ -56,7 +56,7 @@ User-agent: MJ12bot
 Disallow: /
 
 # Sitemap
-Sitemap: https://kai-bundestag.de/sitemap.xml
+Sitemap: https://bundestag.easingthemes.com/sitemap.xml
 
 # LLM-friendly content
 # See /llms.txt for a Markdown site map optimized for AI consumption
