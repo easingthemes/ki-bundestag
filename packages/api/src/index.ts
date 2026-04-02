@@ -23,6 +23,7 @@ import seatsRouter from "./routes/seats.js";
 import budgetRouter from "./routes/budget.js";
 import adminRouter from "./routes/admin.js";
 import quizRouter from "./routes/quiz.js";
+import markdownRouter from "./routes/markdown.js";
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
@@ -100,6 +101,7 @@ app.use(seatsRouter);
 app.use(budgetRouter);
 app.use(adminRouter);
 app.use(quizRouter);
+app.use(markdownRouter);
 
 // Global error handler — must be last middleware, after all routes
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
