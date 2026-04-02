@@ -61,18 +61,8 @@ jobs:
             data/*.db-wal,
             data/*.db-shm
           SCRIPT_BEFORE: |
-            echo "==> Pre-deploy: backing up databases..."
-            cd /opt/ki-bundestag
-            mkdir -p /opt/backups/ki-bundestag/pre-deploy
-            sqlite3 data/simulation.db ".backup '/opt/backups/ki-bundestag/pre-deploy/simulation.db'" 2>/dev/null || true
-            sqlite3 data/users.db ".backup '/opt/backups/ki-bundestag/pre-deploy/users.db'" 2>/dev/null || true
+            bash /opt/ki-bundestag/scripts/backup.sh
           SCRIPT_BEFORE_REQUIRED: "false"
           SCRIPT_AFTER: |
-            echo "==> Post-deploy: installing deps and restarting..."
-            cd /opt/ki-bundestag
-            npm ci
-            npm run migrate
-            pm2 restart ki-api --update-env
-            echo "==> Deployment complete!"
-            pm2 status
+            bash /opt/ki-bundestag/scripts/post-deploy.sh
           SCRIPT_AFTER_REQUIRED: "true"
