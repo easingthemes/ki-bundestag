@@ -1,18 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 KI Bundestag is an AI-powered simulation of the German parliament. Six political parties, each driven by Claude Haiku, propose bills, debate, vote, and issue statements day by day. After elections, parties negotiate coalition terms over multiple rounds. Results are stored in SQLite and served via a REST API to a React frontend with news feed, polls, and party profiles.
 
 ## Setup (MANDATORY before any work)
 
-**Always run `npm install` from the monorepo root before starting any task.** This ensures all workspace dependencies, dev dependencies (vitest, @types/node, @types/react, etc.), and cross-package links are properly resolved. Without it, typecheck and tests will show false errors about missing modules.
-
-```bash
-npm install               # MUST run first — installs all workspace deps
-```
+**Always run `npm install` from the monorepo root before starting any task.** This ensures all workspace dependencies are resolved. Without it, typecheck and tests will show false errors about missing modules.
 
 ## Commands (run from monorepo root)
 
@@ -20,19 +14,12 @@ npm install               # MUST run first — installs all workspace deps
 npm run seed              # Fresh start: wipe DB, seed 6 parties + initial state (backs up first)
 npm run migrate           # Apply schema changes without clearing data (safe to run repeatedly)
 npm run simulate          # Run simulation days (e.g., npm run simulate 5)
-npm run simulate:3        # Run 3 simulation days
-npm run simulate:6        # Run 6 simulation days
 npm run simulate:auto     # Continuous simulation loop (preset-aware delays)
-npm run migrate:timing    # Add timing preset support to existing DBs
-npm run simulate:visitors # Launch 5 Chrome visitors with random actions (needs dev servers)
-npm run trigger:election  # Force next simulate run to trigger an election (testing)
 npm run dev:api           # Express API on port 3001
 npm run dev:web           # Vite dev server on port 5173 (proxies /api → :3001)
 npm run build             # Build all packages via turbo
 npm run typecheck         # Typecheck all packages via turbo
 npm run lint              # ESLint all packages
-npm run format            # Prettier format all packages
-npm run format:check      # Prettier check formatting
 npm run test              # Run test suite (Vitest)
 npm run kill              # Kill dev servers on ports 3001 and 5173
 ```
@@ -44,7 +31,7 @@ Monorepo with npm workspaces + Turborepo. Four packages:
 - **`types`** — Pure TypeScript type definitions (`emitDeclarationOnly`), no runtime code
 - **`engine`** — Core simulation: AI agent calls, DB access (Drizzle + better-sqlite3), simulation loop
 - **`api`** — Express REST server (11 domain routers in `src/routes/`), imports from engine + types
-- **`web`** — React 19 SPA (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui), has its own local type copies in `src/api/`
+- **`web`** — React 19 SPA (Vite + React Router v7 + Tailwind CSS v4 + shadcn/ui)
 
 Dependency chain: `types` ← `engine` ← `api`. Web is standalone (no workspace deps).
 
@@ -52,84 +39,46 @@ Dependency chain: `types` ← `engine` ← `api`. Web is standalone (no workspac
 
 **Package exports**: Both `types` and `engine` point `"import"` and `"default"` exports to `./src/index.ts` (not `dist/`). If `"default"` ever points to `dist/`, tsx may load stale compiled code — this previously caused a DB path resolution bug.
 
-**ESM**: All packages use `"type": "module"`. Internal imports within engine use `.js` extensions (Node16 ESM requirement). See `.claude/rules/esm.md` for details.
+**ESM**: All packages use `"type": "module"`. Internal imports within engine use `.js` extensions (Node16 ESM requirement).
 
 **DB path resolution**: Path resolved via `import.meta.url` + `findMonorepoRoot()` — independent of working directory. All `npm run` commands must run from monorepo root.
 
 ## Domain-Specific Rules
 
-Detailed rules are in `.claude/rules/` (auto-loaded, path-scoped):
+Detailed rules are in `.claude/rules/` (auto-loaded when working on matching paths):
 
 - **`esm.md`** — ESM import patterns, `.js` extensions, naming conventions
 - **`frontend.md`** — Tailwind v4, shadcn/ui, shared components, color maps
 - **`database.md`** — Dual-DB architecture, Drizzle patterns, seed vs migrate
-- **`simulation.md`** — Agent actions, `runDay()` flow, AI call patterns
+- **`simulation.md`** — Agent actions, `runDay()` flow, AI call patterns, model config
 - **`api.md`** — Express REST conventions, route structure, mappers, middleware
-
-## Web Pages (24 routes)
-
-Dashboard, Parties, PartyDetail, Bills, BillDetail, Elections, Budget, NewsFeed, Polls, Media, Questions, Motions, Interpellations, ConfidenceVotes, ConstitutionalCourt, Referendums, Notifications, SimulationLog, MyActivity, Login, About, SimulationInfo, Impressum, Datenschutz.
-
-Routes in `packages/web/src/main.tsx`, API client in `packages/web/src/api/`.
-
-## API Routes (11 domain routers)
-
-All under `/api/` prefix, served from `packages/api/src/routes/`:
-
-| Route | Domain |
-|-------|--------|
-| `/api/auth` | OAuth login (Google, GitHub), session, logout, providers |
-| `/api/parties` | Party profiles, approval, coalition, alignment, proposals |
-| `/api/bills` | Bills, signals, amendments, speeches, MdB votes |
-| `/api/elections` | Elections, results, government, government history |
-| `/api/simulation` | Sim status, calendar, events, costs, state, health, injections |
-| `/api/parliament` | Crises, Fraktionen, motions, interpellations, confidence votes, court |
-| `/api/content` | Media, polls, questions, referendums |
-| `/api/users` | Profile, activity, impact, catchup, notifications, party join/leave, proposals, limits |
-| `/api/seats` | MdB seat applications, roster, availability |
-| `/api/budgets` | Budget listings |
-| `/api/admin` | Timing preset, context depth, analytics, costs |
-
-## Model Configuration
-
-AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (see `packages/engine/src/agent/model-config.ts`):
-
-- Per-party: SPD/CDU/Grune/FDP/Linke use `anthropic:claude-haiku-4-5-20251001`; AfD uses `xai:grok-3-mini`
-- Per-role: `MODEL_DAILY`, `MODEL_NEGOTIATION` (both Haiku), `MODEL_SYNTHESIS` (Sonnet)
-- Override via env vars: `MODEL_PARTY_<ID>`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`
-- Context depth: `low` ($0.03/day), `normal` ($0.055/day, default), `high` ($0.09/day) — configurable via GitHub workflow, admin API, or DB
-- Era summaries: every 60 days (normal/high), compressed narratives + structured case facts (economy, coalition, bills, elections, crises). Token budget per depth: low 500, normal 1500, high 3000
-- API keys: `ANTHROPIC_API_KEY`, `XAI_API_KEY`
 
 ## Environment
 
-Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. Optional: `XAI_API_KEY`, `DATABASE_PATH`, `USER_DATABASE_PATH`, `API_PORT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `MODEL_DAILY`, `MODEL_NEGOTIATION`, `MODEL_SYNTHESIS`, `MODEL_PARTY_<ID>` (per-party overrides, format `provider:model-id`), `BATCH_POLL_INTERVAL`, `BATCH_TIMEOUT`.
+Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. See `.env.example` for all optional vars.
 
-## Issue Tracker
+## Roadmap
 
-Open issues, bugs, and planned work are tracked in `docs/todo/README.md`. Each item has a detail file in `docs/todo/NNN-slug.md` with description, affected files, and fix notes. Check there first when asked about open todos, known issues, or what to work on next.
+Project roadmap in `docs/todo/README.md`. Check there for open todos or what to work on next.
 
 ## Pre-PR Quality Gates
 
-**Never skip pre-existing issues/errors.** Before opening a PR, ensure:
+Before opening a PR, ensure all pass with zero errors:
 
-1. **`npm run typecheck`** — must pass with zero errors (all packages)
-2. **`npm test`** — must pass with zero failures
-3. **`npm run build`** — must succeed
+1. `npm run typecheck`
+2. `npm test`
+3. `npm run build`
 
-If you find pre-existing errors unrelated to your changes, fix them in the same PR or flag them to the user. Do not open a PR with known failing CI.
+If you find pre-existing errors unrelated to your changes, fix them in the same PR or flag them.
 
 ## Debugging Tips
 
-- **Typecheck**: `npm run typecheck` — always run from monorepo root. If you see errors about missing modules (vitest, @types/node, react), run `npm install` first
-- **DB inspection**: `sqlite3 -header -column data/simulation.db "<query>"` (see `/db-query` command)
-- **Simulation state**: `sqlite3 data/simulation.db "SELECT * FROM simulation_meta LIMIT 1"`
-- **Event trace**: `sqlite3 data/simulation.db "SELECT type, actor, title FROM simulation_events WHERE day_number = N"`
-- **Dev servers**: `lsof -i :3001` (API), `lsof -i :5173` (web) — or use `/dev-start`
-- **Kill stuck servers**: `npm run kill`
+- **Typecheck fails on missing modules?** → Run `npm install` first
+- **DB inspection**: `sqlite3 -header -column data/simulation.db "<query>"`
+- **Dev servers**: `lsof -i :3001` / `lsof -i :5173` — or use `/dev-start`
 
 ## MCP
 
-Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+Always use Context7 MCP for library/API documentation without me having to explicitly ask.
 
-When using `chrome-devtools` MCP to take screenshots, always save to `docs/screenshots/<name>.png` — never to `.claude/screenshots/`.
+When using `chrome-devtools` MCP for screenshots, save to `docs/screenshots/` — never `.claude/screenshots/`.
