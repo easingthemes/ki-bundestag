@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SEMANTIC_HEX, EVENT_TYPE_LABEL } from "@/lib/colors";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 type EventCategory = {
   labelKey: string;
@@ -74,6 +76,7 @@ const PAGE_SIZE = 50;
 const DAY_INITIAL = 5;
 
 export function NewsFeed() {
+  usePageMeta(ROUTE_SEO["/news"] ?? { title: "Nachrichten" });
   const { t } = useTranslation("media");
   const [events, setEvents] = useState<SimulationEvent[]>([]);
   const [total, setTotal] = useState(0);

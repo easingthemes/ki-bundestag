@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { EmptyState } from "../components/EmptyState";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
@@ -20,6 +22,7 @@ const QUESTION_TOPICS = [
 ];
 
 export function Questions() {
+  usePageMeta(ROUTE_SEO["/questions"] ?? { title: "Bürgerfragen" });
   const { t } = useTranslation("parties");
   const { user } = useUser();
   const [questions, setQuestions] = useState<CitizenQuestion[]>([]);

@@ -8,6 +8,8 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const VOTED_KEY = "ki-bundestag-voted-polls";
 
@@ -29,6 +31,7 @@ function markVoted(pollId: string) {
 const BAR_COLORS = ["#004b91", "#28a745", "#dc3545", "#ffc107", "#6f42c1", "#17a2b8"];
 
 export function Polls() {
+  usePageMeta(ROUTE_SEO["/polls"] ?? { title: "Umfragen" });
   const { t } = useTranslation("polls");
   const { user } = useUser();
   const [polls, setPolls] = useState<Poll[]>([]);

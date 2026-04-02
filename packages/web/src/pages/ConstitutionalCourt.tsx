@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
 import { EmptyState } from "../components/EmptyState";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const STATUS_OPTIONS = ["all", "pending", "ruled"] as const;
 const DECISION_OPTIONS = ["all", "struck_down", "upheld"] as const;
@@ -15,6 +17,7 @@ const DECISION_OPTIONS = ["all", "struck_down", "upheld"] as const;
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function ConstitutionalCourt() {
+  usePageMeta(ROUTE_SEO["/constitutional-court"] ?? { title: "Verfassungsgericht" });
   const { t } = useTranslation("parliament");
   const [challenges, setChallenges] = useState<ConstitutionalChallenge[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

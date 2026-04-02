@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE } from "@/lib/colors";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const RECOMMENDATION_STYLE: Record<string, string> = {
   pass: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -27,6 +28,11 @@ export function CommitteeDetail() {
   const [committee, setCommittee] = useState<CommitteeDetailType | null>(null);
   const [parties, setParties] = useState<Party[]>([]);
   const [tab, setTab] = useState<"bills" | "members" | "stats">("bills");
+
+  usePageMeta({
+    title: committee?.name ? `${committee.name} — Ausschuss` : "Ausschuss",
+    description: committee?.name ? `Details zum ${committee.name} im KI-Bundestag.` : undefined,
+  });
 
   const refresh = useCallback(() => {
     if (!id) return;
