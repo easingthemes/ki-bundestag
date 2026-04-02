@@ -71,8 +71,14 @@ Each item links to a detail file with full description, affected files, and impl
 | 025 | [Missing React types / SimulationLog TS errors](./025-missing-react-types-simulation-log.md) | done | Web | — |
 | 026 | [Remove legacy nickname auth and backward-compatibility shims](./026-legacy-auth-cleanup.md) | done | API / Web | — |
 
+## Tooling
+
+| # | Title | Status | Area | PR |
+|---|-------|--------|------|----|
+| 039 | [Install dx-aem-flow plugins](./039-install-dx-plugins.md) | open | Tooling / Claude Code | — |
+
 ## Summary
 
-- **Done**: 34 of 37
+- **Done**: 34 of 38
 - **Postponed**: 2 (#022, #027)
-- **Open**: 3 remaining (#029, #032, #038)
+- **Open**: 4 remaining (#029, #032, #038, #039)
