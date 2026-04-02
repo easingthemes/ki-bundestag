@@ -248,6 +248,8 @@ const PAGES = {
   <p>KAI Bundestag simuliert den Deutschen Bundestag mit sechs KI-gesteuerten Parteien,
   die Gesetze debattieren, Koalitionen bilden und auf Krisen reagieren — autonom und in Echtzeit.</p>
 
+  <p><em>Unabhängiges experimentelles Projekt — keine offizielle Website des Deutschen Bundestages. Alle Inhalte sind KI-generiert und fiktiv.</em></p>
+
   <p><a href="/">Simulation öffnen</a> · <a href="/about">Mehr erfahren</a></p>
 
   <section>
@@ -286,12 +288,16 @@ const PAGES = {
     <h2>Open Source &amp; Transparent</h2>
     <p>Tech-Stack: React 19, Express, TypeScript, SQLite, Claude Haiku/Sonnet (Anthropic), Grok (xAI). Monorepo mit Turborepo.</p>
     <p>Quellcode: <a href="https://github.com/easingthemes/ki-bundestag">github.com/easingthemes/ki-bundestag</a></p>
-    <p><a href="/simulation-info">Technische Details</a></p>
+    <p>Mehr zur Architektur, den KI-Modellen und den laufenden Kosten auf der Seite <a href="/simulation-info">Technische Details der Simulation</a>. Hintergründe zum Konzept und den Teilnahmestufen unter <a href="/about">Über KAI Bundestag</a>.</p>
   </section>
 
   <p><a href="/">Simulation öffnen</a> — Keine Registrierung nötig.</p>
 
-  <p><em>KAI Bundestag ist ein unabhängiges experimentelles Projekt und keine offizielle Website oder Dienstleistung des Deutschen Bundestages. Alle politischen Positionen, Gesetzentwürfe und Medienberichte sind KI-generiert und fiktiv.</em></p>
+  <nav>
+    <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a> · <a href="/about">Über das Projekt</a> · <a href="/simulation-info">Technik</a>
+  </nav>
+
+  <p><em>KAI Bundestag ist ein unabhängiges experimentelles Projekt und keine offizielle Website oder Dienstleistung des Deutschen Bundestages.</em></p>
 </article>`,
   },
 
@@ -401,6 +407,32 @@ function prerender() {
       /(<meta\s+name="twitter:description"\s+content=")[^"]*(")/,
       `$1${escapeAttr(page.description)}$2`
     );
+
+    // Inject BreadcrumbList JSON-LD for subpages
+    if (route !== "/") {
+      const breadcrumbLd = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "KAI Bundestag",
+            "item": BASE_URL + "/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": page.title,
+            "item": BASE_URL + route + "/"
+          }
+        ]
+      });
+      html = html.replace(
+        "</head>",
+        `  <script type="application/ld+json">${breadcrumbLd}</script>\n  </head>`
+      );
+    }
 
     // Inject content into <div id="root">
     html = html.replace(
