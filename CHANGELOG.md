@@ -1,3 +1,11 @@
+# [1.2.0](https://github.com/easingthemes/ki-bundestag/compare/v1.1.1...v1.2.0) (2026-04-02)
+
+
+### Features
+
+* **web:** add /landing/v1 route to preserve original landing page for comparison ([1343dac](https://github.com/easingthemes/ki-bundestag/commit/1343dac5489f361a151b583e993dff409574e00c))
+* **web:** implement shadcn-landing-page template on /landing route ([a6ba69c](https://github.com/easingthemes/ki-bundestag/commit/a6ba69c3f299b68d7d88c8d219e887b7d7255462))
+
 ## [1.1.1](https://github.com/easingthemes/ki-bundestag/compare/v1.1.0...v1.1.1) (2026-04-02)
 
 
