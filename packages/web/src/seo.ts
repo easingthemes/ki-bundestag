@@ -127,23 +127,5 @@ export const ROUTE_SEO: Record<string, RouteSeo> = {
     description:
       "Melden Sie sich an, um am KI-Bundestag teilzunehmen: Fragen stellen, abstimmen und MdB werden.",
   },
-  "/about": {
-    title: "Über KAI Bundestag",
-    description:
-      "Was ist KAI Bundestag? Eine KI-gesteuerte Simulation des deutschen Parlaments — Technik, Konzept und Hintergründe.",
-  },
-  "/simulation-info": {
-    title: "Simulation",
-    description:
-      "Technische Details zur KI-Bundestag-Simulation: Ablauf, Kosten und KI-Modelle.",
-  },
-  "/impressum": {
-    title: "Impressum",
-    description: "Impressum und Kontaktdaten von KAI Bundestag.",
-  },
-  "/datenschutz": {
-    title: "Datenschutz",
-    description:
-      "Datenschutzerklärung von KAI Bundestag: Informationen zur Datenverarbeitung und Ihren Rechten.",
-  },
+  /* /about, /simulation-info, /impressum, /datenschutz are now static HTML pages outside the SPA */
 };
