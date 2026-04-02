@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/easingthemes/ki-bundestag/compare/v1.0.0...v1.0.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* disable semantic-release issue/PR comments ([2725ef0](https://github.com/easingthemes/ki-bundestag/commit/2725ef07755790b89c3e3ea004e23ac7de38c247))
+
 # 1.0.0 (2026-04-02)
 
 
