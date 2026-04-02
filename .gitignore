@@ -153,3 +153,9 @@ data/
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 
+# dx workflow
+.ai/specs/
+.ai/run-context/
+.ai/research/
+.ai/me.md
+

@@ -76,18 +76,6 @@
   },
   "enableAllProjectMcpServers": true,
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/session-start.sh",
-            "statusMessage": "Loading project context..."
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "EnterPlanMode",
@@ -124,18 +112,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/stop-validate.sh",
-            "statusMessage": "Pre-finish validation..."
-          }
-        ]
-      }
-    ],
     "Notification": [
       {
         "matcher": "",
@@ -149,7 +125,24 @@
       }
     ]
   },
+    "env": {
+    "COPILOT_CUSTOM_INSTRUCTIONS_DIRS": ".claude/rules"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "enabledPlugins": {
+    "dx-core@dx-aem-flow": true,
     "superpowers": true
+  },
+  "extraKnownMarketplaces": {
+    "dx-aem-flow": {
+      "source": {
+        "source": "github",
+        "repo": "easingthemes/dx-aem-flow"
+      },
+      "autoUpdate": true
+    }
   }
 }
