@@ -60,6 +60,8 @@ Each item links to a detail file with full description, affected files, and impl
 | 027 | [Scalability: user load testing & architecture improvements](./027-scalability-user-loads.md) | postponed | Engine / API / DB | — |
 | 028 | [Batch API cost savings for scaling users](./028-batch-api-cost-savings.md) | done | Engine / Agent | — |
 | 029 | [Real-world news grounding for simulation](./029-real-world-news-grounding.md) | open | Engine / Agent | — |
+| 040 | [Prominent timeline scrubber with playback controls](./040-prominent-timeline-scrubber.md) | open | Web | — |
+| 041 | [Make debates visible and prominent](./041-debate-visibility.md) | open | Web / API / Engine | — |
 | 031 | [Explore abgeordnetenwatch API for deeper integration](./031-abgeordnetenwatch-api-deep-dive.md) | done | Engine / Agent | — |
 | 032 | [Collect more real-world cost & timing data](./032-collect-real-cost-data.md) | open | Operations / Docs | — |
 | 038 | [Batch API latency monitoring](./038-batch-api-latency-monitoring.md) | open | Engine / Operations | — |
@@ -79,6 +81,6 @@ Each item links to a detail file with full description, affected files, and impl
 
 ## Summary
 
-- **Done**: 34 of 38
+- **Done**: 34 of 40
 - **Postponed**: 2 (#022, #027)
-- **Open**: 4 remaining (#029, #032, #038, #039)
+- **Open**: 6 remaining (#029, #032, #038, #039, #040, #041)
