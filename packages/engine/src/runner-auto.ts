@@ -2,7 +2,8 @@ import "dotenv/config";
 import { runDay } from "./simulation/index.js";
 import { closeDb, getSqlite } from "./db/index.js";
 import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
-import { allProvidersLimited, AIProviderLimitError } from "./agent/client.js";
+import { allProvidersLimited, allProvidersUnavailable, AIProviderLimitError, AIProviderAuthError } from "./agent/client.js";
+import { getDayAIHealth } from "./agent/cost-tracker.js";
 import { printRunSummary } from "./simulation/run-stats.js";
 
 /** Clear dayStartedAt so the frontend stops showing "running" after a failure */
@@ -38,6 +39,12 @@ function readPreset(): TimingPreset {
     return "normal";
   }
 }
+
+/** Number of consecutive days where ALL AI calls failed (0 successes). */
+let consecutiveAIFailDays = 0;
+
+/** Threshold: pause after this many consecutive days with 0% AI success. */
+const AI_FAIL_PAUSE_THRESHOLD = 2;
 
 let running = true;
 
@@ -75,6 +82,22 @@ async function main() {
       const durationSec = (durationMs / 1000).toFixed(1);
       console.log(`  [Timing] Day ${dayAfter} completed in ${durationSec}s`);
 
+      // Check AI health: did any AI calls succeed this day?
+      // Two failure modes: (1) batch submitted but all results failed (totalCalls > 0, successfulCalls = 0)
+      // (2) batch submission itself threw, so no results recorded at all (totalCalls = 0)
+      // Both indicate the AI provider is broken (expired key, sustained outage, etc.)
+      const health = getDayAIHealth(dayAfter);
+      const aiCompletelyFailed = health.totalCalls === 0 || health.successfulCalls === 0;
+      if (aiCompletelyFailed) {
+        consecutiveAIFailDays++;
+        const detail = health.totalCalls === 0
+          ? "no AI calls recorded (batch submission failed)"
+          : `ALL ${health.totalCalls} AI calls failed`;
+        console.warn(`  [Runner] Day ${dayAfter}: ${detail} (${consecutiveAIFailDays} consecutive)`);
+      } else {
+        consecutiveAIFailDays = 0;
+      }
+
       // Print periodic summary every 10 days
       if (daysCompleted % 10 === 0) {
         printRunSummary(dayTimings.slice(-10), Date.now() - runStart, { periodic: true, totalDays: daysCompleted });
@@ -92,6 +115,11 @@ async function main() {
         } catch { /* best-effort */ }
       }
 
+      // Auth failure = non-recoverable, stop immediately if all providers are down
+      if (err instanceof AIProviderAuthError) {
+        console.error(`[Runner] Auth failure (${err.provider}) — provider disabled for this session.`);
+      }
+
       // If it's a spending limit error, don't keep looping — fall through to the allProvidersLimited() check
       if (err instanceof AIProviderLimitError) {
         console.error(`[Runner] API limit hit (${err.provider}), will pause below.`);
@@ -100,7 +128,15 @@ async function main() {
 
     if (!running) break;
 
-    // If all AI providers are limited, pause until limits reset
+    // If all providers are unavailable (auth-failed or limited), stop immediately
+    if (allProvidersUnavailable()) {
+      console.error(`\n  [Runner] *** All AI providers are unavailable (auth failure or usage limit) — stopping simulation ***`);
+      console.error(`  [Runner] Fix the API key/billing issue and restart the process.\n`);
+      running = false;
+      break;
+    }
+
+    // If all AI providers are limited (but not auth-failed), pause until limits reset
     if (allProvidersLimited()) {
       console.log("\n  [Runner] All AI providers have hit usage limits. Pausing simulation.");
       console.log("  [Runner] Restart the process after limits reset, or press Ctrl+C to stop.\n");
@@ -108,6 +144,16 @@ async function main() {
         await sleep(60_000);
       }
       if (!running) break;
+    }
+
+    // If N consecutive days had 0% AI success, the API key is likely dead.
+    // Stop the loop to avoid producing more empty days.
+    if (consecutiveAIFailDays >= AI_FAIL_PAUSE_THRESHOLD) {
+      console.error(`\n  [Runner] *** ${consecutiveAIFailDays} consecutive days with 0% AI success — stopping simulation ***`);
+      console.error(`  [Runner] Likely cause: expired/invalid API key, or sustained API outage.`);
+      console.error(`  [Runner] Fix the issue and restart the process.\n`);
+      running = false;
+      break;
     }
 
     const delay = getDelayMs(preset);
