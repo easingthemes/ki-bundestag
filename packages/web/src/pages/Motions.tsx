@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, MOTION_TYPE_BADGE, VOTE_COLORS } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const STATUS_ORDER = ["passed", "rejected"];
 
 export function Motions() {
+  usePageMeta(ROUTE_SEO["/motions"] ?? { title: "Anträge" });
   const { t } = useTranslation("parliament");
   const [motions, setMotions] = useState<Motion[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

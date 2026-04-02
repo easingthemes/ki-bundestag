@@ -14,6 +14,7 @@ import { MdbVoteButtons } from "@/components/bills/MdbVoteButtons";
 import { SpeechDisplay } from "@/components/bills/SpeechDisplay";
 import { SpeechSubmitForm } from "@/components/bills/SpeechSubmitForm";
 import { useTranslation } from "react-i18next";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const STAGE_ORDER: Record<string, number> = {
   proposed: 0,
@@ -48,6 +49,11 @@ export function BillDetail() {
   const [mdbError, setMdbError] = useState<string | null>(null);
   const [mySeat, setMySeat] = useState<BundestagSeat | null>(null);
   const [committees, setCommittees] = useState<CommitteeListItem[]>([]);
+
+  usePageMeta({
+    title: bill?.title ? bill.title : "Gesetzentwurf",
+    description: bill?.title ? `Details zum Gesetzentwurf „${bill.title}" im KI-Bundestag.` : undefined,
+  });
 
   useEffect(() => {
     if (user) api.getMySeat().then(r => setMySeat(r.seat)).catch(() => {});

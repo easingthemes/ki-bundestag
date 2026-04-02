@@ -1,37 +1,39 @@
-import { StrictMode, useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { StrictMode, useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
-import { Parties } from "./pages/Parties";
-import { Bills } from "./pages/Bills";
-import { SimulationLog } from "./pages/SimulationLog";
-import { Elections } from "./pages/Elections";
-import { PartyDetail } from "./pages/PartyDetail";
-import { NewsFeed } from "./pages/NewsFeed";
-import { Polls } from "./pages/Polls";
-import { Media } from "./pages/Media";
-import { Questions } from "./pages/Questions";
-import { Referendums } from "./pages/Referendums";
-import { Motions } from "./pages/Motions";
-import { Interpellations } from "./pages/Interpellations";
-import { ConfidenceVotes } from "./pages/ConfidenceVotes";
-import { ConstitutionalCourt } from "./pages/ConstitutionalCourt";
-import { Budget } from "./pages/Budget";
-import { About } from "./pages/About";
-import { SimulationInfo } from "./pages/SimulationInfo";
-import { Impressum } from "./pages/Impressum";
-import { Datenschutz } from "./pages/Datenschutz";
-import { Quiz } from "./pages/Quiz";
-import { Lobbying } from "./pages/Lobbying";
-import { PartyFinance } from "./pages/PartyFinance";
-import { Login } from "./pages/Login";
-import { BillDetail } from "./pages/BillDetail";
-import { Notifications } from "./pages/Notifications";
-import { MyActivity } from "./pages/MyActivity";
-import { MdbList } from "./pages/MdbList";
-import { MdbDetail } from "./pages/MdbDetail";
-import { Committees } from "./pages/Committees";
-import { CommitteeDetail } from "./pages/CommitteeDetail";
+
+/* ── Lazy-loaded page components (code splitting) ──────────────── */
+const Parties = lazy(() => import("./pages/Parties").then(m => ({ default: m.Parties })));
+const Bills = lazy(() => import("./pages/Bills").then(m => ({ default: m.Bills })));
+const SimulationLog = lazy(() => import("./pages/SimulationLog").then(m => ({ default: m.SimulationLog })));
+const Elections = lazy(() => import("./pages/Elections").then(m => ({ default: m.Elections })));
+const PartyDetail = lazy(() => import("./pages/PartyDetail").then(m => ({ default: m.PartyDetail })));
+const NewsFeed = lazy(() => import("./pages/NewsFeed").then(m => ({ default: m.NewsFeed })));
+const Polls = lazy(() => import("./pages/Polls").then(m => ({ default: m.Polls })));
+const Media = lazy(() => import("./pages/Media").then(m => ({ default: m.Media })));
+const Questions = lazy(() => import("./pages/Questions").then(m => ({ default: m.Questions })));
+const Referendums = lazy(() => import("./pages/Referendums").then(m => ({ default: m.Referendums })));
+const Motions = lazy(() => import("./pages/Motions").then(m => ({ default: m.Motions })));
+const Interpellations = lazy(() => import("./pages/Interpellations").then(m => ({ default: m.Interpellations })));
+const ConfidenceVotes = lazy(() => import("./pages/ConfidenceVotes").then(m => ({ default: m.ConfidenceVotes })));
+const ConstitutionalCourt = lazy(() => import("./pages/ConstitutionalCourt").then(m => ({ default: m.ConstitutionalCourt })));
+const Budget = lazy(() => import("./pages/Budget").then(m => ({ default: m.Budget })));
+const About = lazy(() => import("./pages/About").then(m => ({ default: m.About })));
+const SimulationInfo = lazy(() => import("./pages/SimulationInfo").then(m => ({ default: m.SimulationInfo })));
+const Impressum = lazy(() => import("./pages/Impressum").then(m => ({ default: m.Impressum })));
+const Datenschutz = lazy(() => import("./pages/Datenschutz").then(m => ({ default: m.Datenschutz })));
+const Quiz = lazy(() => import("./pages/Quiz").then(m => ({ default: m.Quiz })));
+const Lobbying = lazy(() => import("./pages/Lobbying").then(m => ({ default: m.Lobbying })));
+const PartyFinance = lazy(() => import("./pages/PartyFinance").then(m => ({ default: m.PartyFinance })));
+const Login = lazy(() => import("./pages/Login").then(m => ({ default: m.Login })));
+const BillDetail = lazy(() => import("./pages/BillDetail").then(m => ({ default: m.BillDetail })));
+const Notifications = lazy(() => import("./pages/Notifications").then(m => ({ default: m.Notifications })));
+const MyActivity = lazy(() => import("./pages/MyActivity").then(m => ({ default: m.MyActivity })));
+const MdbList = lazy(() => import("./pages/MdbList").then(m => ({ default: m.MdbList })));
+const MdbDetail = lazy(() => import("./pages/MdbDetail").then(m => ({ default: m.MdbDetail })));
+const Committees = lazy(() => import("./pages/Committees").then(m => ({ default: m.Committees })));
+const CommitteeDetail = lazy(() => import("./pages/CommitteeDetail").then(m => ({ default: m.CommitteeDetail })));
 import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat, onSimStatus, onNotificationRefresh, isSocketConnected } from "./api";
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -680,6 +682,7 @@ function App() {
 
         {/* Main content */}
         <main className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5 overflow-x-hidden">
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/parties" element={<Parties />} />
@@ -713,6 +716,7 @@ function App() {
             <Route path="/impressum" element={<Impressum />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
           </Routes>
+          </Suspense>
         </main>
 
         {/* Footer */}

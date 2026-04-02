@@ -9,11 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE as STATUS_BADGE_COLORS, INTERPELLATION_TYPE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { FilterPills } from "@/components/FilterPills";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const STATUS_OPTIONS = ["all", "pending", "answered", "expired"] as const;
 const TYPE_OPTIONS = ["all", "kleine", "große"] as const;
 
 export function Interpellations() {
+  usePageMeta(ROUTE_SEO["/interpellations"] ?? { title: "Anfragen" });
   const { t } = useTranslation("parliament");
   const [interpellations, setInterpellations] = useState<Interpellation[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

@@ -46,6 +46,9 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
+# Sitemap
+Sitemap: https://kai-bundestag.de/sitemap.xml
+
 # LLM-friendly content
 # See /llms.txt for a Markdown site map optimized for AI consumption
 # See /llms-full.txt for full page content in Markdown

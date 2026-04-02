@@ -12,6 +12,8 @@ import { BundesadlerIcon } from "@/components/elections/BundesadlerIcon";
 import { VoteBarChart } from "@/components/elections/VoteBarChart";
 import { CoalitionChips } from "@/components/elections/CoalitionChips";
 import { CoalitionCalculator } from "@/components/elections/CoalitionCalculator";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
@@ -56,6 +58,7 @@ function InitialAvatar({ name, color, size = 32 }: { name: string; color: string
 }
 
 export function Elections() {
+  usePageMeta(ROUTE_SEO["/elections"] ?? { title: "Wahlen" });
   const { t } = useTranslation("elections");
   const [elections, setElections] = useState<Election[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

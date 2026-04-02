@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { STATUS_BADGE, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { FilterPills } from "@/components/FilterPills";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const MINISTRY_COLORS: Record<keyof BudgetAllocations, string> = {
   finance: "#4a6fa5",
@@ -24,6 +26,7 @@ const MINISTRY_COLORS: Record<keyof BudgetAllocations, string> = {
 const TOTAL_SEATS = 735;
 
 export function Budget() {
+  usePageMeta(ROUTE_SEO["/budget"] ?? { title: "Haushalt" });
   const { t } = useTranslation("budget");
   const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

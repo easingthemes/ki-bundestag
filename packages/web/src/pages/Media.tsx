@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BIAS_BADGE as SHARED_BIAS_BADGE } from "@/lib/colors";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const CATEGORY_COLORS: Record<string, string> = {
   policy: "#1d4ed8",
@@ -39,6 +41,7 @@ function ArticleBanner({ id, category }: { id: string; category: string }) {
 }
 
 export function Media() {
+  usePageMeta(ROUTE_SEO["/media"] ?? { title: "Presse" });
   const { t } = useTranslation("media");
   const [articles, setArticles] = useState<MediaArticle[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());

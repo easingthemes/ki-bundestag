@@ -20,6 +20,8 @@ import { CatchupCard } from "@/components/dashboard/CatchupCard";
 import { LiveEventTicker } from "@/components/dashboard/LiveEventTicker";
 import { AskPartyWidget } from "@/components/dashboard/AskPartyWidget";
 import { SimStatusPill } from "@/components/dashboard/SimStatusPill";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
   "Berliner Tagesspiegel": { color: "#1d4ed8", label: "Tagesspiegel" },
@@ -28,6 +30,7 @@ const OUTLET_STYLE: Record<string, { color: string; label: string }> = {
 };
 
 export function Dashboard() {
+  usePageMeta(ROUTE_SEO["/"] ?? { title: "Dashboard" });
   const { t } = useTranslation("dashboard");
   const { user } = useUser();
   const [state, setState] = useState<NationalState | null>(null);

@@ -8,10 +8,13 @@ import { useUser } from "../userContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_BADGE, ALERT_STYLES } from "@/lib/colors";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function Referendums() {
+  usePageMeta(ROUTE_SEO["/referendums"] ?? { title: "Volksentscheide" });
   const { t } = useTranslation("polls");
   const { user } = useUser();
   const [referendums, setReferendums] = useState<Referendum[]>([]);

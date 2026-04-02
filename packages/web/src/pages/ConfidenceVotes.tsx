@@ -10,11 +10,14 @@ import { cn } from "@/lib/utils";
 import { STATUS_BADGE, CONFIDENCE_TYPE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
 import { VoteBar } from "@/components/VoteBar";
 import { FilterPills } from "@/components/FilterPills";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const STATUS_OPTIONS = ["all", "passed", "failed"] as const;
 const TYPE_OPTIONS = ["all", "vertrauensfrage", "misstrauensvotum"] as const;
 
 export function ConfidenceVotes() {
+  usePageMeta(ROUTE_SEO["/confidence-votes"] ?? { title: "Vertrauensfragen" });
   const { t } = useTranslation("parliament");
   const [votes, setVotes] = useState<ConfidenceVote[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
