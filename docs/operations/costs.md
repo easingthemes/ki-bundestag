@@ -24,8 +24,8 @@ All Anthropic calls go through **Message Batches API (50% discount)**.
 
 > Batch API adds ~2–5 min latency per submission. With 3–4 batches per day,
 > each sim day takes **~10 min** in ultra-fast mode (AI-bound).
-> See [batch-timing-log.md](./batch-timing-log.md) for detailed observations.
-> See [real-cost-analysis.md](./real-cost-analysis.md) for full cost analysis from real runs.
+> See [timing.md](./timing.md) for detailed observations.
+> See [analysis.md](./analysis.md) for full cost analysis from real runs.
 > Normal/slow presets absorb this within their inter-day delay (30-90 min).
 > PM2 restarts will abandon in-flight batches — wasting tokens.
 
@@ -105,7 +105,7 @@ Advancing between tiers is instant once deposit threshold is met.
 
 > Context depth is configurable: **low** (~$0.020/day, projected), **normal** (~$0.028/day, **measured**), **high** (~$0.040/day, projected). Numbers above are for "normal" as measured from a 12-day run. Set via GitHub Actions, admin API, or DB column `context_depth`.
 > Prompt caching is active — up to 99% of input tokens served from cache at $0.10/MTok.
-> See [real-cost-analysis.md](./real-cost-analysis.md) for full analysis.
+> See [analysis.md](./analysis.md) for full analysis.
 
 ### Per Term (1461 days)
 

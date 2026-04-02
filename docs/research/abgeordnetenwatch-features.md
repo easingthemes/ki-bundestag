@@ -1,7 +1,7 @@
 # Abgeordnetenwatch Feature Implementation
 
 > Implementation record for features inspired by [abgeordnetenwatch.de](https://abgeordnetenwatch.de).
-> API reference: [abgeordnetenwatch-api-reference.md](./abgeordnetenwatch-api-reference.md)
+> API reference: [abgeordnetenwatch-api.md](./abgeordnetenwatch-api.md)
 
 ## Design Constraints
 
@@ -153,7 +153,7 @@ Adds three capabilities using existing abgeordnetenwatch voting data (already fe
 
 **Status:** Pending. Design complete. The `real_world_knowledge` table and `knowledge-fetch.ts` infrastructure already exist.
 
-Planned expansion: dynamic parliament period discovery, per-party voting record enrichment, citizen Q&A topic fetching, and side job content from abgeordnetenwatch API. Five-phase approach documented in [abgeordnetenwatch-api-reference.md](./abgeordnetenwatch-api-reference.md).
+Planned expansion: dynamic parliament period discovery, per-party voting record enrichment, citizen Q&A topic fetching, and side job content from abgeordnetenwatch API. Five-phase approach documented in [abgeordnetenwatch-api.md](./abgeordnetenwatch-api.md).
 
 ---
 

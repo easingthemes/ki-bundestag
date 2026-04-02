@@ -165,7 +165,7 @@ Based on token ratios from prompt sizes and call counts:
 
 The web page `SimulationCosts.tsx` lists Haiku as "$0.80 / $4.00" — this is the old **Haiku 3.5** pricing. We actually use **Haiku 4.5** at $1.00/$5.00. The batch pricing is $0.50/$2.50. The cost estimates in the page were calculated using some mix of old and new prices.
 
-The `api-costs.md` doc correctly lists Haiku 4.5 at $1.00/$5.00, but the web page hardcodes the wrong base prices.
+The `costs.md` doc correctly lists Haiku 4.5 at $1.00/$5.00, but the web page hardcodes the wrong base prices.
 
 ---
 
