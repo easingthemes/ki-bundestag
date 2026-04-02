@@ -30,8 +30,11 @@ import {
   detectLimitError,
   callAI,
   AIProviderLimitError,
+  AIProviderAuthError,
   clearProviderLimits,
   markProviderLimited,
+  markProviderAuthFailed,
+  allProvidersUnavailable,
   parseResetTime,
 } from "./client.js";
 
@@ -135,6 +138,47 @@ describe("detectLimitError", () => {
     };
     const result = detectLimitError(err);
     if (result.type === "hard") {
+      expect(result.provider).toBe("xai");
+    }
+  });
+
+  it("detects 401 Unauthorized as auth error", () => {
+    const result = detectLimitError({ status: 401, message: "Unauthorized" });
+    expect(result.type).toBe("auth");
+    if (result.type === "auth") {
+      expect(result.reason).toContain("invalid or expired API key");
+      expect(result.provider).toBe("anthropic");
+    }
+  });
+
+  it("detects 403 Forbidden as auth error", () => {
+    const result = detectLimitError({ status: 403, message: "Forbidden" });
+    expect(result.type).toBe("auth");
+    if (result.type === "auth") {
+      expect(result.reason).toContain("access denied or key revoked");
+    }
+  });
+
+  it("detects 402 Payment Required as auth error", () => {
+    const result = detectLimitError({ statusCode: 402, message: "Payment Required" });
+    expect(result.type).toBe("auth");
+    if (result.type === "auth") {
+      expect(result.reason).toContain("billing issue");
+    }
+  });
+
+  it("detects Anthropic SDK AuthenticationError by class name", () => {
+    const result = detectLimitError({ name: "AuthenticationError", message: "invalid x-api-key" });
+    expect(result.type).toBe("auth");
+    if (result.type === "auth") {
+      expect(result.reason).toContain("AuthenticationError");
+    }
+  });
+
+  it("detects xAI auth error from x.ai URL", () => {
+    const result = detectLimitError({ status: 401, url: "https://api.x.ai/v1/messages" });
+    expect(result.type).toBe("auth");
+    if (result.type === "auth") {
       expect(result.provider).toBe("xai");
     }
   });
@@ -318,6 +362,37 @@ describe("callAI", () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
+  it("detects 401 auth error → marks provider → throws AIProviderAuthError", async () => {
+    mockGenerateText.mockRejectedValueOnce({
+      status: 401,
+      message: "invalid x-api-key",
+      name: "AuthenticationError",
+    });
+
+    await expect(
+      callAI({ system: "sys", prompt: "user", maxTokens: 100 }),
+    ).rejects.toThrow(AIProviderAuthError);
+
+    // Circuit breaker should now block further calls without hitting the API
+    await expect(
+      callAI({ system: "sys", prompt: "user", maxTokens: 100 }),
+    ).rejects.toThrow(AIProviderAuthError);
+
+    // generateText called only once — second call blocked by auth circuit breaker
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry on 401 auth errors", async () => {
+    mockGenerateText.mockRejectedValueOnce({ status: 401, message: "Unauthorized" });
+
+    await expect(
+      callAI({ system: "sys", prompt: "user", maxTokens: 100 }),
+    ).rejects.toThrow(AIProviderAuthError);
+
+    // No retries — auth errors are immediately fatal
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+  });
+
   it("clears expired circuit breaker and retries the call", async () => {
     // Mark as limited but with a resetAt in the past
     markProviderLimited("anthropic", "2020-01-01T00:00:00Z", Date.now() - 1);
@@ -326,5 +401,43 @@ describe("callAI", () => {
     const result = await callAI({ system: "sys", prompt: "user", maxTokens: 100 });
     expect(result.text).toBe("test response");
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allProvidersUnavailable
+// ---------------------------------------------------------------------------
+
+describe("allProvidersUnavailable", () => {
+  beforeEach(() => {
+    clearProviderLimits();
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    vi.stubEnv("XAI_API_KEY", "test-xai-key");
+  });
+
+  afterEach(() => {
+    clearProviderLimits();
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when no providers are failed", () => {
+    expect(allProvidersUnavailable()).toBe(false);
+  });
+
+  it("returns false when only one provider is auth-failed (other is available)", () => {
+    markProviderAuthFailed("anthropic");
+    expect(allProvidersUnavailable()).toBe(false);
+  });
+
+  it("returns true when all providers are auth-failed", () => {
+    markProviderAuthFailed("anthropic");
+    markProviderAuthFailed("xai");
+    expect(allProvidersUnavailable()).toBe(true);
+  });
+
+  it("returns true when one is auth-failed and other is limited", () => {
+    markProviderAuthFailed("anthropic");
+    markProviderLimited("xai", "2099-01-01T00:00:00Z", Date.now() + 3_600_000);
+    expect(allProvidersUnavailable()).toBe(true);
   });
 });
