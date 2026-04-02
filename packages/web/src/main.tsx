@@ -528,6 +528,8 @@ function NotificationBell() {
 function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div
+      role="alert"
+      aria-live="assertive"
       className="fixed top-[56px] left-1/2 -translate-x-1/2 z-[1000] min-w-[280px] max-w-[480px] bg-destructive text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium cursor-pointer animate-in fade-in slide-in-from-top-2 duration-200"
       onClick={onDismiss}
     >
@@ -602,8 +604,16 @@ function App() {
     <BrowserRouter>
       <ScrollToHash />
       <div className="min-h-screen flex flex-col">
+        {/* Skip to main content link for keyboard/screen reader users */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-0 focus:left-0 focus:z-[100] focus:bg-primary focus:text-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
+        >
+          {t("aria.skipToContent")}
+        </a>
+
         {/* ── Top navigation bar ── */}
-        <nav className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
+        <nav aria-label={t("aria.mainNavigation")} className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
           <Link to="/" className="font-extrabold text-base text-white no-underline mr-5 whitespace-nowrap shrink-0 tracking-tight hover:opacity-90">
             KAI Bundestag
           </Link>
@@ -681,8 +691,8 @@ function App() {
         {error && <ErrorToast message={error} onDismiss={() => setError(null)} />}
 
         {/* Main content */}
-        <main className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5 overflow-x-hidden">
-          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>}>
+        <main id="main-content" className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5 overflow-x-hidden">
+          <Suspense fallback={<div className="flex items-center justify-center py-20" role="status" aria-label={t("aria.loading")}><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /><span className="sr-only">{t("aria.loading")}</span></div>}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/parties" element={<Parties />} />
@@ -720,7 +730,7 @@ function App() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-border bg-card mt-6">
+        <footer className="border-t border-border bg-card mt-6" role="contentinfo">
           <div className="max-w-[1280px] mx-auto px-6 py-4 flex justify-between items-center flex-wrap gap-3 max-md:flex-col max-md:text-center">
             <div className="flex gap-5">
               <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.protocol")}</Link>

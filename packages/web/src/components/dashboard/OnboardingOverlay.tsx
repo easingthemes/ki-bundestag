@@ -121,7 +121,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
                 {joinStatus === "loading" ? "..." : joinStatus === "success" ? t("onboarding.beigetreten") : t("onboarding.beitreten")}
               </button>
               {joinStatus === "error" && (
-                <div className="text-xs text-destructive">{joinError}</div>
+                <div role="alert" aria-live="assertive" className="text-xs text-destructive">{joinError}</div>
               )}
             </div>
           )}
@@ -147,6 +147,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
             <input
               type="text"
               placeholder={t("askParty.placeholder")}
+              aria-label={t("askParty.placeholder")}
               value={askText}
               onChange={e => setAskText(e.target.value)}
               maxLength={140}
@@ -166,7 +167,7 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
             </button>
           </div>
           {askStatus === "error" && (
-            <div className="text-xs text-destructive">{t("onboarding.fehlerBeimSenden")}</div>
+            <div role="alert" aria-live="assertive" className="text-xs text-destructive">{t("onboarding.fehlerBeimSenden")}</div>
           )}
         </div>
       ),
@@ -224,13 +225,23 @@ export function OnboardingOverlay({ externalOpen, onClose, parties }: Onboarding
   const current = steps[step];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={dismiss}>
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+      onClick={dismiss}
+      onKeyDown={e => { if (e.key === "Escape") dismiss(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
+        className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
           <span className="text-xs font-medium text-muted-foreground">{t("onboarding.schritt", { current: step + 1, total: steps.length })}</span>
-          <button onClick={dismiss} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">{t("onboarding.ueberspringen")}</button>
+          <button onClick={dismiss} aria-label={t("onboarding.ueberspringen")} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">{t("onboarding.ueberspringen")}</button>
         </div>
-        <h3 className="text-lg font-semibold mb-1">{current.title}</h3>
+        <h3 id="onboarding-title" className="text-lg font-semibold mb-1">{current.title}</h3>
         <p className="text-sm text-muted-foreground">{current.desc}</p>
         {current.content}
         <div className="flex items-center gap-2 mt-4">

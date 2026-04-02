@@ -55,6 +55,7 @@ export function AskPartyWidget({ parties, coalitionParties }: AskPartyWidgetProp
           <input
             type="text"
             placeholder={t("askParty.placeholder")}
+            aria-label={t("askParty.placeholder")}
             value={questionText}
             onChange={e => setQuestionText(e.target.value)}
             maxLength={140}
@@ -65,10 +66,10 @@ export function AskPartyWidget({ parties, coalitionParties }: AskPartyWidgetProp
           </Button>
         </div>
         {submitStatus === "success" && (
-          <div className="mt-1.5 px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">{t("askParty.eingereicht")}</div>
+          <div role="status" aria-live="polite" className="mt-1.5 px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 text-xs">{t("askParty.eingereicht")}</div>
         )}
         {submitStatus === "error" && (
-          <div className="mt-1.5 px-2.5 py-1 rounded bg-red-50 text-red-700 text-xs">{errorMsg}</div>
+          <div role="alert" aria-live="assertive" className="mt-1.5 px-2.5 py-1 rounded bg-red-50 text-red-700 text-xs">{errorMsg}</div>
         )}
       </CardContent>
     </Card>
