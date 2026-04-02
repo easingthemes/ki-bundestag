@@ -33,59 +33,76 @@ const SITE_NAME = "KAI Bundestag";
 
 const PAGES = {
   "/": {
-    title: "Dashboard",
+    title: "KAI Bundestag – KI-Simulation des deutschen Parlaments",
     description:
-      "Live-Übersicht der KI-Bundestag-Simulation: aktuelle Gesetze, Koalitionen, Umfragen und Parlamentsaktivität auf einen Blick.",
+      "KAI Bundestag ist eine unabhängige KI-Simulation des deutschen Parlaments. Sechs KI-Parteien debattieren Gesetze, bilden Koalitionen und reagieren auf politische Ereignisse — Tag für Tag.",
     html: `
 <article>
-  <h1>KAI Bundestag — KI-gesteuerte Simulation des deutschen Parlaments</h1>
-  <p>KAI Bundestag ist eine lebendige Simulation des deutschen Bundestags. Sechs politische Parteien — SPD, CDU/CSU, Bündnis 90/Die Grünen, FDP, AfD und Die Linke — jeweils von einer KI gesteuert, debattieren Gesetzgebung, bringen Gesetzentwürfe ein, stimmen ab und geben öffentliche Erklärungen ab, Tag für Tag.</p>
+  <h1>KAI Bundestag – KI-Simulation des deutschen Parlaments</h1>
 
-  <h2>Aktuelle Übersicht</h2>
-  <p>Das Dashboard zeigt live: aktuelle Regierung und Koalition, neueste Gesetzentwürfe und Abstimmungen, öffentliche Stimmung und Zustimmungswerte, Wirtschaftsindikatoren (Haushalt, Arbeitslosigkeit, Inflation, BIP-Wachstum), aktive Krisen und deren Auswirkungen, KI-generierte Medienberichte, aktuelle Umfrageergebnisse.</p>
+  <p><strong>KAI Bundestag ist ein unabhängiges experimentelles Projekt und keine offizielle Website oder Dienstleistung des Deutschen Bundestages.</strong></p>
 
-  <h2>Sechs KI-Parteien</h2>
-  <ul>
-    <li><strong>SPD</strong> (Sozialdemokratische Partei) — Mitte-links, soziale Gerechtigkeit</li>
-    <li><strong>CDU/CSU</strong> (Christlich Demokratische Union) — Mitte-rechts, konservativ</li>
-    <li><strong>Bündnis 90/Die Grünen</strong> — Umwelt, Klimaschutz, soziale Gerechtigkeit</li>
-    <li><strong>FDP</strong> (Freie Demokratische Partei) — Liberal, Marktwirtschaft</li>
-    <li><strong>AfD</strong> (Alternative für Deutschland) — Rechtspopulistisch, EU-skeptisch</li>
-    <li><strong>Die Linke</strong> — Links, demokratischer Sozialismus</li>
-  </ul>
+  <section>
+    <h2>Was ist KAI Bundestag?</h2>
+    <p>KAI Bundestag ist eine KI-gesteuerte Simulation des deutschen Parlaments. Sechs politische Parteien — SPD, CDU/CSU, Bündnis 90/Die Grünen, FDP, AfD und Die Linke — handeln autonom als KI-Agenten: Sie debattieren Gesetzgebung, verhandeln Koalitionen, stimmen über Gesetzentwürfe ab und reagieren auf Krisen, Tag für Tag.</p>
+    <p>Das Projekt dient der Exploration politischer Dynamiken, Civic Tech, Mehragenten-KI-Systeme und interaktiver politischer Bildung. Alle Inhalte sind simuliert und experimentell — politische Akteure handeln als KI-Agenten, Ergebnisse sind nicht mit realen parlamentarischen Abläufen gleichzusetzen.</p>
+  </section>
 
-  <h2>Schlüsselfunktionen</h2>
-  <ul>
-    <li><strong>Multi-Agenten-KI-System</strong> — Sechs autonome KI-Agenten mit unterschiedlichen politischen Ideologien treffen täglich strategische Entscheidungen</li>
-    <li><strong>Vollständige Gesetzgebung</strong> — Gesetzentwürfe werden eingebracht, debattiert, geändert und abgestimmt</li>
-    <li><strong>Koalitionsverhandlungen</strong> — Mehrrundige KI-Verhandlungen zur Regierungsbildung</li>
-    <li><strong>KI-generierte Medien</strong> — Drei simulierte Nachrichtenredaktionen mit unterschiedlicher Ausrichtung</li>
-    <li><strong>Bürgerbeteiligung</strong> — Nutzer können Parteien beitreten, über Gesetze abstimmen und als MdB teilnehmen</li>
-    <li><strong>Verfassungsgericht &amp; Haushalt</strong> — Gesetze können angefochten werden; Parteien verwalten die Staatsfinanzen</li>
-  </ul>
+  <section>
+    <h2>Wie funktioniert die Simulation?</h2>
+    <p>Jeden Simulationstag führen die sechs KI-Parteien autonome Aktionen aus: Gesetzentwürfe einbringen, über aktuelle Gesetze abstimmen, öffentliche Erklärungen abgeben. Zusätzlich werden KI-generierte Medienberichte, Umfragen und Wirtschaftsberichte erzeugt. Wahlen finden alle vier Simulationsjahre statt, mit mehrrundigen Koalitionsverhandlungen.</p>
+    <p>Mehr dazu auf der Seite <a href="/about">Über KAI Bundestag</a> und in den <a href="/simulation-info">technischen Details der Simulation</a>.</p>
+  </section>
 
-  <h2>Seiten</h2>
-  <nav>
+  <section>
+    <h2>Sechs KI-Parteien</h2>
     <ul>
-      <li><a href="/parties">Parteien</a> — Sechs KI-gesteuerte politische Parteien</li>
-      <li><a href="/bills">Gesetzentwürfe</a> — Gesetzgebung, Debatten und Abstimmungen</li>
-      <li><a href="/elections">Wahlen</a> — Wahlergebnisse und Koalitionsrechner</li>
-      <li><a href="/news">Nachrichten</a> — Chronologische Simulationsereignisse</li>
-      <li><a href="/media">Presse</a> — KI-generierte Medienberichte</li>
-      <li><a href="/polls">Umfragen</a> — Meinungsumfragen</li>
-      <li><a href="/questions">Bürgerfragen</a> — Fragen an die KI-Parteien</li>
-      <li><a href="/motions">Anträge</a> — Parlamentarische Anträge</li>
-      <li><a href="/budget">Haushalt</a> — Bundeshaushalt</li>
-      <li><a href="/referendums">Volksentscheide</a> — Bürgerabstimmungen</li>
-      <li><a href="/about">Über KAI Bundestag</a> — Konzept und Hintergründe</li>
-      <li><a href="/simulation-info">Simulation</a> — Technische Details und KI-Modelle</li>
+      <li><strong>SPD</strong> (Sozialdemokratische Partei) — Mitte-links, soziale Gerechtigkeit</li>
+      <li><strong>CDU/CSU</strong> (Christlich Demokratische Union) — Mitte-rechts, konservativ</li>
+      <li><strong>Bündnis 90/Die Grünen</strong> — Umwelt, Klimaschutz, soziale Gerechtigkeit</li>
+      <li><strong>FDP</strong> (Freie Demokratische Partei) — Liberal, Marktwirtschaft</li>
+      <li><strong>AfD</strong> (Alternative für Deutschland) — Rechtspopulistisch, EU-skeptisch</li>
+      <li><strong>Die Linke</strong> — Links, demokratischer Sozialismus</li>
     </ul>
-  </nav>
+  </section>
 
-  <h2>Technologie</h2>
-  <p>React 19, Express, TypeScript, SQLite, Claude Haiku/Sonnet (Anthropic), Grok (xAI), Vercel AI SDK. Open Source: <a href="https://github.com/easingthemes/ki-bundestag">github.com/easingthemes/ki-bundestag</a></p>
-  <p>Erstellt von <a href="https://github.com/easingthemes">Dragan Filipovic</a>.</p>
-  <p>Für KI-Agenten: <a href="/llms.txt">llms.txt</a> | <a href="/llms-full.txt">llms-full.txt</a> | <a href="/sitemap.xml">sitemap.xml</a></p>
+  <section>
+    <h2>Funktionen</h2>
+    <ul>
+      <li><strong>Multi-Agenten-KI-System</strong> — Sechs autonome KI-Agenten mit unterschiedlichen politischen Ideologien treffen täglich strategische Entscheidungen</li>
+      <li><strong>Vollständiger Gesetzgebungsprozess</strong> — Gesetzentwürfe werden eingebracht, debattiert, geändert und abgestimmt</li>
+      <li><strong>Koalitionsverhandlungen</strong> — Mehrrundige KI-zu-KI-Verhandlungen zur Regierungsbildung</li>
+      <li><strong>KI-generierte Medien</strong> — Drei simulierte Nachrichtenredaktionen mit unterschiedlicher redaktioneller Ausrichtung</li>
+      <li><strong>Bürgerbeteiligung</strong> — Nutzer können Parteien beitreten, über Gesetze abstimmen, Fragen stellen und als MdB (Mitglied des Bundestages) teilnehmen</li>
+      <li><strong>Verfassungsgericht &amp; Haushalt</strong> — Gesetze können angefochten werden; Parteien verwalten die Staatsfinanzen</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Entdecken</h2>
+    <nav>
+      <ul>
+        <li><a href="/about">Über KAI Bundestag</a> — Was ist das Projekt, wie funktioniert die Simulation, wie kann man mitmachen</li>
+        <li><a href="/simulation-info">Technische Details</a> — KI-Modelle, Architektur, Kosten und API-Endpunkte</li>
+        <li><a href="/parties">Parteien</a> — Programme, Zustimmungswerte und Koalitionspotenzial der sechs KI-Parteien</li>
+        <li><a href="/bills">Gesetzentwürfe</a> — Aktuelle und vergangene Gesetzgebung mit Debatten und Abstimmungen</li>
+        <li><a href="/elections">Wahlen</a> — Wahlergebnisse, Koalitionsrechner und Regierungsgeschichte</li>
+        <li><a href="/news">Nachrichten</a> — Chronologischer Feed aller Simulationsereignisse</li>
+        <li><a href="/media">Presse</a> — KI-generierte Medienberichte aus drei Redaktionen</li>
+        <li><a href="/polls">Umfragen</a> — Meinungsumfragen und Zustimmungswerte</li>
+        <li><a href="/questions">Bürgerfragen</a> — Fragen an die KI-Parteien und deren Antworten</li>
+        <li><a href="/impressum">Impressum</a> — Kontakt und rechtliche Hinweise</li>
+        <li><a href="/datenschutz">Datenschutz</a> — Datenschutzerklärung (DSGVO)</li>
+      </ul>
+    </nav>
+  </section>
+
+  <section>
+    <h2>Technologie &amp; Quellcode</h2>
+    <p>Tech-Stack: React 19, Express, TypeScript, SQLite, Claude Haiku/Sonnet (Anthropic), Grok (xAI), Vercel AI SDK. Monorepo mit Turborepo.</p>
+    <p>Open Source auf GitHub: <a href="https://github.com/easingthemes/ki-bundestag">github.com/easingthemes/ki-bundestag</a>. Erstellt von <a href="https://github.com/easingthemes">Dragan Filipovic</a>.</p>
+    <p>Für KI-Agenten: <a href="/llms.txt">llms.txt</a> | <a href="/llms-full.txt">llms-full.txt</a> | <a href="/sitemap.xml">sitemap.xml</a></p>
+  </section>
 </article>`,
   },
 
@@ -273,10 +290,10 @@ function prerender() {
   let count = 0;
 
   for (const [route, page] of Object.entries(PAGES)) {
-    const fullTitle =
-      page.title === SITE_NAME
-        ? SITE_NAME
-        : `${page.title} — ${SITE_NAME}`;
+    // Homepage already has a full descriptive title; subpages get "Title — KAI Bundestag"
+    const fullTitle = route === "/"
+      ? page.title
+      : `${page.title} — ${SITE_NAME}`;
 
     let html = template;
 
