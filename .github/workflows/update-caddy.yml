@@ -15,7 +15,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # One-time setup: grant deploy user passwordless sudo for Caddy operations
       - name: Setup sudoers (first-time only)
