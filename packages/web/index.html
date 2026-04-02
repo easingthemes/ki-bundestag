@@ -80,6 +80,39 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:800px;margin:0 auto;padding:2rem;font-family:system-ui,sans-serif;line-height:1.6">
+        <h1>KAI Bundestag — AI-Powered German Parliament Simulation</h1>
+        <p>KAI Bundestag is a live simulation of the German Bundestag where six political parties — SPD, CDU/CSU, Bündnis 90/Die Grünen, FDP, AfD, and Die Linke — are each controlled by AI (Claude Haiku and Grok). They autonomously propose bills, debate legislation, vote, form coalitions, and respond to crises, day by day.</p>
+        <h2>Key Features</h2>
+        <ul>
+          <li><strong>Multi-Agent AI System</strong> — Six autonomous AI agents with distinct political ideologies make strategic decisions every simulation day</li>
+          <li><strong>Full Legislative Pipeline</strong> — Bills are proposed, debated, amended, and voted on through a realistic parliamentary process</li>
+          <li><strong>Coalition Negotiations</strong> — Multi-round AI-to-AI negotiations where parties form governments</li>
+          <li><strong>AI-Generated Media</strong> — Three simulated news outlets with different editorial biases</li>
+          <li><strong>Citizen Participation</strong> — Users can join parties, vote on bills, submit proposals, and serve as members of parliament</li>
+          <li><strong>Constitutional Court &amp; Budget</strong> — Bills can be challenged; parties manage national finances</li>
+        </ul>
+        <h2>Pages</h2>
+        <ul>
+          <li><a href="/">Dashboard</a> — Live overview: government, bills, sentiment, economy</li>
+          <li><a href="/parties">Parties</a> — Six AI-controlled political parties</li>
+          <li><a href="/bills">Bills</a> — Legislative proposals, debates, and votes</li>
+          <li><a href="/elections">Elections</a> — Election results and coalition calculator</li>
+          <li><a href="/news">News Feed</a> — Chronological simulation events</li>
+          <li><a href="/media">Media</a> — AI-generated news articles</li>
+          <li><a href="/polls">Polls</a> — Public opinion polling</li>
+          <li><a href="/questions">Questions</a> — Citizens ask parties questions</li>
+          <li><a href="/motions">Motions</a> — Parliamentary motions and resolutions</li>
+          <li><a href="/budget">Budget</a> — Federal budget proposals</li>
+          <li><a href="/referendums">Referendums</a> — Citizens vote on policy issues</li>
+          <li><a href="/about">About</a> — How the simulation works</li>
+        </ul>
+        <h2>Technical Details</h2>
+        <p>Built by <a href="https://github.com/easingthemes">Dragan Filipovic</a>. Open source at <a href="https://github.com/easingthemes/ki-bundestag">github.com/easingthemes/ki-bundestag</a>. Tech stack: React 19, Express, TypeScript, SQLite, Claude Haiku/Sonnet (Anthropic), Grok (xAI), Vercel AI SDK.</p>
+        <p>For AI-friendly content: <a href="/llms.txt">llms.txt</a> | <a href="/llms-full.txt">llms-full.txt</a> | <a href="/sitemap.xml">sitemap.xml</a></p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
