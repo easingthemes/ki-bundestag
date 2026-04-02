@@ -29,7 +29,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { callAI, AIProviderLimitError, detectLimitError, parseResetTime, markProviderLimited } from "./client.js";
+import { callAI, AIProviderLimitError, AIProviderAuthError, detectLimitError, parseResetTime, markProviderLimited, markProviderAuthFailed, isProviderAuthFailed } from "./client.js";
 import { getPartyModel, getRoleModel, type Provider, type RoleKey, type ModelConfig } from "./model-config.js";
 import { recordAICall, calculateCost, getTrackingDay } from "./cost-tracker.js";
 
@@ -192,14 +192,26 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
     return { custom_id: req.customId, params: baseParams };
   });
 
+  // Skip immediately if Anthropic is already marked as auth-failed
+  if (isProviderAuthFailed("anthropic")) {
+    throw new AIProviderAuthError("anthropic", "provider marked as auth-failed");
+  }
+
   console.log(`  [Batch] Submitting ${batchRequests.length} Anthropic requests...`);
   const batchStartMs = Date.now();
   let batch;
   try {
     batch = await client.messages.batches.create({ requests: batchRequests });
   } catch (err) {
-    // Detect spending-limit errors and mark the provider so the circuit breaker kicks in
     const detected = detectLimitError(err);
+    // Non-recoverable auth/billing error — mark provider and stop immediately
+    if (detected.type === "auth") {
+      markProviderAuthFailed("anthropic");
+      console.error(`[Batch] *** ANTHROPIC AUTH FAILURE — ${detected.reason} ***`);
+      console.error(`[Batch] *** All Anthropic calls will be skipped until process restart ***`);
+      throw new AIProviderAuthError("anthropic", detected.reason);
+    }
+    // Spending-limit error — mark with TTL so circuit breaker can auto-recover
     if (detected.type === "hard") {
       const resetAt = parseResetTime(detected.until);
       markProviderLimited("anthropic", detected.until, resetAt);

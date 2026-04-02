@@ -117,12 +117,23 @@ vi.mock("./client.js", () => {
       this.until = until;
     }
   }
+  class AIProviderAuthError extends Error {
+    provider: string;
+    constructor(provider: string, reason: string) {
+      super(`${provider} auth failed: ${reason}`);
+      this.name = "AIProviderAuthError";
+      this.provider = provider;
+    }
+  }
   return {
     AIProviderLimitError,
+    AIProviderAuthError,
     callAI: mocks.callAI,
     detectLimitError: mocks.detectLimitError,
     parseResetTime: mocks.parseResetTime,
     markProviderLimited: mocks.markProviderLimited,
+    markProviderAuthFailed: vi.fn(),
+    isProviderAuthFailed: vi.fn().mockReturnValue(false),
   };
 });
 
