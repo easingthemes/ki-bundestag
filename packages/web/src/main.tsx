@@ -574,7 +574,13 @@ function App() {
       window.history.replaceState({}, "", window.location.pathname);
     }
 
-    const tryAuth = () => api.getAuthMe().then(u => { if (u) setUser(u); });
+    // Skip /auth/me call if user has never logged in (httpOnly cookie can't be checked directly)
+    const hadSession = localStorage.getItem("ki-had-session");
+    if (!isOAuthReturn && !hadSession) return;
+
+    const tryAuth = () => api.getAuthMe().then(u => {
+      if (u) { setUser(u); localStorage.setItem("ki-had-session", "1"); }
+    });
 
     tryAuth().catch(() => {
       // On OAuth return, session may not be ready yet — retry once
@@ -588,6 +594,7 @@ function App() {
 
   const login = useCallback((newUser: User) => {
     setUser(newUser);
+    localStorage.setItem("ki-had-session", "1");
   }, []);
 
   const updateUser = useCallback((newUser: User) => {
@@ -597,6 +604,7 @@ function App() {
   const logout = useCallback(() => {
     api.authLogout().catch(() => {});
     setUser(null);
+    localStorage.removeItem("ki-had-session");
   }, []);
 
   return (
