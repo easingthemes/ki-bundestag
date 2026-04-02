@@ -22,8 +22,11 @@ const {
   mockCallAI,
   mockDetectLimitError,
   mockMarkProviderLimited,
+  mockMarkProviderAuthFailed,
+  mockIsProviderAuthFailed,
   mockParseResetTime,
   MockAIProviderLimitError,
+  MockAIProviderAuthError,
 } = vi.hoisted(() => {
   class MockAIProviderLimitError extends Error {
     provider: string;
@@ -36,6 +39,15 @@ const {
     }
   }
 
+  class MockAIProviderAuthError extends Error {
+    provider: string;
+    constructor(provider: string, reason: string) {
+      super(`[AI] ${provider} authentication failed — ${reason}`);
+      this.name = "AIProviderAuthError";
+      this.provider = provider;
+    }
+  }
+
   return {
     mockBatchCreate: vi.fn(),
     mockBatchRetrieve: vi.fn(),
@@ -43,8 +55,11 @@ const {
     mockCallAI: vi.fn(),
     mockDetectLimitError: vi.fn(),
     mockMarkProviderLimited: vi.fn(),
+    mockMarkProviderAuthFailed: vi.fn(),
+    mockIsProviderAuthFailed: vi.fn().mockReturnValue(false),
     mockParseResetTime: vi.fn(),
     MockAIProviderLimitError,
+    MockAIProviderAuthError,
   };
 });
 
@@ -74,9 +89,12 @@ vi.mock("@anthropic-ai/sdk", () => ({
 vi.mock("./client.js", () => ({
   callAI: mockCallAI,
   AIProviderLimitError: MockAIProviderLimitError,
+  AIProviderAuthError: MockAIProviderAuthError,
   detectLimitError: mockDetectLimitError,
   parseResetTime: mockParseResetTime,
   markProviderLimited: mockMarkProviderLimited,
+  markProviderAuthFailed: mockMarkProviderAuthFailed,
+  isProviderAuthFailed: mockIsProviderAuthFailed,
   clearProviderLimits: vi.fn(),
 }));
 

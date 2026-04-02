@@ -31,6 +31,42 @@ export class AIProviderLimitError extends Error {
   }
 }
 
+export class AIProviderAuthError extends Error {
+  provider: Provider;
+  constructor(provider: Provider, reason: string) {
+    super(`[AI] ${provider} authentication failed — ${reason}`);
+    this.name = "AIProviderAuthError";
+    this.provider = provider;
+  }
+}
+
+/** Tracks providers with non-recoverable auth/billing failures. */
+const providerAuthFailures = new Set<Provider>();
+
+/** Mark a provider as having a non-recoverable auth failure. */
+export function markProviderAuthFailed(provider: Provider): void {
+  providerAuthFailures.add(provider);
+}
+
+/** Check if a specific provider has an auth failure. */
+export function isProviderAuthFailed(provider: Provider): boolean {
+  return providerAuthFailures.has(provider);
+}
+
+/** Returns true when every configured provider is unavailable (limited OR auth-failed). */
+export function allProvidersUnavailable(): boolean {
+  const providers = new Set<Provider>();
+  providers.add("anthropic");
+  if (process.env.XAI_API_KEY) providers.add("xai");
+  const now = Date.now();
+  for (const p of providers) {
+    if (providerAuthFailures.has(p)) continue;
+    const limit = providerLimits.get(p);
+    if (!limit || now >= limit.resetAt) return false; // this provider is available
+  }
+  return true;
+}
+
 /** Returns true when every configured provider is currently limited. */
 export function allProvidersLimited(): boolean {
   if (providerLimits.size === 0) return false;
@@ -45,9 +81,10 @@ export function allProvidersLimited(): boolean {
   return true;
 }
 
-/** Reset limit state (e.g. on new process start or manual clear). */
+/** Reset all provider state (limits + auth failures). Used on process start or in tests. */
 export function clearProviderLimits(): void {
   providerLimits.clear();
+  providerAuthFailures.clear();
 }
 
 /** Mark a provider as limited (used by batch-client when raw SDK calls hit limits). */
@@ -55,10 +92,14 @@ export function markProviderLimited(provider: Provider, until: string, resetAt: 
   providerLimits.set(provider, { until, resetAt });
 }
 
-type LimitResult =
+type APIErrorResult =
   | { type: "hard"; provider: Provider; until: string }
+  | { type: "auth"; provider: Provider; reason: string }
   | { type: "transient"; provider: Provider }
   | { type: "none" };
+
+/** @deprecated Use APIErrorResult — kept for backward compat */
+type LimitResult = APIErrorResult;
 
 function inferProvider(err: Record<string, unknown>): Provider {
   const url = typeof err.url === "string" ? err.url : "";
@@ -73,7 +114,7 @@ function isNetworkError(err: unknown): boolean {
   return typeof msg === "string" && /fetch failed|network|socket hang up/i.test(msg);
 }
 
-export function detectLimitError(err: unknown): LimitResult {
+export function detectLimitError(err: unknown): APIErrorResult {
   if (!err || typeof err !== "object") return { type: "none" };
   const e = err as Record<string, unknown>;
 
@@ -95,8 +136,30 @@ export function detectLimitError(err: unknown): LimitResult {
     return { type: "hard", provider: inferProvider(e), until: limitMatch[1].trim() };
   }
 
+  // Extract HTTP status from various error shapes:
+  // - Anthropic SDK: err.status (AuthenticationError, PermissionDeniedError)
+  // - Vercel AI SDK: err.statusCode
+  const status =
+    (typeof e.status === "number" ? e.status : 0) ||
+    (typeof e.statusCode === "number" ? e.statusCode : 0);
+
+  // Non-recoverable auth/billing errors — API key is dead, no point retrying
+  // 401 = Unauthorized (invalid/expired key), 403 = Forbidden (revoked), 402 = Payment Required
+  if (status === 401 || status === 403 || status === 402) {
+    const reason =
+      status === 401 ? "invalid or expired API key"
+        : status === 403 ? "access denied or key revoked"
+          : "billing issue or payment required";
+    return { type: "auth", provider: inferProvider(e), reason };
+  }
+
+  // Also detect auth errors by error class name (Anthropic SDK throws typed errors)
+  const errName = typeof e.name === "string" ? e.name : "";
+  if (/AuthenticationError|PermissionDeniedError/i.test(errName)) {
+    return { type: "auth", provider: inferProvider(e), reason: `${errName}: ${body.slice(0, 200)}` };
+  }
+
   // Transient 429 rate-limit
-  const status = typeof e.statusCode === "number" ? e.statusCode : 0;
   if (status === 429) {
     return { type: "transient", provider: inferProvider(e) };
   }
@@ -177,6 +240,11 @@ export async function callAI(opts: {
     config = getRoleModel("daily");
   }
 
+  // Circuit breaker: skip call if provider has auth failure (permanent)
+  if (providerAuthFailures.has(config.provider)) {
+    throw new AIProviderAuthError(config.provider, "provider marked as auth-failed");
+  }
+
   // Circuit breaker: skip call if provider is known-limited (with TTL check)
   const limit = providerLimits.get(config.provider);
   if (limit) {
@@ -219,6 +287,15 @@ export async function callAI(opts: {
       return { text: result.text, model: config.model, provider: config.provider, inputTokens, outputTokens };
     } catch (err) {
       const detected = detectLimitError(err);
+
+      if (detected.type === "auth") {
+        markProviderAuthFailed(detected.provider);
+        console.error(
+          `[AI] *** ${detected.provider.toUpperCase()} AUTH FAILURE — ${detected.reason} ***\n` +
+          `[AI] *** All ${detected.provider} calls will be skipped until process restart ***`
+        );
+        throw new AIProviderAuthError(detected.provider, detected.reason);
+      }
 
       if (detected.type === "hard") {
         const resetAt = parseResetTime(detected.until);
