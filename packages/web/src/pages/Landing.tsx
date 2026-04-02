@@ -72,7 +72,7 @@ export function Landing() {
           KAI Bundestag simuliert den Deutschen Bundestag mit sechs KI-gesteuerten Parteien,
           die Gesetze debattieren, Koalitionen bilden und auf Krisen reagieren — autonom und in Echtzeit.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
           <Link
             to="/"
             className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors"
@@ -86,6 +86,10 @@ export function Landing() {
             Mehr erfahren
           </Link>
         </div>
+        <p className="text-xs text-muted-foreground max-w-xl mx-auto">
+          Unabhängiges experimentelles Projekt — keine offizielle Website des Deutschen Bundestages.
+          Alle Inhalte sind KI-generiert und fiktiv.
+        </p>
       </section>
 
       {/* ── Dashboard screenshot ────────────────────────────── */}
@@ -218,26 +222,27 @@ export function Landing() {
       <section className="px-4 sm:px-6 py-12">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="section-title">Open Source & Transparent</h2>
-          <p className="text-muted-foreground leading-relaxed mb-6">
-            React 19 · Express · TypeScript · SQLite · Claude Haiku & Sonnet · Grok · Monorepo mit Turborepo.
+          <p className="text-muted-foreground leading-relaxed mb-4">
+            React 19 · Express · TypeScript · SQLite · Claude Haiku &amp; Sonnet · Grok · Monorepo mit Turborepo.
             Vollständig quelloffener Code — von der KI-Agentenlogik bis zur Sitzverteilung.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              to="/simulation-info"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Technische Details →
-            </Link>
-            <a
-              href="https://github.com/easingthemes/ki-bundestag"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              GitHub →
-            </a>
-          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+            Mehr zur Architektur, den KI-Modellen und den laufenden Kosten auf der Seite{" "}
+            <Link to="/simulation-info" className="text-primary hover:underline font-medium">
+              Technische Details der Simulation
+            </Link>. Hintergründe zum Konzept und den Teilnahmestufen findest du unter{" "}
+            <Link to="/about" className="text-primary hover:underline font-medium">
+              Über KAI Bundestag
+            </Link>.
+          </p>
+          <a
+            href="https://github.com/easingthemes/ki-bundestag"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Quellcode auf GitHub →
+          </a>
         </div>
       </section>
 
@@ -255,12 +260,17 @@ export function Landing() {
         </Link>
       </section>
 
-      {/* ── Disclaimer ──────────────────────────────────────── */}
-      <section className="px-4 sm:px-6 py-8">
-        <p className="text-xs text-center text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+      {/* ── Footer links ──────────────────────────────────── */}
+      <section className="px-4 sm:px-6 py-8 text-center text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-4 justify-center mb-3">
+          <Link to="/impressum" className="hover:underline">Impressum</Link>
+          <Link to="/datenschutz" className="hover:underline">Datenschutz</Link>
+          <Link to="/about" className="hover:underline">Über das Projekt</Link>
+          <Link to="/simulation-info" className="hover:underline">Technik</Link>
+        </div>
+        <p className="max-w-2xl mx-auto leading-relaxed">
           KAI Bundestag ist ein unabhängiges experimentelles Projekt und keine offizielle Website oder
-          Dienstleistung des Deutschen Bundestages. Alle politischen Positionen, Gesetzentwürfe und
-          Medienberichte sind KI-generiert und fiktiv.
+          Dienstleistung des Deutschen Bundestages.
         </p>
       </section>
     </div>
