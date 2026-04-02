@@ -19,7 +19,10 @@ const Interpellations = lazy(() => import("./pages/Interpellations").then(m => (
 const ConfidenceVotes = lazy(() => import("./pages/ConfidenceVotes").then(m => ({ default: m.ConfidenceVotes })));
 const ConstitutionalCourt = lazy(() => import("./pages/ConstitutionalCourt").then(m => ({ default: m.ConstitutionalCourt })));
 const Budget = lazy(() => import("./pages/Budget").then(m => ({ default: m.Budget })));
-/* About, SimulationInfo, Impressum, Datenschutz are now static HTML pages at /about, /simulation-info, /impressum, /datenschutz */
+const About = lazy(() => import("./pages/About").then(m => ({ default: m.About })));
+const SimulationInfo = lazy(() => import("./pages/SimulationInfo").then(m => ({ default: m.SimulationInfo })));
+const Impressum = lazy(() => import("./pages/Impressum").then(m => ({ default: m.Impressum })));
+const Datenschutz = lazy(() => import("./pages/Datenschutz").then(m => ({ default: m.Datenschutz })));
 const Quiz = lazy(() => import("./pages/Quiz").then(m => ({ default: m.Quiz })));
 const Lobbying = lazy(() => import("./pages/Lobbying").then(m => ({ default: m.Lobbying })));
 const PartyFinance = lazy(() => import("./pages/PartyFinance").then(m => ({ default: m.PartyFinance })));
@@ -163,9 +166,9 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileLink to="/media">{t("nav.press")}</MobileLink>
           <Separator className="mx-5 my-2" />
           <MobileLink to="/log">{t("nav.protocol")}</MobileLink>
-          <a href="/about" className="block px-5 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted">{t("nav.about")}</a>
-          <a href="/impressum" className="block px-5 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted">{t("nav.impressum")}</a>
-          <a href="/datenschutz" className="block px-5 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted">{t("nav.datenschutz")}</a>
+          <MobileLink to="/about">{t("nav.about")}</MobileLink>
+          <MobileLink to="/impressum">{t("nav.impressum")}</MobileLink>
+          <MobileLink to="/datenschutz">{t("nav.datenschutz")}</MobileLink>
           <Separator className="mx-5 my-2" />
           {user ? (
             <>
@@ -598,7 +601,7 @@ function App() {
 
   return (
     <UserContext.Provider value={{ user, login, logout, updateUser }}>
-    <BrowserRouter basename="/app">
+    <BrowserRouter>
       <ScrollToHash />
       <div className="min-h-screen flex flex-col">
         {/* Skip to main content link for keyboard/screen reader users */}
@@ -718,6 +721,10 @@ function App() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/my-activity" element={<MyActivity />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/simulation-info" element={<SimulationInfo />} />
+            <Route path="/impressum" element={<Impressum />} />
+            <Route path="/datenschutz" element={<Datenschutz />} />
           </Routes>
           </Suspense>
         </main>
@@ -727,10 +734,10 @@ function App() {
           <div className="max-w-[1280px] mx-auto px-6 py-4 flex justify-between items-center flex-wrap gap-3 max-md:flex-col max-md:text-center">
             <div className="flex gap-5">
               <Link to="/log" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.protocol")}</Link>
-              <a href="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.about")}</a>
-              <a href="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.simulation")}</a>
-              <a href="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.impressum")}</a>
-              <a href="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.datenschutz")}</a>
+              <Link to="/about" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.about")}</Link>
+              <Link to="/simulation-info" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.simulation")}</Link>
+              <Link to="/impressum" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.impressum")}</Link>
+              <Link to="/datenschutz" className="text-muted-foreground no-underline text-xs hover:text-foreground transition-colors duration-100">{t("nav.datenschutz")}</Link>
             </div>
             <div className="text-[11px] text-muted-foreground">{t("footer.tagline")}</div>
           </div>
