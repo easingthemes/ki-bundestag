@@ -1,7 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 export function Impressum() {
+  usePageMeta(ROUTE_SEO["/impressum"] ?? { title: "Impressum" });
   return (
     <div>
       <h2 className="section-title">Impressum</h2>

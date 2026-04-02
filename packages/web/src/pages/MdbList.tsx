@@ -8,10 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MDB_BADGE } from "@/lib/colors";
 import { useTranslation } from "react-i18next";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 export function MdbList() {
+  usePageMeta(ROUTE_SEO["/mdb"] ?? { title: "Abgeordnete" });
   const { t } = useTranslation("common");
   const [seats, setSeats] = useState<BundestagSeat[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

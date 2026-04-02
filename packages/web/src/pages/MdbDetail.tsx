@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MDB_BADGE, STATUS_BADGE, VOTE_HEX } from "@/lib/colors";
 import { DisciplineBadge } from "@/components/MdbBadge";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 type Tab = "votes" | "speeches" | "sidejobs" | "info";
 
@@ -45,6 +46,12 @@ export function MdbDetail() {
   const [sidejobs, setSidejobs] = useState<Sidejob[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("votes");
+
+  const mdbName = profile?.seat?.displayName ?? (profile?.seat ? `Sitz ${profile.seat.seatNumber}` : null);
+  usePageMeta({
+    title: mdbName ? `${mdbName} — MdB` : "Abgeordnete/r",
+    description: mdbName ? `Profil und Abstimmungen von ${mdbName} im KI-Bundestag.` : undefined,
+  });
 
   const refresh = useCallback(() => {
     if (!seatId) return;

@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 export function About() {
+  usePageMeta(ROUTE_SEO["/about"] ?? { title: "Über uns" });
   return (
     <div>
       <h2 className="section-title">Über KAI Bundestag</h2>

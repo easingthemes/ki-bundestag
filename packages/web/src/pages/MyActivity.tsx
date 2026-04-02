@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ShowMoreButton } from "../components/shared";
 import { FilterPills } from "@/components/FilterPills";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 const TYPE_ICONS: Record<string, string> = {
   proposal: "\u{1F4DD}",
@@ -46,6 +48,7 @@ function entityLink(item: ActivityItem): string | null {
 }
 
 export function MyActivity() {
+  usePageMeta(ROUTE_SEO["/my-activity"] ?? { title: "Meine Aktivität" });
   const { t } = useTranslation("notifications");
   const { user } = useUser();
   const [items, setItems] = useState<ActivityItem[]>([]);

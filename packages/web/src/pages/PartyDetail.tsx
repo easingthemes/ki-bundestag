@@ -15,6 +15,7 @@ import { PartyBillsList } from "@/components/party/PartyBillsList";
 import { MdbRosterTable } from "@/components/party/MdbRosterTable";
 import { ProposalForm } from "@/components/party/ProposalForm";
 import { QuestionForm } from "@/components/party/QuestionForm";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export function PartyDetail() {
   const { t } = useTranslation("parties");
@@ -46,6 +47,11 @@ export function PartyDetail() {
   const [myApplications, setMyApplications] = useState<MdbApplication[]>([]);
   const [sidejobs, setSidejobs] = useState<Sidejob[]>([]);
   const [showSidejobs, setShowSidejobs] = useState(false);
+
+  usePageMeta({
+    title: party?.name ? `${party.name} — Partei` : "Partei",
+    description: party?.name ? `Profil und Aktivitäten von ${party.name} im KI-Bundestag.` : undefined,
+  });
 
   const refresh = useCallback(() => {
     if (!id) return;

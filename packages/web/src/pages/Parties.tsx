@@ -10,6 +10,8 @@ import { FRAKTION_BADGE } from "@/lib/colors";
 import { cn, fixColor } from "@/lib/utils";
 import { PartyCard, PartyCardGrid } from "@/components/PartyCard";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { ROUTE_SEO } from "@/seo";
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) return null;
@@ -104,6 +106,7 @@ function JoinModal({ party, onClose, onJoined }: {
 }
 
 export function Parties() {
+  usePageMeta(ROUTE_SEO["/parties"] ?? { title: "Parteien" });
   const { t } = useTranslation("parties");
   const { user } = useUser();
   const [parties, setParties] = useState<Party[]>([]);
