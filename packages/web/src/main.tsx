@@ -23,6 +23,7 @@ const About = lazy(() => import("./pages/About").then(m => ({ default: m.About }
 const SimulationInfo = lazy(() => import("./pages/SimulationInfo").then(m => ({ default: m.SimulationInfo })));
 const Impressum = lazy(() => import("./pages/Impressum").then(m => ({ default: m.Impressum })));
 const Datenschutz = lazy(() => import("./pages/Datenschutz").then(m => ({ default: m.Datenschutz })));
+const Landing = lazy(() => import("./pages/Landing").then(m => ({ default: m.Landing })));
 const Quiz = lazy(() => import("./pages/Quiz").then(m => ({ default: m.Quiz })));
 const Lobbying = lazy(() => import("./pages/Lobbying").then(m => ({ default: m.Lobbying })));
 const PartyFinance = lazy(() => import("./pages/PartyFinance").then(m => ({ default: m.PartyFinance })));
@@ -733,6 +734,7 @@ function App() {
             <Route path="/simulation-info" element={<SimulationInfo />} />
             <Route path="/impressum" element={<Impressum />} />
             <Route path="/datenschutz" element={<Datenschutz />} />
+            <Route path="/landing" element={<Landing />} />
           </Routes>
           </Suspense>
         </main>
