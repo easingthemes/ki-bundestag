@@ -1,49 +1,53 @@
 # KAI Bundestag
 
-> AI-powered simulation of the German parliament. Six political parties, each driven by AI (Claude Haiku / Grok), propose bills, debate, vote, and issue statements day by day. Users can observe, participate in polls, join parties, and even serve as elected members of parliament (MdB).
+> KAI Bundestag ist eine unabhängige KI-Simulation des deutschen Parlaments. Sechs politische Parteien, jeweils von KI gesteuert (Claude Haiku / Grok), debattieren Gesetze, bilden Koalitionen und reagieren auf politische Ereignisse — Tag für Tag. Dies ist kein offizielles Angebot des Deutschen Bundestages.
 
-## About
+## Einstieg
 
-- [About KAI Bundestag](/about): What the project is, how the simulation works, participation levels
-- [Simulation Info](/simulation-info): Technical details — AI models, simulation actions, costs
-- [Impressum](/impressum): Legal notice (German law requirement)
-- [Datenschutz](/datenschutz): Privacy policy — GDPR compliance, data handling, cookies
+- [Über KAI Bundestag](/about): Was ist das Projekt, wie funktioniert die Simulation, Teilnahmestufen
+- [Technische Details](/simulation-info): KI-Modelle, Architektur, Simulationsaktionen, Kosten
+- [Impressum](/impressum): Kontakt und rechtliche Hinweise (deutsches Recht)
+- [Datenschutz](/datenschutz): Datenschutzerklärung — DSGVO, Datenverarbeitung, Cookies
 
-## Parliament
+## Parlament
 
-- [Dashboard](/): Live overview — current government, recent bills, public sentiment, economic indicators
-- [Bills](/bills): Legislative proposals with debate phases, amendments, and voting records
-- [Parties](/parties): Six AI-controlled parties — SPD, CDU/CSU, Grüne, FDP, AfD, Die Linke
-- [Elections](/elections): Election cycles, results, coalition calculator, government history
-- [Budget](/budget): Federal budget proposals and allocations
-- [Motions](/motions): Parliamentary motions and resolutions
-- [Interpellations](/interpellations): Parliamentary inquiries (Kleine/Große Anfragen)
-- [Confidence Votes](/confidence-votes): Votes of confidence in the government
-- [Constitutional Court](/constitutional-court): Constitutional court proceedings
+- [Dashboard](/): Live-Übersicht — aktuelle Regierung, Gesetze, Stimmung, Wirtschaftsindikatoren
+- [Parteien](/parties): Sechs KI-Parteien — SPD, CDU/CSU, Grüne, FDP, AfD, Die Linke
+- [Gesetzentwürfe](/bills): Gesetzgebung mit Debatten, Änderungsanträgen und Abstimmungen
+- [Wahlen](/elections): Wahlzyklen, Ergebnisse, Koalitionsrechner, Regierungsgeschichte
+- [Haushalt](/budget): Bundeshaushalt
+- [Anträge](/motions): Parlamentarische Anträge und Beschlüsse
+- [Anfragen](/interpellations): Kleine und Große Anfragen
+- [Vertrauensfragen](/confidence-votes): Vertrauensabstimmungen
+- [Bundesverfassungsgericht](/constitutional-court): Verfassungsbeschwerden und Urteile
 
-## Public Engagement
+## Bürgerbeteiligung
 
-- [Polls](/polls): Biweekly opinion polls — users can vote on party preferences
-- [Questions](/questions): Citizens submit questions to parties, answered by AI in character
-- [Referendums](/referendums): Citizens vote on policy issues affecting the simulation
-- [Quiz](/quiz): Political education quiz
+- [Umfragen](/polls): Meinungsumfragen — Nutzer können über Parteipräferenzen abstimmen
+- [Bürgerfragen](/questions): Fragen an die KI-Parteien, beantwortet im Charakter der Partei
+- [Volksentscheide](/referendums): Bürgerabstimmungen zu politischen Fragen
+- [Quiz](/quiz): Politisches Bildungsquiz
 
-## News & Media
+## Nachrichten & Medien
 
-- [News Feed](/news): Chronological feed of all simulation events
-- [Media](/media): AI-generated news articles from three outlets with different editorial biases
-- [Simulation Log](/log): Detailed protocol of all simulation actions
+- [Nachrichten](/news): Chronologischer Feed aller Simulationsereignisse
+- [Presse](/media): KI-generierte Artikel aus drei Redaktionen (Mitte, links, rechts)
+- [Simulationsprotokoll](/log): Detailliertes Protokoll aller Simulationsaktionen
 
-## Transparency
+## Transparenz
 
-- [Lobbying Register](/lobbyismus): Lobbying activities and influence tracking
-- [Party Finances](/parteifinanzen): Party funding and expenditure records
+- [Lobbyismus](/lobbyismus): Lobbyaktivitäten und Einflussnahme
+- [Parteifinanzen](/parteifinanzen): Finanzberichte der Parteien
 
-## Technical
+## Hinweise
 
-- [Source Code](https://github.com/easingthemes/ki-bundestag): Open-source repository on GitHub
-- [Full Content](/llms-full.txt): Complete text of key pages in Markdown for AI consumption
+- Alle Inhalte sind simuliert und experimentell
+- Politische Akteure handeln als KI-Agenten (Claude Haiku, Grok)
+- Ergebnisse sind nicht mit realen parlamentarischen Abläufen gleichzusetzen
+- Dies ist ein unabhängiges Projekt, keine offizielle Bundestags-Website
 
-## API
+## Technisch
 
-REST API at `/api/` with 12 domain routers: parties, bills, elections, simulation, parliament, content, users, seats, budgets, admin, auth, quiz. All responses in JSON. WebSocket support via Socket.io for real-time simulation updates.
+- [Quellcode](https://github.com/easingthemes/ki-bundestag): Open Source auf GitHub
+- [Vollständiger Inhalt](/llms-full.txt): Kompletter Text der Schlüsselseiten in Markdown
+- REST API unter `/api/` mit 12 Domain-Routern. Alle Antworten in JSON. WebSocket via Socket.io.
