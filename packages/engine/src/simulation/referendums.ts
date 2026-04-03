@@ -49,12 +49,13 @@ export async function maybeGenerateReferendum(
   const t0 = Date.now();
   try {
     const { text, model, provider } = await callAI({
-      system: `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
+      system: `Du erstellst Volksabstimmungsthemen für eine deutsche Parlamentssimulation. Antworte NUR mit validem JSON.
+WICHTIG: Titel und Beschreibung MÜSSEN auf Deutsch sein.
 
 RESPONSE SCHEMA:
 {
-  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
-  "description": "<1-2 sentence context paragraph>",
+  "title": "<kurzer Abstimmungstitel auf Deutsch, z.B. 'Soll Deutschland die Verteidigungsausgaben auf 3% des BIP erhöhen?'>",
+  "description": "<1-2 Sätze Kontext auf Deutsch>",
   "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
   "impact": {
     "budget": <number -2 to 2, optional>,
@@ -65,11 +66,12 @@ RESPONSE SCHEMA:
   }
 }
 
-Rules:
-- The referendum should be relevant to the current political context
-- Title should be a yes/no question
-- Impact values represent what happens if the referendum passes
-- Keep it realistic for German politics`,
+Regeln:
+- Die Abstimmung soll zum aktuellen politischen Kontext passen
+- Der Titel soll eine Ja/Nein-Frage sein
+- Impact-Werte zeigen, was bei Annahme passiert
+- Realistisch für die deutsche Politik halten
+- category-Werte bleiben auf Englisch (wie im Schema)`,
       prompt: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
       maxTokens: 512,
       roleKey: "daily",
@@ -102,8 +104,8 @@ Rules:
       id: `ref-${generateId()}`,
       title: parsed.title,
       description: parsed.description,
-      options: ["Yes", "No"],
-      votes: { Yes: 0, No: 0 },
+      options: ["Ja", "Nein"],
+      votes: { Ja: 0, Nein: 0 },
       createdOnDay: currentDay,
       closesOnDay: currentDay + 14,
       status: "active",
@@ -160,21 +162,21 @@ export function resolveExpiredReferendums(
     if (totalVotes < 10) {
       // Not enough votes — expired
       status = "expired";
-      console.log(`  [Referendums] Expired (insufficient votes): "${row.title}" (${totalVotes} votes)`);
+      console.log(`  [Referendums] Abgelaufen (zu wenige Stimmen): "${row.title}" (${totalVotes} Stimmen)`);
     } else {
       // Majority wins
-      const yesVotes = votes["Yes"] || 0;
-      const noVotes = votes["No"] || 0;
+      const yesVotes = votes["Ja"] || votes["Yes"] || 0;
+      const noVotes = votes["Nein"] || votes["No"] || 0;
 
       if (yesVotes > noVotes) {
         status = "passed";
-        result = "Yes";
+        result = "Ja";
       } else {
         status = "rejected";
-        result = "No";
+        result = "Nein";
       }
 
-      console.log(`  [Referendums] ${status}: "${row.title}" (Yes: ${yesVotes}, No: ${noVotes})`);
+      console.log(`  [Referendums] ${status}: "${row.title}" (Ja: ${yesVotes}, Nein: ${noVotes})`);
     }
 
     db.update(schema.referendums)
@@ -204,14 +206,18 @@ export function resolveExpiredReferendums(
       }
     }
 
+    const jaVotes = votes["Ja"] || votes["Yes"] || 0;
+    const neinVotes = votes["Nein"] || votes["No"] || 0;
+    const statusLabel = status === "passed" ? "angenommen" : status === "rejected" ? "abgelehnt" : "abgelaufen";
+
     dayEvents.push({
       dayNumber: currentDay,
       type: "day_start", // reuse existing type for referendum events
       actor: "system",
-      title: `Referendum ${status}: "${row.title}"`,
+      title: `Volksabstimmung ${statusLabel}: „${row.title}"`,
       description: status === "expired"
-        ? `The referendum did not receive enough votes (${totalVotes}/10 minimum).`
-        : `Result: ${result} (${votes["Yes"] || 0} Yes, ${votes["No"] || 0} No). ${status === "passed" ? "The measure will be implemented." : "The measure was rejected."}`,
+        ? `Die Volksabstimmung hat nicht genügend Stimmen erhalten (${totalVotes}/10 Minimum).`
+        : `Ergebnis: ${result} (${jaVotes} Ja, ${neinVotes} Nein). ${status === "passed" ? "Die Maßnahme wird umgesetzt." : "Die Maßnahme wurde abgelehnt."}`,
       data: { referendumId: row.id, status, result, totalVotes },
     });
   }
@@ -221,12 +227,13 @@ export function resolveExpiredReferendums(
 // Batch variants
 // ---------------------------------------------------------------------------
 
-const REFERENDUM_SYSTEM = `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
+const REFERENDUM_SYSTEM = `Du erstellst Volksabstimmungsthemen für eine deutsche Parlamentssimulation. Antworte NUR mit validem JSON.
+WICHTIG: Titel und Beschreibung MÜSSEN auf Deutsch sein.
 
 RESPONSE SCHEMA:
 {
-  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
-  "description": "<1-2 sentence context paragraph>",
+  "title": "<kurzer Abstimmungstitel auf Deutsch, z.B. 'Soll Deutschland die Verteidigungsausgaben auf 3% des BIP erhöhen?'>",
+  "description": "<1-2 Sätze Kontext auf Deutsch>",
   "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
   "impact": {
     "budget": <number -2 to 2, optional>,
@@ -237,11 +244,12 @@ RESPONSE SCHEMA:
   }
 }
 
-Rules:
-- The referendum should be relevant to the current political context
-- Title should be a yes/no question
-- Impact values represent what happens if the referendum passes
-- Keep it realistic for German politics`;
+Regeln:
+- Die Abstimmung soll zum aktuellen politischen Kontext passen
+- Der Titel soll eine Ja/Nein-Frage sein
+- Impact-Werte zeigen, was bei Annahme passiert
+- Realistisch für die deutsche Politik halten
+- category-Werte bleiben auf Englisch (wie im Schema)`;
 
 /**
  * Build a BatchRequest for referendum generation, or null if not applicable.
@@ -320,8 +328,8 @@ export function processReferendumBatchResult(
     id: `ref-${generateId()}`,
     title: parsed.title,
     description: parsed.description,
-    options: ["Yes", "No"],
-    votes: { Yes: 0, No: 0 },
+    options: ["Ja", "Nein"],
+    votes: { Ja: 0, Nein: 0 },
     createdOnDay: currentDay,
     closesOnDay: currentDay + 14,
     status: "active",
@@ -345,5 +353,5 @@ export function processReferendumBatchResult(
   }).run();
 
   logAICall({ task: "referendums", model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk: true, validationOk: true });
-  console.log(`  [Referendums] Created: "${parsed.title}"`);
+  console.log(`  [Referendums] Erstellt: "${parsed.title}"`);
 }

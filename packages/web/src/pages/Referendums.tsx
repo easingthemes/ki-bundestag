@@ -13,6 +13,32 @@ import { ROUTE_SEO } from "@/seo";
 
 const SELECT_CLS = "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Aktiv",
+  passed: "Angenommen",
+  rejected: "Abgelehnt",
+  expired: "Abgelaufen",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  economy: "Wirtschaft",
+  social: "Soziales",
+  environment: "Umwelt",
+  immigration: "Einwanderung",
+  defense: "Verteidigung",
+  education: "Bildung",
+  healthcare: "Gesundheit",
+  infrastructure: "Infrastruktur",
+};
+
+const IMPACT_LABELS: Record<string, string> = {
+  budget: "Haushalt",
+  unemployment: "Arbeitslosigkeit",
+  inflation: "Inflation",
+  gdpGrowth: "BIP-Wachstum",
+  publicSentiment: "Öffentliche Stimmung",
+};
+
 export function Referendums() {
   usePageMeta(ROUTE_SEO["/referendums"] ?? { title: "Volksentscheide" });
   const { t } = useTranslation("polls");
@@ -134,9 +160,9 @@ function ReferendumCard({
         <div className="flex items-center gap-2 mb-2">
           {referendum.status === "active" && !hasVoted && <UserActionIcon title={t("stimmeAbgeben")} />}
           <Badge variant="outline" className={STATUS_BADGE[referendum.status] || ""}>
-            {referendum.status}
+            {STATUS_LABELS[referendum.status] || referendum.status}
           </Badge>
-          <span className="text-xs text-muted-foreground">{referendum.category}</span>
+          <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[referendum.category] || referendum.category}</span>
           <span className="text-xs text-muted-foreground ml-auto">
             {t("tagLabel", { day: referendum.createdOnDay })} — {t("schliesstTag", { day: referendum.closesOnDay })}
           </span>
@@ -186,7 +212,7 @@ function ReferendumCard({
           <p className="mt-2 text-xs text-muted-foreground">
             {t("auswirkung")} {Object.entries(referendum.impact)
               .filter(([, v]) => v != null && v !== 0)
-              .map(([k, v]) => `${k}: ${(v as number) > 0 ? "+" : ""}${v}`)
+              .map(([k, v]) => `${IMPACT_LABELS[k] || k}: ${(v as number) > 0 ? "+" : ""}${v}`)
               .join(", ")}
           </p>
         )}
