@@ -39,6 +39,17 @@ import type { DepthConfig } from "./context-depth.js";
  * The fail rate increased slightly after day 60 due to era summaries adding
  * more context to prompts (progressive summarization), which increases token
  * pressure on Haiku's output quality. This is acceptable given the fallbacks.
+ *
+ * NOTE on optional parameter limit (fixed 2026-04-03, days 259-270):
+ *
+ * Anthropic's structured output rejects schemas with >24 optional parameters.
+ * This schema originally had 27 optional params (17 top-level action fields +
+ * 5 in impact + 5 in impactChange). All 5 Anthropic agent batches errored with:
+ *   "Schemas contains too many optional parameters (27), limit: 24"
+ * Fix: impact/impactChange sub-properties are marked required — when the model
+ * includes an impact object, all 5 numeric fields must be present. This reduces
+ * the optional count to 17. The prompt already asks for all 5 fields, so this
+ * matches expected model behavior.
  */
 const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -64,6 +75,7 @@ const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
               gdpGrowth: { type: "number" },
               publicSentiment: { type: "number" },
             },
+            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
             additionalProperties: false,
           },
           impactChange: {
@@ -75,6 +87,7 @@ const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
               gdpGrowth: { type: "number" },
               publicSentiment: { type: "number" },
             },
+            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
             additionalProperties: false,
           },
           statement: { type: "string" },
