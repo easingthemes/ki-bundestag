@@ -1,5 +1,6 @@
 {
   "tag": "Tag {{day}}",
+  "parlamentstag": "Parlamentstag {{day}}",
   "kalender": "Kalender",
   "termine": "Termine",
   "vergangene": "Vergangene",
@@ -15,6 +16,7 @@
   "alleDebatten": "Alle Debatten →",
   "presse": "Presse",
   "bundeskanzlerin": "Bundeskanzler/in",
+  "imAmt": "{{days}} Tage im Amt",
   "zustimmung": "Zustimmung",
   "oeffentlicheStimmung": "Öffentliche Stimmung",
   "mdbSitz": "Ihr MdB-Sitz",
