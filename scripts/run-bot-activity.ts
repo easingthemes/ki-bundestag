@@ -1,20 +1,14 @@
 /**
  * run-bot-activity.ts — Simulate user activity from bot users
  *
- * Runs a single tick of bot activity: picks bots that should act this tick,
- * generates actions (some with AI, some DB-only), and logs everything.
+ * Exports `runBotTick()` for use by runner-bot.ts (PM2 loop).
+ * Also runs standalone: `npx tsx scripts/run-bot-activity.ts [--dry-run]`
  *
  * Activity levels control probability per tick (designed for ~4h intervals):
  *   high:   30% chance/tick → ~2 actions/day
  *   medium: 15% chance/tick → ~1 action/day
  *   low:     5% chance/tick → ~1 action/3 days
  *   lurker:  2% chance/tick → ~1 action/week
- *
- * Usage:
- *   npx tsx scripts/run-bot-activity.ts           # one tick
- *   npx tsx scripts/run-bot-activity.ts --dry-run  # preview without writing
- *
- * Run: npm run bot:activity
  */
 
 import Database from "better-sqlite3";
@@ -50,8 +44,6 @@ const SIM_DB_PATH = process.env.DATABASE_PATH
   ? path.resolve(process.env.DATABASE_PATH)
   : path.join(ROOT, "data", "simulation.db");
 
-const DRY_RUN = process.argv.includes("--dry-run");
-
 // ── Activity probabilities per tick ─────────────────────────────────────────
 
 const ACTIVITY_CHANCE: Record<string, number> = {
@@ -67,8 +59,8 @@ interface ActionWeights {
   vote_question: number;
   vote_proposal: number;
   signal_bill: number;
-  ask_question: number;      // needs AI
-  submit_proposal: number;   // needs AI
+  ask_question: number;
+  submit_proposal: number;
   vote_poll: number;
 }
 
@@ -95,8 +87,7 @@ function weightedPick(weights: ActionWeights): keyof ActionWeights {
   return entries[entries.length - 1][0];
 }
 
-// ── Static question/proposal templates ──────────────────────────────────────
-// Used when ANTHROPIC_API_KEY is not available; AI generation is preferred
+// ── Static templates (fallback when no API key) ─────────────────────────────
 
 const QUESTION_TEMPLATES = [
   "Wie steht Ihre Partei zur aktuellen {topic}-Politik?",
@@ -130,7 +121,7 @@ const CATEGORIES = [
   "Infrastruktur", "Sicherheit", "Digitalisierung", "Justiz", "Außenpolitik",
 ];
 
-// ── AI question generation (optional) ───────────────────────────────────────
+// ── AI generation (optional) ────────────────────────────────────────────────
 
 async function generateAIQuestion(
   partyName: string,
@@ -200,7 +191,6 @@ async function generateAIProposal(
     const text = data.content?.[0]?.text?.trim();
     if (!text) return null;
 
-    // Strip code fences if present
     const cleaned = text.replace(/```json\n?/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleaned);
   } catch {
@@ -208,9 +198,21 @@ async function generateAIProposal(
   }
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Tick result type ────────────────────────────────────────────────────────
 
-async function main() {
+export interface TickResult {
+  totalBots: number;
+  activeBots: number;
+  actions: number;
+  aiCalls: number;
+  breakdown: Record<string, number>;
+}
+
+// ── Main tick function ──────────────────────────────────────────────────────
+
+export async function runBotTick(options?: { dryRun?: boolean }): Promise<TickResult> {
+  const dryRun = options?.dryRun ?? false;
+
   const userDb = new Database(USER_DB_PATH);
   userDb.pragma("journal_mode = WAL");
   userDb.pragma("foreign_keys = ON");
@@ -219,13 +221,24 @@ async function main() {
   simDb.pragma("journal_mode = WAL");
   simDb.pragma("foreign_keys = ON");
 
-  // Get current simulation state
+  try {
+    return await executeTick(userDb, simDb, dryRun);
+  } finally {
+    userDb.close();
+    simDb.close();
+  }
+}
+
+async function executeTick(
+  userDb: Database.Database,
+  simDb: Database.Database,
+  dryRun: boolean,
+): Promise<TickResult> {
   const meta = simDb.prepare("SELECT current_day FROM simulation_meta LIMIT 1").get() as
     | { current_day: number }
     | undefined;
   const currentDay = meta?.current_day ?? 0;
 
-  // Get all bot users
   const bots = userDb.prepare(
     "SELECT id, display_name, party_id, bot_profile, last_active FROM users WHERE is_bot = 1",
   ).all() as Array<{
@@ -236,25 +249,19 @@ async function main() {
     last_active: number;
   }>;
 
-  if (bots.length === 0) {
-    console.log("No bot users found. Run: npm run seed:demo-users");
-    userDb.close();
-    simDb.close();
-    return;
-  }
+  const result: TickResult = { totalBots: bots.length, activeBots: 0, actions: 0, aiCalls: 0, breakdown: {} };
 
-  // Get parties for context
+  if (bots.length === 0) return result;
+
   const parties = simDb.prepare("SELECT id, name FROM parties").all() as Array<{ id: string; name: string }>;
   const partyNameMap: Record<string, string> = {};
   for (const p of parties) partyNameMap[p.id] = p.name;
 
-  // Get recent bills for AI context
   const recentBills = simDb.prepare(
     "SELECT title FROM bills ORDER BY proposed_on_day DESC LIMIT 10",
   ).all() as Array<{ title: string }>;
   const billTitles = recentBills.map(b => b.title);
 
-  // Get open proposals, pending questions, active polls for voting
   const openProposals = userDb.prepare(
     "SELECT id, party_id FROM internal_proposals WHERE status = 'open'",
   ).all() as Array<{ id: string; party_id: string }>;
@@ -272,25 +279,17 @@ async function main() {
   ).all() as Array<{ id: string; options: string }>;
 
   // Filter bots by activity chance
-  const activeBots = bots.filter(bot => {
+  const activeBotList = bots.filter(bot => {
     const profile = bot.bot_profile ? JSON.parse(bot.bot_profile) : { activityLevel: "low" };
     const chance = ACTIVITY_CHANCE[profile.activityLevel] ?? 0.05;
     return Math.random() < chance;
   });
 
-  console.log(`[bot-activity] Day ${currentDay} | ${bots.length} bots total, ${activeBots.length} active this tick`);
-  if (DRY_RUN) console.log("  (dry-run mode — no changes will be written)");
+  result.activeBots = activeBotList.length;
 
-  if (activeBots.length === 0) {
-    userDb.close();
-    simDb.close();
-    return;
-  }
-
-  // Stats
-  let actions = 0;
-  let aiCalls = 0;
-  const actionCounts: Record<string, number> = {};
+  console.log(`[bot-activity] Day ${currentDay} | ${bots.length} bots, ${activeBotList.length} active this tick`);
+  if (dryRun) console.log("  (dry-run mode)");
+  if (activeBotList.length === 0) return result;
 
   // Prepared statements
   const insertQuestionVote = userDb.prepare(
@@ -314,8 +313,6 @@ async function main() {
   const updateLastActive = userDb.prepare(
     "UPDATE users SET last_active = ? WHERE id = ?",
   );
-
-  // Check if user already voted/signaled (to avoid conflicts)
   const hasQuestionVote = userDb.prepare(
     "SELECT 1 FROM question_votes WHERE question_id = ? AND user_id = ?",
   );
@@ -329,7 +326,7 @@ async function main() {
   const now = Date.now();
   const isoNow = new Date(now).toISOString();
 
-  for (const bot of activeBots) {
+  for (const bot of activeBotList) {
     const profile = bot.bot_profile ? JSON.parse(bot.bot_profile) : { activityLevel: "low", engagementStyle: "observer" };
     const weights = STYLE_WEIGHTS[profile.engagementStyle] ?? STYLE_WEIGHTS.observer;
     const action = weightedPick(weights);
@@ -341,12 +338,12 @@ async function main() {
           const q = pick(pendingQuestions);
           if (hasQuestionVote.get(q.id, bot.id)) break;
           const vote = Math.random() < 0.7 ? 1 : -1;
-          if (!DRY_RUN) {
+          if (!dryRun) {
             insertQuestionVote.run(uuid(), q.id, bot.id, vote, now);
             insertAction.run(uuid(), bot.id, "vote_question", q.id, "question", JSON.stringify({ vote }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.vote_question = (actionCounts.vote_question ?? 0) + 1;
+          result.actions++;
+          result.breakdown.vote_question = (result.breakdown.vote_question ?? 0) + 1;
           break;
         }
 
@@ -357,16 +354,15 @@ async function main() {
           const p = pick(partyProposals);
           if (hasInternalVote.get(p.id, bot.id)) break;
           const vote = Math.random() < 0.75 ? 1 : -1;
-          if (!DRY_RUN) {
+          if (!dryRun) {
             insertInternalVote.run(uuid(), p.id, bot.id, vote, now);
-            // Update vote score
             userDb.prepare(
               "UPDATE internal_proposals SET vote_score = vote_score + ?, total_votes = total_votes + 1 WHERE id = ?",
             ).run(vote, p.id);
             insertAction.run(uuid(), bot.id, "vote_on_proposal", p.id, "proposal", JSON.stringify({ vote }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.vote_proposal = (actionCounts.vote_proposal ?? 0) + 1;
+          result.actions++;
+          result.breakdown.vote_proposal = (result.breakdown.vote_proposal ?? 0) + 1;
           break;
         }
 
@@ -375,37 +371,34 @@ async function main() {
           const bill = pick(activeBills);
           if (hasSignal.get(bill.id, bot.id)) break;
           const signal = Math.random() < 0.6 ? "yes" : "no";
-          if (!DRY_RUN) {
+          if (!dryRun) {
             insertSignal.run(uuid(), bill.id, bot.id, signal, now);
             insertAction.run(uuid(), bot.id, "signal_bill", bill.id, "bill", JSON.stringify({ signal }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.signal_bill = (actionCounts.signal_bill ?? 0) + 1;
+          result.actions++;
+          result.breakdown.signal_bill = (result.breakdown.signal_bill ?? 0) + 1;
           break;
         }
 
         case "ask_question": {
           const targetParty = pick(parties);
           const topic = pick(TOPICS);
-
-          // Try AI generation first, fall back to template
           let questionText: string;
           const aiQuestion = await generateAIQuestion(targetParty.name, topic, billTitles);
           if (aiQuestion) {
             questionText = aiQuestion;
-            aiCalls++;
+            result.aiCalls++;
           } else {
             const template = pick(QUESTION_TEMPLATES);
             questionText = template.replace("{topic}", topic);
           }
-
           const qId = `q-bot-${uuid().slice(0, 12)}`;
-          if (!DRY_RUN) {
+          if (!dryRun) {
             insertQuestion.run(qId, questionText, targetParty.id, currentDay, bot.id, topic);
             insertAction.run(uuid(), bot.id, "submit_question", qId, "question", JSON.stringify({ targetPartyId: targetParty.id, topic }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.ask_question = (actionCounts.ask_question ?? 0) + 1;
+          result.actions++;
+          result.breakdown.ask_question = (result.breakdown.ask_question ?? 0) + 1;
           console.log(`  ${bot.display_name} asked ${targetParty.name}: "${questionText.slice(0, 60)}..."`);
           break;
         }
@@ -414,33 +407,27 @@ async function main() {
           if (!bot.party_id) break;
           const topic = pick(TOPICS);
           const partyName = partyNameMap[bot.party_id] ?? bot.party_id;
-
           let title: string, description: string, rationale: string;
           const aiProposal = await generateAIProposal(partyName, topic);
           if (aiProposal) {
             title = aiProposal.title;
             description = aiProposal.description;
             rationale = aiProposal.rationale;
-            aiCalls++;
+            result.aiCalls++;
           } else {
             const template = pick(PROPOSAL_TEMPLATES);
             title = template.title.replace("{topic}", topic);
             description = template.desc.replace("{topic}", topic);
             rationale = `Stärkung im Bereich ${topic} gemäß Parteiprogramm.`;
           }
-
           const pId = uuid();
           const category = pick(CATEGORIES);
-          if (!DRY_RUN) {
-            insertProposal.run(
-              pId, bot.party_id, bot.id, bot.display_name,
-              title, description, category, rationale,
-              currentDay, currentDay + 7,
-            );
+          if (!dryRun) {
+            insertProposal.run(pId, bot.party_id, bot.id, bot.display_name, title, description, category, rationale, currentDay, currentDay + 7);
             insertAction.run(uuid(), bot.id, "submit_proposal", pId, "proposal", JSON.stringify({ partyId: bot.party_id, topic }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.submit_proposal = (actionCounts.submit_proposal ?? 0) + 1;
+          result.actions++;
+          result.breakdown.submit_proposal = (result.breakdown.submit_proposal ?? 0) + 1;
           console.log(`  ${bot.display_name} proposed: "${title}"`);
           break;
         }
@@ -451,38 +438,40 @@ async function main() {
           const options = JSON.parse(poll.options) as string[];
           if (options.length === 0) break;
           const chosen = pick(options);
-
-          // Update poll votes (JSON object with option → count)
-          if (!DRY_RUN) {
+          if (!dryRun) {
             const currentVotes = simDb.prepare("SELECT votes FROM polls WHERE id = ?").get(poll.id) as { votes: string } | undefined;
             const votesObj = currentVotes ? JSON.parse(currentVotes.votes) as Record<string, number> : {};
             votesObj[chosen] = (votesObj[chosen] ?? 0) + 1;
             simDb.prepare("UPDATE polls SET votes = ? WHERE id = ?").run(JSON.stringify(votesObj), poll.id);
             insertAction.run(uuid(), bot.id, "vote_poll", poll.id, "poll", JSON.stringify({ option: chosen }), currentDay, isoNow);
           }
-          actions++;
-          actionCounts.vote_poll = (actionCounts.vote_poll ?? 0) + 1;
+          result.actions++;
+          result.breakdown.vote_poll = (result.breakdown.vote_poll ?? 0) + 1;
           break;
         }
       }
 
-      // Update last active
-      if (!DRY_RUN) {
-        updateLastActive.run(now, bot.id);
-      }
+      if (!dryRun) updateLastActive.run(now, bot.id);
     } catch (err) {
       console.error(`  Error for bot ${bot.display_name}:`, err);
     }
   }
 
-  userDb.close();
-  simDb.close();
+  console.log(`[bot-activity] Done: ${result.actions} actions, ${result.aiCalls} AI calls`);
+  if (Object.keys(result.breakdown).length > 0) console.log(`  Breakdown:`, result.breakdown);
 
-  console.log(`\n[bot-activity] Results: ${actions} actions, ${aiCalls} AI calls`);
-  console.log(`  Breakdown:`, actionCounts);
+  return result;
 }
 
-main().catch(err => {
-  console.error("Bot activity failed:", err);
-  process.exit(1);
-});
+// ── Standalone execution ────────────────────────────────────────────────────
+
+const isMain = process.argv[1]?.endsWith("run-bot-activity.ts") ||
+               process.argv[1]?.endsWith("run-bot-activity");
+
+if (isMain) {
+  const dryRun = process.argv.includes("--dry-run");
+  runBotTick({ dryRun }).catch(err => {
+    console.error("Bot activity failed:", err);
+    process.exit(1);
+  });
+}
