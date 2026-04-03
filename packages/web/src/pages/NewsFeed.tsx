@@ -19,7 +19,7 @@ type EventCategory = {
 const EVENT_CATEGORIES: Record<string, EventCategory> = {
   legislative: {
     labelKey: "newsfeed.categories.legislative",
-    types: ["bill_proposed", "bill_debate", "bill_passed", "bill_rejected"],
+    types: ["bill_proposed", "bill_debate", "bill_passed", "bill_rejected", "mdb_speech"],
   },
   crises: {
     labelKey: "newsfeed.categories.crises",
@@ -70,6 +70,7 @@ const EVENT_BORDER_COLOR: Record<string, string> = {
   weekly_report: "#71717a",
   monthly_report: "#71717a",
   day_start: "#d4d4d8",
+  mdb_speech: "#8b5cf6",
 };
 
 const PAGE_SIZE = 50;
