@@ -130,6 +130,9 @@ export function Dashboard() {
   const partiesByApproval = [...parties].filter(p => p.seatCount > 0).sort((a, b) => b.approvalRating - a.approvalRating);
   const maxApproval = partiesByApproval[0]?.approvalRating ?? 50;
 
+  // Parliament day = days since current government formed (day 1 = formation day)
+  const parliamentDay = government ? simStatus.currentDay - government.formedOnDay + 1 : simStatus.currentDay;
+
   // Hemicycle seat data
   const hemicycleSeats = parties
     .filter(p => p.seatCount > 0)
@@ -142,7 +145,7 @@ export function Dashboard() {
       {/* ── Header row ── */}
       <div className="flex items-center justify-between mb-1 gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="!mb-0">{t("tag", { day: simStatus.currentDay })}</h1>
+          <h1 className="!mb-0">{t("parlamentstag", { day: parliamentDay })}</h1>
           <SimStatusPill status={simStatus} />
         </div>
         {mood && moodBadgeCls && (

@@ -1,5 +1,6 @@
 {
   "tag": "Tag {{day}}",
+  "parlamentstag": "Parlamentstag {{day}}",
   "kalender": "Kalender",
   "termine": "Termine",
   "vergangene": "Vergangene",
