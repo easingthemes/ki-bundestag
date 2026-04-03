@@ -17,6 +17,9 @@
     "loadMore": "Mehr laden",
     "breaking": "Breaking",
     "resetFilters": "Filter zurücksetzen",
+    "day": "Tag {{number}} ({{count}})",
+    "viewBill": "Gesetzentwurf →",
+    "viewElection": "Wahl →",
     "categories": {
       "legislative": "Gesetzgebung",
       "crises": "Krisen",

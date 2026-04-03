@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction, logger } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction, logger, dayToDate } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, count } from "drizzle-orm";
 import { getUserToken } from "../middleware/index.js";
 import { USER_DAILY_LIMITS, getUserDailyCount } from "../middleware/rate-limit.js";
@@ -61,15 +61,37 @@ router.get("/api/users/me/activity", (req, res) => {
 
   const items: Array<{ type: string; title: string; description: string; dayNumber: number; createdAt: string; entityId?: string; entityType?: string; outcome?: string }> = [];
 
+  // Resolve simulation start date for proper day→date conversion
+  const db = getDb();
+  const simMeta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  const startDate = (simMeta as any)?.startDate ? new Date((simMeta as any).startDate) : new Date();
+  const dayToIso = (day: number) => dayToDate(day, startDate).toISOString();
+
+  const STATUS_DE: Record<string, string> = {
+    open: "Offen",
+    reviewing: "In Prüfung",
+    accepted: "Angenommen",
+    declined: "Abgelehnt",
+    expired: "Abgelaufen",
+    pending: "Ausstehend",
+    approved: "Genehmigt",
+    rejected: "Abgelehnt",
+    answered: "Beantwortet",
+  };
+
+  const SIGNAL_DE: Record<string, string> = { yes: "JA", no: "NEIN" };
+  const VOTE_DE: Record<string, string> = { yes: "Ja", no: "Nein", abstain: "Enthaltung" };
+
   // Proposals
   const proposals = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.proposedBy, token)).all();
   for (const p of proposals) {
+    const statusDe = STATUS_DE[p.status] ?? p.status;
     items.push({
       type: "proposal",
-      title: `Proposed: "${p.title}"`,
-      description: `Status: ${p.status}${p.bundestag_bill_id ? ` \u2192 Bill ${p.bundestag_bill_id}` : ""}`,
+      title: `Vorschlag: „${p.title}"`,
+      description: `Status: ${statusDe}${p.bundestag_bill_id ? ` → Gesetzentwurf ${p.bundestag_bill_id}` : ""}`,
       dayNumber: p.createdOnDay,
-      createdAt: new Date(p.createdOnDay * 86400000).toISOString(),
+      createdAt: dayToIso(p.createdOnDay),
       entityId: p.id,
       entityType: "proposal",
       outcome: p.status,
@@ -79,10 +101,11 @@ router.get("/api/users/me/activity", (req, res) => {
   // Signals
   const signals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.userId, token)).all();
   for (const s of signals) {
+    const signalDe = SIGNAL_DE[s.signal] ?? s.signal.toUpperCase();
     items.push({
       type: "signal",
-      title: `Signaled ${s.signal.toUpperCase()} on a bill`,
-      description: `Bill: ${s.billId}`,
+      title: `Signal: ${signalDe} zu einem Gesetzentwurf`,
+      description: `Gesetzentwurf: ${s.billId}`,
       dayNumber: 0,
       createdAt: new Date(s.createdAt).toISOString(),
       entityId: s.billId,
@@ -93,10 +116,11 @@ router.get("/api/users/me/activity", (req, res) => {
   // MdB Votes
   const mdbVotes = userDb.select().from(schema.mdbVotes).where(eq(schema.mdbVotes.userId, token)).all();
   for (const v of mdbVotes) {
+    const voteDe = VOTE_DE[v.vote] ?? v.vote;
     items.push({
       type: "mdb_vote",
-      title: `MdB vote: ${v.vote.toUpperCase()}`,
-      description: `Bill: ${v.billId}`,
+      title: `MdB-Abstimmung: ${voteDe}`,
+      description: `Gesetzentwurf: ${v.billId}`,
       dayNumber: 0,
       createdAt: new Date(v.createdAt).toISOString(),
       entityId: v.billId,
@@ -109,8 +133,8 @@ router.get("/api/users/me/activity", (req, res) => {
   for (const sp of speeches) {
     items.push({
       type: "speech",
-      title: `Speech (Reading ${sp.reading})`,
-      description: sp.content.substring(0, 100) + (sp.content.length > 100 ? "..." : ""),
+      title: `Rede (${sp.reading}. Lesung)`,
+      description: sp.content.substring(0, 100) + (sp.content.length > 100 ? "…" : ""),
       dayNumber: sp.dayNumber,
       createdAt: new Date(sp.createdAt).toISOString(),
       entityId: sp.billId,
@@ -121,12 +145,13 @@ router.get("/api/users/me/activity", (req, res) => {
   // Applications
   const apps = userDb.select().from(schema.mdbApplications).where(eq(schema.mdbApplications.userId, token)).all();
   for (const a of apps) {
+    const statusDe = STATUS_DE[a.status] ?? a.status;
     items.push({
       type: "application",
-      title: `MdB application (${a.partyId})`,
-      description: `Status: ${a.status}`,
+      title: `MdB-Bewerbung (${a.partyId})`,
+      description: statusDe,
       dayNumber: a.createdOnDay,
-      createdAt: new Date(a.createdOnDay * 86400000).toISOString(),
+      createdAt: dayToIso(a.createdOnDay),
       entityId: a.id,
       entityType: "application",
       outcome: a.status,
@@ -134,15 +159,14 @@ router.get("/api/users/me/activity", (req, res) => {
   }
 
   // Questions
-  const db = getDb();
   const questions = db.select().from(schema.citizenQuestions).all().filter((q: any) => q.userId === token);
   for (const q of questions) {
     items.push({
       type: "question",
-      title: `Asked ${q.targetPartyId}: "${q.question.substring(0, 60)}..."`,
-      description: q.response ? `Answered: ${q.response.substring(0, 100)}...` : "Awaiting answer",
+      title: `Frage an ${q.targetPartyId}: „${q.question.substring(0, 60)}…"`,
+      description: q.response ? `Antwort: ${q.response.substring(0, 100)}…` : "Wartet auf Antwort",
       dayNumber: q.createdOnDay,
-      createdAt: new Date(q.createdOnDay * 86400000).toISOString(),
+      createdAt: dayToIso(q.createdOnDay),
       entityId: q.id,
       entityType: "question",
       outcome: q.status,
