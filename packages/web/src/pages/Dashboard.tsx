@@ -418,7 +418,7 @@ export function Dashboard() {
                     </div>
                     <div>
                       <div className="font-bold text-sm">{government.chancellorName}</div>
-                      <div className="text-xs text-muted-foreground">{cp?.name ?? government.chancellorPartyId} · Tag {government.formedOnDay}</div>
+                      <div className="text-xs text-muted-foreground">{cp?.name ?? government.chancellorPartyId} · {t("imAmt", { days: parliamentDay })}</div>
                     </div>
                   </div>
                 </CardContent>
