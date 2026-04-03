@@ -25,7 +25,7 @@ import { tallyVotes } from "./voting.js";
 import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
-import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";
+import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
@@ -502,7 +502,7 @@ export async function runDay(): Promise<number> {
   if (!activeElection) {
     const trigger = injections.triggerElection
       ? { trigger: true, reason: "User-injected snap election" }
-      : shouldTriggerElection(currentDay, nextElectionDay, lowSentimentStreak, null);
+      : shouldTriggerElection(currentDay, nextElectionDay, lowSentimentStreak, null, meta.electionCooldownUntil ?? 0);
     if (trigger.trigger) {
       const newElection = announceElection(currentDay, trigger.reason, startDate);
       activeElection = newElection;
@@ -589,10 +589,13 @@ export async function runDay(): Promise<number> {
       nationalState.oppositionParties = opposition;
 
       lowSentimentStreak = 0;
+      // Honeymoon period: boost sentiment and set cooldown to prevent immediate re-election
+      nationalState.publicSentiment = Math.min(75, Math.max(nationalState.publicSentiment, 30) + 5);
       let nextElDay = currentDay + TIME_CONFIG.TERM_DAYS;
       if (startDate) nextElDay = snapToNextSunday(nextElDay, startDate);
+      const cooldownUntil = currentDay + ELECTION_COOLDOWN_DAYS;
       db.update(schema.simulationMeta)
-        .set({ nextElectionDay: nextElDay, lowSentimentStreak: 0 })
+        .set({ nextElectionDay: nextElDay, lowSentimentStreak: 0, electionCooldownUntil: cooldownUntil } as any)
         .where(eq(schema.simulationMeta.id, meta.id))
         .run();
 
@@ -726,14 +729,18 @@ export async function runDay(): Promise<number> {
       nationalState.oppositionParties = opposition;
 
       // Reset streak and schedule next election (snap to Sunday if calendar-aware)
+      // Honeymoon period: boost sentiment and set cooldown to prevent immediate re-election
       lowSentimentStreak = 0;
+      nationalState.publicSentiment = Math.min(75, Math.max(nationalState.publicSentiment, 30) + 5);
       let nextElDay = currentDay + TIME_CONFIG.TERM_DAYS;
       if (startDate) nextElDay = snapToNextSunday(nextElDay, startDate);
+      const cooldownUntil = currentDay + ELECTION_COOLDOWN_DAYS;
       db.update(schema.simulationMeta)
         .set({
           nextElectionDay: nextElDay,
           lowSentimentStreak: 0,
-        })
+          electionCooldownUntil: cooldownUntil,
+        } as any)
         .where(eq(schema.simulationMeta.id, meta.id))
         .run();
 
