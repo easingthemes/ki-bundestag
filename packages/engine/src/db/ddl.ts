@@ -434,7 +434,9 @@ export const USER_TABLE_DDL = `
     avatar_url TEXT,
     created_at INTEGER NOT NULL,
     last_active INTEGER NOT NULL,
-    switch_cooldown_until INTEGER
+    switch_cooldown_until INTEGER,
+    is_bot INTEGER NOT NULL DEFAULT 0,
+    bot_profile TEXT
   );
 
   CREATE TABLE IF NOT EXISTS sessions (
@@ -611,6 +613,8 @@ export const USER_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql:
   { table: "users", column: "provider_id", sql: "ALTER TABLE users ADD COLUMN provider_id TEXT" },
   { table: "users", column: "avatar_url", sql: "ALTER TABLE users ADD COLUMN avatar_url TEXT" },
   { table: "sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired)" },
+  { table: "users", column: "is_bot", sql: "ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0" },
+  { table: "users", column: "bot_profile", sql: "ALTER TABLE users ADD COLUMN bot_profile TEXT" },
 ];
 
 /**

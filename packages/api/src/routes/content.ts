@@ -51,6 +51,7 @@ function mapQuestion(
   voteScore = 0,
   totalVotes = 0,
   userVote?: 1 | -1 | null,
+  authorInfo?: { displayName: string; isBot: boolean } | null,
 ): CitizenQuestion {
   return {
     id: row.id,
@@ -64,6 +65,8 @@ function mapQuestion(
     voteScore,
     totalVotes,
     userVote: userVote ?? null,
+    authorName: authorInfo?.displayName ?? null,
+    authorIsBot: authorInfo?.isBot ?? false,
   };
 }
 
@@ -205,8 +208,18 @@ router.get("/api/questions", (req, res) => {
     for (const v of userVotes) userVoteMap[v.questionId] = v.vote as 1 | -1;
   }
 
+  // Batch-fetch author info for questions with userId
+  const authorIds = [...new Set(rows.map(r => (r as any).userId).filter(Boolean))];
+  const authorMap: Record<string, { displayName: string; isBot: boolean }> = {};
+  if (authorIds.length > 0) {
+    const allUsers = userDb.select({ id: schema.users.id, displayName: schema.users.displayName, isBot: schema.users.isBot }).from(schema.users).all();
+    for (const u of allUsers) {
+      if (authorIds.includes(u.id)) authorMap[u.id] = { displayName: u.displayName, isBot: u.isBot ?? false };
+    }
+  }
+
   const questions: CitizenQuestion[] = rows.map(r =>
-    mapQuestion(r, scoreMap[r.id]?.score ?? 0, scoreMap[r.id]?.total ?? 0, userVoteMap[r.id] ?? null),
+    mapQuestion(r, scoreMap[r.id]?.score ?? 0, scoreMap[r.id]?.total ?? 0, userVoteMap[r.id] ?? null, (r as any).userId ? authorMap[(r as any).userId] ?? null : null),
   );
   // Pending: by voteScore desc, then oldest first; Answered: by respondedOnDay desc
   questions.sort((a, b) => {
@@ -308,7 +321,13 @@ router.get("/api/questions/:id", (req, res) => {
   const score = votes.reduce((s, v) => s + v.vote, 0);
   const token = getUserToken(req);
   const uv = token ? votes.find(v => v.userId === token) : undefined;
-  res.json(mapQuestion(rows[0], score, votes.length, uv ? (uv.vote as 1 | -1) : null));
+  const qUserId = (rows[0] as any).userId;
+  let authorInfo: { displayName: string; isBot: boolean } | null = null;
+  if (qUserId) {
+    const authorRow = userDb.select({ displayName: schema.users.displayName, isBot: schema.users.isBot }).from(schema.users).where(eq(schema.users.id, qUserId)).all()[0];
+    if (authorRow) authorInfo = { displayName: authorRow.displayName, isBot: authorRow.isBot ?? false };
+  }
+  res.json(mapQuestion(rows[0], score, votes.length, uv ? (uv.vote as 1 | -1) : null, authorInfo));
 });
 
 // POST /api/questions

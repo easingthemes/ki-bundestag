@@ -61,6 +61,8 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at").notNull(),
   lastActive: integer("last_active").notNull(),
   switchCooldownUntil: integer("switch_cooldown_until"), // sim day
+  isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
+  botProfile: text("bot_profile", { mode: "json" }),     // JSON: activityLevel, engagementStyle, etc.
 });
 
 export const notifications = sqliteTable("notifications", {

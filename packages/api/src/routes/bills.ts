@@ -225,17 +225,18 @@ router.get("/api/bills/:id/speeches", (req, res) => {
     .where(eq(schema.mdbSpeeches.billId, req.params.id))
     .all();
 
-  // Enrich with display names
+  // Enrich with display names and bot status
   const userIds = [...new Set(speeches.map(s => s.userId))];
-  const nameMap = new Map<string, string>();
+  const userInfoMap = new Map<string, { displayName: string; isBot: boolean }>();
   for (const uid of userIds) {
     const user = userDb.select().from(schema.users).where(eq(schema.users.id, uid)).all()[0];
-    if (user) nameMap.set(uid, user.displayName);
+    if (user) userInfoMap.set(uid, { displayName: user.displayName, isBot: user.isBot ?? false });
   }
 
   const enriched = speeches.map(s => ({
     ...s,
-    displayName: nameMap.get(s.userId) ?? "Unknown",
+    displayName: userInfoMap.get(s.userId)?.displayName ?? "Unknown",
+    isBot: userInfoMap.get(s.userId)?.isBot ?? false,
   }));
 
   // Group by reading

@@ -59,6 +59,8 @@ export interface CitizenQuestion {
   voteScore: number;
   totalVotes: number;
   userVote?: 1 | -1 | null;
+  authorName?: string | null;
+  authorIsBot?: boolean;
 }
 
 export interface Referendum {
