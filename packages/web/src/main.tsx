@@ -35,6 +35,7 @@ const MdbList = lazy(() => import("./pages/MdbList").then(m => ({ default: m.Mdb
 const MdbDetail = lazy(() => import("./pages/MdbDetail").then(m => ({ default: m.MdbDetail })));
 const Committees = lazy(() => import("./pages/Committees").then(m => ({ default: m.Committees })));
 const CommitteeDetail = lazy(() => import("./pages/CommitteeDetail").then(m => ({ default: m.CommitteeDetail })));
+const Debates = lazy(() => import("./pages/Debates").then(m => ({ default: m.Debates })));
 import { api, setErrorHandler, type User, type SimulationStatus, type BundestagSeat, onSimStatus, onNotificationRefresh, isSocketConnected } from "./api";
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -146,6 +147,7 @@ function MobileNav({ user }: { user: User | null }) {
           <MobileLink to="/mdb">{t("nav.mdb")}</MobileLink>
           <MobileLink to="/committees">{t("nav.committees")}</MobileLink>
           <MobileLink to="/bills">{t("nav.bills")}</MobileLink>
+          <MobileLink to="/debatten">{t("nav.debates")}</MobileLink>
           <MobileLink to="/motions">{t("nav.motions")}</MobileLink>
           <MobileLink to="/interpellations">{t("nav.interpellations")}</MobileLink>
           <MobileLink to="/confidence-votes">{t("nav.confidenceVotes")}</MobileLink>
@@ -644,6 +646,7 @@ function App() {
               <DropdownLink to="/mdb">{t("nav.mdb")}</DropdownLink>
               <DropdownLink to="/committees">{t("nav.committees")}</DropdownLink>
               <DropdownLink to="/bills">{t("nav.bills")}</DropdownLink>
+              <DropdownLink to="/debatten">{t("nav.debates")}</DropdownLink>
               <DropdownLink to="/motions">{t("nav.motions")}</DropdownLink>
               <DropdownLink to="/interpellations">{t("nav.interpellations")}</DropdownLink>
               <DropdownLink to="/confidence-votes">{t("nav.confidenceVotes")}</DropdownLink>
@@ -708,6 +711,7 @@ function App() {
             <Route path="/parties/:id" element={<PartyDetail />} />
             <Route path="/bills" element={<Bills />} />
             <Route path="/bills/:id" element={<BillDetail />} />
+            <Route path="/debatten" element={<Debates />} />
             <Route path="/mdb" element={<MdbList />} />
             <Route path="/mdb/:seatId" element={<MdbDetail />} />
             <Route path="/committees" element={<Committees />} />
