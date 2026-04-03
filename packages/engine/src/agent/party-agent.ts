@@ -64,6 +64,7 @@ const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
               gdpGrowth: { type: "number" },
               publicSentiment: { type: "number" },
             },
+            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
             additionalProperties: false,
           },
           impactChange: {
@@ -75,6 +76,7 @@ const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
               gdpGrowth: { type: "number" },
               publicSentiment: { type: "number" },
             },
+            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
             additionalProperties: false,
           },
           statement: { type: "string" },
