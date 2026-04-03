@@ -92,6 +92,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   dayProgress: integer("day_progress").notNull().default(0),
   nextElectionDay: integer("next_election_day").notNull().default(1461),
   lowSentimentStreak: integer("low_sentiment_streak").notNull().default(0),
+  electionCooldownUntil: integer("election_cooldown_until").notNull().default(0),
   budgetRetryDay: integer("budget_retry_day"),
   dailySummary: text("daily_summary"),
   timingPreset: text("timing_preset").notNull().default("normal"),

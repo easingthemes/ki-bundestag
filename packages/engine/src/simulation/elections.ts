@@ -19,15 +19,23 @@ function gaussianNoise(stddev: number): number {
   return stddev * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
+/** Days after government formation during which snap elections cannot trigger (honeymoon period) */
+export const ELECTION_COOLDOWN_DAYS = 30;
+
 export function shouldTriggerElection(
   currentDay: number,
   nextElectionDay: number,
   lowSentimentStreak: number,
   activeElection: Election | null,
+  electionCooldownUntil?: number,
 ): { trigger: boolean; reason: string } {
   if (activeElection) return { trigger: false, reason: "" };
   if (currentDay >= nextElectionDay) {
     return { trigger: true, reason: "Scheduled federal election" };
+  }
+  // Snap elections blocked during post-election cooldown (honeymoon period)
+  if (electionCooldownUntil && currentDay < electionCooldownUntil) {
+    return { trigger: false, reason: "" };
   }
   if (lowSentimentStreak >= 5) {
     return { trigger: true, reason: "Snap election — prolonged public dissatisfaction" };
