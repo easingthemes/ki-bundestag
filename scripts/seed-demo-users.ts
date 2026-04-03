@@ -1,5 +1,12 @@
 /**
- * Seed 756 demo users with realistic German names and varied states.
+ * Seed demo or bot users with realistic German names and varied states.
+ *
+ * Usage:
+ *   npx tsx scripts/seed-demo-users.ts [count]          — create demo users (default 756)
+ *   npx tsx scripts/seed-demo-users.ts --bots [count]   — create bot users (default 100)
+ *
+ * The --bots flag sets is_bot=1 and assigns randomized activity profiles.
+ * Without --bots, users are created as regular demo users (is_bot=0).
  *
  * Distribution:
  *   ~60% party members (across 6 parties, weighted by approval)
@@ -8,8 +15,6 @@
  * Among party members:
  *   ~15% have MdB applications (mix of pending/approved/rejected)
  *   Some approved users get bundestag seats
- *
- * Run: npx tsx scripts/seed-demo-users.ts
  */
 
 import Database from "better-sqlite3";
@@ -159,7 +164,9 @@ function weightedParty(): string {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
-  const TOTAL_USERS = parseInt(process.argv[2] || "756", 10);
+  const CREATE_BOTS = process.argv.includes("--bots");
+  const countArg = process.argv.find(a => !a.startsWith("-") && a !== process.argv[0] && a !== process.argv[1]);
+  const TOTAL_USERS = parseInt(countArg || (CREATE_BOTS ? "100" : "756"), 10);
 
   // Ensure data directory exists
   for (const dbPath of [USER_DB_PATH, SIM_DB_PATH]) {
@@ -207,6 +214,10 @@ function main() {
     );
   `);
 
+  // Ensure is_bot and bot_profile columns exist (for DBs created before these columns were added)
+  try { userDb.exec("ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0"); } catch { /* already exists */ }
+  try { userDb.exec("ALTER TABLE users ADD COLUMN bot_profile TEXT"); } catch { /* already exists */ }
+
   simDb.exec(`
     CREATE TABLE IF NOT EXISTS simulation_meta (
       id INTEGER PRIMARY KEY AUTOINCREMENT, current_day INTEGER NOT NULL DEFAULT 0,
@@ -237,6 +248,8 @@ function main() {
     ),
   );
 
+  console.log(`Mode: ${CREATE_BOTS ? "BOT users" : "demo users"}`);
+  console.log(`Creating: ${TOTAL_USERS} users`);
   console.log(`Current sim day: ${currentDay}`);
   console.log(`Existing users: ${existingNames.size}`);
 
@@ -334,12 +347,15 @@ function main() {
           ? currentDay + randInt(1, 7)
           : null;
 
-      // Bot profile: assign activity level + engagement style
-      const activityRoll = Math.random();
-      const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
-      const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
-      const engagementStyle = pick([...ENGAGEMENT_STYLES]);
-      const botProfile = JSON.stringify({ activityLevel, engagementStyle });
+      // Bot profile: assign activity level + engagement style (only for bots)
+      let botProfile: string | null = null;
+      if (CREATE_BOTS) {
+        const activityRoll = Math.random();
+        const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
+        const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
+        const engagementStyle = pick([...ENGAGEMENT_STYLES]);
+        botProfile = JSON.stringify({ activityLevel, engagementStyle });
+      }
 
       insertUser.run(
         userId,
@@ -351,7 +367,7 @@ function main() {
         createdAt,
         lastActive,
         switchCooldown,
-        1,  // is_bot = true
+        CREATE_BOTS ? 1 : 0,
         botProfile,
       );
 
@@ -513,7 +529,7 @@ function main() {
   userDb.close();
   simDb.close();
 
-  console.log(`\n✅ Created ${created} demo users`);
+  console.log(`\n✅ Created ${created} ${CREATE_BOTS ? "bot" : "demo"} users`);
   console.log(`   With party: ${withParty}`);
   console.log(`   Without party: ${withoutParty}`);
   console.log(`   Party distribution:`, partyCount);
