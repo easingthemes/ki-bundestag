@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/easingthemes/ki-bundestag/compare/v1.3.1...v1.4.0) (2026-04-03)
+
+
+### Features
+
+* **engine:** add inactivity penalty and activity bonus to approval system ([256af2a](https://github.com/easingthemes/ki-bundestag/commit/256af2a431e44d98e2baa69967b512213bdee517))
+
 ## [1.3.1](https://github.com/easingthemes/ki-bundestag/compare/v1.3.0...v1.3.1) (2026-04-03)
 
 
