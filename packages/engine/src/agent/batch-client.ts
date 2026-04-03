@@ -305,7 +305,8 @@ async function submitAnthropicBatch(requests: BatchRequest[]): Promise<BatchResu
         structuredOutput: structuredIds.has(item.custom_id),
       });
     } else {
-      console.warn(`  [Batch] Request ${item.custom_id} failed: ${item.result.type}`);
+      const errDetail = (item.result as any).error?.error?.message ?? (item.result as any).error?.message ?? item.result.type;
+      console.warn(`  [Batch] Request ${item.custom_id} failed: ${errDetail}`);
 
       recordAICall({
         dayNumber: getTrackingDay(),
