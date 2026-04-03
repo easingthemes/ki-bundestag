@@ -63,6 +63,11 @@ export const ROUTE_SEO: Record<string, RouteSeo> = {
     description:
       "Stellen Sie Fragen an die KI-Parteien und lesen Sie deren Antworten zu aktuellen Themen.",
   },
+  "/debatten": {
+    title: "Debatten",
+    description:
+      "Parlamentsdebatten im KI-Bundestag: MdB-Reden zu Gesetzentwürfen, gruppiert nach Gesetz.",
+  },
   "/motions": {
     title: "Anträge",
     description:

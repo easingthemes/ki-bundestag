@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData } from "../api";
+import { MDB_BADGE } from "@/lib/colors";
 import { CalendarWidget } from "../components/CalendarWidget";
 import { UpcomingCalendar } from "../components/UpcomingCalendar";
 import { Hemicycle } from "../components/Hemicycle";
@@ -50,6 +51,7 @@ export function Dashboard() {
   const [upcomingCalendar, setUpcomingCalendar] = useState<UpcomingCalendarData | null>(null);
   const [calendarView, setCalendarView] = useState<"upcoming" | "past">("upcoming");
   const [showWelcome, setShowWelcome] = useState(false);
+  const [debateEvents, setDebateEvents] = useState<SimulationEvent[]>([]);
 
   const refreshCore = useCallback(() => {
     api.getState().then(setState).catch(console.error);
@@ -66,6 +68,7 @@ export function Dashboard() {
     api.getGovernment().then(setGovernment).catch(console.error);
     api.getMedia().then(setMedia).catch(console.error);
     api.getBills().then(setBills).catch(console.error);
+    api.getEvents(10, 0, "mdb_speech").then(r => setDebateEvents(r.events)).catch(console.error);
   }, []);
 
   useEffect(() => { refreshCore(); refreshSlow(); }, [refreshCore, refreshSlow]);
@@ -302,6 +305,46 @@ export function Dashboard() {
               ))}
             </div>
           </section>
+
+          {/* Top Debates */}
+          {debateEvents.length > 0 && (
+            <section>
+              <div className="flex justify-between items-baseline mb-3">
+                <div className="section-title !mb-0 !pb-0 !border-b-0">{t("debatten")}</div>
+                <Link to="/debatten" className="text-xs font-medium text-primary hover:underline">{t("alleDebatten")}</Link>
+              </div>
+              <div className="space-y-2">
+                {debateEvents.slice(0, 5).map(ev => {
+                  const displayName = ev.title.match(/^MdB (.+?) spricht/)?.[1] ?? "MdB";
+                  const billTitle = ev.title.replace(/^MdB .+ spricht zu "/, "").replace(/" \(\d\. Lesung\)$/, "");
+                  const billId = ev.data?.billId as string | undefined;
+                  return (
+                    <Card key={ev.id}>
+                      <CardContent className="p-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <Badge variant="outline" className={cn("text-[10px]", MDB_BADGE)}>MdB</Badge>
+                              <span className="font-semibold text-xs">{displayName}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground line-clamp-2">{ev.description}</div>
+                            {billId && (
+                              <Link to={`/bills/${billId}`} className="text-[11px] text-primary no-underline hover:underline mt-1 inline-block">
+                                {billTitle}
+                              </Link>
+                            )}
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div className="text-[10px] font-medium text-muted-foreground">Tag {ev.dayNumber}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Media Highlights */}
           {latestMedia.length > 0 && (

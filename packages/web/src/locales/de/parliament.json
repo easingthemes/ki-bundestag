@@ -1,4 +1,17 @@
 {
+  "debates": {
+    "title": "Parlamentsdebatten",
+    "subtitle": "Alle MdB-Reden zu Gesetzentwürfen — gruppiert nach Gesetz.",
+    "empty": "Noch keine Debatten. MdB-Reden werden hier angezeigt, sobald Abgeordnete zu Gesetzen sprechen.",
+    "totalSpeeches": "{{count}} Rede",
+    "totalSpeeches_other": "{{count}} Reden",
+    "speechCount": "{{count}} Rede",
+    "speechCount_other": "{{count}} Reden",
+    "latestDay": "zuletzt Tag {{day}}",
+    "viewBill": "Zum Gesetz →",
+    "showLess": "Weniger anzeigen",
+    "showMoreSpeeches": "{{count}} weitere anzeigen"
+  },
   "motions": {
     "title": "Anträge & Entschließungen",
     "empty": "Noch keine Anträge. Starte die Simulation, um Anträge zu sehen.",
