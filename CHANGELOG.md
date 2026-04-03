@@ -1,3 +1,12 @@
+# [1.7.0](https://github.com/easingthemes/ki-bundestag/compare/v1.6.0...v1.7.0) (2026-04-03)
+
+
+### Features
+
+* add --bots flag to seed-demo-users script ([9a56fc6](https://github.com/easingthemes/ki-bundestag/commit/9a56fc68e068928eedac5bd0d8460ea670dbfceb))
+* cap bot users at target count (default 100) ([97d86fa](https://github.com/easingthemes/ki-bundestag/commit/97d86fad88caf8c4a0ea4def890682e6f261a194))
+* migrate existing demo users to bot status on seed ([a020d5e](https://github.com/easingthemes/ki-bundestag/commit/a020d5e4b9e97c11007939b69d372dde742f2fa3))
+
 # [1.6.0](https://github.com/easingthemes/ki-bundestag/compare/v1.5.0...v1.6.0) (2026-04-03)
 
 
