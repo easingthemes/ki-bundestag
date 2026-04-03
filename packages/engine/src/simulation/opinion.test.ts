@@ -18,6 +18,8 @@ import {
   approvalFromBillOutcome,
   updateSentiment,
   membershipBonus,
+  isPartyActive,
+  inactivityPenalty,
 } from "./opinion.js";
 import type { Party } from "@ki-bundestag/types";
 
@@ -26,7 +28,7 @@ function makeParty(approvalRating: number): Party {
     id: "spd", name: "SPD", color: "#e3000f", ideology: "center-left",
     seatCount: 200, approvalRating,
     policyPriorities: { economy: 0, social: 0, environment: 0, immigration: 0, spending: 0 },
-    coalitionRole: "leader", memberCount: 100,
+    coalitionRole: "leader", memberCount: 100, inactiveDays: 0,
   };
 }
 
@@ -104,5 +106,76 @@ describe("membershipBonus", () => {
     const b10 = membershipBonus(10);
     const b100 = membershipBonus(100);
     expect(b100).toBeGreaterThan(b10);
+  });
+});
+
+describe("isPartyActive", () => {
+  it("returns false for empty actions", () => {
+    expect(isPartyActive([])).toBe(false);
+  });
+
+  it("returns false for abstain-only votes", () => {
+    expect(isPartyActive([
+      { type: "vote", billId: "b1", vote: "abstain", reason: "" },
+      { type: "vote", billId: "b2", vote: "abstain", reason: "" },
+    ])).toBe(false);
+  });
+
+  it("returns false for nothing action", () => {
+    expect(isPartyActive([{ type: "nothing" }])).toBe(false);
+  });
+
+  it("returns true for a yes vote", () => {
+    expect(isPartyActive([
+      { type: "vote", billId: "b1", vote: "yes", reason: "" },
+    ])).toBe(true);
+  });
+
+  it("returns true for a proposal", () => {
+    expect(isPartyActive([
+      { type: "propose_bill", title: "T", description: "D", category: "economy", impact: {} },
+    ])).toBe(true);
+  });
+
+  it("returns true for a statement", () => {
+    expect(isPartyActive([
+      { type: "statement", title: "T", statement: "S" },
+    ])).toBe(true);
+  });
+
+  it("returns true when mixed abstains + one real action", () => {
+    expect(isPartyActive([
+      { type: "vote", billId: "b1", vote: "abstain", reason: "" },
+      { type: "statement", title: "T", statement: "S" },
+    ])).toBe(true);
+  });
+});
+
+describe("inactivityPenalty", () => {
+  it("returns 0 within grace period (5 days)", () => {
+    expect(inactivityPenalty(0)).toBe(0);
+    expect(inactivityPenalty(3)).toBe(0);
+    expect(inactivityPenalty(5)).toBe(0);
+  });
+
+  it("returns base penalty just after grace period", () => {
+    const penalty = inactivityPenalty(6);
+    expect(penalty).toBeCloseTo(0.052, 2); // 0.05 + 1*0.002
+  });
+
+  it("scales up over time", () => {
+    const p10 = inactivityPenalty(10);
+    const p30 = inactivityPenalty(30);
+    expect(p30).toBeGreaterThan(p10);
+  });
+
+  it("caps at 0.15", () => {
+    expect(inactivityPenalty(200)).toBe(0.15);
+    expect(inactivityPenalty(500)).toBe(0.15);
+  });
+
+  it("reaches cap around day 55", () => {
+    // Day 55: 0.05 + (55-5)*0.002 = 0.05 + 0.1 = 0.15
+    expect(inactivityPenalty(55)).toBe(0.15);
   });
 });

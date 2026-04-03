@@ -9,6 +9,7 @@ export const parties = sqliteTable("parties", {
   approvalRating: real("approval_rating").notNull(),
   policyPriorities: text("policy_priorities", { mode: "json" }).notNull(),
   coalitionRole: text("coalition_role").notNull(), // "leader" | "junior" | "opposition"
+  inactiveDays: integer("inactive_days").notNull().default(0),
 });
 
 export const bills = sqliteTable("bills", {

@@ -1,5 +1,5 @@
 import { and, count, eq, gte } from "drizzle-orm";
-import type { BillImpact, Party } from "@ki-bundestag/types";
+import type { AgentAction, BillImpact, Party } from "@ki-bundestag/types";
 import { getUserDb, schema } from "../db/index.js";
 
 const SENTIMENT_MIN = 5;
@@ -54,14 +54,79 @@ export function membershipBonus(activeMembers: number): number {
   return Math.round(bonus * 0.01 * 100) / 100; // e.g. 2.6 → 0.026
 }
 
+// ── Inactivity penalty ──────────────────────────────────────────────
+// Grace period before penalty kicks in (parliamentary recesses are normal)
+const INACTIVITY_GRACE_DAYS = 5;
+// Base penalty per day once grace period expires
+const INACTIVITY_BASE_PENALTY = 0.05;
+// Maximum daily penalty (reached after ~55 consecutive inactive days)
+const INACTIVITY_MAX_PENALTY = 0.15;
+// Scaling factor: penalty grows as 0.05 + days * 0.002, capped at 0.15
+const INACTIVITY_SCALE = 0.002;
+// Small daily bonus for parties that took meaningful actions
+const ACTIVITY_BONUS = 0.05;
+
 /**
- * Apply daily approval drift and membership bonus to all parties.
- * Mutates each party's approvalRating in place.
+ * Determine whether a party was meaningfully active on a given day.
+ * "Meaningful" = anything beyond abstain-only votes:
+ *   proposals, yes/no votes, statements, motions, interpellations, etc.
  */
-export function applyDailyApprovalDrift(parties: Party[]): void {
+export function isPartyActive(actions: AgentAction[]): boolean {
+  for (const a of actions) {
+    if (a.type === "nothing") continue;
+    if (a.type === "vote" && a.vote === "abstain") continue;
+    return true; // any non-abstain, non-nothing action counts
+  }
+  return false;
+}
+
+/**
+ * Calculate the inactivity penalty for a party based on consecutive inactive days.
+ * Returns a positive number (the amount to subtract from approval).
+ */
+export function inactivityPenalty(consecutiveDays: number): number {
+  if (consecutiveDays <= INACTIVITY_GRACE_DAYS) return 0;
+  const effective = consecutiveDays - INACTIVITY_GRACE_DAYS;
+  return Math.min(INACTIVITY_MAX_PENALTY, INACTIVITY_BASE_PENALTY + effective * INACTIVITY_SCALE);
+}
+
+/**
+ * Apply daily approval drift, membership bonus, and inactivity penalty to all parties.
+ * Mutates each party's approvalRating and inactiveDays in place.
+ *
+ * @param actionsMap — map of partyId → actions taken this day. If omitted,
+ *   no inactivity tracking is applied (backwards compatible).
+ */
+export function applyDailyApprovalDrift(
+  parties: Party[],
+  actionsMap?: Map<string, AgentAction[]>,
+): void {
   const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
   for (const party of parties) {
     party.approvalRating = applyApprovalDrift(party);
+
+    // Inactivity tracking + penalty / activity bonus
+    if (actionsMap) {
+      const actions = actionsMap.get(party.id) ?? [];
+      if (isPartyActive(actions)) {
+        party.inactiveDays = 0;
+        // Small reward for being active
+        party.approvalRating = clamp(
+          Math.round((party.approvalRating + ACTIVITY_BONUS) * 10) / 10,
+          1, 60,
+        );
+      } else {
+        party.inactiveDays = (party.inactiveDays ?? 0) + 1;
+        const penalty = inactivityPenalty(party.inactiveDays);
+        if (penalty > 0) {
+          party.approvalRating = clamp(
+            Math.round((party.approvalRating - penalty) * 10) / 10,
+            1, 60,
+          );
+        }
+      }
+    }
+
     // Membership bonus: tiny daily reward for engaged party members
     try {
       const activeCount = getUserDb().select({ cnt: count() }).from(schema.users)
