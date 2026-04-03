@@ -38,4 +38,5 @@ export interface Party {
   policyPriorities: PolicyPriorities;
   coalitionRole: CoalitionRole;
   memberCount: number;
+  inactiveDays: number;
 }

@@ -881,6 +881,9 @@ export async function runDay(): Promise<number> {
 
   progress.set(10); // Init + elections phase done
 
+  // Hoisted so inactivity tracking can read it after the if-block
+  const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
+
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
     const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties);
@@ -957,7 +960,6 @@ export async function runDay(): Promise<number> {
     }
 
     // 6. Run each party agent
-    const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
 
     // Load top internal proposals per party (for agent context)
     const internalProposalsByParty = new Map<string, Array<{ title: string; category: string; score: number; totalVotes: number }>>();
@@ -1878,8 +1880,9 @@ export async function runDay(): Promise<number> {
 
   progress.set(75); // Interpellations + user-driven batches done
 
-  // 11. Apply approval drift to all parties + sentiment drift
-  applyDailyApprovalDrift(allParties);
+  // 11. Apply approval drift to all parties + sentiment drift + inactivity tracking
+  // Only track inactivity when party agents actually ran (skip on election/negotiation days)
+  applyDailyApprovalDrift(allParties, skipPartyAgents ? undefined : partyActions);
   nationalState.publicSentiment = applySentimentDrift(nationalState.publicSentiment);
 
   // 11b. Resolve expired polls and referendums (daily)
@@ -2143,10 +2146,10 @@ export async function runDay(): Promise<number> {
     console.log(`  [Budget] Revision ${cycleNumber}: ${budgetPassed ? "PASSED" : "REJECTED"} (${yesSeats} vs ${noSeats})`);
   }
 
-  // Save party approval ratings
+  // Save party approval ratings + inactivity tracking
   for (const party of allParties) {
     db.update(schema.parties)
-      .set({ approvalRating: party.approvalRating })
+      .set({ approvalRating: party.approvalRating, inactiveDays: party.inactiveDays ?? 0 })
       .where(eq(schema.parties.id, party.id))
       .run();
   }

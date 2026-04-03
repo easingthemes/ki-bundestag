@@ -13,6 +13,7 @@ export function mapParty(row: typeof schema.parties.$inferSelect, memberCount = 
     policyPriorities: (row.policyPriorities && typeof row.policyPriorities === 'object' ? row.policyPriorities : {}) as PolicyPriorities,
     coalitionRole: row.coalitionRole as Party["coalitionRole"],
     memberCount,
+    inactiveDays: row.inactiveDays ?? 0,
   };
 }
 

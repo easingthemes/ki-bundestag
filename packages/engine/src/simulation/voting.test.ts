@@ -25,7 +25,7 @@ function makeParty(id: string, seatCount: number): Party {
     seatCount,
     approvalRating: 20,
     policyPriorities: { economy: 0, social: 0, environment: 0, immigration: 0, spending: 0 },
-    coalitionRole: "opposition", memberCount: 100,
+    coalitionRole: "opposition", memberCount: 100, inactiveDays: 0,
   };
 }
 
