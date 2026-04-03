@@ -215,7 +215,7 @@ export function NewsFeed() {
             return (
               <div key={group.dayNumber}>
                 <div className="font-bold text-sm text-foreground py-2 mt-4 mb-1 border-b border-border">
-                  Day {group.dayNumber} ({dayEvents.length})
+                  {t("newsfeed.day", { number: group.dayNumber, count: dayEvents.length })}
                 </div>
                 {visibleEvents.map(ev => {
                   const isBreaking = BREAKING_TYPES.has(ev.type);
@@ -259,12 +259,12 @@ export function NewsFeed() {
                             )}
                             {!!ev.data?.billId && (
                               <Link to={`/bills/${String(ev.data.billId)}`} className="text-[10px] text-blue-600 hover:underline">
-                                View Bill →
+                                {t("newsfeed.viewBill")}
                               </Link>
                             )}
                             {!!ev.data?.electionId && (
                               <Link to="/elections" className="text-[10px] text-blue-600 hover:underline">
-                                View Election →
+                                {t("newsfeed.viewElection")}
                               </Link>
                             )}
                             {!!ev.data?.crisisId && ev.type === "crisis_start" && (
