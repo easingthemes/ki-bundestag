@@ -62,13 +62,14 @@ interface ActionWeights {
   ask_question: number;
   submit_proposal: number;
   vote_poll: number;
+  apply_mdb: number;
 }
 
 const STYLE_WEIGHTS: Record<string, ActionWeights> = {
-  questioner: { vote_question: 2, vote_proposal: 1, signal_bill: 1, ask_question: 5, submit_proposal: 1, vote_poll: 1 },
-  voter:      { vote_question: 4, vote_proposal: 4, signal_bill: 3, ask_question: 1, submit_proposal: 0, vote_poll: 3 },
-  proposer:   { vote_question: 1, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 5, vote_poll: 1 },
-  observer:   { vote_question: 3, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 0, vote_poll: 2 },
+  questioner: { vote_question: 2, vote_proposal: 1, signal_bill: 1, ask_question: 5, submit_proposal: 1, vote_poll: 1, apply_mdb: 1 },
+  voter:      { vote_question: 4, vote_proposal: 4, signal_bill: 3, ask_question: 1, submit_proposal: 0, vote_poll: 3, apply_mdb: 2 },
+  proposer:   { vote_question: 1, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 5, vote_poll: 1, apply_mdb: 3 },
+  observer:   { vote_question: 3, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 0, vote_poll: 2, apply_mdb: 1 },
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -119,6 +120,14 @@ const PROPOSAL_TEMPLATES = [
 const CATEGORIES = [
   "Wirtschaft", "Soziales", "Umwelt", "Bildung", "Gesundheit",
   "Infrastruktur", "Sicherheit", "Digitalisierung", "Justiz", "Außenpolitik",
+];
+
+const MDB_APPLICATION_TEMPLATES = [
+  "Als engagierter Bürger möchte ich mich für einen Sitz im Bundestag bewerben. Mein Schwerpunkt liegt auf {topic}. Ich bringe langjährige Erfahrung in der politischen Arbeit mit und möchte die Interessen meiner Wähler vertreten.",
+  "Ich bewerbe mich um einen Bundestagssitz, weil ich überzeugt bin, dass wir im Bereich {topic} dringend neue Impulse brauchen. Mit frischen Ideen und Bürgernähe will ich die Politik unserer Partei aktiv mitgestalten.",
+  "Meine Motivation für den Bundestag: Die aktuellen Herausforderungen im Bereich {topic} erfordern kompetente Vertreter. Ich habe mich intensiv mit den Themen auseinandergesetzt und möchte konstruktiv zur Gesetzgebung beitragen.",
+  "Als langjähriges Parteimitglied und Experte für {topic} möchte ich nun den nächsten Schritt gehen und mich als MdB für unsere gemeinsamen Ziele einsetzen. Transparenz und Bürgerbeteiligung stehen für mich an erster Stelle.",
+  "Ich kandidiere für den Bundestag, weil ich glaube, dass {topic} in der aktuellen Debatte zu kurz kommt. Mit meiner Expertise und meinem Engagement möchte ich dafür sorgen, dass diese Themen die nötige Aufmerksamkeit bekommen.",
 ];
 
 // ── AI generation (optional) ────────────────────────────────────────────────
@@ -466,6 +475,47 @@ async function executeTick(
           }
           result.actions++;
           result.breakdown.vote_poll = (result.breakdown.vote_poll ?? 0) + 1;
+          break;
+        }
+
+        case "apply_mdb": {
+          if (!bot.party_id) break;
+          // Check: no existing active seat
+          const existingSeat = simDb.prepare(
+            "SELECT 1 FROM bundestag_seats WHERE active = 1 AND user_id = ?",
+          ).get(bot.id);
+          if (existingSeat) break;
+          // Check: no pending application
+          const pendingApp = userDb.prepare(
+            "SELECT 1 FROM mdb_applications WHERE user_id = ? AND status = 'pending'",
+          ).get(bot.id);
+          if (pendingApp) break;
+          // Check: no cooldown
+          const recentRejected = userDb.prepare(
+            "SELECT cooldown_until_day FROM mdb_applications WHERE user_id = ? AND status = 'rejected' AND cooldown_until_day > ?",
+          ).get(bot.id, currentDay);
+          if (recentRejected) break;
+          // Check: open bot seats exist for party
+          const openBotSeats = simDb.prepare(
+            "SELECT COUNT(*) as cnt FROM bundestag_seats WHERE active = 1 AND controller = 'bot' AND user_id IS NULL AND party_id = ?",
+          ).get(bot.party_id) as { cnt: number };
+          if (openBotSeats.cnt === 0) break;
+
+          const topic = pick(TOPICS);
+          const template = pick(MDB_APPLICATION_TEMPLATES);
+          const applicationText = template.replace("{topic}", topic);
+          const policyFocus = [topic, pick(TOPICS.filter(t => t !== topic))];
+          const appId = uuid();
+
+          if (!dryRun) {
+            userDb.prepare(
+              "INSERT INTO mdb_applications (id, user_id, party_id, application_text, policy_focus, status, created_on_day) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+            ).run(appId, bot.id, bot.party_id, applicationText, JSON.stringify(policyFocus), currentDay);
+            insertAction.run(uuid(), bot.id, "apply_mdb", appId, "application", JSON.stringify({ partyId: bot.party_id, topic }), currentDay, isoNow);
+          }
+          result.actions++;
+          result.breakdown.apply_mdb = (result.breakdown.apply_mdb ?? 0) + 1;
+          console.log(`  ${bot.display_name} applied for MdB seat at ${partyNameMap[bot.party_id] ?? bot.party_id}`);
           break;
         }
       }

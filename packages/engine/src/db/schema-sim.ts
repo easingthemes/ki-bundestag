@@ -307,7 +307,7 @@ export const bundestagSeats = sqliteTable("bundestag_seats", {
   id: text("id").primaryKey(),
   seatNumber: integer("seat_number").notNull(),
   partyId: text("party_id").notNull().references(() => parties.id),
-  controller: text("controller").notNull(),         // "human" | "ai"
+  controller: text("controller").notNull(),         // "human" | "ai" | "bot"
   userId: text("user_id"),
   electionId: text("election_id").references(() => elections.id),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
