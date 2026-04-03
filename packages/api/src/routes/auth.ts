@@ -47,6 +47,7 @@ router.get("/api/auth/me", (req, res) => {
     createdAt: u.createdAt,
     lastActive: u.lastActive,
     switchCooldownUntil: u.switchCooldownUntil,
+    isBot: u.isBot ?? false,
   });
 });
 

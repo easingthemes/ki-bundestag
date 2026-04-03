@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { BotBadge } from "@/components/BotBadge";
 import { EmptyState } from "../components/EmptyState";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { ROUTE_SEO } from "@/seo";
@@ -188,6 +189,12 @@ export function Questions() {
                 {q.status === "answered" && (
                   <span className="text-xs text-muted-foreground" style={{ color: q.voteScore > 0 ? SEMANTIC_HEX.positive : q.voteScore < 0 ? SEMANTIC_HEX.negative : undefined }}>
                     {q.voteScore >= 0 ? "+" : ""}{q.voteScore} ({q.totalVotes})
+                  </span>
+                )}
+                {q.authorName && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {q.authorName}
+                    {q.authorIsBot && <BotBadge />}
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground ml-auto">
