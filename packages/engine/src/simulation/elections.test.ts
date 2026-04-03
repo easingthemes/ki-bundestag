@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldTriggerElection, calculateResults, formGovernment } from "./elections.js";
+import { shouldTriggerElection, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
 import type { Election, Party, PolicyPriorities } from "@ki-bundestag/types";
 
 const POLICY: PolicyPriorities = { economy: 5, social: 5, environment: 5, immigration: 5, spending: 5 };
@@ -50,6 +50,29 @@ describe("shouldTriggerElection", () => {
   it("does not trigger before scheduled day with normal sentiment", () => {
     const result = shouldTriggerElection(100, 1461, 2, null);
     expect(result.trigger).toBe(false);
+  });
+
+  it("blocks snap election during cooldown period", () => {
+    // Day 100, cooldown until day 130 — streak of 10 should NOT trigger
+    const result = shouldTriggerElection(100, 1461, 10, null, 130);
+    expect(result.trigger).toBe(false);
+  });
+
+  it("allows snap election after cooldown expires", () => {
+    // Day 131, cooldown until day 130 — streak of 5 should trigger
+    const result = shouldTriggerElection(131, 1461, 5, null, 130);
+    expect(result.trigger).toBe(true);
+    expect(result.reason).toContain("Snap");
+  });
+
+  it("allows scheduled election even during cooldown", () => {
+    const result = shouldTriggerElection(1461, 1461, 0, null, 1490);
+    expect(result.trigger).toBe(true);
+    expect(result.reason).toContain("Scheduled");
+  });
+
+  it("cooldown period is 30 days", () => {
+    expect(ELECTION_COOLDOWN_DAYS).toBe(30);
   });
 });
 

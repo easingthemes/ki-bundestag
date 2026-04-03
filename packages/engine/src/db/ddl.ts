@@ -87,6 +87,7 @@ export const SIM_TABLE_DDL = `
     last_run_at TEXT,
     next_election_day INTEGER NOT NULL DEFAULT 1461,
     low_sentiment_streak INTEGER NOT NULL DEFAULT 0,
+    election_cooldown_until INTEGER NOT NULL DEFAULT 0,
     budget_retry_day INTEGER,
     daily_summary TEXT,
     day_started_at TEXT,
@@ -598,6 +599,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "era_summaries", column: "case_facts", sql: "ALTER TABLE era_summaries ADD COLUMN case_facts TEXT" },
   { table: "simulation_meta", column: "day_progress", sql: "ALTER TABLE simulation_meta ADD COLUMN day_progress INTEGER NOT NULL DEFAULT 0" },
   { table: "day_summaries", column: "_table", sql: "CREATE TABLE IF NOT EXISTS day_summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, day_number INTEGER NOT NULL UNIQUE, narrative TEXT, mood TEXT, preview TEXT, created_at TEXT NOT NULL)" },
+  { table: "simulation_meta", column: "election_cooldown_until", sql: "ALTER TABLE simulation_meta ADD COLUMN election_cooldown_until INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */
