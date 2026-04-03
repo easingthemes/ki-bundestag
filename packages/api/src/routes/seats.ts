@@ -45,8 +45,9 @@ router.post("/api/seats/apply", (req, res) => {
     return;
   }
 
-  // Check open seats exist for party
-  const openCounts = getOpenSeatCounts();
+  // Check open seats exist for party (bot users check bot seats, humans check human seats)
+  const seatType = user.isBot ? "bot" : "human";
+  const openCounts = getOpenSeatCounts(seatType as "human" | "bot");
   if ((openCounts[user.partyId] ?? 0) === 0) {
     res.status(400).json({ error: "No open seats available for your party" });
     return;
@@ -147,7 +148,7 @@ router.get("/api/seats/roster", (req, res) => {
 
   let seats = getActiveSeats(partyId);
 
-  if (controller && (controller === "human" || controller === "ai")) {
+  if (controller && (controller === "human" || controller === "ai" || controller === "bot")) {
     seats = seats.filter(s => s.controller === controller);
   }
 
@@ -305,14 +306,18 @@ router.get("/api/seats/available", (_req, res) => {
   // Also include total active seats per party for context
   const sqlite = getSqlite();
   const totalRows = sqlite.prepare(
-    "SELECT party_id, COUNT(*) as total, SUM(CASE WHEN controller = 'human' THEN 1 ELSE 0 END) as human_total FROM bundestag_seats WHERE active = 1 GROUP BY party_id"
-  ).all() as Array<{ party_id: string; total: number; human_total: number }>;
+    `SELECT party_id, COUNT(*) as total,
+       SUM(CASE WHEN controller = 'human' THEN 1 ELSE 0 END) as human_total,
+       SUM(CASE WHEN controller = 'bot' THEN 1 ELSE 0 END) as bot_total
+     FROM bundestag_seats WHERE active = 1 GROUP BY party_id`
+  ).all() as Array<{ party_id: string; total: number; human_total: number; bot_total: number }>;
 
-  const result: Record<string, { open: number; humanTotal: number; total: number }> = {};
+  const result: Record<string, { open: number; humanTotal: number; botTotal: number; total: number }> = {};
   for (const row of totalRows) {
     result[row.party_id] = {
       open: openCounts[row.party_id] ?? 0,
       humanTotal: row.human_total,
+      botTotal: row.bot_total,
       total: row.total,
     };
   }
