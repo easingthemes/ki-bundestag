@@ -183,7 +183,8 @@ function main() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY, display_name TEXT NOT NULL UNIQUE, party_id TEXT,
       provider TEXT, provider_id TEXT, avatar_url TEXT,
-      created_at INTEGER NOT NULL, last_active INTEGER NOT NULL, switch_cooldown_until INTEGER
+      created_at INTEGER NOT NULL, last_active INTEGER NOT NULL, switch_cooldown_until INTEGER,
+      is_bot INTEGER NOT NULL DEFAULT 0, bot_profile TEXT
     );
     CREATE TABLE IF NOT EXISTS mdb_applications (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL, party_id TEXT NOT NULL,
@@ -263,8 +264,8 @@ function main() {
 
   // Prepare statements
   const insertUser = userDb.prepare(`
-    INSERT INTO users (id, display_name, party_id, provider, provider_id, avatar_url, created_at, last_active, switch_cooldown_until)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, display_name, party_id, provider, provider_id, avatar_url, created_at, last_active, switch_cooldown_until, is_bot, bot_profile)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertApplication = userDb.prepare(`
@@ -333,6 +334,13 @@ function main() {
           ? currentDay + randInt(1, 7)
           : null;
 
+      // Bot profile: assign activity level + engagement style
+      const activityRoll = Math.random();
+      const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
+      const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
+      const engagementStyle = pick([...ENGAGEMENT_STYLES]);
+      const botProfile = JSON.stringify({ activityLevel, engagementStyle });
+
       insertUser.run(
         userId,
         displayName,
@@ -343,6 +351,8 @@ function main() {
         createdAt,
         lastActive,
         switchCooldown,
+        1,  // is_bot = true
+        botProfile,
       );
 
       created++;

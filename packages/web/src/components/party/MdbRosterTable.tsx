@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { DISCIPLINE_BADGE, DISCIPLINE_LABEL, MDB_BADGE } from "@/lib/colors";
+import { BotBadge } from "@/components/BotBadge";
 
 interface MdbRosterTableProps {
   seats: BundestagSeat[];
@@ -43,6 +44,7 @@ export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
                   ) : (
                     <span className="text-emerald-600 italic">{t("mdbRoster.free")}</span>
                   )}
+                  {seat.isBot && <BotBadge className="ml-1" />}
                   {seat.userId === user?.id && <span className="text-xs ml-1.5 text-emerald-600">{t("mdbRoster.you")}</span>}
                 </td>
                 <td className="px-3 py-2 border-b border-border text-center">

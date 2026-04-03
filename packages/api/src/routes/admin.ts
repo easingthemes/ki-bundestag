@@ -63,13 +63,13 @@ router.get("/api/admin/analytics", requireAdmin, (_req, res) => {
 
     // Top 20 users by action count
     const topUsers = userRaw.prepare(`
-      SELECT ua.user_id as userId, u.displayName as displayName, COUNT(*) as actionCount
+      SELECT ua.user_id as userId, u.display_name as displayName, u.is_bot as isBot, COUNT(*) as actionCount
       FROM user_actions ua
       LEFT JOIN users u ON ua.user_id = u.id
       GROUP BY ua.user_id
       ORDER BY actionCount DESC
       LIMIT 20
-    `).all() as { userId: string; displayName: string; actionCount: number }[];
+    `).all() as { userId: string; displayName: string; isBot: number; actionCount: number }[];
 
     // Funnel
     const registeredRow = userRaw.prepare("SELECT COUNT(*) as cnt FROM users").get() as { cnt: number };

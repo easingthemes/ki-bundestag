@@ -334,6 +334,9 @@ function UserMenu({ user }: { user: User }) {
             ) : (
               <div className="text-sm font-semibold text-white flex items-center gap-2">
                 {user.displayName}
+                {user.isBot && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-400/20 text-sky-300 leading-none">Bot</span>
+                )}
                 {seat && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 leading-none">MdB</span>
                 )}

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MDB_BADGE, STATUS_BADGE, VOTE_HEX } from "@/lib/colors";
 import { DisciplineBadge } from "@/components/MdbBadge";
+import { BotBadge } from "@/components/BotBadge";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 type Tab = "votes" | "speeches" | "sidejobs" | "info";
@@ -110,6 +111,7 @@ export function MdbDetail() {
               </Link>
             )}
             <span className="text-muted-foreground text-sm">Sitz #{seat.seatNumber}</span>
+            {seat.isBot && <BotBadge />}
             {seat.controller === "human" && (
               <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>Spieler</Badge>
             )}
