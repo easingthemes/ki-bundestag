@@ -30,6 +30,7 @@ export interface User {
   createdAt: number;
   lastActive: number;
   switchCooldownUntil: number | null; // sim day
+  isBot: boolean;
 }
 
 export interface Party {
@@ -311,6 +312,8 @@ export interface CitizenQuestion {
   voteScore: number;
   totalVotes: number;
   userVote?: 1 | -1 | null;
+  authorName?: string | null;
+  authorIsBot?: boolean;
 }
 
 export interface TrendingTopic {
@@ -507,7 +510,7 @@ export interface AnalyticsData {
   dau: number;
   wau: number;
   actionBreakdown: { actionType: string; count: number }[];
-  topUsers: { userId: string; displayName: string; actionCount: number }[];
+  topUsers: { userId: string; displayName: string; actionCount: number; isBot?: boolean }[];
   funnel: {
     registered: number;
     joinedParty: number;
@@ -552,6 +555,7 @@ export interface BundestagSeat {
   disciplineReason: string | null;
   allocatedOnDay: number;
   displayName?: string | null; // enriched by API
+  isBot?: boolean;             // enriched by API
 }
 
 export interface MdbApplication {
@@ -577,6 +581,7 @@ export interface MdbSpeech {
   dayNumber: number;
   createdAt: number;
   displayName?: string;
+  isBot?: boolean;
 }
 
 export interface MdbVoteSummary {

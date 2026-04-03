@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MDB_BADGE } from "@/lib/colors";
+import { BotBadge } from "@/components/BotBadge";
 import { useTranslation } from "react-i18next";
 
 interface SpeechDisplayProps {
@@ -25,6 +26,7 @@ export function SpeechDisplay({ speeches }: SpeechDisplayProps) {
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>MdB</Badge>
                 <span className="font-semibold text-sm">{s.displayName ?? "MdB"}</span>
+                {s.isBot && <BotBadge />}
               </div>
               <span className="text-xs text-muted-foreground">
                 {t("speeches.readingDay", { reading: s.reading, day: s.dayNumber })}

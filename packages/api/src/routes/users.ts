@@ -33,7 +33,7 @@ router.patch("/api/users/me", (req, res) => {
     .where(eq(schema.users.id, token))
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
-  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil, isBot: updated.isBot ?? false });
 });
 
 // GET /api/users/me
@@ -44,7 +44,7 @@ router.get("/api/users/me", (req, res) => {
   const rows = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (rows.length === 0) { res.status(404).json({ error: "User not found" }); return; }
   const u = rows[0];
-  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, avatarUrl: u.avatarUrl ?? null, provider: u.provider ?? null, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil });
+  res.json({ id: u.id, displayName: u.displayName, partyId: u.partyId, avatarUrl: u.avatarUrl ?? null, provider: u.provider ?? null, createdAt: u.createdAt, lastActive: u.lastActive, switchCooldownUntil: u.switchCooldownUntil, isBot: u.isBot ?? false });
 });
 
 // GET /api/users/me/activity
@@ -360,7 +360,7 @@ router.post("/api/users/me/join/:partyId", (req, res) => {
     .run();
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
   try { logUserAction(token, "join_party", currentDay, req.params.partyId, "party"); } catch (err) { logger.error("[users] Failed to log action:", err); }
-  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil, isBot: updated.isBot ?? false });
 });
 
 // POST /api/users/me/leave
@@ -387,7 +387,7 @@ router.post("/api/users/me/leave", (req, res) => {
     .run();
   try { logUserAction(token, "leave_party", currentDay, user.partyId ?? undefined, "party"); } catch (err) { logger.error("[users] Failed to log action:", err); }
   const updated = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
-  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil });
+  res.json({ id: updated.id, displayName: updated.displayName, partyId: updated.partyId, avatarUrl: updated.avatarUrl ?? null, provider: updated.provider ?? null, createdAt: updated.createdAt, lastActive: updated.lastActive, switchCooldownUntil: updated.switchCooldownUntil, isBot: updated.isBot ?? false });
 });
 
 // ── Notifications ────────────────────────────────────────────────────────────

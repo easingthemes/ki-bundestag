@@ -125,13 +125,15 @@ router.get("/api/seats/party/:partyId", (req, res) => {
   const userDb = getUserDb();
   const enriched = seats.map(seat => {
     let displayName: string | null = null;
+    let isBot = false;
     if (seat.userId) {
       const user = userDb.select().from(schema.users)
         .where(eq(schema.users.id, seat.userId))
         .all()[0];
       displayName = user?.displayName ?? null;
+      isBot = user?.isBot ?? false;
     }
-    return { ...seat, displayName };
+    return { ...seat, displayName, isBot };
   });
 
   res.json(enriched);
@@ -153,13 +155,15 @@ router.get("/api/seats/roster", (req, res) => {
   const userDb = getUserDb();
   const enriched = seats.map(seat => {
     let displayName: string | null = null;
+    let isBot = false;
     if (seat.userId) {
       const user = userDb.select().from(schema.users)
         .where(eq(schema.users.id, seat.userId))
         .all()[0];
       displayName = user?.displayName ?? null;
+      isBot = user?.isBot ?? false;
     }
-    return { ...seat, displayName };
+    return { ...seat, displayName, isBot };
   });
 
   // Search filter (by display name or seat number)
@@ -185,12 +189,14 @@ router.get("/api/seats/:seatId/profile", (req, res) => {
   // Display name
   const userDb = getUserDb();
   let displayName: string | null = null;
+  let isBot = false;
   let application: typeof schema.mdbApplications.$inferSelect | null = null;
   if (seat.userId) {
     const user = userDb.select().from(schema.users)
       .where(eq(schema.users.id, seat.userId))
       .all()[0];
     displayName = user?.displayName ?? null;
+    isBot = user?.isBot ?? false;
 
     // Get approved application for this user+party (motivation & policy focus)
     application = userDb.select().from(schema.mdbApplications)
@@ -280,7 +286,7 @@ router.get("/api/seats/:seatId/profile", (req, res) => {
   }));
 
   res.json({
-    seat: { ...seat, displayName },
+    seat: { ...seat, displayName, isBot },
     party: party ? { id: party.id, name: party.name, color: party.color } : null,
     application: application ? {
       motivation: application.applicationText,
