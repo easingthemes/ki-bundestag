@@ -207,6 +207,10 @@ function main() {
     );
   `);
 
+  // Ensure is_bot and bot_profile columns exist (for DBs created before these columns were added)
+  try { userDb.exec("ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0"); } catch { /* already exists */ }
+  try { userDb.exec("ALTER TABLE users ADD COLUMN bot_profile TEXT"); } catch { /* already exists */ }
+
   simDb.exec(`
     CREATE TABLE IF NOT EXISTS simulation_meta (
       id INTEGER PRIMARY KEY AUTOINCREMENT, current_day INTEGER NOT NULL DEFAULT 0,
@@ -293,6 +297,30 @@ function main() {
     INSERT INTO bundestag_seats (id, seat_number, party_id, controller, user_id, active, proxy_default, discipline_level, allocated_on_day)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+
+  // ── Migrate existing demo users to bot status ─────────────────────────────
+  // Mark any existing demo users (provider_id LIKE 'demo_%') as bots if not already
+  const existingDemoUsers = userDb.prepare(
+    "SELECT id FROM users WHERE provider_id LIKE 'demo_%' AND is_bot = 0"
+  ).all() as Array<{ id: string }>;
+
+  if (existingDemoUsers.length > 0) {
+    const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
+    const migrateStmt = userDb.prepare(
+      "UPDATE users SET is_bot = 1, bot_profile = ? WHERE id = ?"
+    );
+    const migrateTransaction = userDb.transaction(() => {
+      for (const row of existingDemoUsers) {
+        const activityRoll = Math.random();
+        const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
+        const engagementStyle = pick([...ENGAGEMENT_STYLES]);
+        const profile = JSON.stringify({ activityLevel, engagementStyle });
+        migrateStmt.run(profile, row.id);
+      }
+    });
+    migrateTransaction();
+    console.log(`✅ Migrated ${existingDemoUsers.length} existing demo users to bot status`);
+  }
 
   // Stats
   let created = 0;
