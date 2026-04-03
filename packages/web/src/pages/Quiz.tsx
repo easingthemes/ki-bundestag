@@ -107,6 +107,23 @@ export function Quiz() {
     );
   }
 
+  if (theses.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <CardContent className="p-8 text-center space-y-5">
+            <div className="text-4xl">🗳️</div>
+            <h2 className="text-xl font-semibold">Welche Partei passt zu dir?</h2>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Aktuell sind keine Quizfragen verfügbar. Bitte versuche es später erneut,
+              wenn die Simulation weitere Tage durchlaufen hat.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       {phase === "intro" && <QuizIntro onStart={() => setPhase("questions")} thesisCount={theses.length} />}
