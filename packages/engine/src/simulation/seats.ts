@@ -12,12 +12,14 @@ import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { submitBatch, chunkItems, type BatchResult } from "../agent/batch-client.js";
 import { buildApplicationSelectPrompt, preFilterApplications, type ApplicationItem, type PartyContext } from "../agent/group-prompts.js";
 import { createNotification } from "./event-queue.js";
-import { getHumanSeatRatio, type TimingPreset } from "./timing.js";
+import { getHumanSeatRatio, getBotSeatRatio, type TimingPreset } from "./timing.js";
 
 /**
  * Allocate seats for a party after an election.
- * Creates `seatCount` rows: a percentage as human-available (controller="human", userId=null),
- * the rest as AI-controlled.
+ * Creates `seatCount` rows split three ways:
+ *   - "human" seats (filled via human user applications)
+ *   - "bot" seats (filled via bot user applications)
+ *   - "ai" seats (controlled by AI party agents)
  */
 export function allocateSeats(
   partyId: string,
@@ -28,8 +30,10 @@ export function allocateSeats(
 ): void {
   const db = getDb();
   const humanRatio = getHumanSeatRatio(preset);
+  const botRatio = getBotSeatRatio(preset);
   const humanCount = Math.round(seatCount * humanRatio);
-  const aiCount = seatCount - humanCount;
+  const botCount = Math.max(1, Math.round(seatCount * botRatio));
+  const aiCount = Math.max(0, seatCount - humanCount - botCount);
 
   let seatNumber = 1;
 
@@ -40,6 +44,23 @@ export function allocateSeats(
       seatNumber: seatNumber++,
       partyId,
       controller: "human",
+      userId: null,
+      electionId,
+      active: true,
+      proxyDefault: "party_line",
+      disciplineLevel: 0,
+      disciplineReason: null,
+      allocatedOnDay: currentDay,
+    }).run();
+  }
+
+  // Bot-available seats (no userId yet — filled via bot applications)
+  for (let i = 0; i < botCount; i++) {
+    db.insert(schema.bundestagSeats).values({
+      id: randomUUID(),
+      seatNumber: seatNumber++,
+      partyId,
+      controller: "bot",
       userId: null,
       electionId,
       active: true,
@@ -67,7 +88,7 @@ export function allocateSeats(
     }).run();
   }
 
-  console.log(`  [Seats] ${partyId}: ${seatCount} seats (${humanCount} human, ${aiCount} AI)`);
+  console.log(`  [Seats] ${partyId}: ${seatCount} seats (${humanCount} human, ${botCount} bot, ${aiCount} AI)`);
 }
 
 /**
@@ -109,13 +130,18 @@ export function getUserSeat(userId: string) {
 }
 
 /**
- * Get counts of open (unoccupied human) seats per party.
+ * Get counts of open (unoccupied human + bot) seats per party.
+ * Optionally filter by controller type.
  */
-export function getOpenSeatCounts(): Record<string, number> {
+export function getOpenSeatCounts(controllerFilter?: "human" | "bot"): Record<string, number> {
   const sqlite = getSqlite();
-  const rows = sqlite.prepare(
-    "SELECT party_id, COUNT(*) as cnt FROM bundestag_seats WHERE active = 1 AND controller = 'human' AND user_id IS NULL GROUP BY party_id"
-  ).all() as Array<{ party_id: string; cnt: number }>;
+  let sql: string;
+  if (controllerFilter) {
+    sql = `SELECT party_id, COUNT(*) as cnt FROM bundestag_seats WHERE active = 1 AND controller = '${controllerFilter}' AND user_id IS NULL GROUP BY party_id`;
+  } else {
+    sql = "SELECT party_id, COUNT(*) as cnt FROM bundestag_seats WHERE active = 1 AND controller IN ('human', 'bot') AND user_id IS NULL GROUP BY party_id";
+  }
+  const rows = sqlite.prepare(sql).all() as Array<{ party_id: string; cnt: number }>;
   const result: Record<string, number> = {};
   for (const row of rows) {
     result[row.party_id] = row.cnt;
@@ -177,6 +203,7 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
     app: { id: string; userId: string; applicationText: string; policyFocus: unknown; cooldownUntilDay: number | null };
     score: number;
     displayName: string;
+    isBot: boolean;
   }
 
   interface PartyBatch {
@@ -204,7 +231,7 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
     if (pendingApps.length === 0) continue;
 
     // Build ApplicationItems with activity scores and display names
-    const appMap = new Map<string, { app: typeof pendingApps[0]; score: number; displayName: string }>();
+    const appMap = new Map<string, { app: typeof pendingApps[0]; score: number; displayName: string; isBot: boolean }>();
     const items: ApplicationItem[] = [];
 
     for (const app of pendingApps) {
@@ -217,6 +244,7 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
         .where(eq(schema.users.id, app.userId))
         .get();
       const displayName = user?.displayName ?? "Unknown";
+      const isBot = user?.isBot ?? false;
 
       // Update priority score
       userDb.update(schema.mdbApplications)
@@ -224,7 +252,7 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
         .where(eq(schema.mdbApplications.id, app.id))
         .run();
 
-      appMap.set(app.id, { app, score, displayName });
+      appMap.set(app.id, { app, score, displayName, isBot });
       items.push({
         id: app.id,
         userId: app.userId,
@@ -293,17 +321,18 @@ export async function reviewMdbApplications(currentDay: number): Promise<void> {
       const entry = batch.appMap.get(selection.id);
       if (!entry) continue;
 
-      const { app, score, displayName } = entry;
+      const { app, score, displayName, isBot } = entry;
       const reasoning = selection.reasoning.slice(0, 300);
 
-      // Assign seat atomically
+      // Assign seat atomically — match bot users to "bot" seats, humans to "human" seats
+      const targetController = isBot ? "bot" : "human";
       const sqlite = getSqlite();
       const assignSeat = sqlite.transaction(() => {
         const openSeat = db.select().from(schema.bundestagSeats)
           .where(and(
             eq(schema.bundestagSeats.partyId, batch.partyId),
             eq(schema.bundestagSeats.active, true),
-            eq(schema.bundestagSeats.controller, "human"),
+            eq(schema.bundestagSeats.controller, targetController),
           ))
           .all()
           .find(s => s.userId === null);

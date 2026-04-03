@@ -277,6 +277,22 @@ export function getHumanSeatRatio(preset: TimingPreset): number {
 }
 
 /**
+ * Bot seat ratio per preset.
+ * Bots get a small allocation in ALL presets (including ultra-fast/fast)
+ * so they can apply for seats and participate regardless of mode.
+ */
+const BOT_SEAT_RATIO: Record<TimingPreset, number> = {
+  "ultra-fast": 0.05,
+  "fast": 0.05,
+  "normal": 0.05,
+  "slow": 0.05,
+};
+
+export function getBotSeatRatio(preset: TimingPreset): number {
+  return BOT_SEAT_RATIO[preset];
+}
+
+/**
  * Whether an event should be queued instead of executed (night mode in participatory presets).
  */
 export function shouldQueueEvent(preset: TimingPreset, eventType: string): boolean {

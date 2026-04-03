@@ -1300,11 +1300,13 @@ export async function runDay(): Promise<number> {
               });
             }
           }
-          // Count human seats per party (for proxy calculation)
-          const humanSeats = db.select().from(schema.bundestagSeats)
-            .where(and(eq(schema.bundestagSeats.active, true), eq(schema.bundestagSeats.controller, "human")))
-            .all();
-          for (const s of humanSeats) {
+          // Count human + bot seats per party (for proxy calculation)
+          // Both human and bot users vote individually, so both types count
+          const userSeats = db.select().from(schema.bundestagSeats)
+            .where(eq(schema.bundestagSeats.active, true))
+            .all()
+            .filter(s => s.controller === "human" || s.controller === "bot");
+          for (const s of userSeats) {
             humanSeatCountsForTally[s.partyId] = (humanSeatCountsForTally[s.partyId] ?? 0) + 1;
           }
         }
