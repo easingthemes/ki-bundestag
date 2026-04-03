@@ -229,6 +229,23 @@ export async function runBotTick(options?: { dryRun?: boolean }): Promise<TickRe
   }
 }
 
+// ── Per-user daily limits (same as real users) ─────────────────────────────
+
+const BOT_DAILY_LIMITS: Record<string, number> = {
+  submit_question: 5,
+  submit_proposal: 2,
+};
+
+function checkBotDailyLimit(userDb: Database.Database, userId: string, actionType: string): boolean {
+  const limit = BOT_DAILY_LIMITS[actionType];
+  if (limit == null) return true; // no limit for this action
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const row = userDb.prepare(
+    "SELECT COUNT(*) as cnt FROM user_actions WHERE user_id = ? AND action_type = ? AND created_at >= ?",
+  ).get(userId, actionType, cutoff) as { cnt: number };
+  return row.cnt < limit;
+}
+
 async function executeTick(
   userDb: Database.Database,
   simDb: Database.Database,
@@ -381,6 +398,7 @@ async function executeTick(
         }
 
         case "ask_question": {
+          if (!checkBotDailyLimit(userDb, bot.id, "submit_question")) break;
           const targetParty = pick(parties);
           const topic = pick(TOPICS);
           let questionText: string;
@@ -405,6 +423,7 @@ async function executeTick(
 
         case "submit_proposal": {
           if (!bot.party_id) break;
+          if (!checkBotDailyLimit(userDb, bot.id, "submit_proposal")) break;
           const topic = pick(TOPICS);
           const partyName = partyNameMap[bot.party_id] ?? bot.party_id;
           let title: string, description: string, rationale: string;
