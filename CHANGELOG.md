@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/easingthemes/ki-bundestag/compare/v1.4.0...v1.5.0) (2026-04-03)
+
+
+### Features
+
+* expose debates prominently with dedicated page and dashboard section ([7ae4b4a](https://github.com/easingthemes/ki-bundestag/commit/7ae4b4ab43bb01456e224689391ef86afcbd86ed))
+
 # [1.4.0](https://github.com/easingthemes/ki-bundestag/compare/v1.3.1...v1.4.0) (2026-04-03)
 
 
