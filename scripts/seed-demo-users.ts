@@ -1,5 +1,9 @@
 /**
- * Seed 756 demo users with realistic German names and varied states.
+ * Seed bot users with realistic German names and varied states.
+ *
+ * Targets a total bot count (default 100, configurable via CLI arg).
+ * First migrates existing demo users (provider_id LIKE 'demo_%') to bot status,
+ * then creates new bot users to reach the target.
  *
  * Distribution:
  *   ~60% party members (across 6 parties, weighted by approval)
@@ -9,7 +13,8 @@
  *   ~15% have MdB applications (mix of pending/approved/rejected)
  *   Some approved users get bundestag seats
  *
- * Run: npx tsx scripts/seed-demo-users.ts
+ * Run: npx tsx scripts/seed-demo-users.ts [count]
+ *   e.g., npx tsx scripts/seed-demo-users.ts 100
  */
 
 import Database from "better-sqlite3";
@@ -159,7 +164,7 @@ function weightedParty(): string {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
-  const TOTAL_USERS = parseInt(process.argv[2] || "756", 10);
+  const TOTAL_USERS = parseInt(process.argv[2] || "100", 10);
 
   // Ensure data directory exists
   for (const dbPath of [USER_DB_PATH, SIM_DB_PATH]) {
@@ -298,29 +303,46 @@ function main() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  // ── Migrate existing demo users to bot status ─────────────────────────────
-  // Mark any existing demo users (provider_id LIKE 'demo_%') as bots if not already
-  const existingDemoUsers = userDb.prepare(
-    "SELECT id FROM users WHERE provider_id LIKE 'demo_%' AND is_bot = 0"
-  ).all() as Array<{ id: string }>;
+  // ── Migrate existing demo users to bot status (capped at TOTAL_USERS) ────
+  // Count how many bots already exist
+  const existingBotCount = (userDb.prepare(
+    "SELECT COUNT(*) as cnt FROM users WHERE is_bot = 1"
+  ).get() as { cnt: number }).cnt;
 
-  if (existingDemoUsers.length > 0) {
-    const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
-    const migrateStmt = userDb.prepare(
-      "UPDATE users SET is_bot = 1, bot_profile = ? WHERE id = ?"
-    );
-    const migrateTransaction = userDb.transaction(() => {
-      for (const row of existingDemoUsers) {
-        const activityRoll = Math.random();
-        const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
-        const engagementStyle = pick([...ENGAGEMENT_STYLES]);
-        const profile = JSON.stringify({ activityLevel, engagementStyle });
-        migrateStmt.run(profile, row.id);
-      }
-    });
-    migrateTransaction();
-    console.log(`✅ Migrated ${existingDemoUsers.length} existing demo users to bot status`);
+  const botsNeeded = Math.max(0, TOTAL_USERS - existingBotCount);
+  let migrated = 0;
+
+  if (botsNeeded > 0) {
+    // First, promote unmarked demo users up to the cap
+    const unmarkedDemoUsers = userDb.prepare(
+      "SELECT id FROM users WHERE provider_id LIKE 'demo_%' AND is_bot = 0 LIMIT ?"
+    ).all(botsNeeded) as Array<{ id: string }>;
+
+    if (unmarkedDemoUsers.length > 0) {
+      const ENGAGEMENT_STYLES = ["questioner", "voter", "proposer", "observer"] as const;
+      const migrateStmt = userDb.prepare(
+        "UPDATE users SET is_bot = 1, bot_profile = ? WHERE id = ?"
+      );
+      const migrateTransaction = userDb.transaction(() => {
+        for (const row of unmarkedDemoUsers) {
+          const activityRoll = Math.random();
+          const activityLevel = activityRoll < 0.1 ? "high" : activityRoll < 0.4 ? "medium" : activityRoll < 0.8 ? "low" : "lurker";
+          const engagementStyle = pick([...ENGAGEMENT_STYLES]);
+          const profile = JSON.stringify({ activityLevel, engagementStyle });
+          migrateStmt.run(profile, row.id);
+        }
+      });
+      migrateTransaction();
+      migrated = unmarkedDemoUsers.length;
+      console.log(`✅ Migrated ${migrated} existing demo users to bot status`);
+    }
+  } else {
+    console.log(`Already have ${existingBotCount} bots (target: ${TOTAL_USERS}), skipping migration`);
   }
+
+  // How many new bots still need to be created?
+  const stillNeeded = Math.max(0, TOTAL_USERS - existingBotCount - migrated);
+  console.log(`Bots: ${existingBotCount} existing + ${migrated} migrated + ${stillNeeded} to create = ${TOTAL_USERS} target`);
 
   // Stats
   let created = 0;
@@ -337,7 +359,7 @@ function main() {
   const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
 
   const transaction = userDb.transaction(() => {
-    for (let i = 0; i < TOTAL_USERS; i++) {
+    for (let i = 0; i < stillNeeded; i++) {
       const { displayName, firstName, lastName } = generateName();
       const userId = uuid();
 
