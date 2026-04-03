@@ -70,9 +70,25 @@ export function getTimingPreset(): TimingPreset {
 }
 
 /**
- * Guard for participatory endpoints. Returns true (and sends 403) if blocked.
+ * Check if the current request user is a bot.
+ * Bot users bypass participatory/feature restrictions.
  */
-export function requireParticipatory(_req: express.Request, res: express.Response, feature?: string): boolean {
+function isRequestFromBot(req: express.Request): boolean {
+  const token = getUserToken(req);
+  if (!token) return false;
+  const userDb = getUserDb();
+  const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  return user?.isBot === true;
+}
+
+/**
+ * Guard for participatory endpoints. Returns true (and sends 403) if blocked.
+ * Bot users bypass all participatory/feature restrictions.
+ */
+export function requireParticipatory(req: express.Request, res: express.Response, feature?: string): boolean {
+  // Bot users can always act — they participate in all presets
+  if (isRequestFromBot(req)) return false;
+
   const preset = getTimingPreset();
   if (!isParticipatoryPreset(preset)) {
     res.status(403).json({
