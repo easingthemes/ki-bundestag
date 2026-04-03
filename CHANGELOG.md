@@ -1,3 +1,16 @@
+# [1.6.0](https://github.com/easingthemes/ki-bundestag/compare/v1.5.0...v1.6.0) (2026-04-03)
+
+
+### Bug Fixes
+
+* enforce daily limits on bot content-generating actions ([e5fd0b0](https://github.com/easingthemes/ki-bundestag/commit/e5fd0b02a43e9af157e2760ae8cfefbcab02d809))
+
+
+### Features
+
+* add bot users with isBot flag, UI badges, and activity runner ([c77a856](https://github.com/easingthemes/ki-bundestag/commit/c77a8567aac247589d30392970c5d539af584bfc))
+* add PM2 bot runner loop + status reporter ([7bcfe2d](https://github.com/easingthemes/ki-bundestag/commit/7bcfe2db09682215ae09b3a589b9275d6044925f))
+
 # [1.5.0](https://github.com/easingthemes/ki-bundestag/compare/v1.4.0...v1.5.0) (2026-04-03)
 
 
