@@ -43,6 +43,7 @@ export interface Party {
   coalitionRole: string;
   recentApprovals: number[];
   memberCount: number;
+  inactiveDays: number;
 }
 
 export interface BillImpact {

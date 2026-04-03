@@ -8,7 +8,8 @@ export const SIM_TABLE_DDL = `
     seat_count INTEGER NOT NULL,
     approval_rating REAL NOT NULL,
     policy_priorities TEXT NOT NULL,
-    coalition_role TEXT NOT NULL
+    coalition_role TEXT NOT NULL,
+    inactive_days INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS bills (
@@ -600,6 +601,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "day_progress", sql: "ALTER TABLE simulation_meta ADD COLUMN day_progress INTEGER NOT NULL DEFAULT 0" },
   { table: "day_summaries", column: "_table", sql: "CREATE TABLE IF NOT EXISTS day_summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, day_number INTEGER NOT NULL UNIQUE, narrative TEXT, mood TEXT, preview TEXT, created_at TEXT NOT NULL)" },
   { table: "simulation_meta", column: "election_cooldown_until", sql: "ALTER TABLE simulation_meta ADD COLUMN election_cooldown_until INTEGER NOT NULL DEFAULT 0" },
+  { table: "parties", column: "inactive_days", sql: "ALTER TABLE parties ADD COLUMN inactive_days INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */
