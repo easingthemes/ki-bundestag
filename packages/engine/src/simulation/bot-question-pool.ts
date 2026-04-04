@@ -92,12 +92,15 @@ function estimateDailyQuestionDemand(): number {
 
 /**
  * Generate a fresh pool of bot questions if the pool is running low.
- * Called daily from the simulation loop.
+ * Called daily from the simulation loop. Respects BOTS_ENABLED flag.
  */
 export async function maybeGenerateBotQuestionPool(
   allParties: Party[],
   currentDay: number,
 ): Promise<void> {
+  // Skip pool generation when bots are disabled
+  if (process.env.BOTS_ENABLED?.toLowerCase() === "false") return;
+
   const db = getDb();
 
   // Count unused questions in the pool
