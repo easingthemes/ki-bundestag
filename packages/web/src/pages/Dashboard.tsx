@@ -100,13 +100,22 @@ export function Dashboard() {
   const coalitionSeats = coalitionPartyList.reduce((s, p) => s + p.seatCount, 0);
 
   const GERMAN_MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+  const simStartMs = simStatus?.startDate ? new Date(simStatus.startDate).getTime() : null;
   const simMonthLabel = (() => {
-    if (!simStatus?.startDate) return null;
-    const d = new Date(new Date(simStatus.startDate).getTime() + simStatus.currentDay * 86400000);
+    if (!simStartMs) return null;
+    const d = new Date(simStartMs + simStatus.currentDay * 86400000);
     return GERMAN_MONTH_NAMES[d.getMonth()];
   })();
 
-  const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= simStatus.currentDay - 30);
+  // Compute first sim day of the current sim calendar month
+  const monthStartDay = (() => {
+    if (!simStartMs) return simStatus.currentDay - 30; // fallback to rolling 30d
+    const currentSimDate = new Date(simStartMs + simStatus.currentDay * 86400000);
+    const firstOfMonth = new Date(currentSimDate.getFullYear(), currentSimDate.getMonth(), 1);
+    return Math.max(0, Math.floor((firstOfMonth.getTime() - simStartMs) / 86400000));
+  })();
+
+  const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= monthStartDay);
   const decisionOfMonth = recentBills.length > 0
     ? recentBills.reduce((best, b) => {
         const total = b.votes.reduce((s, v) => s + (parties.find(pp => pp.id === v.partyId)?.seatCount ?? 0), 0);
