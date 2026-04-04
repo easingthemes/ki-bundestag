@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/easingthemes/ki-bundestag/compare/v1.7.2...v1.7.3) (2026-04-04)
+
+
+### Bug Fixes
+
+* prevent mobile horizontal body scroll with layered overflow containment ([67bacb5](https://github.com/easingthemes/ki-bundestag/commit/67bacb54eaa5280250968a7fca34b9b6c185e541))
+
 ## [1.7.2](https://github.com/easingthemes/ki-bundestag/compare/v1.7.1...v1.7.2) (2026-04-04)
 
 
