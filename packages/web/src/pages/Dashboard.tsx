@@ -228,7 +228,7 @@ export function Dashboard() {
                     <Hemicycle seats={hemicycleSeats} coalitionIds={state.coalitionParties} totalSeats={totalSeats} size="md" showLegend={false} />
                   </div>
                   {/* Coalition / Opposition info */}
-                  <div className="grid grid-cols-2 gap-x-12 w-full max-w-4xl px-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-12 gap-y-6 w-full max-w-4xl px-4">
                     <div className="flex flex-col gap-2 items-center">
                       <div className="text-[13px] font-bold uppercase tracking-wide text-emerald-600">
                         {t("koalition")}
