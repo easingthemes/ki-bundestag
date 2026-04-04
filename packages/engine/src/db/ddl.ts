@@ -152,6 +152,19 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (target_party_id) REFERENCES parties(id)
   );
 
+  CREATE TABLE IF NOT EXISTS bot_question_pool (
+    id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    target_party_id TEXT NOT NULL,
+    tags TEXT NOT NULL DEFAULT '[]',
+    relevant_for_parties TEXT NOT NULL DEFAULT '[]',
+    generated_on_day INTEGER NOT NULL,
+    used_by_bot_id TEXT,
+    used_on_day INTEGER,
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
+  );
+
   CREATE TABLE IF NOT EXISTS question_suggestions (
     id TEXT PRIMARY KEY,
     question TEXT NOT NULL,
@@ -604,6 +617,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "day_summaries", column: "_table", sql: "CREATE TABLE IF NOT EXISTS day_summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, day_number INTEGER NOT NULL UNIQUE, narrative TEXT, mood TEXT, preview TEXT, created_at TEXT NOT NULL)" },
   { table: "simulation_meta", column: "election_cooldown_until", sql: "ALTER TABLE simulation_meta ADD COLUMN election_cooldown_until INTEGER NOT NULL DEFAULT 0" },
   { table: "parties", column: "inactive_days", sql: "ALTER TABLE parties ADD COLUMN inactive_days INTEGER NOT NULL DEFAULT 0" },
+  { table: "bot_question_pool", column: "_table", sql: "CREATE TABLE IF NOT EXISTS bot_question_pool (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT NOT NULL, target_party_id TEXT NOT NULL REFERENCES parties(id), tags TEXT NOT NULL DEFAULT '[]', relevant_for_parties TEXT NOT NULL DEFAULT '[]', generated_on_day INTEGER NOT NULL, used_by_bot_id TEXT, used_on_day INTEGER)" },
 ];
 
 /** Column migrations for user DB */
