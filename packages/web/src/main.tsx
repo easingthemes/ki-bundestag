@@ -617,7 +617,7 @@ function App() {
     <UserContext.Provider value={{ user, login, logout, updateUser }}>
     <BrowserRouter>
       <ScrollToHash />
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col overflow-x-clip w-full max-w-full">
         {/* Skip to main content link for keyboard/screen reader users */}
         <a
           href="#main-content"
@@ -706,7 +706,7 @@ function App() {
         {error && <ErrorToast message={error} onDismiss={() => setError(null)} />}
 
         {/* Main content */}
-        <main id="main-content" className="mx-auto max-w-[1280px] flex-1 px-6 py-8 max-md:px-4 max-md:py-5 overflow-x-hidden">
+        <main id="main-content" className="mx-auto max-w-[1280px] w-full min-w-0 flex-1 px-6 py-8 max-md:px-4 max-md:py-5">
           <Suspense fallback={<div className="flex items-center justify-center py-20" role="status" aria-label={t("aria.loading")}><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /><span className="sr-only">{t("aria.loading")}</span></div>}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
