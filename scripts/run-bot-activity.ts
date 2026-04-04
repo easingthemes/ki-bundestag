@@ -93,6 +93,81 @@ function weightedPick(weights: ActionWeights): keyof ActionWeights {
   return entries[entries.length - 1][0];
 }
 
+// ── Bot question pool picker ────────────────────────────────────────────────
+
+interface PoolRow {
+  id: string;
+  question: string;
+  topic: string;
+  target_party_id: string;
+  tags: string;
+  relevant_for_parties: string;
+}
+
+/**
+ * Pick the best matching unused question from the bot_question_pool.
+ *
+ * Matching priority:
+ * 1. Questions tagged as relevant for the bot's party
+ * 2. Questions with matching context tags (opposition bot → opposition tags)
+ * 3. Any unused question
+ *
+ * Also checks that the question hasn't already been submitted (dedup).
+ */
+function pickFromPool(
+  simDb: Database.Database,
+  bot: { id: string; party_id: string | null },
+): PoolRow | null {
+  // Check if the table exists (might not on first run before migration)
+  try {
+    simDb.prepare("SELECT 1 FROM bot_question_pool LIMIT 1").get();
+  } catch {
+    return null;
+  }
+
+  const unused = simDb.prepare(
+    "SELECT id, question, topic, target_party_id, tags, relevant_for_parties FROM bot_question_pool WHERE used_by_bot_id IS NULL",
+  ).all() as PoolRow[];
+
+  if (unused.length === 0) return null;
+
+  // Load existing questions for dedup check
+  const existingQuestions = simDb.prepare(
+    "SELECT question, target_party_id FROM citizen_questions",
+  ).all() as Array<{ question: string; target_party_id: string }>;
+  const existingSet = new Set(
+    existingQuestions.map(q => `${q.target_party_id}::${normalizeText(q.question)}`),
+  );
+
+  // Filter out questions that already exist as citizen questions
+  const candidates = unused.filter(
+    q => !existingSet.has(`${q.target_party_id}::${normalizeText(q.question)}`),
+  );
+
+  if (candidates.length === 0) return null;
+
+  // Score each candidate based on bot profile relevance
+  const scored = candidates.map(q => {
+    let score = 0;
+    const relevantParties: string[] = JSON.parse(q.relevant_for_parties);
+    const tags: string[] = JSON.parse(q.tags);
+
+    // Boost if this question is relevant for the bot's party
+    if (bot.party_id && relevantParties.includes(bot.party_id)) {
+      score += 10;
+    }
+
+    // Small random factor for variety
+    score += Math.random() * 3;
+
+    return { ...q, score };
+  });
+
+  // Sort by score descending, pick top
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0];
+}
+
 // ── Static templates (fallback when no API key) ─────────────────────────────
 
 const QUESTION_TEMPLATES = [
@@ -425,6 +500,26 @@ async function executeTick(
 
         case "ask_question": {
           if (!checkBotDailyLimit(userDb, bot.id, "submit_question")) break;
+
+          // ── Primary: pick from pre-generated bot question pool ──────────
+          const poolQuestion = pickFromPool(simDb, bot);
+          if (poolQuestion) {
+            const qId = `q-bot-${uuid().slice(0, 12)}`;
+            if (!dryRun) {
+              insertQuestion.run(qId, poolQuestion.question, poolQuestion.target_party_id, currentDay, bot.id, poolQuestion.topic);
+              // Mark pool question as used
+              simDb.prepare("UPDATE bot_question_pool SET used_by_bot_id = ?, used_on_day = ? WHERE id = ?")
+                .run(bot.id, currentDay, poolQuestion.id);
+              insertAction.run(uuid(), bot.id, "submit_question", qId, "question", JSON.stringify({ targetPartyId: poolQuestion.target_party_id, topic: poolQuestion.topic, fromPool: true }), currentDay, isoNow);
+            }
+            result.actions++;
+            result.breakdown.ask_question = (result.breakdown.ask_question ?? 0) + 1;
+            const partyName = partyNameMap[poolQuestion.target_party_id] ?? poolQuestion.target_party_id;
+            console.log(`  ${bot.display_name} asked ${partyName} (from pool): "${poolQuestion.question.slice(0, 60)}..."`);
+            break;
+          }
+
+          // ── Fallback: generate on-the-fly (pool empty) ─────────────────
           const targetParty = pick(parties);
           const topic = pick(TOPICS);
 
@@ -440,7 +535,7 @@ async function executeTick(
             questionText = aiQuestion;
             result.aiCalls++;
           } else {
-            // Template fallback: try templates until we find a non-duplicate, give up after all tried
+            // Template fallback: try templates until we find a non-duplicate
             const shuffled = [...QUESTION_TEMPLATES].sort(() => Math.random() - 0.5);
             let found = false;
             questionText = "";
@@ -452,10 +547,10 @@ async function executeTick(
                 break;
               }
             }
-            if (!found) break; // All templates for this topic already exist — skip
+            if (!found) break;
           }
 
-          // Final duplicate check (AI-generated text might still match)
+          // Final duplicate check
           if (existingNormalized.has(normalizeText(questionText))) break;
 
           const qId = `q-bot-${uuid().slice(0, 12)}`;
@@ -465,7 +560,7 @@ async function executeTick(
           }
           result.actions++;
           result.breakdown.ask_question = (result.breakdown.ask_question ?? 0) + 1;
-          console.log(`  ${bot.display_name} asked ${targetParty.name}: "${questionText.slice(0, 60)}..."`);
+          console.log(`  ${bot.display_name} asked ${targetParty.name} (fallback): "${questionText.slice(0, 60)}..."`);
           break;
         }
 

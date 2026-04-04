@@ -121,6 +121,21 @@ export const citizenQuestions = sqliteTable("citizen_questions", {
   topic: text("topic"),
 });
 
+export const botQuestionPool = sqliteTable("bot_question_pool", {
+  id: text("id").primaryKey(),
+  question: text("question").notNull(),
+  topic: text("topic").notNull(),
+  targetPartyId: text("target_party_id").notNull().references(() => parties.id),
+  /** JSON array of tags — e.g. ["opposition", "wirtschaft", "aktuell", "klimaschutz"] */
+  tags: text("tags").notNull().default("[]"),
+  /** JSON array of party IDs whose members would naturally ask this question */
+  relevantForParties: text("relevant_for_parties").notNull().default("[]"),
+  generatedOnDay: integer("generated_on_day").notNull(),
+  /** Null until a bot picks this question */
+  usedByBotId: text("used_by_bot_id"),
+  usedOnDay: integer("used_on_day"),
+});
+
 export const questionSuggestions = sqliteTable("question_suggestions", {
   id: text("id").primaryKey(),
   question: text("question").notNull(),
