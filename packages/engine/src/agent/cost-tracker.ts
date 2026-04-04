@@ -260,6 +260,32 @@ export function getDayAIHealth(dayNumber: number): DayAIHealth {
   }
 }
 
+/**
+ * Check party agent health for a specific simulation day.
+ * Returns success/failure counts for party agent batch requests only
+ * (task IDs matching "agent-<partyId>-day<N>").
+ *
+ * Used by the runner to detect partial batch failures where most parties
+ * fail (e.g. grammar compilation timeout) but one succeeds — creating an
+ * unfair advantage for the surviving party.
+ */
+export function getDayPartyAgentHealth(dayNumber: number): DayAIHealth {
+  try {
+    const sqlite = getSqlite();
+    const row = sqlite.prepare(`
+      SELECT
+        COUNT(*) as totalCalls,
+        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successfulCalls,
+        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failedCalls
+      FROM ai_calls
+      WHERE day_number = ? AND task LIKE 'agent-%-day%'
+    `).get(dayNumber) as DayAIHealth;
+    return row ?? { totalCalls: 0, successfulCalls: 0, failedCalls: 0 };
+  } catch {
+    return { totalCalls: 0, successfulCalls: 0, failedCalls: 0 };
+  }
+}
+
 export function getCostByModel(): ModelCostSummary[] {
   const sqlite = getSqlite();
   return sqlite.prepare(`
