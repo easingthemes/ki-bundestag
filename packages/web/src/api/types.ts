@@ -42,7 +42,7 @@ export interface Party {
   approvalRating: number;
   policyPriorities: Record<string, number>;
   coalitionRole: string;
-  recentApprovals: number[];
+  recentApprovals: { day: number; approval: number }[];
   memberCount: number;
   inactiveDays: number;
 }

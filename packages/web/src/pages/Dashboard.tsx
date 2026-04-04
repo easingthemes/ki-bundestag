@@ -126,7 +126,12 @@ export function Dashboard() {
 
   const politicianOfMonth = parties
     .filter(p => p.seatCount > 0 && p.recentApprovals && p.recentApprovals.length >= 2)
-    .map(p => ({ party: p, delta: p.recentApprovals[p.recentApprovals.length - 1] - p.recentApprovals[0] }))
+    .map(p => {
+      const monthApprovals = p.recentApprovals.filter(a => a.day >= monthStartDay);
+      if (monthApprovals.length < 2) return null;
+      return { party: p, delta: monthApprovals[monthApprovals.length - 1].approval - monthApprovals[0].approval };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => b.delta - a.delta)[0] ?? null;
 
   const latestMedia = [...media].sort((a, b) => b.dayNumber - a.dayNumber).slice(0, 2);
