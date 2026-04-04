@@ -13,11 +13,48 @@
  * Usage: npm run bot:start (via PM2)
  */
 
+import Database from "better-sqlite3";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { runBotTick } from "./run-bot-activity.js";
 
-// Check BOTS_ENABLED flag — allows disabling without stopping the PM2 process
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function findMonorepoRoot(): string {
+  let dir = __dirname;
+  for (let i = 0; i < 10; i++) {
+    const pkgPath = path.join(dir, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+        if (pkg.workspaces) return dir;
+      } catch {}
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+
+const ROOT = findMonorepoRoot();
+const SIM_DB_PATH = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(ROOT, "data", "simulation.db");
+
+/** Check bots_enabled flag from simulation_meta (DB-backed, toggled via npm run bot:on/off). */
 function botsEnabled(): boolean {
-  return process.env.BOTS_ENABLED?.toLowerCase() !== "false";
+  try {
+    const db = new Database(SIM_DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT bots_enabled FROM simulation_meta LIMIT 1").get() as
+      | { bots_enabled: number }
+      | undefined;
+    db.close();
+    return (row?.bots_enabled ?? 1) === 1;
+  } catch {
+    return true; // default to enabled if DB not available
+  }
 }
 
 const INTERVAL_MS = parseInt(process.env.BOT_INTERVAL_MS || "14400000", 10); // 4 hours

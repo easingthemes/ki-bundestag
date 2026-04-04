@@ -28,6 +28,9 @@
     "seed:demo-users": "tsx scripts/seed-demo-users.ts",
     "bot:activity": "tsx scripts/run-bot-activity.ts",
     "bot:status": "tsx scripts/bot-status.ts",
+    "bot:on": "tsx scripts/bot-toggle.ts on",
+    "bot:off": "tsx scripts/bot-toggle.ts off",
+    "bot:toggle": "tsx scripts/bot-toggle.ts",
     "backfill:summaries": "tsx scripts/backfill-day-summaries.ts",
     "rollback": "tsx scripts/rollback-to-day.ts",
     "kill": "lsof -ti :3001 | xargs kill -9 2>/dev/null; lsof -ti :5173 | xargs kill -9 2>/dev/null; echo 'Killed servers on ports 3001 and 5173'"

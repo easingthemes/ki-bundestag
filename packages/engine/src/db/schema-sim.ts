@@ -99,6 +99,7 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   timingPreset: text("timing_preset").notNull().default("normal"),
   contextDepth: text("context_depth").notNull().default("normal"),
   startDate: text("start_date"),
+  botsEnabled: integer("bots_enabled").notNull().default(1),
 });
 
 export const partyHistory = sqliteTable("party_history", {
