@@ -48,6 +48,31 @@ Context depth: `low` (~$0.020/day), `normal` (~$0.028/day, measured), `high` (~$
 - **Semantic retry** — `attemptSemanticRetry()` re-prompts the LLM once with structured validation errors when actions parse OK but fail semantic validation.
 - **Observability** — `logAICall()` emits `[AI] <task> | <provider>/<model> | <ms>ms | OK|PARSE_FAIL|VALIDATION_FAIL`.
 
+### Structured Output (Disabled)
+
+Anthropic's structured output (`output_config.format.json_schema`) was used for party agent responses from day 1. It guaranteed valid JSON shape via constrained decoding, eliminating parse failures. However, it caused two escalating API errors:
+
+1. **Days 259-270**: `"Schemas contains too many optional parameters (27), limit: 24"` — The action schema had 27 optional params (17 top-level + 5 in `impact` + 5 in `impactChange`). Fixed by marking `impact`/`impactChange` sub-fields as required, reducing to 17.
+
+2. **Day 355+**: `"Grammar compilation timed out"` — Even with 17 optional params, the nested array-of-objects schema exceeded Anthropic's 180-second grammar compilation timeout. The grammar compiler builds a finite-state automaton where each optional field roughly doubles state space.
+
+Structured output was disabled entirely. All parties now use `parseAgentResponse()` — the same parse pipeline (code-fence stripping, trailing comma cleanup, sanitizers) that always worked for AfD/xAI. Semantic validation + retry still catches malformed responses.
+
+See: [Anthropic docs on schema complexity limits](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#schema-complexity-limits), [anthropic-sdk-python#1185](https://github.com/anthropics/anthropic-sdk-python/issues/1185).
+
+### Simulation Safety: Partial Failure Detection
+
+The runner (`runner-auto.ts`) stops the simulation when AI failures create unfair outcomes:
+
+| Check | Trigger | Threshold |
+|---|---|---|
+| Total AI failure | `successfulCalls === 0` for all AI calls | 2 consecutive days |
+| **Party agent fairness** | `successRate < 50%` for party agent batch | 2 consecutive days |
+| Provider auth failure | HTTP 401/403/402 + all providers down | Immediate |
+| Provider rate limit | All providers hit 429 | Pause until reset |
+
+The fairness check prevents scenarios where e.g. 5 Anthropic parties fail with a schema error but AfD (xAI) succeeds — giving AfD sole legislative power while others auto-abstain.
+
 ### AI-Powered Features (14 call sites)
 
 Party daily actions, coalition negotiation + synthesis, citizen question answers, interpellation answers, media generation, poll generation, referendum generation, daily narrative summary, internal proposal review, MdB application review, speech scoring, discipline reasoning, era summaries, knowledge digests.

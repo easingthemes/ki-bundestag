@@ -3,7 +3,7 @@ import { runDay } from "./simulation/index.js";
 import { closeDb, getSqlite } from "./db/index.js";
 import { getDelayMs, shouldPauseForNight, type TimingPreset } from "./simulation/timing.js";
 import { allProvidersLimited, allProvidersUnavailable, AIProviderLimitError, AIProviderAuthError } from "./agent/client.js";
-import { getDayAIHealth } from "./agent/cost-tracker.js";
+import { getDayAIHealth, getDayPartyAgentHealth } from "./agent/cost-tracker.js";
 import { printRunSummary } from "./simulation/run-stats.js";
 
 /** Clear dayStartedAt so the frontend stops showing "running" after a failure */
@@ -45,6 +45,24 @@ let consecutiveAIFailDays = 0;
 
 /** Threshold: pause after this many consecutive days with 0% AI success. */
 const AI_FAIL_PAUSE_THRESHOLD = 2;
+
+/** Number of consecutive days where most party agents failed (unfair advantage). */
+let consecutivePartialFailDays = 0;
+
+/**
+ * Threshold: stop after this many consecutive days with majority party agent failures.
+ * When most parties fail but one succeeds, the surviving party gets an unfair
+ * advantage (it can propose/vote/amend while others auto-abstain). Even 1 such
+ * day is damaging, but we allow 1 to tolerate transient API hiccups.
+ */
+const PARTIAL_FAIL_PAUSE_THRESHOLD = 2;
+
+/**
+ * Minimum party agent success rate to consider a day "fair".
+ * Below this threshold, the day is flagged as a partial failure.
+ * With 6 parties, <50% means 3+ parties failed.
+ */
+const MIN_PARTY_AGENT_SUCCESS_RATE = 0.5;
 
 let running = true;
 
@@ -96,6 +114,23 @@ async function main() {
         console.warn(`  [Runner] Day ${dayAfter}: ${detail} (${consecutiveAIFailDays} consecutive)`);
       } else {
         consecutiveAIFailDays = 0;
+      }
+
+      // Check party agent fairness: did most party agents fail while some succeeded?
+      // This catches the scenario where e.g. 5 Anthropic parties fail with "Grammar
+      // compilation timed out" but AfD on xAI succeeds — giving AfD an unfair advantage
+      // (it can propose/vote/amend while others auto-abstain on all bills).
+      const partyHealth = getDayPartyAgentHealth(dayAfter);
+      if (partyHealth.totalCalls > 0 && partyHealth.failedCalls > 0) {
+        const successRate = partyHealth.successfulCalls / partyHealth.totalCalls;
+        if (successRate < MIN_PARTY_AGENT_SUCCESS_RATE) {
+          consecutivePartialFailDays++;
+          console.warn(`  [Runner] Day ${dayAfter}: party agent batch partially failed — ${partyHealth.successfulCalls}/${partyHealth.totalCalls} succeeded (${consecutivePartialFailDays} consecutive)`);
+        } else {
+          consecutivePartialFailDays = 0;
+        }
+      } else {
+        consecutivePartialFailDays = 0;
       }
 
       // Print periodic summary every 10 days
@@ -151,6 +186,18 @@ async function main() {
     if (consecutiveAIFailDays >= AI_FAIL_PAUSE_THRESHOLD) {
       console.error(`\n  [Runner] *** ${consecutiveAIFailDays} consecutive days with 0% AI success — stopping simulation ***`);
       console.error(`  [Runner] Likely cause: expired/invalid API key, or sustained API outage.`);
+      console.error(`  [Runner] Fix the issue and restart the process.\n`);
+      running = false;
+      break;
+    }
+
+    // If N consecutive days had majority party agent failures, stop to prevent
+    // unfair simulation outcomes. When most parties auto-abstain while one acts
+    // normally, that party gains disproportionate legislative influence.
+    if (consecutivePartialFailDays >= PARTIAL_FAIL_PAUSE_THRESHOLD) {
+      console.error(`\n  [Runner] *** ${consecutivePartialFailDays} consecutive days with majority party agent failures — stopping simulation ***`);
+      console.error(`  [Runner] Some parties succeeded while most failed, creating unfair advantage.`);
+      console.error(`  [Runner] Likely cause: structured output schema error, API-side grammar limits, or provider-specific issue.`);
       console.error(`  [Runner] Fix the issue and restart the process.\n`);
       running = false;
       break;
