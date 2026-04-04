@@ -1,3 +1,12 @@
+## [1.7.1](https://github.com/easingthemes/ki-bundestag/compare/v1.7.0...v1.7.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* align "Decision of the Month" to actual sim calendar month ([74748d5](https://github.com/easingthemes/ki-bundestag/commit/74748d5c4862fef5f608472b78192648a90123a4))
+* align Party of the Month to actual sim calendar month ([19a7d30](https://github.com/easingthemes/ki-bundestag/commit/19a7d3067d6b109f4642a071c1709bd89c3893bc))
+* show simulation month name in dashboard "Entscheidung/Partei des Monats" ([b267756](https://github.com/easingthemes/ki-bundestag/commit/b267756a737f5ac01e98c57df5b5a9ce9d0301a3))
+
 # [1.7.0](https://github.com/easingthemes/ki-bundestag/compare/v1.6.0...v1.7.0) (2026-04-03)
 
 
