@@ -98,10 +98,12 @@ export async function maybeGenerateBotQuestionPool(
   allParties: Party[],
   currentDay: number,
 ): Promise<void> {
-  // Skip pool generation when bots are disabled
-  if (process.env.BOTS_ENABLED?.toLowerCase() === "false") return;
-
   const db = getDb();
+
+  // Skip pool generation when bots are disabled (DB flag in simulation_meta)
+  const meta = db.select({ botsEnabled: schema.simulationMeta.botsEnabled })
+    .from(schema.simulationMeta).get();
+  if (meta && !meta.botsEnabled) return;
 
   // Count unused questions in the pool
   const unusedCount = db.select().from(schema.botQuestionPool)
