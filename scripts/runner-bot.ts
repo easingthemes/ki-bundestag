@@ -15,6 +15,11 @@
 
 import { runBotTick } from "./run-bot-activity.js";
 
+// Check BOTS_ENABLED flag — allows disabling without stopping the PM2 process
+function botsEnabled(): boolean {
+  return process.env.BOTS_ENABLED?.toLowerCase() !== "false";
+}
+
 const INTERVAL_MS = parseInt(process.env.BOT_INTERVAL_MS || "14400000", 10); // 4 hours
 const INTERVAL_LABEL = `${Math.round(INTERVAL_MS / 60_000)}min`;
 
@@ -29,6 +34,10 @@ function log(msg: string) {
 }
 
 async function tick() {
+  if (!botsEnabled()) {
+    log("Bots disabled (BOTS_ENABLED=false) — skipping tick");
+    return;
+  }
   tickCount++;
   log(`Tick #${tickCount} starting...`);
   try {
