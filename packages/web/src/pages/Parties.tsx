@@ -159,7 +159,7 @@ export function Parties() {
                       </span>
                     </div>
                     {p.recentApprovals && p.recentApprovals.length >= 2 && (
-                      <Sparkline values={p.recentApprovals} color={displayColor} />
+                      <Sparkline values={p.recentApprovals.map(a => a.approval)} color={displayColor} />
                     )}
                   </div>
                 </PartyCard>

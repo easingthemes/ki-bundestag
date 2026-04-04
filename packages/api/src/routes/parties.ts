@@ -39,17 +39,27 @@ router.get("/api/parties", (_req, res) => {
   const db = getDb();
   const rows = db.select().from(schema.parties).all();
 
-  // Fetch recent approval history (last 14 days) for all parties in one query
-  const metaRow = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0];
-  const minDay = Math.max(0, (metaRow?.day ?? 0) - 13);
+  // Fetch recent approval history for all parties — cover at least current sim month + 14 days
+  const metaRow = db.select({ day: schema.simulationMeta.currentDay, startDate: schema.simulationMeta.startDate }).from(schema.simulationMeta).limit(1).all()[0];
+  const currentDay = metaRow?.day ?? 0;
+  const startDateStr = metaRow?.startDate as string | null;
+  // Compute first sim day of current calendar month (or fallback to 30 days back)
+  let monthStartDay = Math.max(0, currentDay - 30);
+  if (startDateStr) {
+    const startMs = new Date(startDateStr).getTime();
+    const currentSimDate = new Date(startMs + currentDay * 86400000);
+    const firstOfMonth = new Date(currentSimDate.getFullYear(), currentSimDate.getMonth(), 1);
+    monthStartDay = Math.max(0, Math.floor((firstOfMonth.getTime() - startMs) / 86400000));
+  }
+  const minDay = Math.min(monthStartDay, Math.max(0, currentDay - 13));
   const histRows = db.select().from(schema.partyHistory)
     .where(gte(schema.partyHistory.dayNumber, minDay))
     .orderBy(asc(schema.partyHistory.dayNumber))
     .all();
-  const histByParty = new Map<string, number[]>();
+  const histByParty = new Map<string, { day: number; approval: number }[]>();
   for (const row of histRows) {
     if (!histByParty.has(row.partyId)) histByParty.set(row.partyId, []);
-    histByParty.get(row.partyId)!.push(Number(row.approvalRating));
+    histByParty.get(row.partyId)!.push({ day: row.dayNumber, approval: Number(row.approvalRating) });
   }
 
   const memberCounts = getMemberCounts();

@@ -99,7 +99,23 @@ export function Dashboard() {
   const oppositionPartyList = parties.filter(p => state.oppositionParties.includes(p.id) && p.seatCount > 0);
   const coalitionSeats = coalitionPartyList.reduce((s, p) => s + p.seatCount, 0);
 
-  const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= simStatus.currentDay - 30);
+  const GERMAN_MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+  const simStartMs = simStatus?.startDate ? new Date(simStatus.startDate).getTime() : null;
+  const simMonthLabel = (() => {
+    if (!simStartMs) return null;
+    const d = new Date(simStartMs + simStatus.currentDay * 86400000);
+    return GERMAN_MONTH_NAMES[d.getMonth()];
+  })();
+
+  // Compute first sim day of the current sim calendar month
+  const monthStartDay = (() => {
+    if (!simStartMs) return simStatus.currentDay - 30; // fallback to rolling 30d
+    const currentSimDate = new Date(simStartMs + simStatus.currentDay * 86400000);
+    const firstOfMonth = new Date(currentSimDate.getFullYear(), currentSimDate.getMonth(), 1);
+    return Math.max(0, Math.floor((firstOfMonth.getTime() - simStartMs) / 86400000));
+  })();
+
+  const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= monthStartDay);
   const decisionOfMonth = recentBills.length > 0
     ? recentBills.reduce((best, b) => {
         const total = b.votes.reduce((s, v) => s + (parties.find(pp => pp.id === v.partyId)?.seatCount ?? 0), 0);
@@ -110,7 +126,12 @@ export function Dashboard() {
 
   const politicianOfMonth = parties
     .filter(p => p.seatCount > 0 && p.recentApprovals && p.recentApprovals.length >= 2)
-    .map(p => ({ party: p, delta: p.recentApprovals[p.recentApprovals.length - 1] - p.recentApprovals[0] }))
+    .map(p => {
+      const monthApprovals = p.recentApprovals.filter(a => a.day >= monthStartDay);
+      if (monthApprovals.length < 2) return null;
+      return { party: p, delta: monthApprovals[monthApprovals.length - 1].approval - monthApprovals[0].approval };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => b.delta - a.delta)[0] ?? null;
 
   const latestMedia = [...media].sort((a, b) => b.dayNumber - a.dayNumber).slice(0, 2);
@@ -587,7 +608,7 @@ export function Dashboard() {
             return (
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("entscheidungDesMonats")}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{simMonthLabel ? `Entscheidung im ${simMonthLabel}` : t("entscheidungDesMonats")}</div>
                   <Link to={`/bills/${decisionOfMonth.id}`} className="font-bold text-sm text-foreground no-underline hover:underline leading-snug">
                     {decisionOfMonth.title}
                   </Link>
@@ -612,7 +633,7 @@ export function Dashboard() {
           {politicianOfMonth && (
             <Card>
               <CardContent className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("parteiDesMonats")}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{simMonthLabel ? `Partei im ${simMonthLabel}` : t("parteiDesMonats")}</div>
                 <Link to={`/parties/${politicianOfMonth.party.id}`} className="flex items-center gap-2 no-underline text-foreground">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fixColor(politicianOfMonth.party.color) }} />
                   <span className="font-bold text-sm">{politicianOfMonth.party.name}</span>
