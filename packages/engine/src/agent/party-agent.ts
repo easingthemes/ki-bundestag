@@ -6,108 +6,8 @@ import type { PartyCapabilities } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
 import type { ValidationResult } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
-import { getPartyModel } from "./model-config.js";
 import type { Provider } from "./model-config.js";
 import type { DepthConfig } from "./context-depth.js";
-
-/**
- * JSON Schema for Anthropic structured output — agent response.
- * Matches the AgentResponse type: { actions: AgentAction[] }.
- * Passed directly as `output_config.format.schema` in the Anthropic API.
- *
- * NOTE on VALIDATION_FAIL pattern (investigated 2026-04-01, days 77-84):
- *
- * Structured output guarantees valid JSON shape, but NOT valid semantic values.
- * The schema allows any string for `type`, `vote`, `category` etc., while
- * `validateActions()` in action-parser.ts enforces specific enums (e.g.
- * vote must be "yes"|"no"|"abstain", type must be "vote"|"propose"|...).
- *
- * Haiku occasionally produces valid JSON that fails semantic validation:
- *   - Wrong vote values, missing required fields, invalid categories
- *   - Observed ~1.4% VALIDATION_FAIL rate across days 72-85
- *   - Spikes on days 77 (5/6 agents), 83 (5/6), 84 (2/6)
- *
- * AfD (xai/grok-3-mini) never uses structured output (no schema support),
- * so it goes through the full parse pipeline with sanitizers and consistently
- * passes — likely because the parse pipeline is more lenient.
- *
- * This is handled gracefully:
- *   1. Valid actions from the response are kept (validationResult.valid)
- *   2. Fixable errors trigger a semantic retry (re-prompt with error details)
- *   3. Remaining invalid actions fall back to abstain-all for votable bills
- *
- * The fail rate increased slightly after day 60 due to era summaries adding
- * more context to prompts (progressive summarization), which increases token
- * pressure on Haiku's output quality. This is acceptable given the fallbacks.
- *
- * NOTE on optional parameter limit (fixed 2026-04-03, days 259-270):
- *
- * Anthropic's structured output rejects schemas with >24 optional parameters.
- * This schema originally had 27 optional params (17 top-level action fields +
- * 5 in impact + 5 in impactChange). All 5 Anthropic agent batches errored with:
- *   "Schemas contains too many optional parameters (27), limit: 24"
- * Fix: impact/impactChange sub-properties are marked required — when the model
- * includes an impact object, all 5 numeric fields must be present. This reduces
- * the optional count to 17. The prompt already asks for all 5 fields, so this
- * matches expected model behavior.
- */
-const AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
-  type: "object",
-  properties: {
-    actions: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          type: { type: "string" },
-          billId: { type: "string" },
-          vote: { type: "string" },
-          reason: { type: "string" },
-          title: { type: "string" },
-          description: { type: "string" },
-          category: { type: "string" },
-          impact: {
-            type: "object",
-            properties: {
-              budget: { type: "number" },
-              unemployment: { type: "number" },
-              inflation: { type: "number" },
-              gdpGrowth: { type: "number" },
-              publicSentiment: { type: "number" },
-            },
-            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
-            additionalProperties: false,
-          },
-          impactChange: {
-            type: "object",
-            properties: {
-              budget: { type: "number" },
-              unemployment: { type: "number" },
-              inflation: { type: "number" },
-              gdpGrowth: { type: "number" },
-              publicSentiment: { type: "number" },
-            },
-            required: ["budget", "unemployment", "inflation", "gdpGrowth", "publicSentiment"],
-            additionalProperties: false,
-          },
-          statement: { type: "string" },
-          motionType: { type: "string" },
-          interpellationType: { type: "string" },
-          question: { type: "string" },
-          targetMinistry: { type: "string" },
-          promise: { type: "string" },
-          arguments: { type: "string" },
-          proposedChancellor: { type: "string" },
-          proposedChancellorPartyId: { type: "string" },
-        },
-        required: ["type"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["actions"],
-  additionalProperties: false,
-};
 
 /** Derive capabilities from agent context for conditional system prompt. */
 function deriveCapabilities(ctx: AgentContext): PartyCapabilities {
@@ -289,16 +189,16 @@ export function buildPartyAgentRequests(
   depthConfig?: DepthConfig,
 ): BatchRequest[] {
   return contexts.map(ctx => {
-    const config = getPartyModel(ctx.party.id);
-    const isAnthropic = config.provider === "anthropic";
     return {
       customId: `agent-${ctx.party.id}-day${currentDay}`,
       system: buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions),
       prompt: buildUserPrompt(ctx, depthConfig),
       maxTokens: 1024,
       partyId: ctx.party.id,
-      // Only use structured output for Anthropic — xAI/Grok doesn't support it
-      outputSchema: isAnthropic ? AGENT_RESPONSE_SCHEMA : undefined,
+      // Structured output disabled — schema with 17 optional fields in a nested
+      // array causes "Grammar compilation timed out" on the Anthropic API.
+      // All parties now use the parse pipeline (parseAgentResponse) which handles
+      // code fences, trailing commas, etc. and works reliably for all providers.
     };
   });
 }
@@ -306,22 +206,13 @@ export function buildPartyAgentRequests(
 /**
  * Parse a single party agent batch result into validated actions.
  *
- * Two code paths based on provider:
+ * All parties now use the full parse pipeline (parseAgentResponse) with
+ * code-fence stripping, trailing comma cleanup, and sanitizers. Structured
+ * output was disabled because the 17-optional-field schema caused
+ * "Grammar compilation timed out" errors on the Anthropic Batch API.
  *
- * 1. Anthropic (structuredOutput=true): JSON.parse only — Anthropic guarantees
- *    valid JSON shape via the schema. But semantic validation (validateActions)
- *    can still fail when Haiku produces wrong enum values or missing fields.
- *    Logs as VALIDATION_FAIL. Falls back to valid subset + semantic retry.
- *
- * 2. xAI/Grok (structuredOutput=false): Full parse pipeline with code-fence
- *    stripping, trailing comma cleanup, and sanitizers. Then validateActions.
- *    On PARSE_FAIL, does a sequential retry before falling back to abstain-all.
- *
- * Observed VALIDATION_FAIL rates (day 72-85 window, 2026-04-01):
- *   - Overall: 14/1016 calls = 1.4%
- *   - All failures were Anthropic/Haiku agents, never xAI/Grok (AfD)
- *   - Spikes correlated with era summary injection (day 60+) adding context
- *   - Simulation continued normally — fallback actions are deterministic
+ * The structured output code path is retained as a safety net but is
+ * currently unreachable since no party agent requests set outputSchema.
  */
 export async function processPartyAgentResult(
   result: BatchResult | undefined,
