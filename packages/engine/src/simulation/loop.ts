@@ -1818,7 +1818,7 @@ export async function runDay(): Promise<number> {
   // 10b. Answer pending citizen questions
   await answerPendingQuestions(allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
 
-  // 10b2. Refresh bot question pool (weekly — generates tagged questions for bots to pick from)
+  // 10b2. Refresh bot question pool (demand-driven — generates tagged questions for bots to pick from)
   try {
     await maybeGenerateBotQuestionPool(allParties, currentDay);
   } catch (err) {
