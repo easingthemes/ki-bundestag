@@ -32,6 +32,7 @@ import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMa
 import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
 import { getRecentMedia, applyMediaSentiment, applyMediaSentimentFromArticles, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
+import { maybeGenerateBotQuestionPool } from "./bot-question-pool.js";
 import { maybeGenerateReferendum, resolveExpiredReferendums, buildReferendumBatchRequest, processReferendumBatchResult } from "./referendums.js";
 import { processInjections } from "./injections.js";
 import { updateFraktionen, getActiveFraktionen } from "./fraktionen.js";
@@ -1816,6 +1817,13 @@ export async function runDay(): Promise<number> {
 
   // 10b. Answer pending citizen questions
   await answerPendingQuestions(allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
+
+  // 10b2. Refresh bot question pool (demand-driven — generates tagged questions for bots to pick from)
+  try {
+    await maybeGenerateBotQuestionPool(allParties, currentDay);
+  } catch (err) {
+    console.error("[Loop] Error generating bot question pool:", err);
+  }
 
   // 10c. Review internal party proposals (accept/decline/expire)
   try {
