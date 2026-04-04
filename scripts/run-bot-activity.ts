@@ -77,6 +77,11 @@ const STYLE_WEIGHTS: Record<string, ActionWeights> = {
 function uuid(): string { return crypto.randomUUID(); }
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
+/** Normalise text for duplicate comparison (lowercase, collapse whitespace, strip trailing punctuation). */
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim().replace(/[?.!]+$/, "").trim();
+}
+
 function weightedPick(weights: ActionWeights): keyof ActionWeights {
   const entries = Object.entries(weights) as [keyof ActionWeights, number][];
   const total = entries.reduce((s, [, w]) => s + w, 0);
@@ -136,12 +141,18 @@ async function generateAIQuestion(
   partyName: string,
   topic: string,
   recentBills: string[],
+  existingQuestions?: Set<string>,
 ): Promise<string | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
+  // Build a sample of existing questions to tell the AI what to avoid
+  const avoidList = existingQuestions && existingQuestions.size > 0
+    ? `\n\nDiese Fragen wurden bereits gestellt — stelle eine ANDERE Frage:\n${[...existingQuestions].slice(0, 15).join("\n")}`
+    : "";
+
   try {
-    const prompt = `Du bist ein engagierter deutscher Bürger. Stelle eine kurze, spezifische Frage (1-2 Sätze, max 200 Zeichen) an die Partei "${partyName}" zum Thema "${topic}".${recentBills.length > 0 ? ` Aktuelle Gesetzentwürfe: ${recentBills.slice(0, 3).join(", ")}.` : ""} Antworte NUR mit der Frage, ohne Anführungszeichen.`;
+    const prompt = `Du bist ein engagierter deutscher Bürger. Stelle eine kurze, spezifische Frage (1-2 Sätze, max 200 Zeichen) an die Partei "${partyName}" zum Thema "${topic}".${recentBills.length > 0 ? ` Aktuelle Gesetzentwürfe: ${recentBills.slice(0, 3).join(", ")}.` : ""}${avoidList} Antworte NUR mit der Frage, ohne Anführungszeichen.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -173,12 +184,18 @@ async function generateAIQuestion(
 async function generateAIProposal(
   partyName: string,
   topic: string,
+  existingTitles?: Set<string>,
 ): Promise<{ title: string; description: string; rationale: string } | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
+  // Build a sample of existing proposal titles to tell the AI what to avoid
+  const avoidList = existingTitles && existingTitles.size > 0
+    ? ` Bereits existierende Vorschläge (vermeide ähnliche Titel): ${[...existingTitles].slice(0, 10).join(", ")}.`
+    : "";
+
   try {
-    const prompt = `Du bist Mitglied der Partei "${partyName}". Erstelle einen kurzen Parteiinternen Vorschlag zum Thema "${topic}". Antworte als JSON: {"title": "...", "description": "...", "rationale": "..."}. Titel max 60 Zeichen, Beschreibung max 200 Zeichen, Begründung max 150 Zeichen. Nur JSON, kein Markdown.`;
+    const prompt = `Du bist Mitglied der Partei "${partyName}". Erstelle einen kurzen Parteiinternen Vorschlag zum Thema "${topic}".${avoidList} Antworte als JSON: {"title": "...", "description": "...", "rationale": "..."}. Titel max 60 Zeichen, Beschreibung max 200 Zeichen, Begründung max 150 Zeichen. Nur JSON, kein Markdown.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -410,15 +427,37 @@ async function executeTick(
           if (!checkBotDailyLimit(userDb, bot.id, "submit_question")) break;
           const targetParty = pick(parties);
           const topic = pick(TOPICS);
+
+          // Load existing questions for this party to avoid duplicates
+          const existingQuestions = simDb.prepare(
+            "SELECT question FROM citizen_questions WHERE target_party_id = ?",
+          ).all(targetParty.id) as Array<{ question: string }>;
+          const existingNormalized = new Set(existingQuestions.map(q => normalizeText(q.question)));
+
           let questionText: string;
-          const aiQuestion = await generateAIQuestion(targetParty.name, topic, billTitles);
+          const aiQuestion = await generateAIQuestion(targetParty.name, topic, billTitles, existingNormalized);
           if (aiQuestion) {
             questionText = aiQuestion;
             result.aiCalls++;
           } else {
-            const template = pick(QUESTION_TEMPLATES);
-            questionText = template.replace("{topic}", topic);
+            // Template fallback: try templates until we find a non-duplicate, give up after all tried
+            const shuffled = [...QUESTION_TEMPLATES].sort(() => Math.random() - 0.5);
+            let found = false;
+            questionText = "";
+            for (const template of shuffled) {
+              const candidate = template.replace("{topic}", topic);
+              if (!existingNormalized.has(normalizeText(candidate))) {
+                questionText = candidate;
+                found = true;
+                break;
+              }
+            }
+            if (!found) break; // All templates for this topic already exist — skip
           }
+
+          // Final duplicate check (AI-generated text might still match)
+          if (existingNormalized.has(normalizeText(questionText))) break;
+
           const qId = `q-bot-${uuid().slice(0, 12)}`;
           if (!dryRun) {
             insertQuestion.run(qId, questionText, targetParty.id, currentDay, bot.id, topic);
@@ -435,19 +474,41 @@ async function executeTick(
           if (!checkBotDailyLimit(userDb, bot.id, "submit_proposal")) break;
           const topic = pick(TOPICS);
           const partyName = partyNameMap[bot.party_id] ?? bot.party_id;
+
+          // Load existing proposal titles for this party to avoid duplicates
+          const existingProposals = userDb.prepare(
+            "SELECT title FROM internal_proposals WHERE party_id = ?",
+          ).all(bot.party_id) as Array<{ title: string }>;
+          const existingTitles = new Set(existingProposals.map(p => normalizeText(p.title)));
+
           let title: string, description: string, rationale: string;
-          const aiProposal = await generateAIProposal(partyName, topic);
+          const aiProposal = await generateAIProposal(partyName, topic, existingTitles);
           if (aiProposal) {
             title = aiProposal.title;
             description = aiProposal.description;
             rationale = aiProposal.rationale;
             result.aiCalls++;
           } else {
-            const template = pick(PROPOSAL_TEMPLATES);
-            title = template.title.replace("{topic}", topic);
-            description = template.desc.replace("{topic}", topic);
-            rationale = `Stärkung im Bereich ${topic} gemäß Parteiprogramm.`;
+            // Template fallback: try templates until we find a non-duplicate
+            const shuffled = [...PROPOSAL_TEMPLATES].sort(() => Math.random() - 0.5);
+            let found = false;
+            title = ""; description = ""; rationale = "";
+            for (const template of shuffled) {
+              const candidateTitle = template.title.replace("{topic}", topic);
+              if (!existingTitles.has(normalizeText(candidateTitle))) {
+                title = candidateTitle;
+                description = template.desc.replace("{topic}", topic);
+                rationale = `Stärkung im Bereich ${topic} gemäß Parteiprogramm.`;
+                found = true;
+                break;
+              }
+            }
+            if (!found) break; // All templates for this topic already exist — skip
           }
+
+          // Final duplicate check (AI-generated title might still match)
+          if (existingTitles.has(normalizeText(title))) break;
+
           const pId = uuid();
           const category = pick(CATEGORIES);
           if (!dryRun) {
