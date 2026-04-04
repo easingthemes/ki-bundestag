@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ALERT_STYLES } from "@/lib/colors";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Cost data ───────────────────────────────────────────────────────────────
@@ -342,6 +343,12 @@ export function SimulationCosts() {
       {/* ── Live Cost Tracking ───────────────────────────────────── */}
       <div className="mb-8">
         <h2 className="section-title">Live-Kostenübersicht</h2>
+        <div className={cn(ALERT_STYLES.warning, "mb-4")}>
+          <strong>Hinweis:</strong> Diese Daten stammen aus der Entwicklungsphase und sind nicht repräsentativ für den Normalbetrieb.
+          Während der Entwicklung kam es zu fehlgeschlagenen API-Aufrufen (z.B. Anthropic-API-Ausfälle), die zu Wiederholungsversuchen
+          und überhöhten Kosten führten. Die AfD-Partei nutzt Grok (xAI), das stabil lief, während die übrigen Parteien
+          über Anthropic liefen und von den Ausfällen betroffen waren.
+        </div>
         {costsLoading ? (
           <div className="grid md:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
