@@ -1,3 +1,11 @@
+## [1.7.2](https://github.com/easingthemes/ki-bundestag/compare/v1.7.1...v1.7.2) (2026-04-04)
+
+
+### Bug Fixes
+
+* disable structured output for party agents to avoid grammar compilation timeout ([3d71507](https://github.com/easingthemes/ki-bundestag/commit/3d71507b30b98c9f888c0c20902aec5fed12a6dd))
+* **engine:** stop simulation on partial party agent batch failures ([68e764b](https://github.com/easingthemes/ki-bundestag/commit/68e764b004ededf94f832fbfc7fa9cc12cd54aa3))
+
 ## [1.7.1](https://github.com/easingthemes/ki-bundestag/compare/v1.7.0...v1.7.1) (2026-04-04)
 
 
