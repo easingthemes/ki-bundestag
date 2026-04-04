@@ -101,11 +101,9 @@ export function Dashboard() {
 
   const GERMAN_MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
   const simStartMs = simStatus?.startDate ? new Date(simStatus.startDate).getTime() : null;
-  const simMonthLabel = (() => {
-    if (!simStartMs) return null;
-    const d = new Date(simStartMs + simStatus.currentDay * 86400000);
-    return GERMAN_MONTH_NAMES[d.getMonth()];
-  })();
+  const simDate = simStartMs ? new Date(simStartMs + simStatus.currentDay * 86400000) : null;
+  const simMonthLabel = simDate ? GERMAN_MONTH_NAMES[simDate.getMonth()] : null;
+  const simFullDateLabel = simDate ? `${simDate.getDate()}. ${GERMAN_MONTH_NAMES[simDate.getMonth()]} ${simDate.getFullYear()}` : null;
 
   // Compute first sim day of the current sim calendar month
   const monthStartDay = (() => {
@@ -166,7 +164,10 @@ export function Dashboard() {
       {/* ── Header row ── */}
       <div className="flex items-center justify-between mb-1 gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="!mb-0">{t("parlamentstag", { day: parliamentDay })}</h1>
+          <div>
+            <h1 className="!mb-0">{simFullDateLabel ?? t("parlamentstag", { day: parliamentDay })}</h1>
+            <p className="text-sm text-muted-foreground">{t("parlamentstag", { day: parliamentDay })}</p>
+          </div>
           <SimStatusPill status={simStatus} />
         </div>
         {mood && moodBadgeCls && (
