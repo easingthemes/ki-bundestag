@@ -6,6 +6,7 @@ import { buildQuestionBatchPrompt, buildQuestionSuggestionPrompt, preFilterQuest
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
 import { logger } from "../logger.js";
+import { moderateQuestions, filterAlreadyAnswered, markModeratedQuestions } from "./question-moderation.js";
 
 const MAX_ANSWERS_PER_DAY = 50;
 const QUESTION_EXPIRY_DAYS = 14;
@@ -73,7 +74,18 @@ export async function answerPendingQuestions(
 
   if (pending.length === 0) return;
 
-  await answerQuestionsBatch(pending, allParties, scoreMap, currentDay, briefing);
+  // --- Moderation: remove spam + duplicates within pending ---
+  const { unique, duplicateIds, spamIds } = moderateQuestions(pending, scoreMap);
+
+  // --- Party-level: skip questions already answered by the target party ---
+  const { filtered, alreadyAnsweredIds } = filterAlreadyAnswered(unique);
+
+  // Persist moderation decisions
+  markModeratedQuestions(duplicateIds, spamIds, alreadyAnsweredIds, currentDay);
+
+  if (filtered.length === 0) return;
+
+  await answerQuestionsBatch(filtered, allParties, scoreMap, currentDay, briefing);
 }
 
 /**
