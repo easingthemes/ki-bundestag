@@ -99,6 +99,13 @@ export function Dashboard() {
   const oppositionPartyList = parties.filter(p => state.oppositionParties.includes(p.id) && p.seatCount > 0);
   const coalitionSeats = coalitionPartyList.reduce((s, p) => s + p.seatCount, 0);
 
+  const GERMAN_MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+  const simMonthLabel = (() => {
+    if (!simStatus?.startDate) return null;
+    const d = new Date(new Date(simStatus.startDate).getTime() + simStatus.currentDay * 86400000);
+    return GERMAN_MONTH_NAMES[d.getMonth()];
+  })();
+
   const recentBills = bills.filter(b => b.votes.length > 0 && b.proposedOnDay >= simStatus.currentDay - 30);
   const decisionOfMonth = recentBills.length > 0
     ? recentBills.reduce((best, b) => {
@@ -587,7 +594,7 @@ export function Dashboard() {
             return (
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("entscheidungDesMonats")}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{simMonthLabel ? `Entscheidung im ${simMonthLabel}` : t("entscheidungDesMonats")}</div>
                   <Link to={`/bills/${decisionOfMonth.id}`} className="font-bold text-sm text-foreground no-underline hover:underline leading-snug">
                     {decisionOfMonth.title}
                   </Link>
@@ -612,7 +619,7 @@ export function Dashboard() {
           {politicianOfMonth && (
             <Card>
               <CardContent className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{t("parteiDesMonats")}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">{simMonthLabel ? `Partei im ${simMonthLabel}` : t("parteiDesMonats")}</div>
                 <Link to={`/parties/${politicianOfMonth.party.id}`} className="flex items-center gap-2 no-underline text-foreground">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fixColor(politicianOfMonth.party.color) }} />
                   <span className="font-bold text-sm">{politicianOfMonth.party.name}</span>
