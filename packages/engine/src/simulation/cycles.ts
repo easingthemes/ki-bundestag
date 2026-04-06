@@ -38,7 +38,7 @@ export function isSessionDay(day: number, startDate?: Date): boolean {
 
 /**
  * Poll-day opinion recalculation:
- * - Proposers of recently passed bills get +1.0 approval
+ * - Proposers of recently passed bills get +0.3 approval
  * - Opposition bonus if sentiment < 40
  * - Coalition penalty if sentiment < 30
  */
@@ -58,7 +58,7 @@ export function weeklyOpinionRecalc(
   for (const party of parties) {
     if (proposerIds.has(party.id)) {
       party.approvalRating = clamp(
-        Math.round((party.approvalRating + 1.0) * 10) / 10,
+        Math.round((party.approvalRating + 0.3) * 10) / 10,
         1, 60,
       );
     }

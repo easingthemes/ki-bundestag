@@ -63,8 +63,8 @@ const INACTIVITY_BASE_PENALTY = 0.05;
 const INACTIVITY_MAX_PENALTY = 0.15;
 // Scaling factor: penalty grows as 0.05 + days * 0.002, capped at 0.15
 const INACTIVITY_SCALE = 0.002;
-// Small daily bonus for parties that took meaningful actions
-const ACTIVITY_BONUS = 0.05;
+// Activity resets inactivity counter but no longer gives free approval
+const ACTIVITY_BONUS = 0;
 
 /**
  * Determine whether a party was meaningfully active on a given day.
@@ -142,6 +142,49 @@ export function applyDailyApprovalDrift(
         ));
       }
     } catch { /* table may not exist in old DBs */ }
+  }
+}
+
+/**
+ * Zero-sum normalization: after all daily approval changes, redistribute so that
+ * the total approval across all parties stays roughly constant.
+ *
+ * In real politics, approval is roughly zero-sum — if one party gains 3%,
+ * that support comes from other parties. This function enforces that constraint.
+ *
+ * @param parties — current parties (with already-modified approvalRating)
+ * @param startingApprovals — map of partyId → approval at start of day
+ * @param redistributionRate — fraction of net change to redistribute (0.8 = 80%)
+ */
+export function normalizeApprovalChanges(
+  parties: Party[],
+  startingApprovals: Map<string, number>,
+  redistributionRate = 0.8,
+): void {
+  if (parties.length <= 1) return;
+
+  // Calculate net change across all parties
+  let totalDelta = 0;
+  for (const party of parties) {
+    const start = startingApprovals.get(party.id) ?? party.approvalRating;
+    totalDelta += party.approvalRating - start;
+  }
+
+  // If net change is negligible, skip
+  if (Math.abs(totalDelta) < 0.05) return;
+
+  // Redistribute: subtract proportional share from each party based on current approval
+  const amountToRedistribute = totalDelta * redistributionRate;
+  const totalApproval = parties.reduce((sum, p) => sum + p.approvalRating, 0);
+
+  if (totalApproval <= 0) return;
+
+  for (const party of parties) {
+    const share = party.approvalRating / totalApproval;
+    party.approvalRating = clamp(
+      Math.round((party.approvalRating - amountToRedistribute * share) * 10) / 10,
+      1, 60,
+    );
   }
 }
 
