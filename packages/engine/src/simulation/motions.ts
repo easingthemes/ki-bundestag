@@ -1,9 +1,11 @@
 import type { Motion, Party, BillVote } from "@ki-bundestag/types";
+import {
+  MOTION_COALITION_YES_RATE, MOTION_OPPOSITION_YES_RATE, MOTION_CROSS_YES_RATE,
+  MOTION_PASSED_SENTIMENT, RESOLUTION_PASSED_SENTIMENT,
+} from "../config/index.js";
 
 /**
  * Algorithmic vote tally for motions/resolutions.
- * Same-party: always yes. Coalition alignment: 80% yes. Opposition alignment: 70% yes.
- * Cross-alignment: 80% no.
  */
 export function tallyMotionVotes(
   motion: Motion,
@@ -26,16 +28,13 @@ export function tallyMotionVotes(
       vote = "yes";
       reason = "Eigener Antrag";
     } else if (coalitionParties.includes(party.id) && proposerIsCoalition) {
-      // Coalition on coalition motion: 80% yes
-      vote = Math.random() < 0.8 ? "yes" : "no";
+      vote = Math.random() < MOTION_COALITION_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Koalitionsunterstützung" : "Abweichende Position";
     } else if (!coalitionParties.includes(party.id) && !proposerIsCoalition) {
-      // Opposition on opposition motion: 70% yes
-      vote = Math.random() < 0.7 ? "yes" : "no";
+      vote = Math.random() < MOTION_OPPOSITION_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Gemeinsame Oppositionslinie" : "Unterschiedliche Prioritäten";
     } else {
-      // Cross-alignment: 80% no
-      vote = Math.random() < 0.2 ? "yes" : "no";
+      vote = Math.random() < MOTION_CROSS_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Sachlich überzeugend" : "Politisch nicht tragbar";
     }
 
@@ -54,5 +53,5 @@ export function tallyMotionVotes(
  */
 export function motionSentimentImpact(motion: Motion): number {
   if (motion.status !== "passed") return 0;
-  return motion.type === "motion" ? 0.3 : 0.2;
+  return motion.type === "motion" ? MOTION_PASSED_SENTIMENT : RESOLUTION_PASSED_SENTIMENT;
 }

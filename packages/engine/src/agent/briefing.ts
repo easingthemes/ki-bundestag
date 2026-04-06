@@ -16,24 +16,7 @@ import type { Provider } from "./model-config.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
 
-/** Significant event types for the briefing. */
-const BRIEFING_EVENT_TYPES = new Set([
-  "bill_passed",
-  "bill_rejected",
-  "bill_proposed",
-  "crisis_start",
-  "crisis_end",
-  "election_announced",
-  "election_result",
-  "government_formed",
-  "negotiation_complete",
-  "statement",
-  "confidence_vote_result",
-  "constitutional_court_ruling",
-  "presidential_veto",
-  "budget_passed",
-  "budget_rejected",
-]);
+import { BRIEFING_EVENT_TYPES, BRIEFING_SYSTEM_PROMPT } from "../config/index.js";
 
 /**
  * Query the last N days of significant events from the DB.
@@ -162,16 +145,7 @@ EVENTS — LAST 7 DAYS:
 ${recentStr}${olderSection}`;
 }
 
-const BRIEFING_SYSTEM_PROMPT = `You are a senior political analyst at the Bundestag. Write a concise daily briefing for party leaders summarizing the current political landscape. Write the briefing in German.
-
-Your briefing must be FACTUAL — summarize only what happened, the current state, and emerging dynamics. Do not invent events.
-
-FORMAT (respond with ONLY valid JSON, all text in German):
-{
-  "narrative": "<2-3 Sätze: Was ist die politische Geschichte gerade? Welche Dynamiken prägen die Entscheidungen?>",
-  "tensions": "<1-2 Sätze: Was sind die Hauptkonflikte oder offenen Fragen zwischen den Parteien?>",
-  "outlook": "<1 Satz: Worauf sollten Parteivorsitzende in den nächsten Tagen achten?>"
-}`;
+// BRIEFING_SYSTEM_PROMPT imported from config
 
 /**
  * Build a BatchRequest for the daily briefing, or null if too early (day 1-2).

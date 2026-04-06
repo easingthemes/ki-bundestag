@@ -8,6 +8,11 @@
  */
 
 import { getSqlite } from "../db/connection.js";
+import {
+  BATCH_PRICING,
+  STANDARD_PRICING,
+  DEFAULT_PRICING,
+} from "../config/index.js";
 
 // ---------------------------------------------------------------------------
 // Pricing (per token, not per million)
@@ -18,22 +23,9 @@ interface PricingTier {
   output: number;  // cost per token
 }
 
-/** Batch pricing for Anthropic models (50% of standard). */
-const BATCH_PRICING: Record<string, PricingTier> = {
-  "claude-haiku-4-5-20251001": { input: 0.40e-6, output: 1.00e-6 },
-  "claude-sonnet-4-5-20250929": { input: 1.50e-6, output: 5.00e-6 },
-};
-
-/** Standard (non-batch) pricing. */
-const STANDARD_PRICING: Record<string, PricingTier> = {
-  "claude-haiku-4-5-20251001": { input: 0.80e-6, output: 4.00e-6 },
-  "claude-sonnet-4-5-20250929": { input: 3.00e-6, output: 15.00e-6 },
-  "grok-3-mini": { input: 0.30e-6, output: 0.50e-6 },
-};
-
 function getPricing(model: string, isBatch: boolean): PricingTier {
   if (isBatch && BATCH_PRICING[model]) return BATCH_PRICING[model];
-  return STANDARD_PRICING[model] ?? { input: 1.00e-6, output: 4.00e-6 }; // conservative default
+  return STANDARD_PRICING[model] ?? DEFAULT_PRICING;
 }
 
 export function calculateCost(

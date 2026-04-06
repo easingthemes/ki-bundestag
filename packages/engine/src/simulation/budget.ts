@@ -1,26 +1,21 @@
 import type { BudgetAllocations, BudgetVote, BillImpact, EconomyState, Party, Bill } from "@ki-bundestag/types";
+import {
+  BUDGET_TOTAL, PARTY_MINISTRY_WEIGHTS, BUDGET_REVISION_CENTRIST_SHIFT,
+  BUDGET_VOTE_TIERS, BUDGET_REVISION_BOOST,
+  BUDGET_LABOUR_HEALTH_THRESHOLD, BUDGET_LABOUR_HEALTH_UNEMPLOYMENT_EFFECT,
+  BUDGET_FINANCE_INFRA_THRESHOLD, BUDGET_FINANCE_INFRA_GDP_EFFECT,
+  BUDGET_ENVIRONMENT_THRESHOLD, BUDGET_ENVIRONMENT_INFLATION_EFFECT,
+  BUDGET_DEFENCE_THRESHOLD, BUDGET_DEFENCE_GDP_EFFECT,
+  VETO_BASE_PROBABILITY, VETO_SENTIMENT_THRESHOLD, VETO_SENTIMENT_BONUS,
+  VETO_BUDGET_THRESHOLD, VETO_BUDGET_BONUS, VETO_GDP_THRESHOLD, VETO_GDP_BONUS,
+  VETO_REASONS,
+} from "../config/index.js";
 
-export const BUDGET_TOTAL = 300; // billion EUR
-
-const PARTY_MINISTRY_WEIGHTS: Record<string, BudgetAllocations> = {
-  spd:    { finance: 0.10, labour: 0.22, environment: 0.13, interior: 0.07, defence: 0.10, education: 0.14, health: 0.17, infrastructure: 0.07 },
-  cdu:    { finance: 0.15, labour: 0.13, environment: 0.08, interior: 0.12, defence: 0.15, education: 0.13, health: 0.12, infrastructure: 0.12 },
-  gruene: { finance: 0.08, labour: 0.14, environment: 0.22, interior: 0.06, defence: 0.06, education: 0.16, health: 0.16, infrastructure: 0.12 },
-  fdp:    { finance: 0.20, labour: 0.10, environment: 0.10, interior: 0.08, defence: 0.12, education: 0.14, health: 0.10, infrastructure: 0.16 },
-  afd:    { finance: 0.12, labour: 0.12, environment: 0.05, interior: 0.18, defence: 0.22, education: 0.10, health: 0.12, infrastructure: 0.09 },
-  linke:  { finance: 0.07, labour: 0.25, environment: 0.14, interior: 0.05, defence: 0.05, education: 0.15, health: 0.20, infrastructure: 0.09 },
-};
+// Re-export for external consumers
+export { BUDGET_TOTAL } from "../config/index.js";
 
 const MINISTRY_KEYS: (keyof BudgetAllocations)[] = [
   "finance", "labour", "environment", "interior", "defence", "education", "health", "infrastructure",
-];
-
-const VETO_REASONS = [
-  "The Bundespräsident has expressed constitutional concerns about this legislation.",
-  "The federal president cites disproportionate economic risks to the Mittelstand.",
-  "The Bundespräsident questions the compatibility of this law with fundamental rights.",
-  "The federal president finds the legislation lacks sufficient democratic legitimacy.",
-  "The Bundespräsident declines to sign, citing procedural irregularities in the legislative process.",
 ];
 
 /**
@@ -71,15 +66,18 @@ export function tallyBudgetVote(
   noSeats: number;
   passed: boolean;
 } {
-  let coalitionYesRate: number;
-  let oppositionYesRate: number;
+  let coalitionYesRate: number = BUDGET_VOTE_TIERS[BUDGET_VOTE_TIERS.length - 1][1];
+  let oppositionYesRate: number = BUDGET_VOTE_TIERS[BUDGET_VOTE_TIERS.length - 1][2];
 
-  if (publicSentiment > 55)      { coalitionYesRate = 0.97; oppositionYesRate = 0.05; }
-  else if (publicSentiment > 40) { coalitionYesRate = 0.90; oppositionYesRate = 0.10; }
-  else if (publicSentiment > 25) { coalitionYesRate = 0.82; oppositionYesRate = 0.15; }
-  else                           { coalitionYesRate = 0.72; oppositionYesRate = 0.20; }
+  for (const [floor, coalRate, oppRate] of BUDGET_VOTE_TIERS) {
+    if (publicSentiment > floor) {
+      coalitionYesRate = coalRate;
+      oppositionYesRate = oppRate;
+      break;
+    }
+  }
 
-  if (isRevision) coalitionYesRate = Math.min(0.99, coalitionYesRate + 0.05);
+  if (isRevision) coalitionYesRate = Math.min(0.99, coalitionYesRate + BUDGET_REVISION_BOOST);
 
   const votes: BudgetVote[] = [];
   let yesSeats = 0;
@@ -104,9 +102,10 @@ export function tallyBudgetVote(
 export function generateRevisedAllocations(coalitionParties: Party[]): BudgetAllocations {
   const base = generateBudgetAllocations(coalitionParties);
   const equalShare = BUDGET_TOTAL / 8;
+  const shift = BUDGET_REVISION_CENTRIST_SHIFT;
   const result = {} as BudgetAllocations;
   for (const k of MINISTRY_KEYS) {
-    result[k] = Math.round((base[k] * 0.97 + equalShare * 0.03) * 10) / 10;
+    result[k] = Math.round((base[k] * (1 - shift) + equalShare * shift) * 10) / 10;
   }
   return result;
 }
@@ -128,24 +127,24 @@ export function applyBudgetEconomicEffect(
   const environmentShare = allocations.environment / BUDGET_TOTAL;
   const defenceShare = allocations.defence / BUDGET_TOTAL;
 
-  if (labourShare + healthShare > 0.30) {
-    newEconomy.unemployment = clamp(Math.round((newEconomy.unemployment - 0.03) * 100) / 100, 0, 20);
-    effect.unemployment = -0.03;
+  if (labourShare + healthShare > BUDGET_LABOUR_HEALTH_THRESHOLD) {
+    newEconomy.unemployment = clamp(Math.round((newEconomy.unemployment + BUDGET_LABOUR_HEALTH_UNEMPLOYMENT_EFFECT) * 100) / 100, 0, 20);
+    effect.unemployment = BUDGET_LABOUR_HEALTH_UNEMPLOYMENT_EFFECT;
   }
 
-  if (financeShare + infrastructureShare > 0.25) {
-    newEconomy.gdpGrowth = clamp(Math.round((newEconomy.gdpGrowth + 0.03) * 100) / 100, -5, 10);
-    effect.gdpGrowth = 0.03;
+  if (financeShare + infrastructureShare > BUDGET_FINANCE_INFRA_THRESHOLD) {
+    newEconomy.gdpGrowth = clamp(Math.round((newEconomy.gdpGrowth + BUDGET_FINANCE_INFRA_GDP_EFFECT) * 100) / 100, -5, 10);
+    effect.gdpGrowth = BUDGET_FINANCE_INFRA_GDP_EFFECT;
   }
 
-  if (environmentShare > 0.12) {
-    newEconomy.inflation = clamp(Math.round((newEconomy.inflation - 0.02) * 100) / 100, 0, 20);
-    effect.inflation = -0.02;
+  if (environmentShare > BUDGET_ENVIRONMENT_THRESHOLD) {
+    newEconomy.inflation = clamp(Math.round((newEconomy.inflation + BUDGET_ENVIRONMENT_INFLATION_EFFECT) * 100) / 100, 0, 20);
+    effect.inflation = BUDGET_ENVIRONMENT_INFLATION_EFFECT;
   }
 
-  if (defenceShare > 0.18) {
-    newEconomy.gdpGrowth = clamp(Math.round((newEconomy.gdpGrowth + 0.02) * 100) / 100, -5, 10);
-    effect.gdpGrowth = (effect.gdpGrowth ?? 0) + 0.02;
+  if (defenceShare > BUDGET_DEFENCE_THRESHOLD) {
+    newEconomy.gdpGrowth = clamp(Math.round((newEconomy.gdpGrowth + BUDGET_DEFENCE_GDP_EFFECT) * 100) / 100, -5, 10);
+    effect.gdpGrowth = (effect.gdpGrowth ?? 0) + BUDGET_DEFENCE_GDP_EFFECT;
   }
 
   return { economy: newEconomy, effect };
@@ -156,11 +155,11 @@ export function applyBudgetEconomicEffect(
  */
 export function shouldPresidentVeto(bill: Bill): { veto: boolean; reason: string } {
   const impact = bill.impact as BillImpact | undefined;
-  let prob = 0.01;
+  let prob = VETO_BASE_PROBABILITY;
 
-  if (Math.abs(impact?.publicSentiment ?? 0) > 1.5) prob += 0.02;
-  if (Math.abs(impact?.budget ?? 0) > 2) prob += 0.02;
-  if (Math.abs(impact?.gdpGrowth ?? 0) > 0.15) prob += 0.01;
+  if (Math.abs(impact?.publicSentiment ?? 0) > VETO_SENTIMENT_THRESHOLD) prob += VETO_SENTIMENT_BONUS;
+  if (Math.abs(impact?.budget ?? 0) > VETO_BUDGET_THRESHOLD) prob += VETO_BUDGET_BONUS;
+  if (Math.abs(impact?.gdpGrowth ?? 0) > VETO_GDP_THRESHOLD) prob += VETO_GDP_BONUS;
 
   const veto = Math.random() < prob;
   const reason = VETO_REASONS[Math.floor(Math.random() * VETO_REASONS.length)];

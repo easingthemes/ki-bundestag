@@ -6,11 +6,10 @@ import { eq } from "drizzle-orm";
 import { TIME_CONFIG } from "./timing.js";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
-
-const VALID_CATEGORIES = [
-  "economy", "social", "environment", "immigration",
-  "defense", "education", "healthcare", "infrastructure",
-];
+import {
+  REFERENDUM_ACTIVE_DAYS, REFERENDUM_MIN_VOTES,
+  REFERENDUM_SYSTEM, REFERENDUM_VALID_CATEGORIES as VALID_CATEGORIES,
+} from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -49,27 +48,7 @@ export async function maybeGenerateReferendum(
   const t0 = Date.now();
   try {
     const { text, model, provider } = await callAI({
-      system: `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
-
-RESPONSE SCHEMA:
-{
-  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
-  "description": "<1-2 sentence context paragraph>",
-  "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
-  "impact": {
-    "budget": <number -2 to 2, optional>,
-    "unemployment": <number -0.5 to 0.5, optional>,
-    "inflation": <number -0.3 to 0.3, optional>,
-    "gdpGrowth": <number -0.3 to 0.3, optional>,
-    "publicSentiment": <number -3 to 3, optional>
-  }
-}
-
-Rules:
-- The referendum should be relevant to the current political context
-- Title should be a yes/no question
-- Impact values represent what happens if the referendum passes
-- Keep it realistic for German politics`,
+      system: REFERENDUM_SYSTEM,
       prompt: `Current political context:\n${context.join("\n")}\n\nGenerate a referendum topic for day ${currentDay}.`,
       maxTokens: 512,
       roleKey: "daily",
@@ -105,7 +84,7 @@ Rules:
       options: ["Yes", "No"],
       votes: { Yes: 0, No: 0 },
       createdOnDay: currentDay,
-      closesOnDay: currentDay + 14,
+      closesOnDay: currentDay + REFERENDUM_ACTIVE_DAYS,
       status: "active",
       result: null,
       impact: parsed.impact || null,
@@ -157,7 +136,7 @@ export function resolveExpiredReferendums(
     let status: "passed" | "rejected" | "expired";
     let result: string | null = null;
 
-    if (totalVotes < 10) {
+    if (totalVotes < REFERENDUM_MIN_VOTES) {
       // Not enough votes — expired
       status = "expired";
       console.log(`  [Referendums] Expired (insufficient votes): "${row.title}" (${totalVotes} votes)`);
@@ -221,27 +200,7 @@ export function resolveExpiredReferendums(
 // Batch variants
 // ---------------------------------------------------------------------------
 
-const REFERENDUM_SYSTEM = `You create referendum topics for a German political simulation. Respond with ONLY valid JSON.
-
-RESPONSE SCHEMA:
-{
-  "title": "<short referendum title, e.g. 'Should Germany increase defense spending to 3% of GDP?'>",
-  "description": "<1-2 sentence context paragraph>",
-  "category": "economy" | "social" | "environment" | "immigration" | "defense" | "education" | "healthcare" | "infrastructure",
-  "impact": {
-    "budget": <number -2 to 2, optional>,
-    "unemployment": <number -0.5 to 0.5, optional>,
-    "inflation": <number -0.3 to 0.3, optional>,
-    "gdpGrowth": <number -0.3 to 0.3, optional>,
-    "publicSentiment": <number -3 to 3, optional>
-  }
-}
-
-Rules:
-- The referendum should be relevant to the current political context
-- Title should be a yes/no question
-- Impact values represent what happens if the referendum passes
-- Keep it realistic for German politics`;
+// REFERENDUM_SYSTEM imported from config
 
 /**
  * Build a BatchRequest for referendum generation, or null if not applicable.
@@ -323,7 +282,7 @@ export function processReferendumBatchResult(
     options: ["Yes", "No"],
     votes: { Yes: 0, No: 0 },
     createdOnDay: currentDay,
-    closesOnDay: currentDay + 14,
+    closesOnDay: currentDay + REFERENDUM_ACTIVE_DAYS,
     status: "active",
     result: null,
     impact: parsed.impact || null,

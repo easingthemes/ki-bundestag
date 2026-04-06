@@ -2,46 +2,15 @@ import { eq } from "drizzle-orm";
 import type { Government, Minister, MinistryPortfolio, Party, BillCategory } from "@ki-bundestag/types";
 import { getDb, schema } from "../db/index.js";
 import { FRAKTION_LEADERS } from "./fraktionen.js";
+import {
+  MINISTER_CANDIDATES,
+  MINISTRY_NAMES,
+  MINISTRY_TO_CATEGORY,
+  MINISTRY_PORTFOLIOS,
+} from "../config/index.js";
 
-/** 3-4 real German politicians per party who could serve as ministers */
-export const MINISTER_CANDIDATES: Record<string, string[]> = {
-  spd: ["Karl Lauterbach", "Nancy Faeser", "Hubertus Heil", "Svenja Schulze"],
-  cdu: ["Jens Spahn", "Julia Klöckner", "Norbert Röttgen", "Annegret Kramp-Karrenbauer"],
-  gruene: ["Robert Habeck", "Annalena Baerbock", "Steffi Lemke", "Cem Özdemir"],
-  fdp: ["Christian Lindner", "Marco Buschmann", "Bettina Stark-Watzinger", "Volker Wissing"],
-  afd: ["Tino Chrupalla", "Stephan Brandner", "Beatrix von Storch", "Gottfried Curio"],
-  linke: ["Gregor Gysi", "Janine Wissler", "Sahra Wagenknecht", "Klaus Ernst"],
-};
-
-/** Display names for each ministry */
-export const MINISTRY_NAMES: Record<MinistryPortfolio, string> = {
-  finance: "Bundesministerium der Finanzen",
-  labour: "Bundesministerium für Arbeit und Soziales",
-  environment: "Bundesministerium für Umwelt",
-  interior: "Bundesministerium des Innern",
-  defence: "Bundesministerium der Verteidigung",
-  education: "Bundesministerium für Bildung und Forschung",
-  health: "Bundesministerium für Gesundheit",
-  infrastructure: "Bundesministerium für Digitales und Verkehr",
-};
-
-/** Maps ministry portfolio to corresponding BillCategory */
-export const MINISTRY_TO_CATEGORY: Record<MinistryPortfolio, BillCategory> = {
-  finance: "economy",
-  labour: "social",
-  environment: "environment",
-  interior: "immigration",
-  defence: "defense",
-  education: "education",
-  health: "healthcare",
-  infrastructure: "infrastructure",
-};
-
-/** Ordered list of portfolio keys — leader party gets finance first */
-export const MINISTRY_PORTFOLIOS: MinistryPortfolio[] = [
-  "finance", "labour", "environment", "interior",
-  "defence", "education", "health", "infrastructure",
-];
+// Re-export for external consumers
+export { MINISTER_CANDIDATES, MINISTRY_NAMES, MINISTRY_PORTFOLIOS, MINISTRY_TO_CATEGORY } from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);

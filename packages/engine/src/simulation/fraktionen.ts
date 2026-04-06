@@ -1,18 +1,10 @@
 import { eq } from "drizzle-orm";
 import type { Fraktion, Party, SimulationEvent } from "@ki-bundestag/types";
 import { getDb, getSqlite, schema } from "../db/index.js";
+import { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../config/index.js";
 
-export const FRAKTION_LEADERS: Record<string, string> = {
-  spd: "Lars Klingbeil",
-  cdu: "Friedrich Merz",
-  gruene: "Katharina Dröge",
-  fdp: "Christian Dürr",
-  afd: "Alice Weidel",
-  linke: "Dietmar Bartsch",
-};
-
-/** 5% of 735 seats = 36.75, rounded up */
-export const FRAKTION_THRESHOLD = 37;
+// Re-export for external consumers
+export { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);

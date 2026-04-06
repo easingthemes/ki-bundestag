@@ -1,44 +1,11 @@
 import type { BillImpact, EconomyState } from "@ki-bundestag/types";
-
-// Mean-reversion baselines (realistic German economy 2025-2026)
-const BASELINES = {
-  budget: 45,          // ~45B EUR
-  unemployment: 5.0,   // ~5% (OECD/Bundesagentur)
-  inflation: 2.0,      // ~2% (ECB target)
-  gdpGrowth: 0.8,      // ~0.8% (EU Commission forecast)
-};
-
-// Daily reversion rate toward baseline
-const REVERSION = {
-  budget: 0.01,        // 1%/day
-  unemployment: 0.02,  // 2%/day
-  inflation: 0.02,     // 2%/day
-  gdpGrowth: 0.03,     // 3%/day
-};
-
-// Random drift magnitude per day
-const DRIFT = {
-  budget: 0.15,        // was 0.3
-  unemployment: 0.02,  // was 0.05
-  inflation: 0.015,    // was 0.03
-  gdpGrowth: 0.008,    // was 0.02
-};
-
-// Realistic caps
-const CAPS = {
-  budget: [-20, 100] as [number, number],
-  unemployment: [2.5, 20] as [number, number],
-  inflation: [0, 10] as [number, number],
-  gdpGrowth: [-3, 4] as [number, number],
-};
-
-// Max bill impact per indicator (clamp AI proposals)
-const BILL_IMPACT_CAPS = {
-  budget: 3,
-  unemployment: 0.3,
-  inflation: 0.2,
-  gdpGrowth: 0.2,
-};
+import {
+  ECONOMY_BASELINES as BASELINES,
+  ECONOMY_REVERSION as REVERSION,
+  ECONOMY_DRIFT as DRIFT,
+  ECONOMY_CAPS as CAPS,
+  BILL_IMPACT_CAPS,
+} from "../config/index.js";
 
 // Apply mean-reversion + small random noise each day
 export function applyEconomicDrift(economy: EconomyState): EconomyState {
