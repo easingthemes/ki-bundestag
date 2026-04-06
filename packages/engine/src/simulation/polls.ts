@@ -5,6 +5,7 @@ import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
+import { POLL_ACTIVE_DAYS, POLL_WINNER_APPROVAL_BOOST, CONTEXT_POLL_SYSTEM } from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -20,7 +21,7 @@ function createPartyPreferencePoll(parties: Party[], currentDay: number): Poll {
     options: parties.map(p => p.name),
     votes: Object.fromEntries(parties.map(p => [p.name, 0])),
     createdOnDay: currentDay,
-    expiresOnDay: currentDay + 14,
+    expiresOnDay: currentDay + POLL_ACTIVE_DAYS,
     active: true,
     category: "party_preference",
   };
@@ -48,19 +49,7 @@ async function createContextPoll(
   const t0 = Date.now();
   try {
     const { text, model, provider } = await callAI({
-      system: `You create opinion poll questions for a German political simulation. Respond with ONLY valid JSON.
-
-RESPONSE SCHEMA:
-{
-  "question": "<poll question about current political topic>",
-  "options": ["<option 1>", "<option 2>", "<option 3>"],
-  "category": "policy" | "crisis" | "general"
-}
-
-Rules:
-- Question should be relevant to the current political context
-- Provide 3 clear, distinct options
-- Keep it concise and politically neutral`,
+      system: CONTEXT_POLL_SYSTEM,
       prompt: `Current political context:\n${context.join("\n")}\n\nGenerate an opinion poll question.`,
       maxTokens: 512,
       roleKey: "daily",
@@ -95,7 +84,7 @@ Rules:
       options: parsed.options,
       votes: Object.fromEntries(parsed.options.map((o: string) => [o, 0])),
       createdOnDay: currentDay,
-      expiresOnDay: currentDay + 14,
+      expiresOnDay: currentDay + POLL_ACTIVE_DAYS,
       active: true,
       category: parsed.category,
     };
@@ -183,8 +172,8 @@ export function resolveExpiredPolls(
         const topOption = entries[0][0];
         const topParty = parties.find(p => p.name === topOption);
         if (topParty) {
-          topParty.approvalRating = Math.min(60, Math.round((topParty.approvalRating + 0.3) * 10) / 10);
-          console.log(`  [Polls] ${topParty.name} gets +0.3 approval from poll results`);
+          topParty.approvalRating = Math.min(60, Math.round((topParty.approvalRating + POLL_WINNER_APPROVAL_BOOST) * 10) / 10);
+          console.log(`  [Polls] ${topParty.name} gets +${POLL_WINNER_APPROVAL_BOOST} approval from poll results`);
         }
       }
 
@@ -199,19 +188,7 @@ export function resolveExpiredPolls(
 // Batch variants
 // ---------------------------------------------------------------------------
 
-const CONTEXT_POLL_SYSTEM = `You create opinion poll questions for a German political simulation. Respond with ONLY valid JSON.
-
-RESPONSE SCHEMA:
-{
-  "question": "<poll question about current political topic>",
-  "options": ["<option 1>", "<option 2>", "<option 3>"],
-  "category": "policy" | "crisis" | "general"
-}
-
-Rules:
-- Question should be relevant to the current political context
-- Provide 3 clear, distinct options
-- Keep it concise and politically neutral`;
+// CONTEXT_POLL_SYSTEM imported from config
 
 /**
  * Build a BatchRequest for a context poll, or null if no context.
@@ -281,7 +258,7 @@ export function processContextPollBatchResult(
     options: parsed.options,
     votes: Object.fromEntries(parsed.options.map((o: string) => [o, 0])),
     createdOnDay: currentDay,
-    expiresOnDay: currentDay + 14,
+    expiresOnDay: currentDay + POLL_ACTIVE_DAYS,
     active: true,
     category: parsed.category,
   };

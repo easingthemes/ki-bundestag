@@ -2,22 +2,8 @@ import type { Party } from "@ki-bundestag/types";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
-
-const VALID_MOODS = [
-  "Stabile Mehrheit", "Koalitionsreibung", "Politischer Druck",
-  "Krisenreaktion", "Wahlkampf", "Haushaltsstreit", "Regierungswechsel",
-];
-
-const SIGNIFICANT = new Set([
-  "bill_passed", "bill_rejected", "presidential_veto",
-  "bill_committee_rejected",
-  "constitutional_court_ruled", "confidence_vote_passed", "confidence_vote_failed",
-  "government_formed", "government_cabinet_formed", "government_dissolved",
-  "election_announced", "election_result", "negotiation_complete",
-  "crisis_start", "crisis_end",
-  "budget_passed", "budget_rejected", "provisional_budget_started", "budget_revision_rejected",
-  "motion_passed",
-]);
+import { VALID_MOODS, SUMMARY_SYSTEM_PROMPT } from "../config/index.js";
+import { SUMMARY_SIGNIFICANT_TYPES as SIGNIFICANT } from "../config/index.js";
 
 /**
  * Build a BatchRequest for the daily summary.
@@ -54,7 +40,7 @@ Das mood-Feld MUSS exakt einer der 7 oben genannten Werte sein.`;
 
   return {
     customId: `summary-day${day}`,
-    system: "Du bist ein prägnanter deutscher Politikjournalist. Antworte NUR mit validem JSON.",
+    system: SUMMARY_SYSTEM_PROMPT,
     prompt,
     maxTokens: 320,
     roleKey: "daily",

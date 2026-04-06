@@ -1,36 +1,39 @@
 import { and, count, eq, gte } from "drizzle-orm";
 import type { AgentAction, BillImpact, Party } from "@ki-bundestag/types";
 import { getUserDb, schema } from "../db/index.js";
-
-const SENTIMENT_MIN = 5;
-const SENTIMENT_MAX = 75;
-const SENTIMENT_BASELINE = 45;
-const SENTIMENT_REVERSION_RATE = 0.03;
+import {
+  SENTIMENT_MIN, SENTIMENT_MAX, SENTIMENT_BASELINE, SENTIMENT_REVERSION_RATE,
+  SENTIMENT_DRIFT_NOISE, BILL_SENTIMENT_CAP,
+  APPROVAL_MIN, APPROVAL_MAX, APPROVAL_DRIFT_NOISE,
+  BILL_PASS_APPROVAL, BILL_REJECT_APPROVAL,
+  INACTIVITY_GRACE_DAYS, INACTIVITY_BASE_PENALTY, INACTIVITY_MAX_PENALTY, INACTIVITY_SCALE,
+  ACTIVITY_BONUS,
+  MEMBERSHIP_BONUS_CAP, MEMBERSHIP_BONUS_SCALE, MEMBERSHIP_BONUS_RATE, MEMBERSHIP_ACTIVE_WINDOW_DAYS,
+} from "../config/index.js";
 
 // Update approval ratings based on party actions
 export function updateApproval(party: Party, delta: number): number {
   const newRating = party.approvalRating + delta;
-  return clamp(Math.round(newRating * 10) / 10, 1, 60);
+  return clamp(Math.round(newRating * 10) / 10, APPROVAL_MIN, APPROVAL_MAX);
 }
 
 // Bills passing/failing affects proposer approval
 export function approvalFromBillOutcome(passed: boolean, isProposer: boolean): number {
   if (!isProposer) return 0;
-  return passed ? 0.3 : -0.2;
+  return passed ? BILL_PASS_APPROVAL : BILL_REJECT_APPROVAL;
 }
 
 // Update public sentiment based on bill impacts (clamped to realistic range)
 export function updateSentiment(currentSentiment: number, impact: BillImpact): number {
-  // Cap the per-bill sentiment swing to ±2 to prevent AI from gaming the system
   const rawDelta = impact.publicSentiment ?? 0;
-  const delta = clamp(rawDelta, -2, 2);
+  const delta = clamp(rawDelta, -BILL_SENTIMENT_CAP, BILL_SENTIMENT_CAP);
   return clamp(Math.round((currentSentiment + delta) * 10) / 10, SENTIMENT_MIN, SENTIMENT_MAX);
 }
 
 // Daily sentiment drift — mean-reverts toward baseline + small random noise
 export function applySentimentDrift(currentSentiment: number): number {
   const reversionPull = (SENTIMENT_BASELINE - currentSentiment) * SENTIMENT_REVERSION_RATE;
-  const noise = (Math.random() - 0.5) * 0.4; // was 0.6 — tighter daily noise
+  const noise = (Math.random() - 0.5) * SENTIMENT_DRIFT_NOISE;
   return clamp(
     Math.round((currentSentiment + reversionPull + noise) * 10) / 10,
     SENTIMENT_MIN,
@@ -40,8 +43,8 @@ export function applySentimentDrift(currentSentiment: number): number {
 
 // Small random drift in approval each day
 export function applyApprovalDrift(party: Party): number {
-  const drift = (Math.random() - 0.5) * 0.4;
-  return clamp(Math.round((party.approvalRating + drift) * 10) / 10, 1, 60);
+  const drift = (Math.random() - 0.5) * APPROVAL_DRIFT_NOISE;
+  return clamp(Math.round((party.approvalRating + drift) * 10) / 10, APPROVAL_MIN, APPROVAL_MAX);
 }
 
 /**
@@ -50,21 +53,9 @@ export function applyApprovalDrift(party: Party): number {
  */
 export function membershipBonus(activeMembers: number): number {
   if (activeMembers <= 0) return 0;
-  const bonus = Math.min(5, Math.log10(activeMembers + 1) * 2.5);
-  return Math.round(bonus * 0.01 * 100) / 100; // e.g. 2.6 → 0.026
+  const bonus = Math.min(MEMBERSHIP_BONUS_CAP, Math.log10(activeMembers + 1) * MEMBERSHIP_BONUS_SCALE);
+  return Math.round(bonus * MEMBERSHIP_BONUS_RATE * 100) / 100;
 }
-
-// ── Inactivity penalty ──────────────────────────────────────────────
-// Grace period before penalty kicks in (parliamentary recesses are normal)
-const INACTIVITY_GRACE_DAYS = 5;
-// Base penalty per day once grace period expires
-const INACTIVITY_BASE_PENALTY = 0.05;
-// Maximum daily penalty (reached after ~55 consecutive inactive days)
-const INACTIVITY_MAX_PENALTY = 0.15;
-// Scaling factor: penalty grows as 0.05 + days * 0.002, capped at 0.15
-const INACTIVITY_SCALE = 0.002;
-// Activity resets inactivity counter but no longer gives free approval
-const ACTIVITY_BONUS = 0;
 
 /**
  * Determine whether a party was meaningfully active on a given day.
@@ -101,7 +92,7 @@ export function applyDailyApprovalDrift(
   parties: Party[],
   actionsMap?: Map<string, AgentAction[]>,
 ): void {
-  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+  const TWO_WEEKS_MS = MEMBERSHIP_ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   for (const party of parties) {
     party.approvalRating = applyApprovalDrift(party);
 
@@ -113,7 +104,7 @@ export function applyDailyApprovalDrift(
         // Small reward for being active
         party.approvalRating = clamp(
           Math.round((party.approvalRating + ACTIVITY_BONUS) * 10) / 10,
-          1, 60,
+          APPROVAL_MIN, APPROVAL_MAX,
         );
       } else {
         party.inactiveDays = (party.inactiveDays ?? 0) + 1;
@@ -121,7 +112,7 @@ export function applyDailyApprovalDrift(
         if (penalty > 0) {
           party.approvalRating = clamp(
             Math.round((party.approvalRating - penalty) * 10) / 10,
-            1, 60,
+            APPROVAL_MIN, APPROVAL_MAX,
           );
         }
       }
@@ -137,7 +128,7 @@ export function applyDailyApprovalDrift(
         .get()?.cnt ?? 0;
       if (activeCount > 0) {
         const bonus = membershipBonus(activeCount);
-        party.approvalRating = Math.max(1, Math.min(60,
+        party.approvalRating = Math.max(APPROVAL_MIN, Math.min(APPROVAL_MAX,
           Math.round((party.approvalRating + bonus) * 10) / 10,
         ));
       }

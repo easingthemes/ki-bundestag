@@ -5,33 +5,17 @@ import { safeParseJson, logAICall } from "../agent/ai-json.js";
 import { getDb, schema } from "../db/index.js";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
+import {
+  MEDIA_OUTLETS as OUTLETS,
+  NEWSWORTHY_TYPES,
+  MEDIA_SENTIMENT_SCALE, MEDIA_SENTIMENT_PER_ARTICLE_CAP, MEDIA_SENTIMENT_DAILY_CAP,
+  MEDIA_DAILY_ARTICLE_CAP, MEDIA_CATEGORY_SENTIMENT,
+  MEDIA_SYSTEM_PROMPT,
+} from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
-
-const OUTLETS = [
-  { name: "Berliner Tagesspiegel", bias: "center" },
-  { name: "Volksstimme", bias: "left" },
-  { name: "Wirtschaftswoche", bias: "right" },
-  { name: "Süddeutsche Zeitung", bias: "center-left" },
-  { name: "Frankfurter Allgemeine", bias: "center-right" },
-  { name: "taz", bias: "left" },
-] as const;
-
-const NEWSWORTHY_TYPES = new Set([
-  "bill_passed",
-  "bill_rejected",
-  "crisis_start",
-  "crisis_end",
-  "election_announced",
-  "election_campaign",
-  "election_result",
-  "government_formed",
-  "negotiation_complete",
-  "statement",
-  "sidejob_scandal",
-]);
 
 /**
  * Load the most recent media articles for agent context.
@@ -63,22 +47,12 @@ export function mediaSentimentImpact(articles: Array<{ category: string; sentime
   let delta = 0;
   for (const a of articles) {
     if (typeof a.sentiment === "number") {
-      // AI-provided sentiment: -1.0 to +1.0, scaled to ±0.2
-      delta += Math.max(-0.2, Math.min(0.2, a.sentiment * 0.2));
+      delta += Math.max(-MEDIA_SENTIMENT_PER_ARTICLE_CAP, Math.min(MEDIA_SENTIMENT_PER_ARTICLE_CAP, a.sentiment * MEDIA_SENTIMENT_SCALE));
     } else {
-      // Fallback: category-based heuristic
-      if (a.category === "crisis") {
-        delta -= 0.2;
-      } else if (a.category === "opinion") {
-        delta -= 0.1; // opinion pieces tend to be critical
-      } else if (a.category === "election") {
-        delta -= 0.05; // election coverage creates uncertainty
-      } else if (a.category === "economy" || a.category === "policy") {
-        delta += 0.1;
-      }
+      delta += MEDIA_CATEGORY_SENTIMENT[a.category] ?? 0;
     }
   }
-  return Math.max(-0.5, Math.min(0.5, Math.round(delta * 10) / 10));
+  return Math.max(-MEDIA_SENTIMENT_DAILY_CAP, Math.min(MEDIA_SENTIMENT_DAILY_CAP, Math.round(delta * 10) / 10));
 }
 
 /**
@@ -114,7 +88,7 @@ export async function generateDailyMedia(
     const db = getDb();
     let inserted = 0;
 
-    for (const article of articles.slice(0, 3)) {
+    for (const article of articles.slice(0, MEDIA_DAILY_ARTICLE_CAP)) {
       const a = article as Record<string, unknown>;
       if (!a.headline || !a.summary || !a.content || !a.outlet) continue;
 
@@ -208,37 +182,7 @@ export function applyMediaSentimentFromArticles(
 // Batch variants
 // ---------------------------------------------------------------------------
 
-const MEDIA_SYSTEM_PROMPT = `You are a team of German political journalists writing for different news outlets. Each outlet has a distinct editorial bias that colors their coverage. Respond with ONLY valid JSON.
-
-OUTLETS (pick 2-3 from this list):
-- "Berliner Tagesspiegel" (center): Balanced, factual reporting with moderate analysis
-- "Volksstimme" (left): Focuses on social justice, workers' rights, inequality angles
-- "Wirtschaftswoche" (right): Focuses on business impact, fiscal responsibility, market effects
-- "Süddeutsche Zeitung" (center-left): In-depth political analysis, progressive-leaning
-- "Frankfurter Allgemeine" (center-right): Conservative, establishment perspective
-- "taz" (left): Critical, investigative, counter-establishment
-
-RESPONSE SCHEMA (JSON array of 2-3 articles):
-[
-  {
-    "headline": "<newspaper headline, punchy, max 100 chars>",
-    "summary": "<1-2 sentence summary>",
-    "content": "<2-3 paragraph article body>",
-    "outlet": "<exact outlet name from list above>",
-    "category": "policy" | "crisis" | "election" | "opinion" | "economy",
-    "sentiment": <number from -1.0 (very negative) to +1.0 (very positive), reflecting the article's tone>
-  }
-]
-
-Rules:
-- Write 2-3 articles covering the most important events of the day
-- Each article MUST be from a different outlet — vary which outlets you choose day to day
-- Headlines should be dramatic but realistic German political journalism style
-- Content should reflect the outlet's bias — critical outlets should write critical pieces
-- Not every day is good news: crises, vetoes, failed bills, and scandals should produce negative coverage
-- Write in German (all headlines, summaries, and article content must be in German)
-- Category should match the primary topic
-- Sentiment MUST honestly reflect whether the article is positive, negative, or neutral`;
+// MEDIA_SYSTEM_PROMPT imported from config
 
 /**
  * Build a BatchRequest for daily media generation, or null if no newsworthy events.
@@ -288,7 +232,7 @@ export function processMediaBatchResult(
   let inserted = 0;
   const parsed: Array<{ category: string; sentiment?: number }> = [];
 
-  for (const article of articles.slice(0, 3)) {
+  for (const article of articles.slice(0, MEDIA_DAILY_ARTICLE_CAP)) {
     const a = article as Record<string, unknown>;
     if (!a.headline || !a.summary || !a.content || !a.outlet) continue;
 

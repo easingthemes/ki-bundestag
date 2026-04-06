@@ -1,4 +1,10 @@
 import type { BillVote, Party, VoteChoice } from "@ki-bundestag/types";
+import {
+  MAJORITY_SEATS as MAJORITY_THRESHOLD,
+  VERTRAUENSFRAGE_COALITION_YES_RATE,
+  MISSTRAUENSVOTUM_OPPOSITION_YES_RATE,
+  CONFIDENCE_IMPACTS,
+} from "../config/index.js";
 
 export interface ConfidenceTallyResult {
   passed: boolean;
@@ -6,9 +12,6 @@ export interface ConfidenceTallyResult {
   noSeats: number;
   votes: BillVote[];
 }
-
-/** Absolute majority threshold in the 735-seat Bundestag */
-const MAJORITY_THRESHOLD = 368;
 
 /**
  * Vertrauensfrage: Chancellor requests confidence.
@@ -31,8 +34,7 @@ export function tallyVertrauensfrage(
     let vote: VoteChoice;
 
     if (isCoalition) {
-      // 10% defection risk makes drama possible
-      vote = Math.random() < 0.9 ? "yes" : "no";
+      vote = Math.random() < VERTRAUENSFRAGE_COALITION_YES_RATE ? "yes" : "no";
     } else {
       vote = "no";
     }
@@ -74,8 +76,7 @@ export function tallyMisstrauensvotum(
     if (party.id === proposingPartyId) {
       vote = "yes";
     } else if (!isCoalition) {
-      // Other opposition: 85% probability of supporting the vote
-      vote = Math.random() < 0.85 ? "yes" : "no";
+      vote = Math.random() < MISSTRAUENSVOTUM_OPPOSITION_YES_RATE ? "yes" : "no";
     } else {
       vote = "no";
     }
@@ -109,26 +110,20 @@ export function confidenceVoteSentimentImpact(
     let delta = 0;
 
     if (type === "vertrauensfrage") {
-      if (passed) {
-        delta = isCoalition ? 0.5 : -0.3;
-      } else {
-        // Government falls — coalition takes hit, opposition benefits
-        delta = isCoalition ? -2.0 : 1.0;
-      }
+      const impacts = passed ? CONFIDENCE_IMPACTS.vertrauensfrage.passed : CONFIDENCE_IMPACTS.vertrauensfrage.failed;
+      delta = isCoalition ? impacts.coalition : impacts.opposition;
     } else {
-      // misstrauensvotum
       if (passed) {
         if (party.id === proposingPartyId) {
-          delta = 2.0; // Proposing party wins big
+          delta = CONFIDENCE_IMPACTS.misstrauensvotum.passed.proposer;
         } else if (isCoalition) {
-          delta = -2.0; // Old coalition ousted
+          delta = CONFIDENCE_IMPACTS.misstrauensvotum.passed.coalition;
         }
-        // Other opposition parties get no direct impact
       } else {
         if (isCoalition) {
-          delta = 0.3; // Coalition survives attempt
+          delta = CONFIDENCE_IMPACTS.misstrauensvotum.failed.coalition;
         } else if (party.id === proposingPartyId) {
-          delta = -0.5; // Failed motion hurts proposer
+          delta = CONFIDENCE_IMPACTS.misstrauensvotum.failed.proposer;
         }
       }
     }
