@@ -1,3 +1,10 @@
+## [1.7.4](https://github.com/easingthemes/ki-bundestag/compare/v1.7.3...v1.7.4) (2026-04-06)
+
+
+### Bug Fixes
+
+* make approval ratings zero-sum to prevent universal upward trend ([1759b89](https://github.com/easingthemes/ki-bundestag/commit/1759b897702bd8222c88e3aa1e9b9415b9edc9bb))
+
 ## [1.7.3](https://github.com/easingthemes/ki-bundestag/compare/v1.7.2...v1.7.3) (2026-04-04)
 
 
