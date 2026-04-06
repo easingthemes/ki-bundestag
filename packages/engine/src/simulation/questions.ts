@@ -8,28 +8,15 @@ import { createNotification } from "./event-queue.js";
 import { logger } from "../logger.js";
 import { moderateQuestions, filterAlreadyAnswered, markModeratedQuestions } from "./question-moderation.js";
 
-const MAX_ANSWERS_PER_DAY = 50;
-const QUESTION_EXPIRY_DAYS = 14;
+import {
+  QUESTION_MAX_ANSWERS_PER_DAY as MAX_ANSWERS_PER_DAY,
+  QUESTION_EXPIRY_DAYS,
+  QUESTION_TOPICS,
+} from "../config/index.js";
 
-export const QUESTION_TOPICS = [
-  "Klimaschutz",
-  "Migration",
-  "Bildung",
-  "Wirtschaft",
-  "Soziales",
-  "Gesundheit",
-  "Innere Sicherheit",
-  "Verteidigung",
-  "Digitalisierung",
-  "Verkehr",
-  "Finanzen",
-  "Arbeit",
-  "Wohnen",
-  "Außenpolitik",
-  "Landwirtschaft",
-  "Justiz",
-  "Sonstiges",
-] as const;
+// Re-export for external consumers
+export { QUESTION_TOPICS } from "../config/index.js";
+
 export type QuestionTopic = (typeof QUESTION_TOPICS)[number];
 
 /**

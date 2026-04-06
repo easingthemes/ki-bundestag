@@ -12,38 +12,13 @@ function generateId(): string {
 // Generation cycle
 // ---------------------------------------------------------------------------
 
+import { SIDEJOB_INTERVAL, SIDEJOB_SYSTEM_PROMPT } from "../config/index.js";
+
 export function shouldGenerateSidejobs(currentDay: number): boolean {
-  return currentDay > 0 && currentDay % 30 === 0;
+  return currentDay > 0 && currentDay % SIDEJOB_INTERVAL === 0;
 }
 
-// ---------------------------------------------------------------------------
-// System prompt
-// ---------------------------------------------------------------------------
-
-const SIDEJOB_SYSTEM_PROMPT = `Du bist ein Parlamentssimulator. Generiere realistische Nebentätigkeiten für Bundestagsabgeordnete.
-
-Kategorien: beratung (Beratungstätigkeit), vortrag (Vortragshonorare), aufsichtsrat (Aufsichtsratsmandat), verband (Verbandstätigkeit), medien (Medientätigkeit), sonstiges
-
-Einkommensstufen: "1000-3500", "3500-7000", "7000-15000", "15000-30000", "30000+"
-
-Etwa 20% der Nebentätigkeiten sollten kontrovers sein (hohe Einkommensstufe + lobbying-nahe Organisation).
-
-Generiere für jeden genannten MdB einen fiktiven deutschen Namen und eine Nebentätigkeit.
-
-FORMAT (nur gültiges JSON):
-{
-  "sidejobs": [
-    {
-      "seatIndex": 0,
-      "politicianName": "Dr. Karla Müller",
-      "organization": "Deutsche Industrieberatung GmbH",
-      "role": "Beraterin für Energiepolitik",
-      "incomeLevel": "7000-15000",
-      "category": "beratung",
-      "isControversial": false
-    }
-  ]
-}`;
+// SIDEJOB_SYSTEM_PROMPT imported from config
 
 // ---------------------------------------------------------------------------
 // Batch request builder
