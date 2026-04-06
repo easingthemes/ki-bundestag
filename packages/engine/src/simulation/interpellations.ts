@@ -6,8 +6,11 @@ import { getDb, schema } from "../db/index.js";
 import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
 
-const MAX_ANSWERS_PER_DAY = 2;
-const INTERPELLATION_DEADLINE_DAYS = 14;
+import {
+  INTERPELLATION_MAX_ANSWERS_PER_DAY as MAX_ANSWERS_PER_DAY,
+  INTERPELLATION_DEADLINE_DAYS,
+  INTERPELLATION_IMPACTS,
+} from "../config/index.js";
 
 /**
  * Answer pending interpellations (max 2/day, oldest first) and expire overdue ones.
@@ -32,7 +35,7 @@ export async function answerPendingInterpellations(
   // Expire overdue ones
   for (const row of allPending) {
     if (currentDay - row.dayNumber > INTERPELLATION_DEADLINE_DAYS) {
-      const impact = row.type === "große" ? -0.3 : -0.3;
+      const impact = INTERPELLATION_IMPACTS.expired;
       db.update(schema.interpellations)
         .set({ status: "expired", sentimentImpact: impact })
         .where(eq(schema.interpellations.id, row.id))
@@ -84,7 +87,7 @@ export async function answerPendingInterpellations(
       continue;
     }
 
-    const impact = row.type === "große" ? 0.3 : 0.1;
+    const impact = row.type === "große" ? INTERPELLATION_IMPACTS.grosseAnswered : INTERPELLATION_IMPACTS.kleineAnswered;
 
     db.update(schema.interpellations)
       .set({
@@ -118,10 +121,10 @@ export async function answerPendingInterpellations(
  */
 export function interpellationSentimentImpact(interpellation: Interpellation): number {
   if (interpellation.status === "answered") {
-    return interpellation.type === "große" ? 0.3 : 0.1;
+    return interpellation.type === "große" ? INTERPELLATION_IMPACTS.grosseAnswered : INTERPELLATION_IMPACTS.kleineAnswered;
   }
   if (interpellation.status === "expired") {
-    return -0.3;
+    return INTERPELLATION_IMPACTS.expired;
   }
   return 0;
 }

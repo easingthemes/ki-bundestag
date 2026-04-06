@@ -1,91 +1,13 @@
-import type { BillCategory, BillImpact, Crisis, CrisisSeverity, EconomyState } from "@ki-bundestag/types";
+import type { Crisis, EconomyState } from "@ki-bundestag/types";
 import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
-
-interface CrisisTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: BillCategory;
-  severity: CrisisSeverity;
-  durationDays: [number, number]; // [min, max]
-  dailyImpact: BillImpact;
-}
-
-const CRISIS_TEMPLATES: CrisisTemplate[] = [
-  {
-    id: "energiekrise",
-    name: "Energiekrise",
-    description: "Steigende Energiepreise belasten Haushalte und Industrie. Sofortige Maßnahmen zur Preisstabilisierung werden gefordert.",
-    category: "economy",
-    severity: "high",
-    durationDays: [5, 12],
-    dailyImpact: { budget: -0.5, inflation: 0.04, gdpGrowth: -0.02, publicSentiment: -0.8 },
-  },
-  {
-    id: "fluechtlingswelle",
-    name: "Flüchtlingswelle",
-    description: "Ein starker Anstieg der Asylanträge stellt die Aufnahmekapazitäten auf die Probe und dominiert die politische Debatte.",
-    category: "immigration",
-    severity: "high",
-    durationDays: [7, 14],
-    dailyImpact: { budget: -0.3, publicSentiment: -0.6 },
-  },
-  {
-    id: "industrieskandal",
-    name: "Industrieskandal",
-    description: "Ein großer deutscher Konzern steht wegen Betrug unter Verdacht. Vertrauen in die Wirtschaftsaufsicht sinkt.",
-    category: "economy",
-    severity: "medium",
-    durationDays: [3, 8],
-    dailyImpact: { gdpGrowth: -0.02, publicSentiment: -0.5 },
-  },
-  {
-    id: "hochwasser",
-    name: "Hochwasserkatastrophe",
-    description: "Schwere Überschwemmungen zerstören Infrastruktur in mehreren Bundesländern. Soforthilfe und Wiederaufbau werden gebraucht.",
-    category: "infrastructure",
-    severity: "high",
-    durationDays: [4, 10],
-    dailyImpact: { budget: -0.5, unemployment: 0.01, publicSentiment: -0.4 },
-  },
-  {
-    id: "krankenhausnotstand",
-    name: "Krankenhausnotstand",
-    description: "Personalmangel und Überlastung der Krankenhäuser führen zu Versorgungsengpässen im Gesundheitssystem.",
-    category: "healthcare",
-    severity: "medium",
-    durationDays: [5, 12],
-    dailyImpact: { budget: -0.2, publicSentiment: -0.5 },
-  },
-  {
-    id: "cyberangriff",
-    name: "Cyberangriff auf Bundesbehörden",
-    description: "Ein massiver Cyberangriff legt IT-Systeme mehrerer Bundesbehörden lahm. Sicherheitslücken werden offenbar.",
-    category: "defense",
-    severity: "medium",
-    durationDays: [3, 7],
-    dailyImpact: { budget: -0.3, publicSentiment: -0.6 },
-  },
-  {
-    id: "handelsstreit",
-    name: "Handelsstreit mit den USA",
-    description: "Neue Zölle bedrohen den deutschen Export. Die Automobilindustrie und der Maschinenbau sind besonders betroffen.",
-    category: "economy",
-    severity: "medium",
-    durationDays: [6, 14],
-    dailyImpact: { gdpGrowth: -0.04, unemployment: 0.01, publicSentiment: -0.3 },
-  },
-  {
-    id: "protestwelle",
-    name: "Protestwelle",
-    description: "Landesweite Proteste gegen die Regierungspolitik legen den öffentlichen Verkehr lahm und erhöhen den politischen Druck.",
-    category: "social",
-    severity: "low",
-    durationDays: [3, 7],
-    dailyImpact: { publicSentiment: -1.0 },
-  },
-];
+import {
+  CRISIS_TEMPLATES,
+  CRISIS_DAILY_PROBABILITY,
+  CRISIS_MONTHLY_PROBABILITY,
+  CRISIS_MAX_CONCURRENT,
+} from "../config/index.js";
+import type { CrisisTemplate } from "../config/crises.js";
 
 export function getCrisisTemplates(): CrisisTemplate[] {
   return CRISIS_TEMPLATES;
@@ -134,9 +56,9 @@ export function maybeTriggerCrisis(
   activeCrises: Crisis[],
   isMonthlyDay: boolean,
 ): Crisis | null {
-  if (activeCrises.length >= 2) return null;
+  if (activeCrises.length >= CRISIS_MAX_CONCURRENT) return null;
 
-  const probability = isMonthlyDay ? 0.25 : 0.08;
+  const probability = isMonthlyDay ? CRISIS_MONTHLY_PROBABILITY : CRISIS_DAILY_PROBABILITY;
   if (Math.random() > probability) return null;
 
   // Avoid duplicating an active crisis template

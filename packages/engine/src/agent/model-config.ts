@@ -1,43 +1,20 @@
 /**
  * Per-party and per-role AI model configuration.
- * 
- * PARTY_MODELS: Maps party IDs to their configured AI provider and model.
- * ROLE_MODELS: Maps system roles (daily, negotiation, synthesis) to models.
- * 
- * Environment variable overrides:
- * - MODEL_PARTY_<ID>: Override per-party model (e.g., MODEL_PARTY_AFD=xai:grok-3-mini)
- * - MODEL_DAILY, MODEL_NEGOTIATION, MODEL_SYNTHESIS: Override role models
+ *
+ * Model defaults are defined in config/models.ts.
+ * This module provides runtime resolution with env var overrides.
  */
 
-export type Provider = "anthropic" | "xai";
+import {
+  PARTY_MODELS,
+  ROLE_MODELS,
+  type Provider,
+  type ModelConfig,
+} from "../config/index.js";
 
-export interface ModelConfig {
-  provider: Provider;
-  model: string;
-}
-
-/**
- * Per-party model configuration.
- * Used for daily party agent calls, party-specific negotiations, interpellations, internal proposals, and questions.
- */
-export const PARTY_MODELS: Record<string, ModelConfig> = {
-  spd: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  cdu: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  gruene: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  fdp: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  afd: { provider: "xai", model: "grok-3-mini" },
-  linke: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-};
-
-/**
- * Per-role model configuration.
- * Used for system-wide calls: media, polls, referendums, summary, and synthesis.
- */
-export const ROLE_MODELS: Record<string, ModelConfig> = {
-  daily: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  negotiation: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  synthesis: { provider: "anthropic", model: "claude-sonnet-4-5-20250929" },
-};
+// Re-export for external consumers
+export { PARTY_MODELS, ROLE_MODELS } from "../config/index.js";
+export type { Provider, ModelConfig } from "../config/index.js";
 
 export type RoleKey = keyof typeof ROLE_MODELS;
 

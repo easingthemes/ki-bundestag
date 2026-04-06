@@ -1,4 +1,10 @@
 import type { Amendment, Bill, BillImpact, BillVote, Party, VoteChoice } from "@ki-bundestag/types";
+import {
+  AMENDMENT_COALITION_YES_RATE,
+  AMENDMENT_OPPOSITION_YES_RATE,
+  AMENDMENT_CROSS_YES_RATE,
+  DISCIPLINE_FORCE_LEVEL,
+} from "../config/index.js";
 
 export interface MdbVoteEntry {
   seatId: string;
@@ -88,8 +94,8 @@ export function tallyVotes(
     // Count direct human votes
     let humanVotedCount = 0;
     for (const mv of partyMdbVotes) {
-      // Whipped MdBs (level 3) are forced to party line
-      const effectiveVote = mv.disciplineLevel >= 3 ? partyVote.vote : mv.vote;
+      // Whipped MdBs are forced to party line
+      const effectiveVote = mv.disciplineLevel >= DISCIPLINE_FORCE_LEVEL ? partyVote.vote : mv.vote;
       switch (effectiveVote) {
         case "yes": yesSeats++; humanYes++; break;
         case "no": noSeats++; humanNo++; break;
@@ -151,16 +157,13 @@ export function tallyAmendmentVotes(
       vote = "yes";
       reason = "Eigener Änderungsantrag";
     } else if (coalitionParties.includes(party.id) && coalitionParties.includes(amendment.proposedBy)) {
-      // Coalition alignment: 90% yes
-      vote = Math.random() < 0.9 ? "yes" : "no";
+      vote = Math.random() < AMENDMENT_COALITION_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Koalitionsdisziplin" : "Abweichende Position innerhalb der Koalition";
     } else if (!coalitionParties.includes(party.id) && !coalitionParties.includes(amendment.proposedBy)) {
-      // Both opposition: 70% yes
-      vote = Math.random() < 0.7 ? "yes" : "no";
+      vote = Math.random() < AMENDMENT_OPPOSITION_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Gemeinsame Opposition" : "Unterschiedliche Prioritäten";
     } else {
-      // Opposition vs coalition or vice versa: 90% no
-      vote = Math.random() < 0.1 ? "yes" : "no";
+      vote = Math.random() < AMENDMENT_CROSS_YES_RATE ? "yes" : "no";
       reason = vote === "yes" ? "Sachlich überzeugend" : "Politisch nicht tragbar";
     }
 

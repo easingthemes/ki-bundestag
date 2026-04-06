@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Bill, Party, SimulationEvent } from "@ki-bundestag/types";
 import { getDb, schema } from "../db/index.js";
 import { shouldPresidentVeto } from "./budget.js";
+import { VETO_PROPOSER_APPROVAL_PENALTY } from "../config/index.js";
 
 /**
  * Presidential veto check on a bill that just passed third reading.
@@ -38,7 +39,7 @@ export function checkPresidentialVeto(
 
     const proposer = parties.find(p => p.id === bill.proposedBy);
     if (proposer) {
-      proposer.approvalRating = Math.round((proposer.approvalRating - 0.5) * 10) / 10;
+      proposer.approvalRating = Math.round((proposer.approvalRating - VETO_PROPOSER_APPROVAL_PENALTY) * 10) / 10;
     }
 
     console.log(`  [President] Veto: "${bill.title}"`);

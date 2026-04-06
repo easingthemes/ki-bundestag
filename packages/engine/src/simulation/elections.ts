@@ -7,10 +7,16 @@ import type {
 } from "@ki-bundestag/types";
 import { TIME_CONFIG } from "./timing.js";
 import { snapToNextSunday } from "./calendar.js";
+import {
+  TOTAL_SEATS,
+  MAJORITY_SEATS,
+  ELECTORAL_THRESHOLD as THRESHOLD,
+  ELECTION_NOISE_STDDEV,
+  PARIAH_PARTIES,
+} from "../config/index.js";
 
-const TOTAL_SEATS = 735;
-const MAJORITY_SEATS = 368; // > 50%
-const THRESHOLD = 5; // 5% threshold
+// Re-export for external consumers
+export { ELECTION_COOLDOWN_DAYS } from "../config/index.js";
 
 // Gaussian noise using Box-Muller transform
 function gaussianNoise(stddev: number): number {
@@ -18,9 +24,6 @@ function gaussianNoise(stddev: number): number {
   const u2 = Math.random();
   return stddev * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
-
-/** Days after government formation during which snap elections cannot trigger (honeymoon period) */
-export const ELECTION_COOLDOWN_DAYS = 30;
 
 export function shouldTriggerElection(
   currentDay: number,
@@ -92,7 +95,7 @@ export function advanceElectionPhase(
 export function calculateResults(parties: Party[]): ElectionResult[] {
   // Base vote share from approval ratings + noise
   const rawShares = parties.map(p => {
-    const noisy = Math.max(0.5, p.approvalRating + gaussianNoise(2));
+    const noisy = Math.max(0.5, p.approvalRating + gaussianNoise(ELECTION_NOISE_STDDEV));
     return { partyId: p.id, raw: noisy };
   });
 
@@ -147,9 +150,7 @@ function ideologicalDistance(a: PolicyPriorities, b: PolicyPriorities): number {
   );
 }
 
-// Parties that all others refuse to form a coalition with (Brandmauer).
-// They are only considered as a last resort when no other majority is possible.
-const PARIAH_PARTIES = new Set(["afd"]);
+// PARIAH_PARTIES imported from config
 
 function tryFormCoalition(
   leader: ElectionResult,
