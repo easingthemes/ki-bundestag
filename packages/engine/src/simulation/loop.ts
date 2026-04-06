@@ -22,7 +22,7 @@ import { submitBatch, findResult, type BatchRequest } from "../agent/batch-clien
 import { AIProviderLimitError } from "../agent/client.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
-import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift } from "./opinion.js";
+import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, normalizeApprovalChanges } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
@@ -199,6 +199,8 @@ export async function runDay(): Promise<number> {
 
   // 2. Load all data
   const allParties = db.select().from(schema.parties).all() as unknown as Party[];
+  // Snapshot starting approvals for zero-sum normalization at end of day
+  const startingApprovals = new Map(allParties.map(p => [p.id, p.approvalRating]));
   const stateRows = db.select().from(schema.nationalState).all();
   const state = stateRows[0];
   if (!state) throw new Error("No national state found.");
@@ -2155,6 +2157,10 @@ export async function runDay(): Promise<number> {
 
     console.log(`  [Budget] Revision ${cycleNumber}: ${budgetPassed ? "PASSED" : "REJECTED"} (${yesSeats} vs ${noSeats})`);
   }
+
+  // Zero-sum normalization: redistribute 80% of net approval gain/loss
+  // so that approval doesn't trend upward for all parties simultaneously
+  normalizeApprovalChanges(allParties, startingApprovals);
 
   // Save party approval ratings + inactivity tracking
   for (const party of allParties) {
