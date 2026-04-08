@@ -2,7 +2,7 @@ export { runDay } from "./loop.js";
 export { applyEconomicDrift, applyBillImpact } from "./economy.js";
 export { tallyVotes } from "./voting.js";
 export type { MdbVoteEntry, VoteResult } from "./voting.js";
-export { updateApproval, updateSentiment, applyApprovalDrift, applySentimentDrift } from "./opinion.js";
+export { updateApproval, updateSentiment, applyApprovalDrift, applySentimentDrift, clampApproval } from "./opinion.js";
 export { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises, getCrisisTemplates, triggerCrisisFromTemplate } from "./crises.js";
 export { isPollDay, isWeeklyDay, isMonthlyDay, isBudgetDay, isSessionDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 export { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment } from "./elections.js";

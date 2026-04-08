@@ -22,7 +22,7 @@ import { submitBatch, findResult, type BatchRequest } from "../agent/batch-clien
 import { AIProviderLimitError } from "../agent/client.js";
 import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
-import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, normalizeApprovalChanges } from "./opinion.js";
+import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, normalizeApprovalChanges, clampApproval } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
@@ -1369,7 +1369,7 @@ export async function runDay(): Promise<number> {
       for (const party of allParties) {
         const delta = approvalFromBillOutcome(result.passed, party.id === bill.proposedBy);
         if (delta !== 0) {
-          party.approvalRating = Math.round((party.approvalRating + delta) * 10) / 10;
+          party.approvalRating = clampApproval(party.approvalRating + delta);
         }
       }
     }
@@ -1857,9 +1857,7 @@ export async function runDay(): Promise<number> {
   for (const answered of interpResult.answered) {
     const filingParty = allParties.find(p => p.id === answered.filedByPartyId);
     if (filingParty && answered.sentimentImpact) {
-      filingParty.approvalRating = Math.max(5, Math.min(75,
-        Math.round((filingParty.approvalRating + answered.sentimentImpact) * 10) / 10,
-      ));
+      filingParty.approvalRating = clampApproval(filingParty.approvalRating + answered.sentimentImpact);
     }
 
     addEvent(dayEvents, {
@@ -1875,9 +1873,7 @@ export async function runDay(): Promise<number> {
   for (const expired of interpResult.expired) {
     const targetParty = allParties.find(p => p.id === expired.targetPartyId);
     if (targetParty && expired.sentimentImpact) {
-      targetParty.approvalRating = Math.max(5, Math.min(75,
-        Math.round((targetParty.approvalRating + expired.sentimentImpact) * 10) / 10,
-      ));
+      targetParty.approvalRating = clampApproval(targetParty.approvalRating + expired.sentimentImpact);
     }
 
     addEvent(dayEvents, {
@@ -2038,11 +2034,11 @@ export async function runDay(): Promise<number> {
       const sortedCoalition = [...coalitionParties].sort((a, b) => b.seatCount - a.seatCount);
       for (let i = 0; i < sortedCoalition.length; i++) {
         const penalty = i === 0 ? -0.5 : -1.0;
-        sortedCoalition[i].approvalRating = Math.round((sortedCoalition[i].approvalRating + penalty) * 10) / 10;
+        sortedCoalition[i].approvalRating = clampApproval(sortedCoalition[i].approvalRating + penalty);
       }
       const oppositionParties = allParties.filter(p => !nationalState.coalitionParties.includes(p.id));
       for (const p of oppositionParties) {
-        p.approvalRating = Math.round((p.approvalRating + 0.3) * 10) / 10;
+        p.approvalRating = clampApproval(p.approvalRating + 0.3);
       }
 
       addEvent(dayEvents, {
@@ -2105,7 +2101,7 @@ export async function runDay(): Promise<number> {
       nationalState.publicSentiment = Math.max(5, Math.min(75, nationalState.publicSentiment - 2.0));
       const sortedCoalition = [...coalitionParties].sort((a, b) => b.seatCount - a.seatCount);
       for (const p of sortedCoalition) {
-        p.approvalRating = Math.round((p.approvalRating - 1.5) * 10) / 10;
+        p.approvalRating = clampApproval(p.approvalRating - 1.5);
       }
 
       addEvent(dayEvents, {

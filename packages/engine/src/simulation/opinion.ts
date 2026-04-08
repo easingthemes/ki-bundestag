@@ -4,7 +4,7 @@ import { getUserDb, schema } from "../db/index.js";
 import {
   SENTIMENT_MIN, SENTIMENT_MAX, SENTIMENT_BASELINE, SENTIMENT_REVERSION_RATE,
   SENTIMENT_DRIFT_NOISE, BILL_SENTIMENT_CAP,
-  APPROVAL_MIN, APPROVAL_MAX, APPROVAL_DRIFT_NOISE,
+  APPROVAL_MIN, APPROVAL_MAX, APPROVAL_DRIFT_NOISE, APPROVAL_REDISTRIBUTION_RATE,
   BILL_PASS_APPROVAL, BILL_REJECT_APPROVAL,
   INACTIVITY_GRACE_DAYS, INACTIVITY_BASE_PENALTY, INACTIVITY_MAX_PENALTY, INACTIVITY_SCALE,
   ACTIVITY_BONUS,
@@ -150,7 +150,7 @@ export function applyDailyApprovalDrift(
 export function normalizeApprovalChanges(
   parties: Party[],
   startingApprovals: Map<string, number>,
-  redistributionRate = 0.8,
+  redistributionRate = APPROVAL_REDISTRIBUTION_RATE,
 ): void {
   if (parties.length <= 1) return;
 
@@ -174,11 +174,16 @@ export function normalizeApprovalChanges(
     const share = party.approvalRating / totalApproval;
     party.approvalRating = clamp(
       Math.round((party.approvalRating - amountToRedistribute * share) * 10) / 10,
-      1, 60,
+      APPROVAL_MIN, APPROVAL_MAX,
     );
   }
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/** Clamp an approval value to APPROVAL_MIN..APPROVAL_MAX with standard rounding. */
+export function clampApproval(value: number): number {
+  return clamp(Math.round(value * 10) / 10, APPROVAL_MIN, APPROVAL_MAX);
 }

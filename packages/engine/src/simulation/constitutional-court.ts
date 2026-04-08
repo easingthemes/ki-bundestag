@@ -5,6 +5,7 @@ import {
   STRIKE_DOWN_REASONS,
   UPHOLD_REASONS,
 } from "../config/index.js";
+import { clampApproval } from "./opinion.js";
 
 // Re-export for external consumers
 export { COURT_STRIKE_DOWN_PROBABILITY as STRIKE_DOWN_PROBABILITY } from "../config/index.js";
@@ -28,13 +29,13 @@ export function constitutionalCourtApprovalImpact(
   for (const party of allParties) {
     if (struckDown) {
       if (party.id === filedByPartyId) {
-        party.approvalRating = Math.max(5, Math.min(75, Math.round((party.approvalRating + COURT_APPROVAL_IMPACTS.filerGainOnStrikeDown) * 10) / 10));
+        party.approvalRating = clampApproval(party.approvalRating + COURT_APPROVAL_IMPACTS.filerGainOnStrikeDown);
       } else if (party.id === proposedByPartyId) {
-        party.approvalRating = Math.max(5, Math.min(75, Math.round((party.approvalRating + COURT_APPROVAL_IMPACTS.proposerLossOnStrikeDown) * 10) / 10));
+        party.approvalRating = clampApproval(party.approvalRating + COURT_APPROVAL_IMPACTS.proposerLossOnStrikeDown);
       }
     } else {
       if (party.id === filedByPartyId) {
-        party.approvalRating = Math.max(5, Math.min(75, Math.round((party.approvalRating + COURT_APPROVAL_IMPACTS.filerLossOnUphold) * 10) / 10));
+        party.approvalRating = clampApproval(party.approvalRating + COURT_APPROVAL_IMPACTS.filerLossOnUphold);
       }
     }
   }
