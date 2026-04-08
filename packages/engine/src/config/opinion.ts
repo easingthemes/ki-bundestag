@@ -21,8 +21,8 @@ export const APPROVAL_MIN = 1;
 export const APPROVAL_MAX = 60;
 /** Daily random noise magnitude for approval drift */
 export const APPROVAL_DRIFT_NOISE = 0.4;
-/** Zero-sum redistribution rate (0.8 = 80% of net change redistributed) */
-export const APPROVAL_REDISTRIBUTION_RATE = 0.8;
+/** Zero-sum redistribution rate (1.0 = 100% of net change redistributed, fully zero-sum) */
+export const APPROVAL_REDISTRIBUTION_RATE = 1.0;
 
 // ── Bill outcome impacts ────────────────────────────────────────────
 /** Approval gain for proposer when bill passes */

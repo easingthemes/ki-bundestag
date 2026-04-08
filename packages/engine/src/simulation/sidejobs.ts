@@ -3,6 +3,7 @@ import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import { safeParseJson } from "../agent/ai-json.js";
+import { clampApproval } from "./opinion.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -144,7 +145,7 @@ export function applySidejobScandalImpact(
 
     // -0.2 to -0.5 approval hit
     const impact = -(0.2 + Math.random() * 0.3);
-    const newApproval = Math.max(5, Math.round((party.approvalRating + impact) * 10) / 10);
+    const newApproval = clampApproval(party.approvalRating + impact);
 
     db.update(schema.parties)
       .set({ approvalRating: newApproval })

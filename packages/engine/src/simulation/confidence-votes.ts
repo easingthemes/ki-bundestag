@@ -5,6 +5,7 @@ import {
   MISSTRAUENSVOTUM_OPPOSITION_YES_RATE,
   CONFIDENCE_IMPACTS,
 } from "../config/index.js";
+import { clampApproval } from "./opinion.js";
 
 export interface ConfidenceTallyResult {
   passed: boolean;
@@ -129,9 +130,7 @@ export function confidenceVoteSentimentImpact(
     }
 
     if (delta !== 0) {
-      party.approvalRating = Math.max(5, Math.min(75,
-        Math.round((party.approvalRating + delta) * 10) / 10,
-      ));
+      party.approvalRating = clampApproval(party.approvalRating + delta);
     }
   }
 }
