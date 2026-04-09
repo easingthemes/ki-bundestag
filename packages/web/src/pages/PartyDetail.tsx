@@ -95,7 +95,7 @@ export function PartyDetail() {
   const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
   const rejectedApp = myApplications.find(a => a.status === "rejected" && a.partyId === id);
   const canApply = isMyParty && !hasSeat && !pendingApp && openCount > 0;
-  const humanSeats = seats.filter(s => s.controller === "human");
+  const humanSeats = seats.filter(s => s.controller === "human" || s.controller === "bot");
 
   const handleJoin = async () => {
     if (!user) {

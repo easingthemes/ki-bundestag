@@ -546,7 +546,7 @@ export interface BundestagSeat {
   id: string;
   seatNumber: number;
   partyId: string;
-  controller: "human" | "ai";
+  controller: "human" | "ai" | "bot";
   userId: string | null;
   electionId: string | null;
   active: boolean;
@@ -607,7 +607,7 @@ export interface CommitteeMember {
   partyId: string;
   role: "chair" | "deputy_chair" | "member";
   displayName: string | null;
-  controller: "human" | "ai";
+  controller: "human" | "ai" | "bot";
 }
 
 export interface CommitteeDetail {
