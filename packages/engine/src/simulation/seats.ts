@@ -94,11 +94,31 @@ export function allocateSeats(
 /**
  * Deactivate all seats from the previous term.
  * Called before allocating new seats after an election.
+ * Notifies users who held seats that their term has ended.
  */
-export function resetAllSeats(): void {
+export function resetAllSeats(currentDay: number): void {
   const sqlite = getSqlite();
+
+  // Find users who hold active seats before deactivating
+  const occupiedSeats = sqlite.prepare(
+    "SELECT user_id, party_id, seat_number FROM bundestag_seats WHERE active = 1 AND user_id IS NOT NULL"
+  ).all() as Array<{ user_id: string; party_id: string; seat_number: number }>;
+
   sqlite.prepare("UPDATE bundestag_seats SET active = 0").run();
-  console.log("  [Seats] All previous seats deactivated");
+
+  // Notify each displaced user
+  for (const seat of occupiedSeats) {
+    createNotification(
+      seat.user_id,
+      "mdb_term_ended",
+      "Legislaturperiode beendet",
+      `Ihre Amtszeit als MdB (Sitz #${seat.seat_number}, ${seat.party_id}) ist mit der Neuwahl beendet. Sie können sich erneut bewerben.`,
+      { partyId: seat.party_id, seatNumber: seat.seat_number },
+      currentDay,
+    );
+  }
+
+  console.log(`  [Seats] All previous seats deactivated (${occupiedSeats.length} users notified)`);
 }
 
 /**

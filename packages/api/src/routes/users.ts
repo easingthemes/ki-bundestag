@@ -158,6 +158,21 @@ router.get("/api/users/me/activity", (req, res) => {
     });
   }
 
+  // Seat term endings (from notifications)
+  const termEndNotifs = userDb.select().from(schema.notifications)
+    .where(and(eq(schema.notifications.userId, token), eq(schema.notifications.type, "mdb_term_ended")))
+    .all();
+  for (const n of termEndNotifs) {
+    items.push({
+      type: "seat_ended",
+      title: "Legislaturperiode beendet",
+      description: n.message,
+      dayNumber: n.dayNumber,
+      createdAt: n.createdAt,
+      outcome: "ended",
+    });
+  }
+
   // Questions
   const questions = db.select().from(schema.citizenQuestions).all().filter((q: any) => q.userId === token);
   for (const q of questions) {
