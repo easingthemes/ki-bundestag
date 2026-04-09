@@ -1,3 +1,10 @@
+## [1.7.10](https://github.com/easingthemes/ki-bundestag/compare/v1.7.9...v1.7.10) (2026-04-09)
+
+
+### Bug Fixes
+
+* correct systematic upward bias in public sentiment (74→45 baseline) ([02ad3c7](https://github.com/easingthemes/ki-bundestag/commit/02ad3c7738b3a284a174ed32f8fd5cdea49d825b))
+
 ## [1.7.9](https://github.com/easingthemes/ki-bundestag/compare/v1.7.8...v1.7.9) (2026-04-09)
 
 
