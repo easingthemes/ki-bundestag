@@ -19,9 +19,8 @@
  * and other FK references remain intact.
  */
 
-import { getDb, getSqlite, schema, resetAllSeats, allocateSeats, closeDb, getUserSqlite, closeUserDb } from "@ki-bundestag/engine";
-import { assignCommitteeMemberships, shouldSeedCommittees, seedCommittees } from "@ki-bundestag/engine/src/simulation/committees.js";
-import type { TimingPreset } from "@ki-bundestag/engine/src/simulation/timing.js";
+import { getDb, getSqlite, schema, resetAllSeats, allocateSeats, closeDb, getUserSqlite, closeUserDb, assignCommitteeMemberships, shouldSeedCommittees, seedCommittees } from "@ki-bundestag/engine";
+import type { TimingPreset } from "@ki-bundestag/engine";
 
 const VALID_PRESETS: TimingPreset[] = ["ultra-fast", "fast", "normal", "slow"];
 
