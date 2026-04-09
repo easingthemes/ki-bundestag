@@ -11,9 +11,9 @@ describe("mediaSentimentImpact", () => {
     expect(mediaSentimentImpact(articles)).toBe(-0.4);
   });
 
-  it("returns positive impact for economy/policy articles", () => {
+  it("returns zero impact for economy/policy articles (neutral heuristic)", () => {
     const articles = [{ category: "economy" }, { category: "policy" }];
-    expect(mediaSentimentImpact(articles)).toBe(0.2);
+    expect(mediaSentimentImpact(articles)).toBe(0);
   });
 
   it("caps at -0.5 for many crisis articles", () => {
@@ -21,9 +21,9 @@ describe("mediaSentimentImpact", () => {
     expect(mediaSentimentImpact(articles)).toBe(-0.5);
   });
 
-  it("caps at +0.5 for many positive articles", () => {
+  it("returns zero for many economy articles (neutral heuristic)", () => {
     const articles = Array(10).fill({ category: "economy" });
-    expect(mediaSentimentImpact(articles)).toBe(0.5);
+    expect(mediaSentimentImpact(articles)).toBe(0);
   });
 
   it("returns 0 for non-impactful categories", () => {
@@ -36,11 +36,11 @@ describe("mediaSentimentImpact", () => {
   });
 
   it("nets out mixed articles", () => {
-    // 2 crisis (-0.4) + 3 economy (+0.3) = -0.1
+    // 2 crisis (-0.4) + 3 economy (0) = -0.4
     const articles = [
       { category: "crisis" }, { category: "crisis" },
       { category: "economy" }, { category: "economy" }, { category: "economy" },
     ];
-    expect(mediaSentimentImpact(articles)).toBe(-0.1);
+    expect(mediaSentimentImpact(articles)).toBe(-0.4);
   });
 });
