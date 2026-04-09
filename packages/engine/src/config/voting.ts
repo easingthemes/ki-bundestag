@@ -24,8 +24,12 @@ export const MOTION_CROSS_YES_RATE = 0.2;
 // ── Motion sentiment impacts ────────────────────────────────────────
 /** Sentiment gain when a motion passes */
 export const MOTION_PASSED_SENTIMENT = 0.3;
+/** Sentiment loss when a motion is rejected (gridlock disappoints the public) */
+export const MOTION_REJECTED_SENTIMENT = -0.1;
 /** Sentiment gain when a resolution passes */
 export const RESOLUTION_PASSED_SENTIMENT = 0.2;
+/** Sentiment loss when a resolution is rejected */
+export const RESOLUTION_REJECTED_SENTIMENT = -0.1;
 
 // ── Confidence vote rates ───────────────────────────────────────────
 /** Vertrauensfrage: coalition yes rate (10% defection risk) */

@@ -732,9 +732,9 @@ export async function runDay(): Promise<number> {
       nationalState.oppositionParties = opposition;
 
       // Reset streak and schedule next election (snap to Sunday if calendar-aware)
-      // Honeymoon period: boost sentiment and set cooldown to prevent immediate re-election
+      // Honeymoon period: modest boost (capped at 55 — must earn higher through governance)
       lowSentimentStreak = 0;
-      nationalState.publicSentiment = Math.min(75, Math.max(nationalState.publicSentiment, 30) + 5);
+      nationalState.publicSentiment = Math.min(55, Math.max(nationalState.publicSentiment, 30) + 3);
       let nextElDay = currentDay + TIME_CONFIG.TERM_DAYS;
       if (startDate) nextElDay = snapToNextSunday(nextElDay, startDate);
       const cooldownUntil = currentDay + ELECTION_COOLDOWN_DAYS;

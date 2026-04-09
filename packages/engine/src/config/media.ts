@@ -41,12 +41,13 @@ export const MEDIA_SENTIMENT_DAILY_CAP = 0.5;
 export const MEDIA_DAILY_ARTICLE_CAP = 3;
 
 // ── Fallback sentiment heuristics (when AI sentiment unavailable) ───
+// Neutral-to-negative: media negativity bias (bad news sells)
 export const MEDIA_CATEGORY_SENTIMENT: Record<string, number> = {
   crisis: -0.2,
   opinion: -0.1,
   election: -0.05,
-  economy: 0.1,
-  policy: 0.1,
+  economy: 0,
+  policy: 0,
 };
 
 // ── Significant event types for day summaries ───────────────────────

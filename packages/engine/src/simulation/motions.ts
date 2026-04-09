@@ -1,7 +1,8 @@
 import type { Motion, Party, BillVote } from "@ki-bundestag/types";
 import {
   MOTION_COALITION_YES_RATE, MOTION_OPPOSITION_YES_RATE, MOTION_CROSS_YES_RATE,
-  MOTION_PASSED_SENTIMENT, RESOLUTION_PASSED_SENTIMENT,
+  MOTION_PASSED_SENTIMENT, MOTION_REJECTED_SENTIMENT,
+  RESOLUTION_PASSED_SENTIMENT, RESOLUTION_REJECTED_SENTIMENT,
 } from "../config/index.js";
 
 /**
@@ -48,10 +49,16 @@ export function tallyMotionVotes(
 }
 
 /**
- * Sentiment impact for a passed motion.
- * Motions: +0.3, Resolutions: +0.2
+ * Sentiment impact from motion outcome.
+ * Passed: +0.3 (motion) / +0.2 (resolution)
+ * Rejected: -0.1 (public dislikes gridlock)
  */
 export function motionSentimentImpact(motion: Motion): number {
-  if (motion.status !== "passed") return 0;
-  return motion.type === "motion" ? MOTION_PASSED_SENTIMENT : RESOLUTION_PASSED_SENTIMENT;
+  if (motion.status === "passed") {
+    return motion.type === "motion" ? MOTION_PASSED_SENTIMENT : RESOLUTION_PASSED_SENTIMENT;
+  }
+  if (motion.status === "rejected") {
+    return motion.type === "motion" ? MOTION_REJECTED_SENTIMENT : RESOLUTION_REJECTED_SENTIMENT;
+  }
+  return 0;
 }
