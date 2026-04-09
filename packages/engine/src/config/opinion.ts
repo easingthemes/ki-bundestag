@@ -9,8 +9,8 @@
 export const SENTIMENT_MIN = 5;
 export const SENTIMENT_MAX = 75;
 export const SENTIMENT_BASELINE = 45;
-/** Daily mean-reversion pull toward SENTIMENT_BASELINE */
-export const SENTIMENT_REVERSION_RATE = 0.03;
+/** Daily mean-reversion pull toward SENTIMENT_BASELINE (6% per day) */
+export const SENTIMENT_REVERSION_RATE = 0.06;
 /** Daily random noise magnitude (±half this value) */
 export const SENTIMENT_DRIFT_NOISE = 0.4;
 /** Max per-bill sentiment swing (clamped to prevent AI gaming) */
