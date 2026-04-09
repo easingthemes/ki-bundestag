@@ -1,3 +1,10 @@
+## [1.7.9](https://github.com/easingthemes/ki-bundestag/compare/v1.7.8...v1.7.9) (2026-04-09)
+
+
+### Bug Fixes
+
+* export committee functions and fix script import ([fb2e311](https://github.com/easingthemes/ki-bundestag/commit/fb2e311a3509784bb8f2434459671b3d14aaf3c7))
+
 ## [1.7.8](https://github.com/easingthemes/ki-bundestag/compare/v1.7.7...v1.7.8) (2026-04-09)
 
 
