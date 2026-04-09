@@ -39,7 +39,9 @@ export function MdbList() {
 
   // Sort: human-controlled first, then by seat number
   const sorted = [...seats].sort((a, b) => {
-    if (a.controller !== b.controller) return a.controller === "human" ? -1 : 1;
+    const aIsPlayer = a.controller === "human" || a.controller === "bot";
+    const bIsPlayer = b.controller === "human" || b.controller === "bot";
+    if (aIsPlayer !== bIsPlayer) return aIsPlayer ? -1 : 1;
     return a.seatNumber - b.seatNumber;
   });
 
@@ -113,7 +115,7 @@ export function MdbList() {
                       </div>
                     </div>
                     <div className="flex gap-1.5 mt-2">
-                      {seat.controller === "human" && (
+                      {(seat.controller === "human" || seat.controller === "bot") && (
                         <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>Spieler</Badge>
                       )}
                       {seat.controller === "ai" && (
@@ -162,7 +164,7 @@ export function MdbList() {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      {seat.controller === "human" ? (
+                      {(seat.controller === "human" || seat.controller === "bot") ? (
                         <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>Spieler</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs bg-zinc-50 text-zinc-500">KI</Badge>

@@ -112,7 +112,7 @@ export function MdbDetail() {
             )}
             <span className="text-muted-foreground text-sm">Sitz #{seat.seatNumber}</span>
             {seat.isBot && <BotBadge />}
-            {seat.controller === "human" && (
+            {(seat.controller === "human" || seat.controller === "bot") && (
               <Badge variant="outline" className={cn("text-xs", MDB_BADGE)}>Spieler</Badge>
             )}
             {seat.controller === "ai" && (
@@ -263,7 +263,7 @@ export function MdbDetail() {
                 <dt className="text-muted-foreground">Partei</dt>
                 <dd>{party?.name ?? seat.partyId}</dd>
                 <dt className="text-muted-foreground">Steuerung</dt>
-                <dd>{seat.controller === "human" ? "Spieler" : "KI-gesteuert"}</dd>
+                <dd>{(seat.controller === "human" || seat.controller === "bot") ? "Spieler" : "KI-gesteuert"}</dd>
                 <dt className="text-muted-foreground">Proxy-Standard</dt>
                 <dd>{seat.proxyDefault === "party_line" ? "Parteilinie" : "Enthaltung"}</dd>
                 <dt className="text-muted-foreground">Zugewiesen am</dt>
