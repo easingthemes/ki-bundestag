@@ -1,3 +1,10 @@
+## [1.7.6](https://github.com/easingthemes/ki-bundestag/compare/v1.7.5...v1.7.6) (2026-04-09)
+
+
+### Bug Fixes
+
+* enforce APPROVAL_MAX (60%) cap consistently across all approval mutations ([caff575](https://github.com/easingthemes/ki-bundestag/commit/caff575562913b4d77cb776f502d4e30f473539f))
+
 ## [1.7.5](https://github.com/easingthemes/ki-bundestag/compare/v1.7.4...v1.7.5) (2026-04-06)
 
 ## [1.7.4](https://github.com/easingthemes/ki-bundestag/compare/v1.7.3...v1.7.4) (2026-04-06)
