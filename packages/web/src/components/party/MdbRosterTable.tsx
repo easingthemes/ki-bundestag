@@ -15,7 +15,7 @@ interface MdbRosterTableProps {
 export function MdbRosterTable({ seats, partyId }: MdbRosterTableProps) {
   const { t } = useTranslation("parties");
   const { user } = useUser();
-  const humanSeats = seats.filter(s => s.controller === "human");
+  const humanSeats = seats.filter(s => s.controller === "human" || s.controller === "bot");
   const aiSeats = seats.filter(s => s.controller === "ai");
 
   // Suppress unused variable warning - partyId is used by consumers to determine context
