@@ -1,16 +1,19 @@
 {
   "debates": {
     "title": "Parlamentsdebatten",
-    "subtitle": "Alle MdB-Reden zu Gesetzentwürfen — gruppiert nach Gesetz.",
+    "subtitle": "MdB-Reden zu Gesetzentwürfen und Stellungnahmen der Fraktionen.",
     "empty": "Noch keine Debatten. MdB-Reden werden hier angezeigt, sobald Abgeordnete zu Gesetzen sprechen.",
-    "totalSpeeches": "{{count}} Rede",
-    "totalSpeeches_other": "{{count}} Reden",
+    "emptyStatements": "Noch keine Stellungnahmen. Parteistellungnahmen erscheinen hier nach der Simulation.",
+    "totalSpeeches": "{{count}} Beitrag",
+    "totalSpeeches_other": "{{count}} Beiträge",
     "speechCount": "{{count}} Rede",
     "speechCount_other": "{{count}} Reden",
     "latestDay": "zuletzt Tag {{day}}",
     "viewBill": "Zum Gesetz →",
     "showLess": "Weniger anzeigen",
-    "showMoreSpeeches": "{{count}} weitere anzeigen"
+    "showMoreSpeeches": "{{count}} weitere anzeigen",
+    "tabSpeeches": "MdB-Reden",
+    "tabStatements": "Partei-Stellungnahmen"
   },
   "motions": {
     "title": "Anträge & Entschließungen",
