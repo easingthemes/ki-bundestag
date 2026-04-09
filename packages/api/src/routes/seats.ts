@@ -302,6 +302,8 @@ router.get("/api/seats/:seatId/profile", (req, res) => {
 // GET /api/seats/available — open seat counts per party
 router.get("/api/seats/available", (_req, res) => {
   const openCounts = getOpenSeatCounts();
+  const humanOpenCounts = getOpenSeatCounts("human");
+  const botOpenCounts = getOpenSeatCounts("bot");
 
   // Also include total active seats per party for context
   const sqlite = getSqlite();
@@ -312,10 +314,12 @@ router.get("/api/seats/available", (_req, res) => {
      FROM bundestag_seats WHERE active = 1 GROUP BY party_id`
   ).all() as Array<{ party_id: string; total: number; human_total: number; bot_total: number }>;
 
-  const result: Record<string, { open: number; humanTotal: number; botTotal: number; total: number }> = {};
+  const result: Record<string, { open: number; humanOpen: number; botOpen: number; humanTotal: number; botTotal: number; total: number }> = {};
   for (const row of totalRows) {
     result[row.party_id] = {
       open: openCounts[row.party_id] ?? 0,
+      humanOpen: humanOpenCounts[row.party_id] ?? 0,
+      botOpen: botOpenCounts[row.party_id] ?? 0,
       humanTotal: row.human_total,
       botTotal: row.bot_total,
       total: row.total,

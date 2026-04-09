@@ -38,7 +38,8 @@
       "mdb_vote": "MdB-Abstimmung",
       "speech": "Rede",
       "application": "Bewerbung",
-      "question": "Anfrage"
+      "question": "Anfrage",
+      "seat_ended": "Mandat beendet"
     },
     "outcomes": {
       "accepted": "Angenommen",
@@ -48,7 +49,8 @@
       "answered": "Beantwortet",
       "pending": "Ausstehend",
       "approved": "Genehmigt",
-      "rejected": "Abgelehnt"
+      "rejected": "Abgelehnt",
+      "ended": "Beendet"
     }
   },
   "simulationLog": {

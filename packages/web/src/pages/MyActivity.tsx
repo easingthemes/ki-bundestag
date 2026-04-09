@@ -18,6 +18,7 @@ const TYPE_ICONS: Record<string, string> = {
   speech: "\u{1F3A4}",
   application: "\u{1F4CB}",
   question: "\u2753",
+  seat_ended: "\u{1F6AA}",
 };
 
 const TYPE_BADGE: Record<string, string> = {
@@ -27,6 +28,7 @@ const TYPE_BADGE: Record<string, string> = {
   speech: "bg-cyan-50 text-cyan-700 border-cyan-200",
   application: "bg-amber-50 text-amber-700 border-amber-200",
   question: "bg-sky-50 text-sky-700 border-sky-200",
+  seat_ended: "bg-red-50 text-red-700 border-red-200",
 };
 
 const OUTCOME_BADGE: Record<string, string> = {
@@ -38,6 +40,7 @@ const OUTCOME_BADGE: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-red-50 text-red-700 border-red-200",
+  ended: "bg-red-50 text-red-700 border-red-200",
 };
 
 function entityLink(item: ActivityItem): string | null {

@@ -277,7 +277,7 @@ export const getMySeat = () =>
   fetchJson<{ seat: BundestagSeat | null; applications: MdbApplication[] }>("/seats/my-seat");
 export const getPartySeats = (partyId: string) => fetchJson<BundestagSeat[]>(`/seats/party/${partyId}`);
 export const getAvailableSeats = () =>
-  fetchJson<Record<string, { open: number; humanTotal: number; total: number }>>("/seats/available");
+  fetchJson<Record<string, { open: number; humanOpen: number; botOpen: number; humanTotal: number; botTotal: number; total: number }>>("/seats/available");
 export const applyForSeat = (applicationText: string, policyFocus?: string) =>
   postJson<{ status: string }>("/seats/apply", { applicationText, policyFocus: policyFocus ? [policyFocus] : undefined });
 export const getSeatRoster = (partyId?: string, controller?: string, search?: string) => {
