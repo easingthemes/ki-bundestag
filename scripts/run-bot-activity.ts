@@ -61,15 +61,16 @@ interface ActionWeights {
   signal_bill: number;
   ask_question: number;
   submit_proposal: number;
+  submit_speech: number;
   vote_poll: number;
   apply_mdb: number;
 }
 
 const STYLE_WEIGHTS: Record<string, ActionWeights> = {
-  questioner: { vote_question: 2, vote_proposal: 1, signal_bill: 1, ask_question: 5, submit_proposal: 1, vote_poll: 1, apply_mdb: 1 },
-  voter:      { vote_question: 4, vote_proposal: 4, signal_bill: 3, ask_question: 1, submit_proposal: 0, vote_poll: 3, apply_mdb: 2 },
-  proposer:   { vote_question: 1, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 5, vote_poll: 1, apply_mdb: 3 },
-  observer:   { vote_question: 3, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 0, vote_poll: 2, apply_mdb: 1 },
+  questioner: { vote_question: 2, vote_proposal: 1, signal_bill: 1, ask_question: 5, submit_proposal: 1, submit_speech: 1, vote_poll: 1, apply_mdb: 1 },
+  voter:      { vote_question: 4, vote_proposal: 4, signal_bill: 3, ask_question: 1, submit_proposal: 0, submit_speech: 2, vote_poll: 3, apply_mdb: 2 },
+  proposer:   { vote_question: 1, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 5, submit_speech: 3, vote_poll: 1, apply_mdb: 3 },
+  observer:   { vote_question: 3, vote_proposal: 2, signal_bill: 2, ask_question: 1, submit_proposal: 0, submit_speech: 1, vote_poll: 2, apply_mdb: 1 },
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -210,6 +211,20 @@ const MDB_APPLICATION_TEMPLATES = [
   "Ich kandidiere für den Bundestag, weil ich glaube, dass {topic} in der aktuellen Debatte zu kurz kommt. Mit meiner Expertise und meinem Engagement möchte ich dafür sorgen, dass diese Themen die nötige Aufmerksamkeit bekommen.",
 ];
 
+const SPEECH_TEMPLATES = [
+  "Als Vertreter unserer Fraktion möchte ich betonen, dass dieses Gesetz im Bereich {topic} einen wichtigen Schritt darstellt. Wir müssen sicherstellen, dass die vorgeschlagenen Maßnahmen auch in der Praxis umsetzbar sind und den Bürgern zugutekommen.",
+  "Meine Damen und Herren, der vorliegende Gesetzentwurf zu {topic} greift zentrale Herausforderungen auf, denen sich unser Land stellen muss. Allerdings sehen wir Nachbesserungsbedarf bei der konkreten Ausgestaltung.",
+  "Ich spreche heute zum Thema {topic}, weil es die Menschen in unserem Land unmittelbar betrifft. Dieses Gesetz muss praxisnah und sozial ausgewogen gestaltet werden. Unsere Fraktion wird sich dafür einsetzen.",
+  "Die Debatte über {topic} ist längst überfällig. Dieser Gesetzentwurf bietet eine solide Grundlage, auf der wir aufbauen können. Wir unterstützen die Richtung, fordern aber eine stärkere Berücksichtigung der betroffenen Interessengruppen.",
+  "Zum vorliegenden Entwurf im Bereich {topic}: Die Ziele sind begrüßenswert, doch die vorgeschlagenen Mittel reichen unserer Einschätzung nach nicht aus. Wir schlagen vor, die Umsetzungsfristen anzupassen und die Finanzierung nachhaltiger zu gestalten.",
+];
+
+const SPEECH_READING_LABELS: Record<number, string> = {
+  1: "erste Lesung",
+  2: "zweite Lesung",
+  3: "dritte Lesung",
+};
+
 // ── AI generation (optional) ────────────────────────────────────────────────
 
 async function generateAIQuestion(
@@ -299,6 +314,44 @@ async function generateAIProposal(
   }
 }
 
+async function generateAISpeech(
+  partyName: string,
+  billTitle: string,
+  reading: number,
+): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const prompt = `Du bist MdB der Partei "${partyName}" im Deutschen Bundestag. Halte eine kurze Rede (2-4 Sätze, 100-300 Zeichen) zum Gesetzentwurf "${billTitle}" in der ${SPEECH_READING_LABELS[reading] ?? `${reading}. Lesung`}. Sprich sachlich und parteilich. Antworte NUR mit der Rede, ohne Anführungszeichen.`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`  AI speech generation failed: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json() as any;
+    return data.content?.[0]?.text?.trim() ?? null;
+  } catch (err) {
+    console.error("  AI speech generation error:", err);
+    return null;
+  }
+}
+
 // ── Tick result type ────────────────────────────────────────────────────────
 
 export interface TickResult {
@@ -335,6 +388,7 @@ export async function runBotTick(options?: { dryRun?: boolean }): Promise<TickRe
 const BOT_DAILY_LIMITS: Record<string, number> = {
   submit_question: 5,
   submit_proposal: 2,
+  submit_speech: 3,
 };
 
 function checkBotDailyLimit(userDb: Database.Database, userId: string, actionType: string): boolean {
@@ -396,6 +450,10 @@ async function executeTick(
     "SELECT id, options FROM polls WHERE active = 1",
   ).all() as Array<{ id: string; options: string }>;
 
+  const billsInReading = simDb.prepare(
+    "SELECT id, title, status, category FROM bills WHERE status IN ('first_reading', 'second_reading', 'third_reading')",
+  ).all() as Array<{ id: string; title: string; status: string; category: string }>;
+
   // Filter bots by activity chance
   const activeBotList = bots.filter(bot => {
     const profile = bot.bot_profile ? JSON.parse(bot.bot_profile) : { activityLevel: "low" };
@@ -439,6 +497,12 @@ async function executeTick(
   );
   const hasSignal = userDb.prepare(
     "SELECT 1 FROM member_signals WHERE bill_id = ? AND user_id = ?",
+  );
+  const insertSpeech = userDb.prepare(
+    "INSERT INTO mdb_speeches (id, user_id, bill_id, reading, content, sentiment_impact, day_number, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+  );
+  const hasSpeech = userDb.prepare(
+    "SELECT 1 FROM mdb_speeches WHERE bill_id = ? AND user_id = ? AND reading = ?",
   );
 
   const now = Date.now();
@@ -672,6 +736,47 @@ async function executeTick(
           result.actions++;
           result.breakdown.apply_mdb = (result.breakdown.apply_mdb ?? 0) + 1;
           console.log(`  ${bot.display_name} applied for MdB seat at ${partyNameMap[bot.party_id] ?? bot.party_id}`);
+          break;
+        }
+
+        case "submit_speech": {
+          if (!bot.party_id) break;
+          if (!checkBotDailyLimit(userDb, bot.id, "submit_speech")) break;
+          if (billsInReading.length === 0) break;
+
+          // Bot must have an active MdB seat
+          const seat = simDb.prepare(
+            "SELECT 1 FROM bundestag_seats WHERE active = 1 AND user_id = ?",
+          ).get(bot.id);
+          if (!seat) break;
+
+          const bill = pick(billsInReading);
+          const statusToReading: Record<string, number> = { first_reading: 1, second_reading: 2, third_reading: 3 };
+          const reading = statusToReading[bill.status];
+          if (!reading) break;
+
+          // Check hasn't already spoken on this bill+reading
+          if (hasSpeech.get(bill.id, bot.id, reading)) break;
+
+          const partyName = partyNameMap[bot.party_id] ?? bot.party_id;
+          let speechContent: string;
+          const aiSpeech = await generateAISpeech(partyName, bill.title, reading);
+          if (aiSpeech && aiSpeech.length >= 20) {
+            speechContent = aiSpeech;
+            result.aiCalls++;
+          } else {
+            const topic = bill.category || pick(TOPICS);
+            speechContent = pick(SPEECH_TEMPLATES).replace("{topic}", topic);
+          }
+
+          const speechId = uuid();
+          if (!dryRun) {
+            insertSpeech.run(speechId, bot.id, bill.id, reading, speechContent, currentDay, now);
+            insertAction.run(uuid(), bot.id, "submit_speech", speechId, "bill", JSON.stringify({ billId: bill.id, reading }), currentDay, isoNow);
+          }
+          result.actions++;
+          result.breakdown.submit_speech = (result.breakdown.submit_speech ?? 0) + 1;
+          console.log(`  ${bot.display_name} spoke on "${bill.title}" (${reading}. Lesung)`);
           break;
         }
       }

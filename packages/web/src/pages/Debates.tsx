@@ -39,20 +39,37 @@ function groupByBill(events: SimulationEvent[]): DebateGroup[] {
   return [...map.values()].sort((a, b) => b.latestDay - a.latestDay);
 }
 
+/** Extract party name from statement title like "CDU/CSU: Title here" */
+function extractPartyName(title: string): string {
+  const colonIdx = title.indexOf(": ");
+  return colonIdx > 0 ? title.slice(0, colonIdx) : title;
+}
+
+function extractStatementTitle(title: string): string {
+  const colonIdx = title.indexOf(": ");
+  return colonIdx > 0 ? title.slice(colonIdx + 2) : title;
+}
+
 export function Debates() {
   usePageMeta(ROUTE_SEO["/debatten"] ?? { title: "Debatten" });
   const { t } = useTranslation("parliament");
-  const [events, setEvents] = useState<SimulationEvent[]>([]);
+  const [speechEvents, setSpeechEvents] = useState<SimulationEvent[]>([]);
+  const [statementEvents, setStatementEvents] = useState<SimulationEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [visibleStatements, setVisibleStatements] = useState(PAGE_SIZE);
+  const [tab, setTab] = useState<"speeches" | "statements">("speeches");
 
   const refresh = useCallback(() => {
     api.getEvents(200, 0, "mdb_speech").then(r => {
-      setEvents(r.events);
+      setSpeechEvents(r.events);
       setTotal(r.total);
       setLoading(false);
+    }).catch(console.error);
+    api.getEvents(200, 0, "statement").then(r => {
+      setStatementEvents(r.events);
     }).catch(console.error);
     api.getParties().then(setParties).catch(console.error);
   }, []);
@@ -63,35 +80,85 @@ export function Debates() {
   if (loading) return <div className="py-8"><LoadingSkeleton lines={6} /></div>;
 
   const partyMap = new Map(parties.map(p => [p.id, p]));
-  const groups = groupByBill(events);
+  const groups = groupByBill(speechEvents);
   const visibleGroups = groups.slice(0, visibleCount);
+  const totalEntries = total + statementEvents.length;
+  const sortedStatements = [...statementEvents].sort((a, b) => b.dayNumber - a.dayNumber);
+  const visibleStmts = sortedStatements.slice(0, visibleStatements);
 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
         <h1>{t("debates.title")}</h1>
         <Badge variant="outline" className="text-xs">
-          {t("debates.totalSpeeches", { count: total })}
+          {t("debates.totalSpeeches", { count: totalEntries })}
         </Badge>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">{t("debates.subtitle")}</p>
+      <p className="text-sm text-muted-foreground mb-4">{t("debates.subtitle")}</p>
 
-      {groups.length === 0 ? (
-        <EmptyState message={t("debates.empty")} icon="🎤" />
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setTab("speeches")}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
+            tab === "speeches"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-muted text-muted-foreground border-border hover:bg-accent",
+          )}
+        >
+          {t("debates.tabSpeeches")} ({total})
+        </button>
+        <button
+          onClick={() => setTab("statements")}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium rounded-full border cursor-pointer transition-colors",
+            tab === "statements"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-muted text-muted-foreground border-border hover:bg-accent",
+          )}
+        >
+          {t("debates.tabStatements")} ({statementEvents.length})
+        </button>
+      </div>
+
+      {tab === "speeches" ? (
+        <>
+          {groups.length === 0 ? (
+            <EmptyState message={t("debates.empty")} icon="🎤" />
+          ) : (
+            <div className="space-y-4">
+              {visibleGroups.map(group => (
+                <DebateCard key={group.billId} group={group} partyMap={partyMap} />
+              ))}
+            </div>
+          )}
+          <ShowMoreButton
+            total={groups.length}
+            visible={Math.min(visibleCount, groups.length)}
+            increment={PAGE_SIZE}
+            onShowMore={() => setVisibleCount(c => c + PAGE_SIZE)}
+          />
+        </>
       ) : (
-        <div className="space-y-4">
-          {visibleGroups.map(group => (
-            <DebateCard key={group.billId} group={group} partyMap={partyMap} />
-          ))}
-        </div>
+        <>
+          {sortedStatements.length === 0 ? (
+            <EmptyState message={t("debates.emptyStatements")} icon="🏛️" />
+          ) : (
+            <div className="space-y-3">
+              {visibleStmts.map(ev => (
+                <StatementCard key={ev.id} event={ev} partyMap={partyMap} />
+              ))}
+            </div>
+          )}
+          <ShowMoreButton
+            total={sortedStatements.length}
+            visible={Math.min(visibleStatements, sortedStatements.length)}
+            increment={PAGE_SIZE}
+            onShowMore={() => setVisibleStatements(c => c + PAGE_SIZE)}
+          />
+        </>
       )}
-
-      <ShowMoreButton
-        total={groups.length}
-        visible={Math.min(visibleCount, groups.length)}
-        increment={PAGE_SIZE}
-        onShowMore={() => setVisibleCount(c => c + PAGE_SIZE)}
-      />
     </div>
   );
 }
@@ -168,6 +235,31 @@ function DebateCard({ group, partyMap }: { group: DebateGroup; partyMap: Map<str
             }
           </button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatementCard({ event, partyMap }: { event: SimulationEvent; partyMap: Map<string, Party> }) {
+  const partyName = extractPartyName(event.title);
+  const stmtTitle = extractStatementTitle(event.title);
+  const party = partyMap.get(event.actor);
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          {party && (
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: fixColor(party.color) }}
+            />
+          )}
+          <span className="font-semibold text-xs">{partyName}</span>
+          <span className="text-[10px] text-muted-foreground ml-auto">Tag {event.dayNumber}</span>
+        </div>
+        <div className="font-medium text-sm mb-1">{stmtTitle}</div>
+        <div className="text-sm text-muted-foreground leading-relaxed">{event.description}</div>
       </CardContent>
     </Card>
   );
