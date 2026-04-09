@@ -1,3 +1,10 @@
+## [1.7.7](https://github.com/easingthemes/ki-bundestag/compare/v1.7.6...v1.7.7) (2026-04-09)
+
+
+### Bug Fixes
+
+* show bot-controller seats alongside human seats in parliament roster ([b8898dc](https://github.com/easingthemes/ki-bundestag/commit/b8898dccbb080b4fecce62c97804cea68dacdbc7))
+
 ## [1.7.6](https://github.com/easingthemes/ki-bundestag/compare/v1.7.5...v1.7.6) (2026-04-09)
 
 
