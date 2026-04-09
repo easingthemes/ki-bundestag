@@ -1,3 +1,10 @@
+## [1.7.8](https://github.com/easingthemes/ki-bundestag/compare/v1.7.7...v1.7.8) (2026-04-09)
+
+
+### Bug Fixes
+
+* apply button accuracy, seat loss notifications, and activity feed ([430eb4d](https://github.com/easingthemes/ki-bundestag/commit/430eb4d5b1953f9bc00a755f2380e079c2cff9ec))
+
 ## [1.7.7](https://github.com/easingthemes/ki-bundestag/compare/v1.7.6...v1.7.7) (2026-04-09)
 
 
