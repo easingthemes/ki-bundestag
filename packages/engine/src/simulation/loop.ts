@@ -626,7 +626,7 @@ export async function runDay(): Promise<number> {
       });
 
       const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
-      resetAllSeats();
+      resetAllSeats(currentDay);
       for (const result of activeElection.results!) {
         allocateSeats(result.partyId, result.seatsWon, activeElection.id, currentDay, timingPreset);
       }
@@ -791,7 +791,7 @@ export async function runDay(): Promise<number> {
 
       // Allocate Bundestag seats per party based on election results
       const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
-      resetAllSeats();
+      resetAllSeats(currentDay);
       for (const result of activeElection.results!) {
         allocateSeats(result.partyId, result.seatsWon, activeElection.id, currentDay, timingPreset);
       }

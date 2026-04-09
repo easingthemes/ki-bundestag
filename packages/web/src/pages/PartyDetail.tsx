@@ -38,7 +38,7 @@ export function PartyDetail() {
   const [joinError, setJoinError] = useState("");
   const joinNavigate = useNavigate();
   const [seats, setSeats] = useState<BundestagSeat[]>([]);
-  const [availableSeats, setAvailableSeats] = useState<Record<string, { open: number; humanTotal: number; total: number }>>({});
+  const [availableSeats, setAvailableSeats] = useState<Record<string, { open: number; humanOpen: number; botOpen: number; humanTotal: number; botTotal: number; total: number }>>({});
   const [showApplyForm, setShowApplyForm] = useState(false);
   const [applyMotivation, setApplyMotivation] = useState("");
   const [applyFocus, setApplyFocus] = useState("");
@@ -91,10 +91,11 @@ export function PartyDetail() {
 
   const partyAvail = availableSeats[id!];
   const openCount = partyAvail?.open ?? 0;
+  const userOpenCount = user?.isBot ? (partyAvail?.botOpen ?? 0) : (partyAvail?.humanOpen ?? 0);
   const hasSeat = seats.some(s => s.userId === user?.id);
   const pendingApp = myApplications.find(a => a.status === "pending" && a.partyId === id);
   const rejectedApp = myApplications.find(a => a.status === "rejected" && a.partyId === id);
-  const canApply = isMyParty && !hasSeat && !pendingApp && openCount > 0;
+  const canApply = isMyParty && !hasSeat && !pendingApp && userOpenCount > 0;
   const humanSeats = seats.filter(s => s.controller === "human" || s.controller === "bot");
 
   const handleJoin = async () => {
