@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/easingthemes/ki-bundestag/compare/v1.7.10...v1.8.0) (2026-04-09)
+
+
+### Features
+
+* populate debates page with bot speeches and AI party statements ([859c84c](https://github.com/easingthemes/ki-bundestag/commit/859c84c7648a45c2d0f2258f81c8f46ec158b7c4))
+
 ## [1.7.10](https://github.com/easingthemes/ki-bundestag/compare/v1.7.9...v1.7.10) (2026-04-09)
 
 
