@@ -4,7 +4,9 @@ Draft message to share with colleagues in Slack.
 
 ---
 
-:rocket: Built a side project: *KAI Bundestag* — an AI simulation of the German parliament where 6 Claude-powered parties autonomously propose bills, debate, form coalitions, and govern.
+This is how I learned agentic workflows — learning by doing. :rocket:
+
+Meet *KAI Bundestag*: an AI simulation of the German parliament where 6 Claude-powered parties autonomously propose bills, debate, form coalitions, and govern.
 
 Live: https://bundestag.easingthemes.com/
 
