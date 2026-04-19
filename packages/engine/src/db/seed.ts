@@ -72,6 +72,15 @@ export function migrateDatabase() {
     if (committeeBackfill.changes > 0) {
       console.log(`[Migrate] Backfilled committee stage_min_duration on ${committeeBackfill.changes} bill(s)`);
     }
+
+    // 3. Pre-PR-3 passed bills: treat as already in force (Inkrafttreten == status change day).
+    //    Impact was applied at the old bill_passed emission point so no re-application needed.
+    const passedBackfill = sqlite.prepare(
+      "UPDATE bills SET bundesrat_state = 'cleared', inkrafttreten_day = COALESCE(status_changed_on_day, proposed_on_day) WHERE status = 'passed' AND bundesrat_state IS NULL",
+    ).run();
+    if (passedBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled Bundesrat/Inkrafttreten state on ${passedBackfill.changes} already-passed bill(s)`);
+    }
   } catch {
     // bills table might not have the new columns yet on very old DBs
   }

@@ -36,6 +36,10 @@ export const bills = sqliteTable("bills", {
   stageMinDuration: integer("stage_min_duration"),
   stageMaxDuration: integer("stage_max_duration"),
   isComplexBill: integer("is_complex_bill", { mode: "boolean" }).default(false),
+  bundesratState: text("bundesrat_state"),
+  bundesratEntryDay: integer("bundesrat_entry_day"),
+  ausfertigungDay: integer("ausfertigung_day"),
+  inkrafttretenDay: integer("inkrafttreten_day"),
 });
 
 export const nationalState = sqliteTable("national_state", {

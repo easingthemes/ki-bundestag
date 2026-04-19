@@ -76,6 +76,14 @@ export interface Bill {
   stageMaxDuration?: number;
   /** True for bills drawn on the longer (complex) committee timing tier. */
   isComplexBill?: boolean;
+  /** Post-3rd-reading state. Null until parliament passes the bill. */
+  bundesratState?: "pending" | "cleared";
+  /** Day the bill entered the Bundesrat phase (== day 3rd-reading vote passed). */
+  bundesratEntryDay?: number;
+  /** Scheduled Ausfertigung (Kanzler/Minister signature) day. */
+  ausfertigungDay?: number;
+  /** Day the bill takes effect (Inkrafttreten). bill_passed fires here. */
+  inkrafttretenDay?: number;
 }
 
 // Motions & Resolutions

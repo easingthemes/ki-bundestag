@@ -33,6 +33,10 @@ export const SIM_TABLE_DDL = `
     stage_min_duration INTEGER,
     stage_max_duration INTEGER,
     is_complex_bill INTEGER NOT NULL DEFAULT 0,
+    bundesrat_state TEXT,
+    bundesrat_entry_day INTEGER,
+    ausfertigung_day INTEGER,
+    inkrafttreten_day INTEGER,
     FOREIGN KEY (proposed_by) REFERENCES parties(id)
   );
 
@@ -629,6 +633,10 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "bills", column: "stage_min_duration", sql: "ALTER TABLE bills ADD COLUMN stage_min_duration INTEGER" },
   { table: "bills", column: "stage_max_duration", sql: "ALTER TABLE bills ADD COLUMN stage_max_duration INTEGER" },
   { table: "bills", column: "is_complex_bill", sql: "ALTER TABLE bills ADD COLUMN is_complex_bill INTEGER NOT NULL DEFAULT 0" },
+  { table: "bills", column: "bundesrat_state", sql: "ALTER TABLE bills ADD COLUMN bundesrat_state TEXT" },
+  { table: "bills", column: "bundesrat_entry_day", sql: "ALTER TABLE bills ADD COLUMN bundesrat_entry_day INTEGER" },
+  { table: "bills", column: "ausfertigung_day", sql: "ALTER TABLE bills ADD COLUMN ausfertigung_day INTEGER" },
+  { table: "bills", column: "inkrafttreten_day", sql: "ALTER TABLE bills ADD COLUMN inkrafttreten_day INTEGER" },
 ];
 
 /** Column migrations for user DB */
