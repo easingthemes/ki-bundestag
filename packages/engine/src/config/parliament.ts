@@ -106,6 +106,36 @@ export const VALID_MOODS: string[] = [
   "Krisenreaktion", "Wahlkampf", "Haushaltsstreit", "Regierungswechsel",
 ];
 
+// ── Bill pipeline stage durations ───────────────────────────────────
+/**
+ * Per-stage minimum dwell time (in sim days) before a bill can advance.
+ *
+ * Committee phase has two tiers:
+ *   - ordinary: 6–12 weeks (matches 20. WP median)
+ *   - complex:  3–6 months (constitutional amendments, structural reforms)
+ *
+ * First/second readings advance on the next Sitzungstag (gating handled by
+ * the pipeline). Third reading follows the second on the same sitting day
+ * (GO-BT §81 — standard practice is 2./3. Lesung back-to-back).
+ */
+export const BILL_STAGE_DURATIONS = {
+  proposed:       { min: 0, max: 0 },
+  first_reading:  { min: 1, max: 1 },
+  committee: {
+    ordinary: { min: 42, max: 84 },
+    complex:  { min: 90, max: 180 },
+  },
+  second_reading: { min: 1, max: 1 },
+  third_reading:  { min: 0, max: 0 },
+} as const;
+
+/**
+ * Baseline probability that a newly-proposed bill is drawn on the complex
+ * committee tier. Reserved for constitutional amendments, Steuerreformen,
+ * Rentenreformen. Actual categorisation heuristic lives in bill-pipeline.ts.
+ */
+export const COMPLEX_BILL_PROBABILITY = 0.15;
+
 // ── Parliamentary calendar ──────────────────────────────────────────
 /**
  * Abstract calendar rule: even ISO weeks are Sitzungswochen, minus recess

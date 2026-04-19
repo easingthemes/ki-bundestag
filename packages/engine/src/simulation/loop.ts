@@ -889,7 +889,7 @@ export async function runDay(): Promise<number> {
 
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
-    const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties);
+    const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties, startDate);
     for (const ev of pipelineEvents) {
       addEvent(dayEvents, ev);
     }

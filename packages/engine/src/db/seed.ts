@@ -51,6 +51,31 @@ export function migrateDatabase() {
     // bills table might not have the new columns yet
   }
 
+  // Cycle 1 (todo 043) — backfill bill stage timing for in-flight bills.
+  // Idempotent: each UPDATE is guarded by WHERE col IS NULL.
+  try {
+    // 1. stage_entry_day defaults to status_changed_on_day, falling back to proposed_on_day
+    const entryBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_entry_day = COALESCE(status_changed_on_day, proposed_on_day) WHERE stage_entry_day IS NULL",
+    ).run();
+    if (entryBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled stage_entry_day on ${entryBackfill.changes} bill(s)`);
+    }
+
+    // 2. Committee-stage bills without a drawn stage_min_duration — assign
+    //    the ordinary-tier minimum (42 days). Existing bills already past this
+    //    threshold will simply advance on the next Sitzungstag, which matches
+    //    the Cycle 1 spec Q3 ("backfill + force-advance").
+    const committeeBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_min_duration = 42, stage_max_duration = 84 WHERE status = 'committee' AND stage_min_duration IS NULL",
+    ).run();
+    if (committeeBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled committee stage_min_duration on ${committeeBackfill.changes} bill(s)`);
+    }
+  } catch {
+    // bills table might not have the new columns yet on very old DBs
+  }
+
   // Auto-populate fraktionen if table exists but is empty and parties have seats
   try {
     const fraktionCount = sqlite.prepare("SELECT COUNT(*) as cnt FROM fraktionen").get() as { cnt: number };

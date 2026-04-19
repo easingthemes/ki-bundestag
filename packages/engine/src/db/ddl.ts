@@ -29,6 +29,10 @@ export const SIM_TABLE_DDL = `
     original_impact TEXT,
     status_changed_on_day INTEGER,
     vetoed_by_president INTEGER NOT NULL DEFAULT 0,
+    stage_entry_day INTEGER,
+    stage_min_duration INTEGER,
+    stage_max_duration INTEGER,
+    is_complex_bill INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (proposed_by) REFERENCES parties(id)
   );
 
@@ -620,6 +624,11 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "parties", column: "inactive_days", sql: "ALTER TABLE parties ADD COLUMN inactive_days INTEGER NOT NULL DEFAULT 0" },
   { table: "bot_question_pool", column: "_table", sql: "CREATE TABLE IF NOT EXISTS bot_question_pool (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT NOT NULL, target_party_id TEXT NOT NULL REFERENCES parties(id), tags TEXT NOT NULL DEFAULT '[]', relevant_for_parties TEXT NOT NULL DEFAULT '[]', generated_on_day INTEGER NOT NULL, used_by_bot_id TEXT, used_on_day INTEGER)" },
   { table: "simulation_meta", column: "bots_enabled", sql: "ALTER TABLE simulation_meta ADD COLUMN bots_enabled INTEGER NOT NULL DEFAULT 1" },
+  // Cycle 1 (todo 043) — bill pipeline stage timing
+  { table: "bills", column: "stage_entry_day", sql: "ALTER TABLE bills ADD COLUMN stage_entry_day INTEGER" },
+  { table: "bills", column: "stage_min_duration", sql: "ALTER TABLE bills ADD COLUMN stage_min_duration INTEGER" },
+  { table: "bills", column: "stage_max_duration", sql: "ALTER TABLE bills ADD COLUMN stage_max_duration INTEGER" },
+  { table: "bills", column: "is_complex_bill", sql: "ALTER TABLE bills ADD COLUMN is_complex_bill INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */

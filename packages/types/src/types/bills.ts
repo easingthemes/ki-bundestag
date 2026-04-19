@@ -68,6 +68,14 @@ export interface Bill {
   vetoedByPresident?: boolean;
   memberInitiative?: boolean;
   proposerDisplayName?: string;
+  /** Day the bill entered its current stage. Drives min-dwell gating. */
+  stageEntryDay?: number;
+  /** Minimum days the bill must spend in the current stage (persisted per-bill). */
+  stageMinDuration?: number;
+  /** Soft cap on stage duration (informational; pipeline doesn't force-exit today). */
+  stageMaxDuration?: number;
+  /** True for bills drawn on the longer (complex) committee timing tier. */
+  isComplexBill?: boolean;
 }
 
 // Motions & Resolutions
