@@ -73,6 +73,19 @@ export function migrateDatabase() {
       console.log(`[Migrate] Backfilled committee stage_min_duration on ${committeeBackfill.changes} bill(s)`);
     }
 
+    // 2b. 1st/2nd reading bills get the 1-day min/max from BILL_STAGE_DURATIONS.
+    //     Pipeline reads from config directly, so this is cosmetic parity with
+    //     committee rows — keeps row-level state self-describing and makes DB
+    //     inspection less ambiguous. third_reading excluded: legacy rows there
+    //     may be mid-tally, pre-tally, or post-vote, and their intended
+    //     stage_min_duration depends on which sub-phase they're in.
+    const readingBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_min_duration = 1, stage_max_duration = 1 WHERE status IN ('first_reading','second_reading') AND stage_min_duration IS NULL",
+    ).run();
+    if (readingBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled reading-stage stage_min_duration on ${readingBackfill.changes} bill(s)`);
+    }
+
     // 3. Pre-PR-3 passed bills: treat as already in force (Inkrafttreten == status change day).
     //    Impact was applied at the old bill_passed emission point so no re-application needed.
     const passedBackfill = sqlite.prepare(
