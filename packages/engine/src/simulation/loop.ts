@@ -25,7 +25,7 @@ import { tallyVotes } from "./voting.js";
 import { applyDailyApprovalDrift, approvalFromBillOutcome, applySentimentDrift, normalizeApprovalChanges, clampApproval } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
-import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
+import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS, computeKonstituierendeSitzungDay } from "./elections.js";
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
@@ -757,11 +757,8 @@ export async function runDay(): Promise<number> {
         data: { electionId: activeElection.id, agreement },
       });
 
-      // Update Fraktionen based on new seat counts
-      const fraktionResult = updateFraktionen(currentDay, allParties);
-      for (const ev of fraktionResult.events) {
-        addEvent(dayEvents, ev);
-      }
+      // Fraktionsbildung now lands on the konstituierende Sitzung day (Cycle 1
+       // PR 4) — the formal Bundestag is not yet constituted at coalition time.
 
       const coalitionNames = coalition.map(id => allParties.find(p => p.id === id)!.name).join(", ");
       addEvent(dayEvents, {
@@ -843,18 +840,24 @@ export async function runDay(): Promise<number> {
       console.log(`  [Election] Election day! Calculating results...`);
       const results = calculateResults(allParties);
 
+      // Konstituierende Sitzung — Art. 39 Abs. 2 GG, scheduled now so the
+      // interregnum gate has a target day to compare against from tomorrow on.
+      const ksDay = computeKonstituierendeSitzungDay(activeElection.electionDay, startDate);
+
       // Store results and transition to negotiation
       db.update(schema.elections)
         .set({
           status: "negotiation",
           results: results as any,
           negotiationRounds: [] as any,
+          konstituierendeSitzungDay: ksDay,
         })
         .where(eq(schema.elections.id, activeElection.id))
         .run();
 
       activeElection.results = results;
       activeElection.status = "negotiation";
+      activeElection.konstituierendeSitzungDay = ksDay;
 
       const resultsStr = results
         .sort((a, b) => b.seatsWon - a.seatsWon)
@@ -882,6 +885,46 @@ export async function runDay(): Promise<number> {
   }
 
   progress.set(10); // Init + elections phase done
+
+  // Konstituierende Sitzung gate — Art. 39 Abs. 2 GG. Between election day and
+  // the konstituierende Sitzung the old Bundestag has dissolved and the new
+  // one is not yet formally constituted, so plenary events are blocked. On the
+  // konstituierende Sitzung day itself we emit the event and form Fraktionen.
+  const latestElectionForKS = db.select().from(schema.elections)
+    .orderBy(desc(schema.elections.electionDay))
+    .limit(1)
+    .all()[0];
+  if (latestElectionForKS?.konstituierendeSitzungDay != null) {
+    const ksDay = latestElectionForKS.konstituierendeSitzungDay;
+    if (currentDay < ksDay) {
+      // Interregnum — block plenary events. Coalition negotiations may still
+      // run; they're handled before this point and don't depend on a
+      // constituted Bundestag.
+      skipPartyAgents = true;
+    } else if (currentDay >= ksDay) {
+      // Konstituierende Sitzung emission is idempotent: only fires if no event
+      // of this type exists for the new term yet (i.e. >= electionDay).
+      const alreadyHeld = db.select().from(schema.simulationEvents)
+        .where(and(
+          eq(schema.simulationEvents.type, "konstituierende_sitzung"),
+          gte(schema.simulationEvents.dayNumber, latestElectionForKS.electionDay),
+        ))
+        .all().length > 0;
+      if (!alreadyHeld) {
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "konstituierende_sitzung",
+          actor: "system",
+          title: "Konstituierende Sitzung des Bundestages",
+          description: `Der neugewählte Bundestag tritt erstmals zusammen. Fraktionsbildung, Wahl des/der Bundestagspräsidenten/in (Cycle 2), Konstituierung von Ältestenrat und Ausschüssen (Cycle 2).`,
+          data: { electionId: latestElectionForKS.id, electionDay: latestElectionForKS.electionDay },
+        });
+        const fraktionResult = updateFraktionen(currentDay, allParties);
+        for (const ev of fraktionResult.events) addEvent(dayEvents, ev);
+        console.log(`  [Konstituierende Sitzung] Bundestag formally constituted; ${fraktionResult.formed.length} Fraktion(en) formed`);
+      }
+    }
+  }
 
   // Hoisted so inactivity tracking can read it after the if-block
   const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();

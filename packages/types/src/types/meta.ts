@@ -46,7 +46,8 @@ export type SimulationEventType =
   | "presidential_veto"
   | "bill_committee_rejected"
   | "mdb_speech"
-  | "sidejob_scandal";
+  | "sidejob_scandal"
+  | "konstituierende_sitzung";
 
 export interface SimulationEvent {
   id: string;
