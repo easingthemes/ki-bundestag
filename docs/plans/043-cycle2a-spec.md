@@ -190,3 +190,126 @@ vermittlungOutcome: text("vermittlung_outcome"),         // "compromise" | "bund
 ### Loop integration
 
 None — Stage 5 is already dispatched from `advanceBillPipeline()` which `loop.ts:892` calls in Step 5 of the 13-step flow. No new call-sites.
+
+## Design — Piece 2: Kanzlerwahl (Art. 63 GG, 3 phases) + Amtseid
+
+Splits coalition completion (AI/algorithmic) from cabinet formation (post-Amtseid). Today `loop.ts:776` calls `formCabinet()` on the same day as `negotiation_complete`; Cycle 1 already deferred Fraktionsbildung to the Konstituierende Sitzung (`loop.ts:760` comment). Cycle 2a completes the decoupling: the coalition agreement names a Chancellor-Kandidat, Kanzlerwahl happens on (or after) KS day, and only then does the cabinet form.
+
+### New module: `packages/engine/src/simulation/kanzlerwahl.ts`
+
+```ts
+export type KanzlerwahlPhase = 1 | 2 | 3;
+export type KanzlerwahlOutcome = "elected" | "failed" | "pending";
+
+export interface KanzlerwahlRound {
+  phase: KanzlerwahlPhase;
+  day: number;
+  candidatePartyId: string;
+  candidateName: string;
+  votesYes: number;
+  votesNo: number;
+  votesAbstain: number;
+  required: number;          // Kanzlermehrheit for Phase 1/2, relative majority for Phase 3
+  outcome: KanzlerwahlOutcome;
+}
+
+export interface KanzlerwahlState {
+  id: string;
+  electionId: string;
+  startedOnDay: number;
+  phase1: KanzlerwahlRound | null;
+  phase2Rounds: KanzlerwahlRound[];       // 0..N within 14-day window
+  phase2WindowEndDay: number | null;
+  phase3: KanzlerwahlRound | null;
+  status: "phase1" | "phase2" | "phase3" | "elected" | "failed";
+  electedCandidatePartyId: string | null;
+  electedCandidateName: string | null;
+  amtseidDay: number | null;
+}
+
+export function startKanzlerwahl(electionId: string, agreement: CoalitionAgreement | null,
+  coalition: string[], allParties: Party[], day: number): KanzlerwahlState;
+
+export function runPhase1(state: KanzlerwahlState, allParties: Party[],
+  coalitionParties: string[], day: number): KanzlerwahlState;
+
+export function runPhase2Round(state: KanzlerwahlState, allParties: Party[],
+  coalitionParties: string[], day: number): KanzlerwahlState;
+
+export function runPhase3(state: KanzlerwahlState, allParties: Party[],
+  coalitionParties: string[], day: number): KanzlerwahlState;
+```
+
+### New module: `packages/engine/src/simulation/chancellor-tally.ts` (or reuse `voting.ts`)
+
+Keep tally logic co-located with bill voting. Extend `voting.ts` with:
+
+```ts
+export function tallyChancellorVote(
+  candidatePartyId: string,
+  parties: Party[],
+  coalitionParties: string[],
+  mode: "absolute" | "relative",
+): { yes: number; no: number; abstain: number; passed: boolean };
+```
+
+Mode `"absolute"` requires `yes >= MAJORITY_SEATS` (Kanzlermehrheit, Art. 63 Abs. 1/3 GG). Mode `"relative"` requires `yes > no` (Art. 63 Abs. 4 Satz 2 GG). Abstain behaviour is standard Fraktionsdisziplin: coalition parties vote yes on their own candidate, opposition parties vote no on the candidate party's leader, third-party candidates produce split votes.
+
+### New schema: `kanzlerwahl` table
+
+```ts
+export const kanzlerwahl = sqliteTable("kanzlerwahl", {
+  id: text("id").primaryKey(),
+  electionId: text("election_id").notNull().references(() => elections.id),
+  startedOnDay: integer("started_on_day").notNull(),
+  phase1: text("phase1", { mode: "json" }),                   // KanzlerwahlRound | null
+  phase2Rounds: text("phase2_rounds", { mode: "json" }).notNull().default("[]"),
+  phase2WindowEndDay: integer("phase2_window_end_day"),
+  phase3: text("phase3", { mode: "json" }),
+  status: text("status").notNull(),
+  electedCandidatePartyId: text("elected_candidate_party_id"),
+  electedCandidateName: text("elected_candidate_name"),
+  amtseidDay: integer("amtseid_day"),
+});
+```
+
+`CoalitionAgreement` gains a `chancellorCandidate?: { partyId: string; name: string }` optional field (types package — pure additive). `synthesizeAgreement()` prompt gets one new JSON field; when the AI omits it, fall back to `FRAKTION_LEADERS[coalition[0]]`.
+
+### Event types (additions to `SimulationEventType`)
+
+```ts
+| "kanzlerwahl_phase1"
+| "kanzlerwahl_phase2"
+| "kanzlerwahl_phase3"
+| "amtseid"
+```
+
+All four classified as `IMPORTANT_EVENTS`. `amtseid` additionally flagged CRITICAL (end of interregnum).
+
+### Constants (`config/elections.ts`)
+
+```ts
+export const KANZLERWAHL_PHASE2_WINDOW_DAYS = 14;   // Art. 63 Abs. 3 GG
+export const KANZLERWAHL_PHASE2_MAX_ROUNDS = 3;     // sim cap — prevents AI-driven infinite rounds
+```
+
+### Loop integration (replacing `loop.ts:760–808`)
+
+The block that runs when negotiations max out (`loop.ts:672` branch, `roundNumber >= getMaxNegotiationRounds()`) is split into three new call-sites:
+
+1. **Coalition finalisation** (same place, `loop.ts:~672`): persist `newCoalition`/`newOpposition`/`coalitionAgreement`, emit `negotiation_complete` and `government_formed`. **Remove** the inline `formCabinet()` call at `loop.ts:776`. Seat allocation (`resetAllSeats` + `allocateSeats`, `loop.ts:789–793`) and MdB-application expiry stay here — those are administrative and independent of Kanzlerwahl.
+2. **Kanzlerwahl trigger** (new block inside the Konstituierende-Sitzung gate in `loop.ts:~905`): when `currentDay === ksDay` AND the latest election has `newCoalition` set but no `kanzlerwahl` row yet, call `startKanzlerwahl()` + `runPhase1()` synchronously. Emit `kanzlerwahl_phase1` with full vote breakdown. If Phase 1 passes: set `amtseidDay = nextSitzungsTag(day+1)`. If not: set `phase2WindowEndDay = day + KANZLERWAHL_PHASE2_WINDOW_DAYS`.
+3. **Kanzlerwahl progression + Amtseid** (new block right after KS gate): daily check for active `kanzlerwahl` row where `status in ("phase2","phase3")`:
+   - Phase 2: if `isSitzungsTag(day)` and `phase2Rounds.length < PHASE2_MAX_ROUNDS`, run a round. On pass → set `amtseidDay`. On `day >= phase2WindowEndDay` without a pass → transition to Phase 3.
+   - Phase 3: run `runPhase3()` once. Relative-majority winner always wins (per sub-decision Q3). Set `amtseidDay = nextSitzungsTag(day+1)`.
+   - On `currentDay === amtseidDay`: emit `amtseid` event, call `formCabinet(coalition, allParties, electionId, currentDay)` (moved from `loop.ts:776`), emit `government_cabinet_formed` (existing event, same data), run `shouldSeedCommittees()` + `assignCommitteeMemberships()` (moved from `loop.ts:801–806`).
+
+### Acting-government window (sub-decision S7)
+
+`formCabinet()` at `government.ts:24` currently calls `dissolveGovernment(currentDay)` at the top. Change: only dissolve when an Amtseid actually lands. Between Wahltag and Amtseid of the new Chancellor, the old government stays `active=true` — matches Art. 69 Abs. 3 GG (geschäftsführende Bundesregierung). In practice, just moving `formCabinet()` to Amtseid day accomplishes this naturally, since the old government keeps its `active` flag until the new one is inserted.
+
+### Candidate selection detail (sub-decision S5)
+
+- Phase 1 candidate: `agreement.chancellorCandidate.partyId` if present, else `FRAKTION_LEADERS[coalition[0]]`. Name: `agreement.chancellorCandidate.name` or `FRAKTION_LEADERS[coalition[0]]`.
+- Phase 2 candidates: any party may nominate — for the sim, iterate through parties by seat count, each gets one round. Cap at `KANZLERWAHL_PHASE2_MAX_ROUNDS`. A round passes if `tallyChancellorVote(candidate, "absolute").passed === true`.
+- Phase 3 candidate: party with the highest Phase-2 vote count (the "relative-majority winner" ready-made). If Phase 2 had zero rounds, fall back to coalition leader's candidate.
