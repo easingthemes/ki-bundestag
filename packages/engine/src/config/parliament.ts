@@ -105,3 +105,19 @@ export const VALID_MOODS: string[] = [
   "Stabile Mehrheit", "Koalitionsreibung", "Politischer Druck",
   "Krisenreaktion", "Wahlkampf", "Haushaltsstreit", "Regierungswechsel",
 ];
+
+// ── Parliamentary calendar ──────────────────────────────────────────
+/**
+ * Abstract calendar rule: even ISO weeks are Sitzungswochen, minus recess
+ * periods, plus one forced Haushaltswoche per year. Matches real Bundestag
+ * density of ~20–22 sitting weeks per year without requiring an externally
+ * maintained Sitzungskalender JSON.
+ */
+export const CALENDAR = {
+  /** Expected Sitzungswochen per year (for reference / tests). */
+  SITZUNGS_WEEKS_PER_YEAR_TARGET: 22,
+  /** Month (0-indexed) that holds the Haushaltswoche. */
+  HAUSHALTS_WEEK_MONTH: 10, // November
+  /** 1-indexed ordinal of the Monday-week within HAUSHALTS_WEEK_MONTH. */
+  HAUSHALTS_WEEK_OF_MONTH: 2,
+} as const;
