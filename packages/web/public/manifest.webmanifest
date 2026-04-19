@@ -14,14 +14,26 @@
       "sizes": "any"
     },
     {
-      "src": "/favicon-32x32.png",
+      "src": "/favicon-96x96.png",
       "type": "image/png",
-      "sizes": "32x32"
+      "sizes": "96x96"
     },
     {
       "src": "/apple-touch-icon.png",
       "type": "image/png",
       "sizes": "180x180"
+    },
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ]
 }
