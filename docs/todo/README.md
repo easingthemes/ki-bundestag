@@ -56,7 +56,7 @@
 
 ---
 
-## Open (5 items)
+## Open (6 items)
 
 ### 032 — Collect Real-World Cost & Timing Data
 **Area**: Operations  
@@ -70,10 +70,17 @@ Horizontal slider from day 1 to current day. Drag to preview events, click for f
 
 ### 041 — Make Debates Visible and Prominent
 **Area**: Web / API / Engine  
-Phase 1: Surface existing speeches in News Feed + dedicated /debates page.  
-Phase 2: AI parties generate debate arguments during bill readings.  
-Phase 3: Threaded debate conversations, user responses.  
+Phase 1 done (Debates page + bot MdB speeches, shipped in 1.8.0).  
+Phase 2 (AI party debates on contested 2nd readings, option C parallel openings + rebuttal) blocked on sim timing fidelity ([043](./043-sim-timing-fidelity.md)).  
+Phase 3 (threaded user↔party exchanges) future.  
 [Details →](./041-debate-visibility.md)
+
+### 043 — Sim Events 1:1 Fidelity to Real Bundestag
+**Area**: Engine / DB / Simulation  
+Full sim-vs-reality audit complete (~35–40% event coverage today). Remediation in cycles P0–P4.  
+Cycle 1 (P0): parliamentary calendar + bill pipeline timing + konstituierende Sitzung. Ready for brainstorm.  
+Blocks: 041 Phase 2.  
+[Details →](./043-sim-timing-fidelity.md) · [Audit →](../research/sim-vs-real-gaps.md)
 
 ### 042 — Fix Deploy Workflow Not Triggering on Release
 **Area**: CI/CD  
