@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { dwellDays, committeeRange } from "./bill-pipeline.js";
-import { BILL_STAGE_DURATIONS } from "../config/parliament.js";
+import {
+  BILL_STAGE_DURATIONS,
+  BUNDESRAT_DURATION,
+  AUSFERTIGUNG_DURATION,
+  INKRAFTTRETEN_OFFSET,
+} from "../config/parliament.js";
 import type { Bill } from "@ki-bundestag/types";
 
 function makeBill(over: Partial<Bill>): Bill {
@@ -66,6 +71,33 @@ describe("bill-pipeline helpers", () => {
 
     it("third reading can happen same sitting day as second", () => {
       expect(BILL_STAGE_DURATIONS.third_reading.min).toBe(0);
+    });
+  });
+
+  describe("post-3rd-reading timing", () => {
+    it("Bundesrat phase is 3–6 weeks", () => {
+      expect(BUNDESRAT_DURATION.min).toBe(21);
+      expect(BUNDESRAT_DURATION.max).toBe(42);
+    });
+
+    it("Ausfertigung phase is 2–6 weeks", () => {
+      expect(AUSFERTIGUNG_DURATION.min).toBe(14);
+      expect(AUSFERTIGUNG_DURATION.max).toBe(42);
+    });
+
+    it("default Inkrafttreten is +14 days after BGBl", () => {
+      expect(INKRAFTTRETEN_OFFSET).toBe(14);
+    });
+
+    it("minimum end-to-end post-3rd-reading timeline ≥ 49 days", () => {
+      // Even the fastest path: 21 (Bundesrat min) + 14 (Ausfert. min) + 14 (Inkrafttreten)
+      const minimum = BUNDESRAT_DURATION.min + AUSFERTIGUNG_DURATION.min + INKRAFTTRETEN_OFFSET;
+      expect(minimum).toBe(49);
+    });
+
+    it("maximum end-to-end post-3rd-reading timeline ≤ 98 days", () => {
+      const maximum = BUNDESRAT_DURATION.max + AUSFERTIGUNG_DURATION.max + INKRAFTTRETEN_OFFSET;
+      expect(maximum).toBe(98);
     });
   });
 });

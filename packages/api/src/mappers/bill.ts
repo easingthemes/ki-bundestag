@@ -26,5 +26,9 @@ export function mapBill(row: typeof schema.bills.$inferSelect): Bill {
     stageMinDuration: row.stageMinDuration ?? undefined,
     stageMaxDuration: row.stageMaxDuration ?? undefined,
     isComplexBill: row.isComplexBill ?? undefined,
+    bundesratState: (row.bundesratState as "pending" | "cleared" | null) ?? undefined,
+    bundesratEntryDay: row.bundesratEntryDay ?? undefined,
+    ausfertigungDay: row.ausfertigungDay ?? undefined,
+    inkrafttretenDay: row.inkrafttretenDay ?? undefined,
   };
 }

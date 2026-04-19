@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, gte, inArray } from "drizzle-orm";
 import type {
   AgentContext,
   Bill,
@@ -20,9 +20,9 @@ import { getDb, getSqlite, getUserDb, getUserSqlite, schema, migrateDatabase } f
 import { runPartyAgent, buildPartyAgentRequests, processPartyAgentResult } from "../agent/index.js";
 import { submitBatch, findResult, type BatchRequest } from "../agent/batch-client.js";
 import { AIProviderLimitError } from "../agent/client.js";
-import { applyEconomicDrift, applyBillImpact, reverseBillImpact } from "./economy.js";
+import { applyEconomicDrift, reverseBillImpact } from "./economy.js";
 import { tallyVotes } from "./voting.js";
-import { applyDailyApprovalDrift, approvalFromBillOutcome, updateSentiment, applySentimentDrift, normalizeApprovalChanges, clampApproval } from "./opinion.js";
+import { applyDailyApprovalDrift, approvalFromBillOutcome, applySentimentDrift, normalizeApprovalChanges, clampApproval } from "./opinion.js";
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
@@ -44,7 +44,6 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
-import { checkPresidentialVeto } from "./veto.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
 import { createNotification, createNotificationForAll } from "./event-queue.js";
@@ -889,7 +888,7 @@ export async function runDay(): Promise<number> {
 
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
-    const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties, startDate);
+    const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties, startDate, nationalState);
     for (const ev of pipelineEvents) {
       addEvent(dayEvents, ev);
     }
@@ -897,8 +896,10 @@ export async function runDay(): Promise<number> {
     // Collect bills for agent calls — fresh DB queries so the validator and prompt
     // always agree on the exact set of votable bills, even if the in-memory allBills
     // snapshot is stale from a prior aborted run or mid-step pipeline mutation.
+    // Bills in Bundesrat / Ausfertigung phase keep status='third_reading' but have
+    // bundesratState set, so exclude them — the 3rd-reading vote has already happened.
     const thirdReadingBills = db.select().from(schema.bills)
-      .where(eq(schema.bills.status, "third_reading"))
+      .where(and(eq(schema.bills.status, "third_reading"), isNull(schema.bills.bundesratState)))
       .all() as unknown as Bill[];
     const secondReadingBills = db.select().from(schema.bills)
       .where(eq(schema.bills.status, "second_reading"))
@@ -1317,23 +1318,45 @@ export async function runDay(): Promise<number> {
 
       // Tally and determine outcome
       const result = tallyVotes(bill, allParties, mdbVoteEntries.length > 0 ? mdbVoteEntries : undefined, Object.keys(humanSeatCountsForTally).length > 0 ? humanSeatCountsForTally : undefined);
-      const newStatus = result.passed ? "passed" : "rejected";
 
-      db.update(schema.bills)
-        .set({ status: newStatus })
-        .where(eq(schema.bills.id, bill.id))
-        .run();
+      if (result.passed) {
+        // Parliament approved — bill enters Bundesrat / Ausfertigung phase.
+        // bill_passed now fires at Inkrafttreten (emitted by bill-pipeline), not here.
+        const bundesratMin = 21 + Math.floor(Math.random() * 22); // 21..42 days
+        db.update(schema.bills)
+          .set({
+            bundesratState: "pending",
+            bundesratEntryDay: currentDay,
+            stageEntryDay: currentDay,
+            stageMinDuration: bundesratMin,
+          })
+          .where(eq(schema.bills.id, bill.id))
+          .run();
+        // Sync in-memory allBills snapshot so same-day downstream logic sees it.
+        bill.bundesratState = "pending";
+        bill.bundesratEntryDay = currentDay;
+        bill.stageEntryDay = currentDay;
+        bill.stageMinDuration = bundesratMin;
+      } else {
+        db.update(schema.bills)
+          .set({ status: "rejected", statusChangedOnDay: currentDay })
+          .where(eq(schema.bills.id, bill.id))
+          .run();
+        bill.status = "rejected";
+        bill.statusChangedOnDay = currentDay;
 
-      addEvent(dayEvents, {
-        dayNumber: currentDay,
-        type: result.passed ? "bill_passed" : "bill_rejected",
-        actor: "system",
-        title: `"${bill.title}" ${result.passed ? "ANGENOMMEN" : "ABGELEHNT"}`,
-        description: `Ja: ${result.yesSeats} Sitze, Nein: ${result.noSeats} Sitze, Enthaltung: ${result.abstainSeats} Sitze`,
-        data: { billId: bill.id, ...result },
-      });
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "bill_rejected",
+          actor: "system",
+          title: `"${bill.title}" ABGELEHNT`,
+          description: `Ja: ${result.yesSeats} Sitze, Nein: ${result.noSeats} Sitze, Enthaltung: ${result.abstainSeats} Sitze`,
+          data: { billId: bill.id, ...result },
+        });
+      }
 
-      // Notify users who signaled on this bill
+      // Notify users who signaled on this bill — fires on parliamentary decision
+      // regardless of Bundesrat/Inkrafttreten timing.
       try {
         const signals = getUserDb().select().from(schema.memberSignals)
           .where(eq(schema.memberSignals.billId, bill.id))
@@ -1350,22 +1373,10 @@ export async function runDay(): Promise<number> {
         }
       } catch {}
 
-      console.log(`  [Vote] "${bill.title}": ${newStatus} (Yes: ${result.yesSeats}, No: ${result.noSeats})`);
+      console.log(`  [Vote] "${bill.title}": ${result.passed ? "PASSED (→ Bundesrat)" : "REJECTED"} (Yes: ${result.yesSeats}, No: ${result.noSeats})`);
 
-      // 9. Apply passed bill impacts (with presidential veto check)
-      if (result.passed) {
-        const { vetoed, events: vetoEvents } = checkPresidentialVeto(bill, allParties, currentDay);
-        for (const ev of vetoEvents) {
-          addEvent(dayEvents, ev);
-        }
-        if (!vetoed) {
-          const impact = bill.impact as BillImpact;
-          nationalState.economy = applyBillImpact(nationalState.economy, impact);
-          nationalState.publicSentiment = updateSentiment(nationalState.publicSentiment, impact);
-        }
-      }
-
-      // Update proposer approval
+      // Proposer approval delta lands on parliamentary decision day — this is
+      // the politically visible moment, independent of Bundesrat/Inkrafttreten.
       for (const party of allParties) {
         const delta = approvalFromBillOutcome(result.passed, party.id === bill.proposedBy);
         if (delta !== 0) {

@@ -1,11 +1,14 @@
 import { and, eq } from "drizzle-orm";
-import type { Amendment, Bill, BillCategory, Party, SimulationEvent } from "@ki-bundestag/types";
+import type { Amendment, Bill, BillCategory, BillImpact, NationalState, Party, SimulationEvent } from "@ki-bundestag/types";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { assignCommittee, generateRecommendation } from "./committees.js";
 import { tallyAmendmentVotes, applyAmendmentToBill } from "./voting.js";
 import { createNotification } from "./event-queue.js";
 import { isSitzungsTag } from "./parliament-calendar.js";
-import { BILL_STAGE_DURATIONS } from "../config/parliament.js";
+import { checkPresidentialVeto } from "./veto.js";
+import { applyBillImpact } from "./economy.js";
+import { updateSentiment } from "./opinion.js";
+import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET } from "../config/parliament.js";
 
 /**
  * Uniform draw from an inclusive integer range.
@@ -54,6 +57,7 @@ export function advanceBillPipeline(
   parties: Party[],
   coalitionParties: string[],
   startDate?: Date,
+  nationalState?: NationalState,
 ): Array<Omit<SimulationEvent, "id">> {
   const db = getDb();
   const events: Array<Omit<SimulationEvent, "id">> = [];
@@ -332,6 +336,74 @@ export function advanceBillPipeline(
     } catch {}
 
     console.log(`  [Pipeline] "${bill.title}" → third_reading`);
+  }
+
+  // Stage 5: third_reading (bundesratState='pending') → Bundesrat cleared + veto check.
+  // Entered when loop.ts tallies a passing 3rd-reading vote and sets bundesratState.
+  // Dwell clock uses bundesratEntryDay; min duration is stored in stageMinDuration
+  // (re-drawn per-bill in loop.ts from BUNDESRAT_DURATION).
+  const bundesratPending = allBills.filter(b =>
+    b.status === "third_reading" &&
+    b.bundesratState === "pending" &&
+    b.bundesratEntryDay != null &&
+    (day - b.bundesratEntryDay) >= (b.stageMinDuration ?? BUNDESRAT_DURATION.min),
+  );
+  for (const bill of bundesratPending) {
+    const { vetoed, events: vetoEvents } = checkPresidentialVeto(bill, parties, day);
+    for (const ev of vetoEvents) events.push(ev);
+    if (vetoed) {
+      // veto.ts has already updated status='rejected' + vetoedByPresident in DB.
+      bill.status = "rejected";
+      bill.statusChangedOnDay = day;
+      continue;
+    }
+    const ausfertigung = day + randomInRange(AUSFERTIGUNG_DURATION.min, AUSFERTIGUNG_DURATION.max);
+    const inkrafttreten = ausfertigung + INKRAFTTRETEN_OFFSET;
+    bill.bundesratState = "cleared";
+    bill.ausfertigungDay = ausfertigung;
+    bill.inkrafttretenDay = inkrafttreten;
+    db.update(schema.bills)
+      .set({
+        bundesratState: "cleared",
+        ausfertigungDay: ausfertigung,
+        inkrafttretenDay: inkrafttreten,
+      })
+      .where(eq(schema.bills.id, bill.id))
+      .run();
+    console.log(`  [Pipeline] "${bill.title}" → Bundesrat cleared, Inkrafttreten day ${inkrafttreten}`);
+  }
+
+  // Stage 6: Inkrafttreten — status='passed', apply economic impact, emit bill_passed.
+  const inkrafttretenReady = allBills.filter(b =>
+    b.status === "third_reading" &&
+    b.bundesratState === "cleared" &&
+    b.inkrafttretenDay != null &&
+    day >= b.inkrafttretenDay,
+  );
+  for (const bill of inkrafttretenReady) {
+    bill.status = "passed";
+    bill.statusChangedOnDay = day;
+    bill.stageEntryDay = day;
+    db.update(schema.bills)
+      .set({ status: "passed", statusChangedOnDay: day, stageEntryDay: day })
+      .where(eq(schema.bills.id, bill.id))
+      .run();
+
+    if (nationalState) {
+      const impact = bill.impact as BillImpact;
+      nationalState.economy = applyBillImpact(nationalState.economy, impact);
+      nationalState.publicSentiment = updateSentiment(nationalState.publicSentiment, impact);
+    }
+
+    events.push({
+      dayNumber: day,
+      type: "bill_passed",
+      actor: "system",
+      title: `"${bill.title}" — tritt in Kraft`,
+      description: `Das Gesetz wurde im Bundesgesetzblatt verkündet und tritt heute in Kraft.`,
+      data: { billId: bill.id, inkrafttretenDay: day },
+    });
+    console.log(`  [Pipeline] "${bill.title}" → passed (Inkrafttreten)`);
   }
 
   return events;

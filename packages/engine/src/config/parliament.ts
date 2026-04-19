@@ -136,6 +136,20 @@ export const BILL_STAGE_DURATIONS = {
  */
 export const COMPLEX_BILL_PROBABILITY = 0.15;
 
+// ── Post-3rd-reading timing ─────────────────────────────────────────
+/**
+ * Bundesrat 2. Durchgang window (sim days). Cycle 1 models the phase as a
+ * dwell timer only — Zustimmungsgesetz / Einspruchsgesetz and Vermittlungs-
+ * ausschuss voting logic are P1. Real range per 20. WP: 3–6 weeks.
+ */
+export const BUNDESRAT_DURATION = { min: 21, max: 42 } as const;
+
+/** Ausfertigung (Kanzler + ressortverantwortlicher Minister signature) + Verkündung im BGBl. */
+export const AUSFERTIGUNG_DURATION = { min: 14, max: 42 } as const;
+
+/** Default offset between Verkündung and Inkrafttreten when the bill doesn't specify. */
+export const INKRAFTTRETEN_OFFSET = 14;
+
 // ── Parliamentary calendar ──────────────────────────────────────────
 /**
  * Abstract calendar rule: even ISO weeks are Sitzungswochen, minus recess
