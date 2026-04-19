@@ -22,5 +22,9 @@ export function mapBill(row: typeof schema.bills.$inferSelect): Bill {
     vetoedByPresident: row.vetoedByPresident ?? undefined,
     memberInitiative: row.memberInitiative ?? undefined,
     proposerDisplayName: row.proposerDisplayName ?? undefined,
+    stageEntryDay: row.stageEntryDay ?? undefined,
+    stageMinDuration: row.stageMinDuration ?? undefined,
+    stageMaxDuration: row.stageMaxDuration ?? undefined,
+    isComplexBill: row.isComplexBill ?? undefined,
   };
 }

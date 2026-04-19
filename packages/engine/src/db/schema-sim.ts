@@ -32,6 +32,10 @@ export const bills = sqliteTable("bills", {
   vetoedByPresident: integer("vetoed_by_president", { mode: "boolean" }).default(false),
   memberInitiative: integer("member_initiative", { mode: "boolean" }).default(false),
   proposerDisplayName: text("proposer_display_name"),
+  stageEntryDay: integer("stage_entry_day"),
+  stageMinDuration: integer("stage_min_duration"),
+  stageMaxDuration: integer("stage_max_duration"),
+  isComplexBill: integer("is_complex_bill", { mode: "boolean" }).default(false),
 });
 
 export const nationalState = sqliteTable("national_state", {
