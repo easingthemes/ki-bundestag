@@ -63,6 +63,8 @@ export interface Election {
   newOpposition: string[] | null;
   negotiationRounds: NegotiationRound[][] | null;
   coalitionAgreement: CoalitionAgreement | null;
+  /** Day of the konstituierende Sitzung (Art. 39 Abs. 2 GG, ≤30 days post-election). */
+  konstituierendeSitzungDay?: number | null;
 }
 
 // Confidence Votes

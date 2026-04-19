@@ -90,6 +90,7 @@ export const elections = sqliteTable("elections", {
   newOpposition: text("new_opposition", { mode: "json" }),
   negotiationRounds: text("negotiation_rounds", { mode: "json" }),
   coalitionAgreement: text("coalition_agreement", { mode: "json" }),
+  konstituierendeSitzungDay: integer("konstituierende_sitzung_day"),
 });
 
 export const simulationMeta = sqliteTable("simulation_meta", {

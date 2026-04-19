@@ -87,7 +87,8 @@ export const SIM_TABLE_DDL = `
     new_coalition TEXT,
     new_opposition TEXT,
     negotiation_rounds TEXT,
-    coalition_agreement TEXT
+    coalition_agreement TEXT,
+    konstituierende_sitzung_day INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS simulation_meta (
@@ -637,6 +638,7 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "bills", column: "bundesrat_entry_day", sql: "ALTER TABLE bills ADD COLUMN bundesrat_entry_day INTEGER" },
   { table: "bills", column: "ausfertigung_day", sql: "ALTER TABLE bills ADD COLUMN ausfertigung_day INTEGER" },
   { table: "bills", column: "inkrafttreten_day", sql: "ALTER TABLE bills ADD COLUMN inkrafttreten_day INTEGER" },
+  { table: "elections", column: "konstituierende_sitzung_day", sql: "ALTER TABLE elections ADD COLUMN konstituierende_sitzung_day INTEGER" },
 ];
 
 /** Column migrations for user DB */

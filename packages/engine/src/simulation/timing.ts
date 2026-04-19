@@ -112,6 +112,7 @@ export const IMPORTANT_EVENTS = [
   "government_dissolved",
   "government_formed",
   "constitutional_court_ruled",
+  "konstituierende_sitzung",
 ] as const;
 
 export const ROUTINE_EVENTS = [
