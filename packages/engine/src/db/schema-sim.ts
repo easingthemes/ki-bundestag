@@ -99,6 +99,21 @@ export const elections = sqliteTable("elections", {
   konstituierendeSitzungDay: integer("konstituierende_sitzung_day"),
 });
 
+// Cycle 2a — Kanzlerwahl (Art. 63 GG) 3-phase chancellor election.
+export const kanzlerwahl = sqliteTable("kanzlerwahl", {
+  id: text("id").primaryKey(),
+  electionId: text("election_id").notNull().references(() => elections.id),
+  startedOnDay: integer("started_on_day").notNull(),
+  phase1: text("phase1", { mode: "json" }),
+  phase2Rounds: text("phase2_rounds", { mode: "json" }).notNull().default("[]"),
+  phase2WindowEndDay: integer("phase2_window_end_day"),
+  phase3: text("phase3", { mode: "json" }),
+  status: text("status").notNull(),
+  electedCandidatePartyId: text("elected_candidate_party_id"),
+  electedCandidateName: text("elected_candidate_name"),
+  amtseidDay: integer("amtseid_day"),
+});
+
 export const simulationMeta = sqliteTable("simulation_meta", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentDay: integer("current_day").notNull().default(0),

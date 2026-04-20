@@ -96,6 +96,21 @@ export const SIM_TABLE_DDL = `
     konstituierende_sitzung_day INTEGER
   );
 
+  CREATE TABLE IF NOT EXISTS kanzlerwahl (
+    id TEXT PRIMARY KEY,
+    election_id TEXT NOT NULL,
+    started_on_day INTEGER NOT NULL,
+    phase1 TEXT,
+    phase2_rounds TEXT NOT NULL DEFAULT '[]',
+    phase2_window_end_day INTEGER,
+    phase3 TEXT,
+    status TEXT NOT NULL,
+    elected_candidate_party_id TEXT,
+    elected_candidate_name TEXT,
+    amtseid_day INTEGER,
+    FOREIGN KEY (election_id) REFERENCES elections(id)
+  );
+
   CREATE TABLE IF NOT EXISTS simulation_meta (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     current_day INTEGER NOT NULL DEFAULT 0,
@@ -650,6 +665,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "bills", column: "vermittlung_entry_day", sql: "ALTER TABLE bills ADD COLUMN vermittlung_entry_day INTEGER" },
   { table: "bills", column: "vermittlung_min_duration", sql: "ALTER TABLE bills ADD COLUMN vermittlung_min_duration INTEGER" },
   { table: "bills", column: "vermittlung_outcome", sql: "ALTER TABLE bills ADD COLUMN vermittlung_outcome TEXT" },
+  // Cycle 2a (todo 043) — Kanzlerwahl table (idempotent create for upgrade path)
+  { table: "kanzlerwahl", column: "_table", sql: "CREATE TABLE IF NOT EXISTS kanzlerwahl (id TEXT PRIMARY KEY, election_id TEXT NOT NULL REFERENCES elections(id), started_on_day INTEGER NOT NULL, phase1 TEXT, phase2_rounds TEXT NOT NULL DEFAULT '[]', phase2_window_end_day INTEGER, phase3 TEXT, status TEXT NOT NULL, elected_candidate_party_id TEXT, elected_candidate_name TEXT, amtseid_day INTEGER)" },
 ];
 
 /** Column migrations for user DB */
