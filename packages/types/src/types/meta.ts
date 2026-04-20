@@ -58,7 +58,10 @@ export type SimulationEventType =
   | "regierungsbefragung"
   | "fragestunde"
   | "aktuelle_stunde"
-  | "schriftliche_einzelfragen";
+  | "schriftliche_einzelfragen"
+  | "petition_created"
+  | "petition_quorum_reached"
+  | "petition_debated";
 
 export interface SimulationEvent {
   id: string;

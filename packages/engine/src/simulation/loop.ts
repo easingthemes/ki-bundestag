@@ -56,6 +56,11 @@ import {
   processAktuelleStundeBatchResult,
 } from "./aktuelle-stunde.js";
 import { runSchriftlicheEinzelfragenTick } from "./schriftliche-einzelfragen.js";
+import {
+  maybeSpawnPetition,
+  tickPetitionSignatures,
+  resolveQuorumReachedPetitions,
+} from "./petitions.js";
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
@@ -2160,6 +2165,58 @@ export async function runDay(): Promise<number> {
     } catch (err) {
       console.error("[Loop] Error reviewing party discipline:", err);
     }
+  }
+
+  // 10d3. Cycle 2b PR 8 — Petitions daily tick (spawn + signatures + resolve).
+  try {
+    const spawned = maybeSpawnPetition(currentDay);
+    if (spawned) {
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "petition_created",
+        actor: "citizen",
+        title: `Petition: ${spawned.title}`,
+        description: spawned.description,
+        data: {
+          petitionId: spawned.id,
+          category: spawned.category,
+          authorDisplayName: spawned.authorDisplayName,
+          signatureQuorum: spawned.signatureQuorum,
+          publicWindowEndDay: spawned.publicWindowEndDay,
+        },
+      });
+    }
+
+    const recentBillCats = db.select().from(schema.bills)
+      .orderBy(desc(schema.bills.proposedOnDay))
+      .limit(10)
+      .all()
+      .map(b => b.category as any);
+    const { quorumReached } = tickPetitionSignatures(currentDay, activeCrises, recentBillCats);
+    for (const p of quorumReached) {
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "petition_quorum_reached",
+        actor: "citizen",
+        title: `Petition erreicht Quorum: ${p.title}`,
+        description: `${p.signatureCount.toLocaleString("de-DE")} Unterschriften — der Petitionsausschuss wird sich befassen.`,
+        data: { petitionId: p.id, signatureCount: p.signatureCount, day: currentDay },
+      });
+    }
+
+    const { debated } = resolveQuorumReachedPetitions(currentDay);
+    for (const p of debated) {
+      addEvent(dayEvents, {
+        dayNumber: currentDay,
+        type: "petition_debated",
+        actor: "bundestag",
+        title: `Petition im Plenum: ${p.title}`,
+        description: `Der Bundestag behandelt die Petition nach positiver Empfehlung des Petitionsausschusses.`,
+        data: { petitionId: p.id, outcome: p.outcome },
+      });
+    }
+  } catch (err) {
+    console.warn(`  [Petitions] tick skipped: ${(err as Error).message}`);
   }
 
   // 10e. Answer pending interpellations + expire overdue ones
