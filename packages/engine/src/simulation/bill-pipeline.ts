@@ -9,6 +9,15 @@ import { checkPresidentialVeto } from "./veto.js";
 import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
 import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET } from "../config/parliament.js";
+import { VERMITTLUNG_DURATION } from "../config/bundesrat.js";
+import {
+  voteBundesrat,
+  getBundesratMode,
+  rollVermittlungOutcome,
+  resolveVermittlungOutcome,
+  canOverrideEinspruch,
+  applyImpactHaircut,
+} from "./bundesrat.js";
 
 /**
  * Uniform draw from an inclusive integer range.
@@ -39,6 +48,82 @@ export function committeeRange(bill: Bill): { min: number; max: number } {
   return bill.isComplexBill
     ? BILL_STAGE_DURATIONS.committee.complex
     : BILL_STAGE_DURATIONS.committee.ordinary;
+}
+
+/**
+ * Transition a bill out of the Bundesrat phase into 'cleared', running the
+ * presidential veto check and setting Ausfertigung/Inkrafttreten. Called from
+ * Stage 5 (vote passed) and Stage 5b (compromise accepted / Einspruch overridden).
+ *
+ * This is the single place the veto call fires — keep it that way (landmine B2).
+ * Mutates `bill` in place and writes to the sim DB; appends side-effect events.
+ */
+function clearBundesratPhase(
+  bill: Bill,
+  parties: Party[],
+  day: number,
+  events: Omit<SimulationEvent, "id">[],
+): void {
+  const db = getDb();
+  const { vetoed, events: vetoEvents } = checkPresidentialVeto(bill, parties, day);
+  for (const ev of vetoEvents) events.push(ev);
+  if (vetoed) {
+    // veto.ts has already updated status='rejected' + vetoedByPresident in DB.
+    bill.status = "rejected";
+    bill.statusChangedOnDay = day;
+    return;
+  }
+  const ausfertigung = day + randomInRange(AUSFERTIGUNG_DURATION.min, AUSFERTIGUNG_DURATION.max);
+  const inkrafttreten = ausfertigung + INKRAFTTRETEN_OFFSET;
+  bill.bundesratState = "cleared";
+  bill.ausfertigungDay = ausfertigung;
+  bill.inkrafttretenDay = inkrafttreten;
+  db.update(schema.bills)
+    .set({
+      bundesratState: "cleared",
+      ausfertigungDay: ausfertigung,
+      inkrafttretenDay: inkrafttreten,
+    })
+    .where(eq(schema.bills.id, bill.id))
+    .run();
+  console.log(`  [Pipeline] "${bill.title}" → Bundesrat cleared, Inkrafttreten day ${inkrafttreten}`);
+}
+
+function vermittlungOutcomeLabel(outcome: "compromise" | "bundestag_rejects" | "bundesrat_rejects"): string {
+  switch (outcome) {
+    case "compromise":         return "Einigung erzielt";
+    case "bundestag_rejects":  return "Bundestag lehnt ab";
+    case "bundesrat_rejects":  return "Bundesrat lehnt ab";
+  }
+}
+
+function vermittlungOutcomeDescription(
+  outcome: "compromise" | "bundestag_rejects" | "bundesrat_rejects",
+  resolution: { kind: "compromise" | "einspruch_overridden" | "rejected" },
+): string {
+  if (outcome === "compromise") {
+    return "Der Vermittlungsausschuss hat sich auf einen Kompromiss geeinigt. Das Gesetz wird mit angepasster Wirkung in Kraft treten.";
+  }
+  if (resolution.kind === "einspruch_overridden") {
+    return "Der Kompromiss ist gescheitert, aber der Bundestag überstimmt den Einspruch mit Kanzlermehrheit. Das Gesetz passiert.";
+  }
+  if (outcome === "bundestag_rejects") {
+    return "Der Bundestag lehnt den Kompromissvorschlag ab. Das Gesetz ist gescheitert.";
+  }
+  return "Der Bundesrat lehnt den Kompromissvorschlag ab. Das Gesetz ist gescheitert.";
+}
+
+function vermittlungRejectionReason(
+  outcome: "compromise" | "bundestag_rejects" | "bundesrat_rejects",
+  mode: "zustimmung" | "einspruch",
+): string {
+  if (outcome === "bundestag_rejects") {
+    return "Der Bundestag verwirft den Kompromissvorschlag des Vermittlungsausschusses.";
+  }
+  if (mode === "zustimmung") {
+    return "Der Bundesrat verweigert die Zustimmung nach gescheiterter Vermittlung. Zustimmungsgesetz ist blockiert.";
+  }
+  return "Einspruch des Bundesrates bleibt bestehen — Bundestag hat keine Kanzlermehrheit zur Überstimmung.";
 }
 
 /**
@@ -338,10 +423,15 @@ export function advanceBillPipeline(
     console.log(`  [Pipeline] "${bill.title}" → third_reading`);
   }
 
-  // Stage 5: third_reading (bundesratState='pending') → Bundesrat cleared + veto check.
-  // Entered when loop.ts tallies a passing 3rd-reading vote and sets bundesratState.
-  // Dwell clock uses bundesratEntryDay; min duration is stored in stageMinDuration
-  // (re-drawn per-bill in loop.ts from BUNDESRAT_DURATION).
+  // Stage 5: bundesratState='pending' — cast the Bundesrat vote, then either
+  // clear (Zustimmung passed, or Einspruch: no Einspruch filed) or enter the
+  // Vermittlungsausschuss. Dwell clock uses bundesratEntryDay; min duration is
+  // re-drawn per-bill in loop.ts from BUNDESRAT_DURATION.
+  //
+  // clearBundesratPhase() keeps the veto + Ausfertigung + Inkrafttreten side
+  // effects on a single code path — Stage 5b's compromise and Einspruch-override
+  // branches also call it (landmine B2: the veto check must fire on every path
+  // reaching 'cleared').
   const bundesratPending = allBills.filter(b =>
     b.status === "third_reading" &&
     b.bundesratState === "pending" &&
@@ -349,28 +439,115 @@ export function advanceBillPipeline(
     (day - b.bundesratEntryDay) >= (b.stageMinDuration ?? BUNDESRAT_DURATION.min),
   );
   for (const bill of bundesratPending) {
-    const { vetoed, events: vetoEvents } = checkPresidentialVeto(bill, parties, day);
-    for (const ev of vetoEvents) events.push(ev);
-    if (vetoed) {
-      // veto.ts has already updated status='rejected' + vetoedByPresident in DB.
-      bill.status = "rejected";
-      bill.statusChangedOnDay = day;
-      continue;
-    }
-    const ausfertigung = day + randomInRange(AUSFERTIGUNG_DURATION.min, AUSFERTIGUNG_DURATION.max);
-    const inkrafttreten = ausfertigung + INKRAFTTRETEN_OFFSET;
-    bill.bundesratState = "cleared";
-    bill.ausfertigungDay = ausfertigung;
-    bill.inkrafttretenDay = inkrafttreten;
+    const result = voteBundesrat(bill, parties);
+    const mode = result.mode;
+    bill.bundesratMode = mode;
+    bill.bundesratVoteResult = result;
     db.update(schema.bills)
       .set({
-        bundesratState: "cleared",
-        ausfertigungDay: ausfertigung,
-        inkrafttretenDay: inkrafttreten,
+        bundesratMode: mode,
+        bundesratVoteResult: result as unknown as Record<string, unknown>,
       })
       .where(eq(schema.bills.id, bill.id))
       .run();
-    console.log(`  [Pipeline] "${bill.title}" → Bundesrat cleared, Inkrafttreten day ${inkrafttreten}`);
+
+    events.push({
+      dayNumber: day,
+      type: "bundesrat_vote",
+      actor: "system",
+      title: `Bundesrat ${mode === "zustimmung" ? "Zustimmung" : "Einspruch"}: "${bill.title}"`,
+      description: `Bundesrat-Abstimmung: ${result.tally.ja} Ja, ${result.tally.nein} Nein, ${result.tally.enthaltung} Enthaltung. ${result.passed ? "Gesetz passiert." : (mode === "zustimmung" ? "Zustimmung verweigert — Vermittlungsausschuss." : "Einspruch eingelegt — Vermittlungsausschuss.")}`,
+      data: { billId: bill.id, mode, result },
+    });
+
+    if (result.passed) {
+      clearBundesratPhase(bill, parties, day, events);
+    } else {
+      const vMin = randomInRange(VERMITTLUNG_DURATION.min, VERMITTLUNG_DURATION.max);
+      bill.bundesratState = "vermittlung";
+      bill.vermittlungEntryDay = day;
+      bill.vermittlungMinDuration = vMin;
+      db.update(schema.bills)
+        .set({
+          bundesratState: "vermittlung",
+          vermittlungEntryDay: day,
+          vermittlungMinDuration: vMin,
+        })
+        .where(eq(schema.bills.id, bill.id))
+        .run();
+      events.push({
+        dayNumber: day,
+        type: "vermittlungsausschuss_invoked",
+        actor: "system",
+        title: `Vermittlungsausschuss angerufen: "${bill.title}"`,
+        description: `Bundestag und Bundesrat verhandeln über einen Kompromiss. Erwartetes Ergebnis in ${vMin} Tagen.`,
+        data: { billId: bill.id, mode, entryDay: day, minDuration: vMin },
+      });
+      console.log(`  [Pipeline] "${bill.title}" → Vermittlungsausschuss (${vMin}d)`);
+    }
+  }
+
+  // Stage 5b: Vermittlungsausschuss resolution. Draw outcome, route accordingly.
+  // Compromise and Einspruch-override funnel back through clearBundesratPhase()
+  // so the veto check fires on every cleared path.
+  const vermittlungReady = allBills.filter(b =>
+    b.status === "third_reading" &&
+    b.bundesratState === "vermittlung" &&
+    b.vermittlungEntryDay != null &&
+    b.vermittlungMinDuration != null &&
+    (day - b.vermittlungEntryDay) >= b.vermittlungMinDuration,
+  );
+  for (const bill of vermittlungReady) {
+    const outcome = rollVermittlungOutcome();
+    const mode = bill.bundesratMode ?? getBundesratMode(bill.category);
+    const canOverride = mode === "einspruch" ? canOverrideEinspruch(bill, parties) : false;
+    const resolution = resolveVermittlungOutcome(outcome, mode, canOverride);
+
+    bill.vermittlungOutcome = outcome;
+    db.update(schema.bills)
+      .set({ vermittlungOutcome: outcome })
+      .where(eq(schema.bills.id, bill.id))
+      .run();
+
+    events.push({
+      dayNumber: day,
+      type: "vermittlungsausschuss_resolved",
+      actor: "system",
+      title: `Vermittlungsausschuss: ${vermittlungOutcomeLabel(outcome)} — "${bill.title}"`,
+      description: vermittlungOutcomeDescription(outcome, resolution),
+      data: { billId: bill.id, outcome, resolution: resolution.kind, canOverride },
+    });
+
+    if (resolution.kind === "compromise") {
+      const factor = 0.7 + Math.random() * 0.2;  // [0.7, 0.9]
+      const newImpact = applyImpactHaircut(bill.impact, factor);
+      bill.impact = newImpact;
+      bill.originalImpact = bill.originalImpact ?? bill.impact;
+      db.update(schema.bills)
+        .set({ impact: newImpact as unknown as Record<string, unknown> })
+        .where(eq(schema.bills.id, bill.id))
+        .run();
+      clearBundesratPhase(bill, parties, day, events);
+    } else if (resolution.kind === "einspruch_overridden") {
+      clearBundesratPhase(bill, parties, day, events);
+    } else {
+      bill.status = "rejected";
+      bill.statusChangedOnDay = day;
+      bill.bundesratState = undefined;
+      db.update(schema.bills)
+        .set({ status: "rejected", statusChangedOnDay: day })
+        .where(eq(schema.bills.id, bill.id))
+        .run();
+      events.push({
+        dayNumber: day,
+        type: "bill_rejected",
+        actor: "system",
+        title: `"${bill.title}" abgelehnt (Vermittlung gescheitert)`,
+        description: vermittlungRejectionReason(outcome, mode),
+        data: { billId: bill.id, reason: outcome },
+      });
+      console.log(`  [Pipeline] "${bill.title}" → rejected (${outcome})`);
+    }
   }
 
   // Stage 6: Inkrafttreten — status='passed', apply economic impact, emit bill_passed.

@@ -47,7 +47,10 @@ export type SimulationEventType =
   | "bill_committee_rejected"
   | "mdb_speech"
   | "sidejob_scandal"
-  | "konstituierende_sitzung";
+  | "konstituierende_sitzung"
+  | "bundesrat_vote"
+  | "vermittlungsausschuss_invoked"
+  | "vermittlungsausschuss_resolved";
 
 export interface SimulationEvent {
   id: string;

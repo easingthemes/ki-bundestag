@@ -113,6 +113,9 @@ export const IMPORTANT_EVENTS = [
   "government_formed",
   "constitutional_court_ruled",
   "konstituierende_sitzung",
+  "bundesrat_vote",
+  "vermittlungsausschuss_invoked",
+  "vermittlungsausschuss_resolved",
 ] as const;
 
 export const ROUTINE_EVENTS = [
