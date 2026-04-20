@@ -161,6 +161,9 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   contextDepth: text("context_depth").notNull().default("normal"),
   startDate: text("start_date"),
   botsEnabled: integer("bots_enabled").notNull().default(1),
+  // Cycle 2b — Schriftliche-Einzelfragen cumulative counters (PR 7).
+  schriftlicheEinzelfragenFiledTotal: integer("schriftliche_einzelfragen_filed_total").notNull().default(0),
+  schriftlicheEinzelfragenAnsweredTotal: integer("schriftliche_einzelfragen_answered_total").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {

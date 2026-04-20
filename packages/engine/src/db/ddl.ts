@@ -150,7 +150,9 @@ export const SIM_TABLE_DDL = `
     timing_preset TEXT NOT NULL DEFAULT 'normal',
     context_depth TEXT NOT NULL DEFAULT 'normal',
     start_date TEXT,
-    bots_enabled INTEGER NOT NULL DEFAULT 1
+    bots_enabled INTEGER NOT NULL DEFAULT 1,
+    schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0,
+    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -695,6 +697,9 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "parliamentary_qa_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS parliamentary_qa_sessions (id TEXT PRIMARY KEY, kind TEXT NOT NULL, day INTEGER NOT NULL, questions TEXT NOT NULL, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, answered_on_day INTEGER)" },
   // Cycle 2b (todo 043) — Aktuelle Stunde sessions (crisis-hooked + baseline)
   { table: "aktuelle_stunde_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS aktuelle_stunde_sessions (id TEXT PRIMARY KEY, scheduled_day INTEGER NOT NULL, topic TEXT NOT NULL, trigger_kind TEXT NOT NULL, crisis_id TEXT, government_party_id TEXT NOT NULL, opposition_party_id TEXT NOT NULL, positions TEXT, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, emitted_on_day INTEGER)" },
+  // Cycle 2b (todo 043) — Schriftliche-Einzelfragen cumulative counters on simulation_meta
+  { table: "simulation_meta", column: "schriftliche_einzelfragen_filed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0" },
+  { table: "simulation_meta", column: "schriftliche_einzelfragen_answered_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */

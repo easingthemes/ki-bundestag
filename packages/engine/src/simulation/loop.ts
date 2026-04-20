@@ -55,6 +55,7 @@ import {
   buildAktuelleStundeBatchRequests,
   processAktuelleStundeBatchResult,
 } from "./aktuelle-stunde.js";
+import { runSchriftlicheEinzelfragenTick } from "./schriftliche-einzelfragen.js";
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
@@ -2107,6 +2108,29 @@ export async function runDay(): Promise<number> {
 
   // 10b. Answer pending citizen questions
   await answerPendingQuestions(allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
+
+  // 10b1. Cycle 2b PR 7 — Schriftliche Einzelfragen daily counter + template
+  // sample. Fires every sim day (not gated on Sitzungstag — these are filed
+  // to the Bundestag administration, not the plenum). No AI cost.
+  try {
+    const sef = runSchriftlicheEinzelfragenTick();
+    addEvent(dayEvents, {
+      dayNumber: currentDay,
+      type: "schriftliche_einzelfragen",
+      actor: "bundestag",
+      title: `Schriftliche Einzelfragen (${sef.filedCount} neu, ${sef.answeredCount} beantwortet)`,
+      description: `Heute gingen ${sef.filedCount} schriftliche Einzelfragen ein, ${sef.answeredCount} wurden beantwortet.`,
+      data: {
+        filedCount: sef.filedCount,
+        answeredCount: sef.answeredCount,
+        cumulativeFiled: sef.cumulativeFiled,
+        cumulativeAnswered: sef.cumulativeAnswered,
+        sampleQuestions: sef.sampleQuestions,
+      },
+    });
+  } catch (err) {
+    console.warn(`  [Schriftliche Einzelfragen] tick skipped: ${(err as Error).message}`);
+  }
 
   // 10b2. Refresh bot question pool (demand-driven — generates tagged questions for bots to pick from)
   try {
