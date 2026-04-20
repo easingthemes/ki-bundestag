@@ -135,6 +135,22 @@ export const SIM_TABLE_DDL = `
     emitted_on_day INTEGER
   );
 
+  CREATE TABLE IF NOT EXISTS petitions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    author_display_name TEXT NOT NULL,
+    started_on_day INTEGER NOT NULL,
+    public_window_end_day INTEGER NOT NULL,
+    signature_count INTEGER NOT NULL DEFAULT 0,
+    signature_quorum INTEGER NOT NULL DEFAULT 30000,
+    status TEXT NOT NULL DEFAULT 'collecting',
+    quorum_reached_on_day INTEGER,
+    debated_on_day INTEGER,
+    outcome TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS simulation_meta (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     current_day INTEGER NOT NULL DEFAULT 0,
@@ -700,6 +716,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   // Cycle 2b (todo 043) — Schriftliche-Einzelfragen cumulative counters on simulation_meta
   { table: "simulation_meta", column: "schriftliche_einzelfragen_filed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "schriftliche_einzelfragen_answered_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 2b (todo 043) — Petitions (öffentliche E-Petitionen)
+  { table: "petitions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS petitions (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL, author_display_name TEXT NOT NULL, started_on_day INTEGER NOT NULL, public_window_end_day INTEGER NOT NULL, signature_count INTEGER NOT NULL DEFAULT 0, signature_quorum INTEGER NOT NULL DEFAULT 30000, status TEXT NOT NULL DEFAULT 'collecting', quorum_reached_on_day INTEGER, debated_on_day INTEGER, outcome TEXT)" },
 ];
 
 /** Column migrations for user DB */
@@ -743,6 +761,8 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_parliamentary_qa_sessions_answered", sql: "CREATE INDEX IF NOT EXISTS idx_parliamentary_qa_sessions_answered ON parliamentary_qa_sessions(answered_on_day)" },
   { name: "idx_aktuelle_stunde_sessions_day", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_day ON aktuelle_stunde_sessions(scheduled_day)" },
   { name: "idx_aktuelle_stunde_sessions_emitted", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_emitted ON aktuelle_stunde_sessions(emitted_on_day)" },
+  { name: "idx_petitions_status_started", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_status_started ON petitions(status, started_on_day)" },
+  { name: "idx_petitions_category", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_category ON petitions(category)" },
 ];
 
 /** Index migrations for user DB */

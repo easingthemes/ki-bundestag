@@ -127,6 +127,23 @@ export const parliamentaryQaSessions = sqliteTable("parliamentary_qa_sessions", 
   answeredOnDay: integer("answered_on_day"),
 });
 
+// Cycle 2b — Petitions (öffentliche E-Petitionen). One row per petition.
+export const petitions = sqliteTable("petitions", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  authorDisplayName: text("author_display_name").notNull(),
+  startedOnDay: integer("started_on_day").notNull(),
+  publicWindowEndDay: integer("public_window_end_day").notNull(),
+  signatureCount: integer("signature_count").notNull().default(0),
+  signatureQuorum: integer("signature_quorum").notNull().default(30_000),
+  status: text("status").notNull().default("collecting"),
+  quorumReachedOnDay: integer("quorum_reached_on_day"),
+  debatedOnDay: integer("debated_on_day"),
+  outcome: text("outcome"),
+});
+
 // Cycle 2b — Aktuelle Stunde (crisis-hooked + baseline). One row per session.
 // `positions` holds {government, opposition} AI-generated statements, null
 // until the weekly batch result lands. `emitted_on_day` is set when the event

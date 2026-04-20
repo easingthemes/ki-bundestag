@@ -123,6 +123,8 @@ export const IMPORTANT_EVENTS = [
   "regierungsbefragung",
   "fragestunde",
   "aktuelle_stunde",
+  "petition_quorum_reached",
+  "petition_debated",
 ] as const;
 
 export const ROUTINE_EVENTS = [
