@@ -108,6 +108,31 @@ export function migrateDatabase() {
   // dwell, cleared state) are intentional no-ops: no retroactive vote emission
   // for bills already past the voting gate, and in-flight pending rows just
   // vote when dwell expires on the next pipeline tick.
+
+  // Cycle 2a (todo 043) — synthetic kanzlerwahl rows for pre-PR-4 active
+  // governments. Without this, the new KS-gate Phase-1 trigger would re-fire
+  // on the next sim day for terms that already had formCabinet() run. Load-
+  // bearing only if the strict === guards are ever loosened to >= — see the
+  // spec migration section for the invariant. Idempotent: WHERE NOT EXISTS.
+  try {
+    const activeGovs = sqlite.prepare(
+      "SELECT election_id, chancellor_party_id, chancellor_name, formed_on_day FROM government WHERE active = 1 AND election_id IS NOT NULL",
+    ).all() as Array<{ election_id: string; chancellor_party_id: string; chancellor_name: string; formed_on_day: number }>;
+    let inserted = 0;
+    for (const gov of activeGovs) {
+      const hasKw = sqlite.prepare(
+        "SELECT 1 FROM kanzlerwahl WHERE election_id = ?",
+      ).get(gov.election_id);
+      if (hasKw) continue;
+      sqlite.prepare(
+        "INSERT INTO kanzlerwahl (id, election_id, started_on_day, phase1, phase2_rounds, phase2_window_end_day, phase3, status, elected_candidate_party_id, elected_candidate_name, amtseid_day) VALUES (?, ?, ?, NULL, '[]', NULL, NULL, 'elected', ?, ?, ?)",
+      ).run(`kw-migrate-${gov.election_id}`, gov.election_id, gov.formed_on_day, gov.chancellor_party_id, gov.chancellor_name, gov.formed_on_day);
+      inserted++;
+    }
+    if (inserted > 0) {
+      console.log(`[Migrate] Backfilled ${inserted} synthetic kanzlerwahl row(s) for pre-Cycle-2a active governments`);
+    }
+  } catch { /* government or kanzlerwahl table may not exist on fresh DBs */ }
   try {
     const cases = Object.entries(BUNDESRAT_MODE_BY_CATEGORY)
       .map(([cat, mode]) => `WHEN '${cat}' THEN '${mode}'`)
