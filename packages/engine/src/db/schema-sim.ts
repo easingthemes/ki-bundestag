@@ -114,6 +114,19 @@ export const kanzlerwahl = sqliteTable("kanzlerwahl", {
   amtseidDay: integer("amtseid_day"),
 });
 
+// Cycle 2b — Parliamentary-QA (Regierungsbefragung + Fragestunde).
+// One row per session. `questions` holds the Q+A list (JSON). `answered_on_day`
+// is set when the weekly AI batch result is processed back onto the row.
+export const parliamentaryQaSessions = sqliteTable("parliamentary_qa_sessions", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  day: integer("day").notNull(),
+  questions: text("questions", { mode: "json" }).notNull(),
+  batchRequestId: text("batch_request_id"),
+  batchAttempts: integer("batch_attempts").notNull().default(0),
+  answeredOnDay: integer("answered_on_day"),
+});
+
 export const simulationMeta = sqliteTable("simulation_meta", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentDay: integer("current_day").notNull().default(0),
