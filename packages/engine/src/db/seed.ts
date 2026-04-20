@@ -4,6 +4,7 @@ import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/governme
 import { getHumanSeatRatio } from "../simulation/timing.js";
 import { PARTIES, INITIAL_NATIONAL_STATE } from "./seed-data.js";
 import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS, SIM_INDEX_MIGRATIONS, USER_INDEX_MIGRATIONS } from "./ddl.js";
+import { BUNDESRAT_MODE_BY_CATEGORY } from "../config/bundesrat.js";
 
 /**
  * Ensure all tables and columns exist without touching data.
@@ -96,6 +97,24 @@ export function migrateDatabase() {
     }
   } catch {
     // bills table might not have the new columns yet on very old DBs
+  }
+
+  // Cycle 2a (todo 043) — backfill bundesrat_mode from category using the
+  // canonical BUNDESRAT_MODE_BY_CATEGORY map so the SQL CASE stays in sync
+  // with code. Historical rows get NULL if the table predates the column.
+  // Idempotent: guarded by WHERE bundesrat_mode IS NULL.
+  try {
+    const cases = Object.entries(BUNDESRAT_MODE_BY_CATEGORY)
+      .map(([cat, mode]) => `WHEN '${cat}' THEN '${mode}'`)
+      .join(" ");
+    const modeBackfill = sqlite.prepare(
+      `UPDATE bills SET bundesrat_mode = CASE category ${cases} END WHERE bundesrat_mode IS NULL`,
+    ).run();
+    if (modeBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled bundesrat_mode on ${modeBackfill.changes} bill(s)`);
+    }
+  } catch {
+    // bundesrat_mode column may not exist yet on very old DBs
   }
 
   // Auto-populate fraktionen if table exists but is empty and parties have seats

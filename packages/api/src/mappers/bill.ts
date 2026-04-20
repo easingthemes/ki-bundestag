@@ -1,5 +1,5 @@
 import { schema } from "@ki-bundestag/engine";
-import type { Bill, BillImpact, BillVote } from "@ki-bundestag/types";
+import type { Bill, BillImpact, BillVote, BundesratVoteResult } from "@ki-bundestag/types";
 
 export function mapBill(row: typeof schema.bills.$inferSelect): Bill {
   return {
@@ -26,9 +26,14 @@ export function mapBill(row: typeof schema.bills.$inferSelect): Bill {
     stageMinDuration: row.stageMinDuration ?? undefined,
     stageMaxDuration: row.stageMaxDuration ?? undefined,
     isComplexBill: row.isComplexBill ?? undefined,
-    bundesratState: (row.bundesratState as "pending" | "cleared" | null) ?? undefined,
+    bundesratState: (row.bundesratState as Bill["bundesratState"] | null) ?? undefined,
     bundesratEntryDay: row.bundesratEntryDay ?? undefined,
     ausfertigungDay: row.ausfertigungDay ?? undefined,
     inkrafttretenDay: row.inkrafttretenDay ?? undefined,
+    bundesratMode: (row.bundesratMode as Bill["bundesratMode"]) ?? undefined,
+    bundesratVoteResult: (row.bundesratVoteResult && typeof row.bundesratVoteResult === 'object' ? row.bundesratVoteResult as BundesratVoteResult : undefined),
+    vermittlungEntryDay: row.vermittlungEntryDay ?? undefined,
+    vermittlungMinDuration: row.vermittlungMinDuration ?? undefined,
+    vermittlungOutcome: (row.vermittlungOutcome as Bill["vermittlungOutcome"]) ?? undefined,
   };
 }
