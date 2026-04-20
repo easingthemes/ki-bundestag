@@ -122,6 +122,7 @@ export const IMPORTANT_EVENTS = [
   "amtseid",
   "regierungsbefragung",
   "fragestunde",
+  "aktuelle_stunde",
 ] as const;
 
 export const ROUTINE_EVENTS = [
