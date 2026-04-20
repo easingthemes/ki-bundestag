@@ -37,6 +37,11 @@ export const SIM_TABLE_DDL = `
     bundesrat_entry_day INTEGER,
     ausfertigung_day INTEGER,
     inkrafttreten_day INTEGER,
+    bundesrat_mode TEXT,
+    bundesrat_vote_result TEXT,
+    vermittlung_entry_day INTEGER,
+    vermittlung_min_duration INTEGER,
+    vermittlung_outcome TEXT,
     FOREIGN KEY (proposed_by) REFERENCES parties(id)
   );
 
@@ -639,6 +644,12 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "bills", column: "ausfertigung_day", sql: "ALTER TABLE bills ADD COLUMN ausfertigung_day INTEGER" },
   { table: "bills", column: "inkrafttreten_day", sql: "ALTER TABLE bills ADD COLUMN inkrafttreten_day INTEGER" },
   { table: "elections", column: "konstituierende_sitzung_day", sql: "ALTER TABLE elections ADD COLUMN konstituierende_sitzung_day INTEGER" },
+  // Cycle 2a (todo 043) — Bundesrat voting + Vermittlungsausschuss schema
+  { table: "bills", column: "bundesrat_mode", sql: "ALTER TABLE bills ADD COLUMN bundesrat_mode TEXT" },
+  { table: "bills", column: "bundesrat_vote_result", sql: "ALTER TABLE bills ADD COLUMN bundesrat_vote_result TEXT" },
+  { table: "bills", column: "vermittlung_entry_day", sql: "ALTER TABLE bills ADD COLUMN vermittlung_entry_day INTEGER" },
+  { table: "bills", column: "vermittlung_min_duration", sql: "ALTER TABLE bills ADD COLUMN vermittlung_min_duration INTEGER" },
+  { table: "bills", column: "vermittlung_outcome", sql: "ALTER TABLE bills ADD COLUMN vermittlung_outcome TEXT" },
 ];
 
 /** Column migrations for user DB */

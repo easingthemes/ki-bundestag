@@ -40,6 +40,12 @@ export const bills = sqliteTable("bills", {
   bundesratEntryDay: integer("bundesrat_entry_day"),
   ausfertigungDay: integer("ausfertigung_day"),
   inkrafttretenDay: integer("inkrafttreten_day"),
+  // Cycle 2a — Bundesrat voting + Vermittlungsausschuss
+  bundesratMode: text("bundesrat_mode"),
+  bundesratVoteResult: text("bundesrat_vote_result", { mode: "json" }),
+  vermittlungEntryDay: integer("vermittlung_entry_day"),
+  vermittlungMinDuration: integer("vermittlung_min_duration"),
+  vermittlungOutcome: text("vermittlung_outcome"),
 });
 
 export const nationalState = sqliteTable("national_state", {
