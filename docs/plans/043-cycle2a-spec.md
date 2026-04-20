@@ -14,11 +14,11 @@ Restated from Cycle 2 brainstorm, plus sub-decisions surfaced while designing.
 | Q2 | Bundesrat modelling depth | **Full 16-Länder static model.** Compositions seeded from current real Land governments, weighted votes per Art. 51 Abs. 2 GG. No Landtagswahlen simulation (deferred to Cycle 3+). |
 | Q3 | Kanzlerwahl phases | **Full 3-phase (Art. 63 GG).** Phase 3 simplified: Bundespräsident appoints relative-majority winner. No dissolution-of-Bundestag path (no Bundespräsident modelling yet). |
 | Q5 | New event types | **Accept.** Ballpark 6 new types in 2a: `bundesrat_vote`, `vermittlungsausschuss_invoked`, `vermittlungsausschuss_resolved`, `kanzlerwahl_phase1`, `kanzlerwahl_phase2`, `kanzlerwahl_phase3`, `amtseid`. |
-| S1 | Zustimmungsgesetz vs Einspruchsgesetz — how to classify | **Category-driven deterministic map on `BillCategory`.** `education`, `healthcare`, `social`, `infrastructure` → Zustimmung (Länder-Verwaltung hook). `economy`, `environment`, `immigration`, `defense` → Einspruch. Exposed as `getBundesratMode(category)`. ~50/50 split mirrors the real 38–45% Zustimmungsgesetz share within the sim's category mix. |
-| S2 | Land-government → sim-party mapping | **Nearest-ideological-sim-party mapping for Landesregierungs-Parteien not in the sim's six-party set.** BSW/Linke-splitter → `linke`. Freie Wähler → `cdu`. SSW → excluded from government weight (minority-status in SH). Mapping table lives in `config/bundesrat.ts` with a comment citing real-world party. |
-| S3 | Bundesrat vote mechanics | **Per-Land bloc vote, unanimous within Land (Art. 51 Abs. 3 GG).** Coalitions inside a Land resolve to a single position via weighted ideological average vs. bill impact vector. If coalition disagreement exceeds threshold, Land abstains (`Enthaltung`, which counts as No — standard practice). |
-| S4 | Vermittlungsausschuss composition | **Abstracted — no MdB-level modelling.** Outcome drawn stochastically: 60% compromise accepted (bill keeps amended impact), 25% Bundestag rejects compromise (bill dies), 15% Bundesrat rejects compromise (bill dies if Zustimmungsgesetz, goes back to Bundesrat Einspruch otherwise). Duration: 14–56 sim days. |
-| S5 | Kanzlerwahl candidate selection | **Coalition agreement nominates the Chancellor-Kandidat (`agreement.chancellorCandidate`).** If `synthesizeAgreement()` doesn't surface one, fall back to `FRAKTION_LEADERS[coalition[0]]` (current behaviour, lifted out of `formCabinet`). Phase 2 candidates: up to 2 per party-Fraktion, drawn AI-side if a round is actually needed; Phase 1 failure is already rare. |
+| S1 | Zustimmungsgesetz vs Einspruchsgesetz — how to classify | **Category-driven deterministic map on `BillCategory`.** `education`, `healthcare`, `social`, `infrastructure` → Zustimmung (Länder-Verwaltung hook). `economy`, `environment`, `immigration`, `defense` → Einspruch. Exposed as `getBundesratMode(category)`. 4/4 category split is a modelling choice, not an empirical fit — realised Zustimmung share depends on AI propose frequencies per category and is not tuned to the real 38–45% figure. Refinement deferred to Cycle 3+ alongside empirical category-distribution work. |
+| S2 | Land-government → sim-party mapping | **Nearest-ideological-sim-party mapping for Landesregierungs-Parteien not in the sim's six-party set.** BSW/Linke-splitter → `linke`. Freie Wähler → `cdu`. SSW → excluded from government weight (minority-status in SH). Mapping table lives in `config/bundesrat.ts` with a comment citing real-world party. **Deduplication note**: when both coalition partners map to the same sim-party (Bayern: CSU + Freie Wähler → `cdu`), `simParties` collapses to `["cdu"]` rather than `["cdu","cdu"]`. Consequence: intra-coalition variance is structurally 0 for these Länder, so they never abstain from ideological disagreement — they always vote the single-mapped party's line. Acceptable within 2a scope; realistic abstention for these Länder requires distinguishing Freie-Wähler-like parties, which is deferred to Cycle 3+. |
+| S3 | Bundesrat vote mechanics | **Per-Land bloc vote, unanimous within Land (Art. 51 Abs. 3 GG).** Coalitions inside a Land resolve to a single position via weighted ideological average vs. bill impact vector. If coalition disagreement exceeds threshold, Land abstains (`Enthaltung`, which counts as No — standard practice). **Calibration note**: high-spread 3-party Länder (Thuringian Brombeer CDU+SPD+Linke, RLP Ampel SPD+Grüne+FDP) will abstain on most polarised bills under `LAND_ABSTENTION_THRESHOLD = 0.35`. Since abstention is scored as No, this can meaningfully block Zustimmungsgesetze. After PR 2 lands, measure the realised abstention rate and — if it exceeds ~25% of total Bundesrat votes — either raise the threshold to ~0.45 or downweight minor coalition partners. Don't tune pre-implementation; treat threshold as a ship-with-fixable constant. |
+| S4 | Vermittlungsausschuss composition | **Abstracted — no MdB-level modelling.** Outcome drawn stochastically from an invented distribution (not empirical): 60% compromise accepted (bill keeps amended impact), 25% Bundestag rejects compromise (bill dies), 15% Bundesrat rejects compromise (bill dies if Zustimmungsgesetz, goes back to Bundesrat Einspruch otherwise). Duration: 14–56 sim days. Real Bundesrat data shows higher compromise-acceptance (~70–90%) and near-zero post-Vermittlung rejection; the sim's heavier rejection tail is a viewer-drama choice. Fit to real data deferred. |
+| S5 | Kanzlerwahl candidate selection | **Coalition agreement nominates the Chancellor-Kandidat (`agreement.chancellorCandidate: { partyId; name }`).** If `synthesizeAgreement()` doesn't surface one, fall back to `{ partyId: coalition[0], name: FRAKTION_LEADERS[coalition[0]] }` (current behaviour, lifted out of `formCabinet`). The fallback wraps `FRAKTION_LEADERS[...]` (which returns only a name string) into the full `{ partyId, name }` shape so every Phase-1 call-site has a uniform candidate struct. Phase 2 candidates: up to 2 per party-Fraktion, drawn AI-side if a round is actually needed; Phase 1 failure is already rare. |
 | S6 | Kanzlerwahl timing | **Phase 1 fires on Konstituierende-Sitzung day or the next Sitzungstag after coalition agreement, whichever is later.** Phase 2 window: 14 sim days. Phase 3: immediately after Phase 2 window closes. Amtseid: next Sitzungstag after successful Kanzlerwahl. `formCabinet()` runs on Amtseid day, not earlier. |
 | S7 | Failure modes during interregnum | **Keep acting-government model.** Outgoing cabinet stays `active=true` until Amtseid (`geschäftsführende Bundesregierung`, Art. 69 Abs. 3 GG). No extra schema — just skip `dissolveGovernment()` until the new Amtseid fires. |
 
@@ -35,7 +35,7 @@ Restated from Cycle 2 brainstorm, plus sub-decisions surfaced while designing.
 
 ## Design — Piece 1: Bundesrat voting + Vermittlungsausschuss
 
-Extends Cycle 1 PR 3's Stage 5 (`bill-pipeline.ts:341–374`) which currently auto-clears every bill after `stageMinDuration` days. Cycle 2a replaces the auto-clear with an actual Land-weighted vote; on Zustimmungsgesetze that fail, convenes a Vermittlungsausschuss.
+Extends Cycle 1 PR 3's Stage 5 (`bill-pipeline.ts:341–374`). Stage 5 today is: at dwell expiry, run `checkPresidentialVeto`, then (if not vetoed) transition to `cleared` and compute `ausfertigungDay` + `inkrafttretenDay`. Cycle 2a inserts the Land-weighted Bundesrat vote *before* the veto check; on Zustimmungsgesetze that fail, convenes a Vermittlungsausschuss. The veto call and the Ausfertigung/Inkrafttreten calc stay on every path that transitions to `cleared` — including the Vermittlungsausschuss compromise path (see Stage 5b below).
 
 ### New module: `packages/engine/src/simulation/bundesrat.ts`
 
@@ -124,7 +124,7 @@ export const BUNDESRAT_LAENDER: Array<{
   { id: "nw", name: "Nordrhein-Westfalen",      votes: 6, simParties: ["cdu","gruene"],       realParties: ["CDU","Grüne"] },
   { id: "rp", name: "Rheinland-Pfalz",          votes: 4, simParties: ["spd","gruene","fdp"], realParties: ["SPD","Grüne","FDP"] },
   { id: "sl", name: "Saarland",                 votes: 3, simParties: ["spd"],                 realParties: ["SPD"] },
-  { id: "sn", name: "Sachsen",                  votes: 4, simParties: ["cdu","spd"],           realParties: ["CDU","SPD","Grüne"] },
+  { id: "sn", name: "Sachsen",                  votes: 4, simParties: ["cdu","spd"],           realParties: ["CDU","SPD"] },  // CDU+SPD Minderheitsregierung since Sep 2024; pre-2024 was CDU+SPD+Grüne
   { id: "st", name: "Sachsen-Anhalt",           votes: 4, simParties: ["cdu","spd","fdp"],     realParties: ["CDU","SPD","FDP"] },
   { id: "sh", name: "Schleswig-Holstein",       votes: 4, simParties: ["cdu","gruene"],       realParties: ["CDU","Grüne"] },
   { id: "th", name: "Thüringen",                votes: 4, simParties: ["cdu","spd","linke"],   realParties: ["CDU","SPD","BSW"] },
@@ -160,8 +160,8 @@ Concrete changes:
   - Zustimmung + failed → `vermittlung`, set `vermittlungEntryDay`, draw `vermittlungMinDuration` from `VERMITTLUNG_DURATION`.
   - Einspruch + passed (no Einspruch filed) → `cleared` (same as Zustimmung-passed).
   - Einspruch + failed (Bundesrat filed Einspruch) → `vermittlung` (same dwell path). On compromise failure, Bundestag overrides in ~80% of cases → treat as `cleared`; else `rejected`.
-- New Stage 5b: `vermittlungEntryDay` + `vermittlungMinDuration` satisfied → roll outcome from `VERMITTLUNG_OUTCOMES`. Emit `vermittlungsausschuss_resolved` with outcome. On `compromise`: optionally apply a small randomised impact haircut to `bill.impact` (scale factor 0.7–0.9 per non-zero field) before transitioning to `cleared`.
-- On Einspruch-path `vermittlung → cleared` override: tally a virtual Bundestag override vote using existing coalition majority (same as `voting.ts` `tallyBillVotes`); if override fails, bill dies.
+- New Stage 5b: `vermittlungEntryDay` + `vermittlungMinDuration` satisfied → roll outcome from `VERMITTLUNG_OUTCOMES`. Emit `vermittlungsausschuss_resolved` with outcome. On `compromise`: optionally apply a small randomised impact haircut to `bill.impact` (scale factor 0.7–0.9 per non-zero field), persist `bill.impact`, then reset `bundesratState='pending'` and `bundesratEntryDay=day` with a 0-day `stageMinDuration` so the next pipeline tick re-enters the Stage-5 clear transition. This keeps the veto call + Ausfertigung/Inkrafttreten calc on a single path and avoids a second implementation of those side-effects inside Stage 5b.
+- On Einspruch-path `vermittlung → cleared` override: tally a virtual Bundestag override vote using existing coalition majority (same as `voting.ts` `tallyBillVotes`); if override fails, bill dies. If override succeeds, funnel through the same `bundesratState='pending'` re-entry so veto still fires.
 
 ### Schema additions (`bills` table)
 
@@ -189,7 +189,7 @@ vermittlungOutcome: text("vermittlung_outcome"),         // "compromise" | "bund
 
 ### Loop integration
 
-None — Stage 5 is already dispatched from `advanceBillPipeline()` which `loop.ts:892` calls in Step 5 of the 13-step flow. No new call-sites.
+None — Stage 5 is already dispatched from `advanceBillPipeline()` which `loop.ts:934` calls in Step 5 of the 13-step flow. No new call-sites.
 
 ## Design — Piece 2: Kanzlerwahl (Art. 63 GG, 3 phases) + Amtseid
 
@@ -323,13 +323,16 @@ The block that runs when negotiations max out (`loop.ts:672` branch, `roundNumbe
 | R3 | Vermittlungsausschuss stretches bill-lifecycle tail by 14–56 more days. Compound with Cycle 1 timeline (Einbringung → Inkrafttreten ≈ 4–6 months). | Expected. ~15–20% of Zustimmungsgesetze hit Vermittlungs path in real Bundestag; in sim, similar. Add a before/after histogram to PR description. |
 | R4 | `formCabinet()` moved out of the negotiation-complete block. Any code path that reads `getActiveGovernment()` between `negotiation_complete` and Amtseid now sees the OLD government. | Intentional — matches Art. 69 Abs. 3 GG (geschäftsführende Bundesregierung). Audit `getActiveGovernment()` call-sites: `bill-pipeline.ts` (isGovernmentBill check — old ministers still apply during interregnum, matching reality), `interpellations.ts`, `voting.ts`. All safe; no logic that breaks on stale government. |
 | R5 | Kanzlerwahl Phase 1 can fail in sim (opposition majority, fragmented coalition) while `formGovernment()` fallback returned a minority coalition. Today this would never have hit `formCabinet()`. | Exactly the scenario Phase 2/3 is designed for. Phase 3 always resolves (simplified per Q3). If coalition leader loses Phase 1, Phase 2 opens to opposition candidates. Add integration test for this path. |
-| R6 | `confidence-votes.ts` Misstrauensvotum success path at `loop.ts:1696` calls `formCabinet()` directly. That's a separate procedure (Art. 67 GG) — should **not** go through Kanzlerwahl. | Non-goal — keep that call-site unchanged. Misstrauensvotum-Kanzlerwahl is a single constructive vote; the Art. 63 Kanzlerwahl is only the post-election path. Call out in code comment. |
+| R6 | Misstrauensvotum success path at `loop.ts:1750` calls `formCabinet()` directly. That's a separate procedure (Art. 67 GG) — should **not** go through Kanzlerwahl. | Non-goal — keep that call-site unchanged. Misstrauensvotum-Kanzlerwahl is a single constructive vote; the Art. 63 Kanzlerwahl is only the post-election path. Call out in code comment. |
 | R7 | Vermittlungsausschuss compromise applies an impact haircut. Economic impact is applied at Inkrafttreten (Cycle 1 PR 3), not at compromise time. | Order is correct: compromise day mutates `bill.impact`, Inkrafttreten day reads the final `bill.impact`. Persist the haircut via `db.update(schema.bills).set({ impact })`. |
-| R8 | Frontend assumes `government_cabinet_formed` fires on `negotiation_complete` day. News feed timeline now shows a ~3–6 week gap. | Frontend change is cosmetic (news feed ordering already handles). Add copy: the interregnum event list reads as `negotiation_complete` → `konstituierende_sitzung` → `kanzlerwahl_phase1` → `amtseid` → `government_cabinet_formed`, all within ≤30 days. |
+| R8 | Frontend assumes `government_cabinet_formed` fires on `negotiation_complete` day. News feed timeline now shows a ~2–3 week gap (≤30 days total from election day to Amtseid under Art. 39 Abs. 2 GG; negotiation itself eats ~5–10 of those). | Frontend change is cosmetic (news feed ordering already handles). Add copy: the interregnum event list reads as `negotiation_complete` → `konstituierende_sitzung` → `kanzlerwahl_phase1` → `amtseid` → `government_cabinet_formed`, all within ≤30 days. |
 | R9 | Land-government static seed drifts from reality over time (Landtagswahlen every 5 years). | Explicit non-goal for Cycle 2a. Flag in config file header: "Seeded from 2025/2026 real distribution; refresh in Cycle 3+ alongside Landtagswahlen modelling." |
 | R10 | The sub-decision S2 party-mapping (BSW → linke, Freie Wähler → cdu) will feel wrong to informed viewers. | Surface `realParties` in event payload so the frontend can display "Bayern (CSU + Freie Wähler): 6 Stimmen dafür" even though the vote was computed from `simParties`. Mapping documented in the config header. |
 | R11 | Cycle 1 PR 4 tests assume `government_cabinet_formed` fires in the same loop iteration as `konstituierende_sitzung`. | Update those tests: `government_cabinet_formed` now lands 1–14 sim days after KS, depending on Kanzlerwahl phase count. `elections.test.ts` has to schedule ksDay deterministically (already does via `startDate`). |
 | R12 | `formCabinet()` deferred past KS means `assignCommitteeMemberships()` (`loop.ts:804`) runs late. Bills in Stage 5 during interregnum may lack committee assignments. | Bills in Stage 5 are already past committee phase — committee assignments matter for Stage 3 (committee → 2nd reading). Interregnum plenary-block (Cycle 1 PR 4) already prevents new bills from reaching that stage. Safe to defer. |
+| R13 | **Stuck-negotiation safety net (`loop.ts:555–647`) still forms cabinet synchronously.** The emergency-fallback branch when `daysSinceElection > MAX_NEGOTIATION_DAYS` calls `formCabinet()` at `loop.ts:617`, `updateFraktionen` at 614, `resetAllSeats`/`allocateSeats` at 628–631, and `assignCommitteeMemberships` at 640–642 — all on the same day the fallback fires. Without a carve-out, the new KS-gate Kanzlerwahl trigger would then fire Phase 1 again for the same `electionId` (no `kanzlerwahl` row yet) and double-emit `government_cabinet_formed`. | PR 4 must carve this branch out: on fallback-completion, insert a synthetic `kanzlerwahl` row with `status='elected'`, `electedCandidatePartyId=coalition[0]`, `electedCandidateName=FRAKTION_LEADERS[coalition[0]]`, `amtseidDay=currentDay` immediately after `formCabinet()` runs at 617. This keeps the Kanzlerwahl gate from re-firing. Document as an Art.-63-skipping recovery path (same semantic as the Misstrauensvotum carve-out at R6). |
+| R14 | Crisis-queued motions routed to `nextSitzungsTag` (Cycle 1 PR 4) can land on KS day itself, at which point `skipPartyAgents` flips false but Kanzlerwahl Phase 1 hasn't yet run. A motion against the "government" fires with no chancellor elected. | Add a guard in motion processing: if `getActiveGovernment()` is null AND an active Kanzlerwahl row exists with `status ∈ {"phase1","phase2","phase3"}`, defer the motion to the next Sitzungstag after `amtseidDay`. Single-line check; add to motion-dispatch in `loop.ts`. |
+| R15 | `Vertrauensfrage`/budget-crisis failure paths (`loop.ts:1632`, `loop.ts:2173`) already call `dissolveGovernment()` + schedule snap election. Between dissolution and new Amtseid, `getActiveGovernment()` returns null — the sim has no geschäftsführende Regierung during this interregnum, which diverges from Art. 69 Abs. 3 GG. S7's "acting-government model" describes the normal end-of-term path only. | Pre-existing divergence (not introduced by Cycle 2a). Flag as follow-up for Cycle 3+ when Bundespräsident modelling lands — at that point the dissolution path can leave the outgoing cabinet `active=true` with a new `isGeschaeftsfuehrend=true` flag until the next Amtseid. Out of 2a scope. |
 
 ## Migration strategy
 
@@ -353,14 +356,21 @@ New migration file: `packages/engine/src/db/migrations/0044-cycle2a-bundesrat-ka
 3. **In-flight election** with `status='negotiation'` when the migration runs:
    - If `konstituierendeSitzungDay` has not yet been reached: no-op. Next loop iteration will trigger `startKanzlerwahl()` at KS day.
    - If KS day has passed but `negotiation_complete` hasn't fired: the existing stuck-negotiation safety net (`loop.ts:550–648`) already handles this. Let it force-complete, then synthetic-Kanzlerwahl runs on the next day (Phase 1 algorithmic pass-through using coalition leader).
-   - If `negotiation_complete` already fired AND `formCabinet()` already ran (pre-Cycle-2a DB state): insert a synthetic `kanzlerwahl` row with `status='elected'`, `amtseidDay = existing government.formedOnDay` so the new gate recognises the term as complete.
+   - If `negotiation_complete` already fired AND `formCabinet()` already ran (pre-Cycle-2a DB state): insert a synthetic `kanzlerwahl` row with `status='elected'`, `electedCandidatePartyId = government.chancellorPartyId`, `electedCandidateName = government.chancellorName`, `amtseidDay = government.formedOnDay` so the new gate recognises the term as complete.
 4. `CoalitionAgreement.chancellorCandidate`: optional field, no backfill.
+
+**Load-bearing invariant**: both the PR-4 Kanzlerwahl trigger (`currentDay === ksDay`) and the Amtseid-day block (`currentDay === amtseidDay`) use **strict equality**. Because `ksDay` and `amtseidDay` for pre-Cycle-2a terms are in the past, the `===` guards never match on the first post-migration run, so the synthetic row is technically redundant for already-governing terms. It becomes structurally required the moment anyone loosens those checks to `>=`. If that refactor ever lands, the synthetic row is the only thing keeping migration-time elections from re-firing Phase 1 — document this dependency in the PR-4 code comments.
 
 Idempotent: each step guarded by `WHERE col IS NULL` or equivalent.
 
 ## Implementation plan — 4 PRs
 
-Each PR runs `npm run typecheck && npm test && npm run build` before merge. PR 1 and PR 2 are independent and can land in either order; PR 3 depends on both; PR 4 depends on PR 3.
+Each PR runs `npm run typecheck && npm test && npm run build` before merge. Dependency order:
+
+- **PR 2 depends on PR 1** (PR 2 calls `voteBundesrat()` which is added in PR 1).
+- **PR 3 is independent of PR 1 and PR 2** — it's the Kanzlerwahl scaffold and doesn't touch Bundesrat code. Can land in parallel with PR 1.
+- **PR 4 depends on PR 3** (wires Kanzlerwahl into the loop).
+- **Shared file coupling**: PR 1 and PR 3 both add steps to the same new migration file `0044-cycle2a-bundesrat-kanzlerwahl.ts`, both extend the `SimulationEventType` union, and both touch `IMPORTANT_EVENTS` classification. Merge order matters — expect minor conflict resolution if they land in parallel.
 
 ### PR 1: Bundesrat schema + static Länder config + vote logic (no pipeline wiring yet)
 
@@ -373,8 +383,8 @@ Each PR runs `npm run typecheck && npm test && npm run build` before merge. PR 1
 
 ### PR 2: Bundesrat pipeline wiring + Vermittlungsausschuss
 
-- Replace Stage 5 auto-clear (`bill-pipeline.ts:345–374`) with `voteBundesrat()` call.
-- Add Stage 5b (Vermittlungsausschuss) handler with outcome roll.
+- Insert `voteBundesrat()` at the head of Stage 5 (`bill-pipeline.ts:345–374`), *before* the existing `checkPresidentialVeto` call. Keep the veto + Ausfertigung/Inkrafttreten side-effects on every path that transitions to `cleared`.
+- Add Stage 5b (Vermittlungsausschuss) handler with outcome roll. Compromise path funnels back through the Stage-5 clear transition so the veto check still fires.
 - Add event types `bundesrat_vote`, `vermittlungsausschuss_invoked`, `vermittlungsausschuss_resolved` to `SimulationEventType`.
 - Add to `IMPORTANT_EVENTS` classification in `timing.ts`.
 - Migration 0044 steps (3)–(5) — in-flight bill handling.
@@ -399,11 +409,12 @@ Each PR runs `npm run typecheck && npm test && npm run build` before merge. PR 1
 
 ### PR 4: Split `formCabinet()` from `negotiation_complete`; wire Kanzlerwahl into the loop
 
-- Remove `formCabinet()` + `resetAllSeats` + `allocateSeats` seat allocation **stay** at `negotiation_complete` (administrative).
-- Only move: `formCabinet()` + `government_cabinet_formed` event + `shouldSeedCommittees()` / `assignCommitteeMemberships()` → gated on Amtseid day.
-- Add Kanzlerwahl trigger block inside the KS gate in `loop.ts:~905`: on `currentDay === ksDay`, call `startKanzlerwahl()` + `runPhase1()`.
+- At `loop.ts:776` (normal `negotiation_complete` branch): `resetAllSeats` + `allocateSeats` **stay** (administrative). **Move** `formCabinet()` + `government_cabinet_formed` event + `shouldSeedCommittees()` / `assignCommitteeMemberships()` → gated on Amtseid day.
+- At `loop.ts:555–647` (stuck-negotiation safety net, see R13): `formCabinet()` at 617 stays synchronous (this is a recovery path), **but** insert a synthetic `kanzlerwahl` row immediately after it with `status='elected'`, `electedCandidatePartyId=coalition[0]`, `electedCandidateName=FRAKTION_LEADERS[coalition[0]]`, `amtseidDay=currentDay`. This prevents the new KS-gate from double-firing Phase 1 later. Document with a code comment referencing R13.
+- Add Kanzlerwahl trigger block inside the KS gate in `loop.ts:~905`: on `currentDay === ksDay` AND latest election has `newCoalition` set AND no `kanzlerwahl` row exists for `electionId`, call `startKanzlerwahl()` + `runPhase1()`. Use strict `===` (load-bearing per migration step 3 — see migration section).
 - Add Kanzlerwahl progression block right after the KS gate: daily check for active `kanzlerwahl` row with `status ∈ {"phase2","phase3"}`, advance via `runPhase2Round()` or `runPhase3()`.
-- Add Amtseid-day block: emit `amtseid`, call `formCabinet()`, emit `government_cabinet_formed`, run committee assignment.
+- Add Amtseid-day block: on `currentDay === amtseidDay` (strict `===`), emit `amtseid`, call `formCabinet()`, emit `government_cabinet_formed`, run committee assignment.
+- Add motion-deferral guard (see R14): skip motion processing on KS day if an active Kanzlerwahl row is in `phase1`/`phase2`/`phase3`; re-queue to next Sitzungstag ≥ `amtseidDay + 1`.
 - Migration 0044 kanzlerwahl steps (2)–(4) — in-flight election handling + synthetic backfill for pre-Cycle-2a terms.
 - Update tests:
   - `elections.test.ts`: adjust to expect `government_cabinet_formed` 1–14 days after KS, not same-day as `negotiation_complete`.
