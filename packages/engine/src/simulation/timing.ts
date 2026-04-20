@@ -120,6 +120,8 @@ export const IMPORTANT_EVENTS = [
   "kanzlerwahl_phase2",
   "kanzlerwahl_phase3",
   "amtseid",
+  "regierungsbefragung",
+  "fragestunde",
 ] as const;
 
 export const ROUTINE_EVENTS = [
