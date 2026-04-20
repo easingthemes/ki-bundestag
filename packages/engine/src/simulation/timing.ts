@@ -116,6 +116,10 @@ export const IMPORTANT_EVENTS = [
   "bundesrat_vote",
   "vermittlungsausschuss_invoked",
   "vermittlungsausschuss_resolved",
+  "kanzlerwahl_phase1",
+  "kanzlerwahl_phase2",
+  "kanzlerwahl_phase3",
+  "amtseid",
 ] as const;
 
 export const ROUTINE_EVENTS = [

@@ -50,7 +50,11 @@ export type SimulationEventType =
   | "konstituierende_sitzung"
   | "bundesrat_vote"
   | "vermittlungsausschuss_invoked"
-  | "vermittlungsausschuss_resolved";
+  | "vermittlungsausschuss_resolved"
+  | "kanzlerwahl_phase1"
+  | "kanzlerwahl_phase2"
+  | "kanzlerwahl_phase3"
+  | "amtseid";
 
 export interface SimulationEvent {
   id: string;

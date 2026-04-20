@@ -197,7 +197,8 @@ RESPONSE SCHEMA:
   "parties": ["<party_id>", ...],
   "keyPolicies": ["<Politikvereinbarung 1>", ...],
   "summary": "<2-3 Sätze Zusammenfassung des Koalitionsvertrags>",
-  "concessions": { "<party_id>": "<Zugeständnis der Partei>", ... }
+  "concessions": { "<party_id>": "<Zugeständnis der Partei>", ... },
+  "chancellorCandidate": { "partyId": "<partei-id der führenden Partei>", "name": "<Vollständiger Name des Kanzler-Kandidaten>" }
 }`;
 
   const user = `WAHLERGEBNISSE:
@@ -231,11 +232,23 @@ Bestimme den Koalitionsvertrag. Antworte als JSON.`;
         const o = v as Record<string, unknown>;
         if (!Array.isArray(o.parties) || !o.parties.every((p: unknown) => typeof p === "string")) return null;
         if (typeof o.summary !== "string") return null;
+
+        // Validate chancellorCandidate if present — drop malformed values so
+        // the loop-side fallback (FRAKTION_LEADERS[parties[0]]) takes over.
+        let chancellorCandidate: CoalitionAgreement["chancellorCandidate"];
+        if (o.chancellorCandidate && typeof o.chancellorCandidate === "object") {
+          const c = o.chancellorCandidate as Record<string, unknown>;
+          if (typeof c.partyId === "string" && typeof c.name === "string" && (o.parties as string[]).includes(c.partyId)) {
+            chancellorCandidate = { partyId: c.partyId, name: c.name };
+          }
+        }
+
         return {
           parties: o.parties as string[],
           keyPolicies: Array.isArray(o.keyPolicies) ? (o.keyPolicies as string[]) : [],
           summary: o.summary,
           concessions: (o.concessions && typeof o.concessions === "object") ? o.concessions as Record<string, string> : {},
+          chancellorCandidate,
         };
       },
       "Negotiation:Synthesis",

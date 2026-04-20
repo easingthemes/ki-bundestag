@@ -44,11 +44,19 @@ export interface NegotiationRound {
   acceptablePartners: string[];
 }
 
+export interface ChancellorCandidate {
+  partyId: string;
+  name: string;
+}
+
 export interface CoalitionAgreement {
   parties: string[];
   keyPolicies: string[];
   summary: string;
   concessions: Record<string, string>;
+  /** Chancellor-Kandidat named in the agreement (Cycle 2a S5). Optional — falls
+   *  back to FRAKTION_LEADERS[parties[0]] when absent. */
+  chancellorCandidate?: ChancellorCandidate;
 }
 
 export interface Election {
@@ -93,4 +101,39 @@ export interface Fraktion {
   status: "active" | "dissolved";
   formedOnDay: number;
   dissolvedOnDay: number | null;
+}
+
+// Kanzlerwahl (Art. 63 GG, Cycle 2a S5/S6) — 3-phase chancellor election.
+
+export type KanzlerwahlPhase = 1 | 2 | 3;
+export type KanzlerwahlOutcome = "elected" | "failed" | "pending";
+export type KanzlerwahlStatus = "phase1" | "phase2" | "phase3" | "elected" | "failed";
+
+export interface KanzlerwahlRound {
+  phase: KanzlerwahlPhase;
+  day: number;
+  candidatePartyId: string;
+  candidateName: string;
+  votesYes: number;
+  votesNo: number;
+  votesAbstain: number;
+  /** Required yes votes for this round to pass (Kanzlermehrheit for P1/P2,
+   *  relative majority for P3). */
+  required: number;
+  outcome: KanzlerwahlOutcome;
+}
+
+export interface KanzlerwahlState {
+  id: string;
+  electionId: string;
+  startedOnDay: number;
+  phase1: KanzlerwahlRound | null;
+  phase2Rounds: KanzlerwahlRound[];
+  phase2WindowEndDay: number | null;
+  phase3: KanzlerwahlRound | null;
+  status: KanzlerwahlStatus;
+  electedCandidatePartyId: string | null;
+  electedCandidateName: string | null;
+  /** Next Sitzungstag after a successful Kanzlerwahl; cabinet forms on this day. */
+  amtseidDay: number | null;
 }
