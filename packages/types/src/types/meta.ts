@@ -57,7 +57,8 @@ export type SimulationEventType =
   | "amtseid"
   | "regierungsbefragung"
   | "fragestunde"
-  | "aktuelle_stunde";
+  | "aktuelle_stunde"
+  | "schriftliche_einzelfragen";
 
 export interface SimulationEvent {
   id: string;
