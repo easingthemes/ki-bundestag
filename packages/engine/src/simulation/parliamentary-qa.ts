@@ -14,6 +14,8 @@ import { eq, and, isNull, gte, lte } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type { BatchRequest, BatchResult } from "../agent/batch-client.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
+import { isSitzungsTag, getWeekdaySemantic } from "./parliament-calendar.js";
+import { dayToDate } from "./calendar.js";
 import {
   MDB_QUESTION_POOL,
   MINISTRY_FALLBACK_PARTY,
@@ -395,6 +397,62 @@ export function processParliamentaryQABatchResult(
   }
 
   return { answered };
+}
+
+/**
+ * Weekly scheduler. On the first Sitzungstag of a Sitzungswoche, inserts
+ * one Regierungsbefragung row (that week's Wednesday if it's a Sitzungstag)
+ * and one Fragestunde row (that week's Thursday if it's a Sitzungstag).
+ * Idempotent — re-running on the same week is a no-op.
+ *
+ * Skipped entirely during interregnum (no active government) to avoid
+ * scheduling sessions no minister can answer (S12).
+ */
+export function scheduleWeeklyParliamentaryQA(
+  currentDay: number,
+  startDate: Date,
+  government: Government | null,
+  parties: Party[],
+  activeCategories: BillCategory[] = [],
+  activeCrisisMinistries: MinistryPortfolio[] = [],
+  rng: RNG = defaultRng,
+): { regierungsbefragung: ParliamentaryQaSession | null; fragestunde: ParliamentaryQaSession | null } {
+  if (!government) return { regierungsbefragung: null, fragestunde: null };
+
+  // Compute this week's Monday → Friday window (ISO weekday).
+  const date = dayToDate(currentDay, startDate);
+  const dow = ((date.getDay() + 6) % 7) + 1; // Mon=1..Sun=7
+  const weekStart = currentDay - (dow - 1);
+  const wedDay = weekStart + 2;
+  const thuDay = weekStart + 3;
+
+  // Bail if neither day is a valid Sitzungstag (recess weeks etc).
+  const wedOk = isSitzungsTag(wedDay, startDate) && getWeekdaySemantic(wedDay, startDate) === "regierungsbefragung";
+  const thuOk = isSitzungsTag(thuDay, startDate);
+  if (!wedOk && !thuOk) return { regierungsbefragung: null, fragestunde: null };
+
+  // Track used question ids across the week so RB + Fragestunde don't repeat.
+  const usedIds: string[] = [];
+
+  let rb: ParliamentaryQaSession | null = null;
+  if (wedOk) {
+    const n = questionsPerSession("regierungsbefragung", rng);
+    const templates = pickQuestionsForSession(n, { activeCategories, activeCrisisMinistries, excludeIds: usedIds }, rng);
+    templates.forEach(t => usedIds.push(t.id));
+    const draft: Omit<ParliamentaryQaSession, "id"> = buildSession("_pending", "regierungsbefragung", wedDay, templates, government, parties, rng);
+    rb = persistScheduledSession(draft);
+  }
+
+  let fs: ParliamentaryQaSession | null = null;
+  if (thuOk) {
+    const n = questionsPerSession("fragestunde", rng);
+    const templates = pickQuestionsForSession(n, { activeCategories, activeCrisisMinistries, excludeIds: usedIds }, rng);
+    templates.forEach(t => usedIds.push(t.id));
+    const draft: Omit<ParliamentaryQaSession, "id"> = buildSession("_pending", "fragestunde", thuDay, templates, government, parties, rng);
+    fs = persistScheduledSession(draft);
+  }
+
+  return { regierungsbefragung: rb, fragestunde: fs };
 }
 
 /**

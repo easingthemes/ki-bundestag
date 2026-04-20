@@ -42,6 +42,19 @@ import { formCabinet, getActiveGovernment, dissolveGovernment, isGovernmentBill 
 import { startKanzlerwahl, runPhase1, runPhase2Round, runPhase3 } from "./kanzlerwahl.js";
 import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus } from "@ki-bundestag/types";
 import { nextSitzungsTag, isSitzungsTag } from "./parliament-calendar.js";
+import {
+  scheduleWeeklyParliamentaryQA,
+  getPendingSessions as getPendingParliamentaryQASessions,
+  buildParliamentaryQABatchRequests,
+  processParliamentaryQABatchResult,
+} from "./parliamentary-qa.js";
+import {
+  scheduleAktuelleStundeForCrisis,
+  maybeScheduleBaselineAktuelleStunde,
+  getPendingAktuelleStundeSessions,
+  buildAktuelleStundeBatchRequests,
+  processAktuelleStundeBatchResult,
+} from "./aktuelle-stunde.js";
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
@@ -495,6 +508,21 @@ export async function runDay(): Promise<number> {
     });
 
     try { createNotificationForAll("crisis_alert", `Krise: ${newCrisis.name}`, `${newCrisis.description} (Schweregrad: ${newCrisis.severity})`, { crisisId: newCrisis.id, severity: newCrisis.severity }, currentDay); } catch {}
+
+    // Cycle 2b PR 6 — Aktuelle-Stunde crisis hook. Only schedules if severity
+    // >= MIN and no session already exists this Sitzungswoche. Silent on dedup
+    // to avoid noise when multiple high-severity crises cluster.
+    if (startDate) {
+      try {
+        const gov = getActiveGovernment();
+        const scheduled = scheduleAktuelleStundeForCrisis(newCrisis, gov, allParties, startDate, currentDay);
+        if (scheduled) {
+          console.log(`  [Aktuelle Stunde] Scheduled for day ${scheduled.scheduledDay} (crisis: ${newCrisis.name})`);
+        }
+      } catch (err) {
+        console.warn(`  [Aktuelle Stunde] crisis-hook skipped: ${(err as Error).message}`);
+      }
+    }
 
     console.log(`  [Crisis] Started: ${newCrisis.name} (${newCrisis.severity}, until day ${newCrisis.endDay})`);
   }
@@ -2474,7 +2502,24 @@ export async function runDay(): Promise<number> {
     .where(eq(schema.nationalState.id, state.id))
     .run();
 
-  // 12b+12d. Batch media + summary together (2 calls → 1 batch)
+  // 12a. Cycle 2b PR 6 — schedule weekly Parliamentary-QA + baseline Aktuelle
+  // Stunde on each Sitzungstag. Both helpers are idempotent (check for existing
+  // rows) so calling them on every Sitzungstag in the week is fine.
+  if (startDate && isSitzungsTag(currentDay, startDate)) {
+    try {
+      const gov = getActiveGovernment();
+      scheduleWeeklyParliamentaryQA(currentDay, startDate, gov, allParties);
+      const recentBills = db.select().from(schema.bills)
+        .orderBy(desc(schema.bills.proposedOnDay))
+        .limit(5)
+        .all() as unknown as Bill[];
+      maybeScheduleBaselineAktuelleStunde(currentDay, startDate, gov, allParties, recentBills);
+    } catch (err) {
+      console.warn(`  [Parliamentary-QA] weekly-schedule skipped: ${(err as Error).message}`);
+    }
+  }
+
+  // 12b+12d. Batch media + summary + parliamentary-qa + aktuelle-stunde (piggyback).
   const endOfDayRequests: BatchRequest[] = [];
   const mediaReq = buildMediaBatchRequest(dayEvents, allParties, currentDay, depthConfig.enrichSecondaryCalls ? (briefingText ?? undefined) : undefined);
   if (mediaReq) endOfDayRequests.push(mediaReq);
@@ -2483,6 +2528,16 @@ export async function runDay(): Promise<number> {
     nationalState.publicSentiment, nationalState.coalitionParties,
   );
   endOfDayRequests.push(summaryReq);
+
+  // Parliamentary-QA pending sessions → batch requests (R1 piggyback).
+  const pendingParlSessions = getPendingParliamentaryQASessions(currentDay);
+  const parlQaReqs = buildParliamentaryQABatchRequests(pendingParlSessions);
+  for (const p of parlQaReqs) endOfDayRequests.push(p.req);
+
+  // Aktuelle-Stunde pending sessions → batch requests (same piggyback window).
+  const pendingAktstSessions = getPendingAktuelleStundeSessions(currentDay);
+  const aktstReqs = buildAktuelleStundeBatchRequests(pendingAktstSessions, allParties);
+  for (const a of aktstReqs) endOfDayRequests.push(a.req);
 
   progress.set(80); // Starting media + summary batch
 
@@ -2518,6 +2573,63 @@ export async function runDay(): Promise<number> {
   const dailySummaryStr = summaryResult ? JSON.stringify(summaryResult) : null;
   if (dailySummaryStr) {
     console.log(`  [Summary] Generated daily narrative`);
+  }
+
+  // Cycle 2b PR 6 — Parliamentary-QA result processing + event emit.
+  if (pendingParlSessions.length > 0) {
+    try {
+      const { answered } = processParliamentaryQABatchResult(endOfDayResults, pendingParlSessions, currentDay);
+      for (const s of answered) {
+        if (s.day > currentDay) continue; // scheduled for future — batch pre-answered, wait until day
+        const title = s.kind === "regierungsbefragung" ? "Regierungsbefragung" : "Fragestunde";
+        const ministries = [...new Set(s.questions.map(q => q.ministry))];
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: s.kind,
+          actor: "bundestag",
+          title,
+          description: `${s.questions.length} Fragen an die Bundesregierung, Ministerien: ${ministries.join(", ")}`,
+          data: {
+            sessionId: s.id,
+            day: s.day,
+            ministries,
+            questions: s.questions,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn(`  [Parliamentary-QA] process failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Cycle 2b PR 6 — Aktuelle-Stunde result processing + event emit.
+  if (pendingAktstSessions.length > 0) {
+    try {
+      const { ready } = processAktuelleStundeBatchResult(endOfDayResults, pendingAktstSessions, currentDay);
+      for (const s of ready) {
+        const govName = allParties.find(p => p.id === s.governmentPartyId)?.name ?? s.governmentPartyId;
+        const oppName = allParties.find(p => p.id === s.oppositionPartyId)?.name ?? s.oppositionPartyId;
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "aktuelle_stunde",
+          actor: "bundestag",
+          title: `Aktuelle Stunde: ${s.topic}`,
+          description: `${govName} und ${oppName} positionieren sich im Plenum.`,
+          data: {
+            sessionId: s.id,
+            day: s.scheduledDay,
+            topic: s.topic,
+            triggerKind: s.triggerKind,
+            crisisId: s.crisisId,
+            positions: s.positions,
+            governmentPartyId: s.governmentPartyId,
+            oppositionPartyId: s.oppositionPartyId,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn(`  [Aktuelle Stunde] process failed: ${(err as Error).message}`);
+    }
   }
 
   // Persist narrative + mood into day_summaries table (preview already saved at day start)

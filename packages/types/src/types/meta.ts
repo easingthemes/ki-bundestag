@@ -56,7 +56,8 @@ export type SimulationEventType =
   | "kanzlerwahl_phase3"
   | "amtseid"
   | "regierungsbefragung"
-  | "fragestunde";
+  | "fragestunde"
+  | "aktuelle_stunde";
 
 export interface SimulationEvent {
   id: string;

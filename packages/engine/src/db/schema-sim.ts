@@ -127,6 +127,24 @@ export const parliamentaryQaSessions = sqliteTable("parliamentary_qa_sessions", 
   answeredOnDay: integer("answered_on_day"),
 });
 
+// Cycle 2b — Aktuelle Stunde (crisis-hooked + baseline). One row per session.
+// `positions` holds {government, opposition} AI-generated statements, null
+// until the weekly batch result lands. `emitted_on_day` is set when the event
+// has been fired into simulation_events on/after `scheduled_day`.
+export const aktuelleStundeSessions = sqliteTable("aktuelle_stunde_sessions", {
+  id: text("id").primaryKey(),
+  scheduledDay: integer("scheduled_day").notNull(),
+  topic: text("topic").notNull(),
+  triggerKind: text("trigger_kind").notNull(),
+  crisisId: text("crisis_id"),
+  governmentPartyId: text("government_party_id").notNull(),
+  oppositionPartyId: text("opposition_party_id").notNull(),
+  positions: text("positions", { mode: "json" }),
+  batchRequestId: text("batch_request_id"),
+  batchAttempts: integer("batch_attempts").notNull().default(0),
+  emittedOnDay: integer("emitted_on_day"),
+});
+
 export const simulationMeta = sqliteTable("simulation_meta", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentDay: integer("current_day").notNull().default(0),

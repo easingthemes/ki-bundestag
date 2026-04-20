@@ -121,6 +121,20 @@ export const SIM_TABLE_DDL = `
     answered_on_day INTEGER
   );
 
+  CREATE TABLE IF NOT EXISTS aktuelle_stunde_sessions (
+    id TEXT PRIMARY KEY,
+    scheduled_day INTEGER NOT NULL,
+    topic TEXT NOT NULL,
+    trigger_kind TEXT NOT NULL,
+    crisis_id TEXT,
+    government_party_id TEXT NOT NULL,
+    opposition_party_id TEXT NOT NULL,
+    positions TEXT,
+    batch_request_id TEXT,
+    batch_attempts INTEGER NOT NULL DEFAULT 0,
+    emitted_on_day INTEGER
+  );
+
   CREATE TABLE IF NOT EXISTS simulation_meta (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     current_day INTEGER NOT NULL DEFAULT 0,
@@ -679,6 +693,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "kanzlerwahl", column: "_table", sql: "CREATE TABLE IF NOT EXISTS kanzlerwahl (id TEXT PRIMARY KEY, election_id TEXT NOT NULL REFERENCES elections(id), started_on_day INTEGER NOT NULL, phase1 TEXT, phase2_rounds TEXT NOT NULL DEFAULT '[]', phase2_window_end_day INTEGER, phase3 TEXT, status TEXT NOT NULL, elected_candidate_party_id TEXT, elected_candidate_name TEXT, amtseid_day INTEGER)" },
   // Cycle 2b (todo 043) — Parliamentary-QA sessions (Regierungsbefragung + Fragestunde)
   { table: "parliamentary_qa_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS parliamentary_qa_sessions (id TEXT PRIMARY KEY, kind TEXT NOT NULL, day INTEGER NOT NULL, questions TEXT NOT NULL, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, answered_on_day INTEGER)" },
+  // Cycle 2b (todo 043) — Aktuelle Stunde sessions (crisis-hooked + baseline)
+  { table: "aktuelle_stunde_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS aktuelle_stunde_sessions (id TEXT PRIMARY KEY, scheduled_day INTEGER NOT NULL, topic TEXT NOT NULL, trigger_kind TEXT NOT NULL, crisis_id TEXT, government_party_id TEXT NOT NULL, opposition_party_id TEXT NOT NULL, positions TEXT, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, emitted_on_day INTEGER)" },
 ];
 
 /** Column migrations for user DB */
@@ -720,6 +736,8 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_party_donations_day", sql: "CREATE INDEX IF NOT EXISTS idx_party_donations_day ON party_donations(day_number)" },
   { name: "idx_parliamentary_qa_sessions_day", sql: "CREATE INDEX IF NOT EXISTS idx_parliamentary_qa_sessions_day ON parliamentary_qa_sessions(day)" },
   { name: "idx_parliamentary_qa_sessions_answered", sql: "CREATE INDEX IF NOT EXISTS idx_parliamentary_qa_sessions_answered ON parliamentary_qa_sessions(answered_on_day)" },
+  { name: "idx_aktuelle_stunde_sessions_day", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_day ON aktuelle_stunde_sessions(scheduled_day)" },
+  { name: "idx_aktuelle_stunde_sessions_emitted", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_emitted ON aktuelle_stunde_sessions(emitted_on_day)" },
 ];
 
 /** Index migrations for user DB */
