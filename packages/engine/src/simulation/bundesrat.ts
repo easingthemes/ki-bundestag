@@ -13,11 +13,13 @@
 import type {
   Bill,
   BillCategory,
+  BillImpact,
   BundesratLandResult,
   BundesratMode,
   BundesratVoteResult,
   LandVote,
   Party,
+  VermittlungOutcome,
 } from "@ki-bundestag/types";
 import {
   BUNDESRAT_LAENDER,
@@ -25,14 +27,24 @@ import {
   BUNDESRAT_MODE_BY_CATEGORY,
   BUNDESRAT_TOTAL_VOTES,
   LAND_ABSTENTION_THRESHOLD,
+  VERMITTLUNG_OUTCOMES,
 } from "../config/bundesrat.js";
+import { MAJORITY_SEATS } from "../config/elections.js";
+import { tallyVotes } from "./voting.js";
 
 export type {
   BundesratMode,
   LandVote,
   BundesratLandResult,
   BundesratVoteResult,
+  VermittlungOutcome,
 } from "@ki-bundestag/types";
+
+/** Post-Vermittlungsausschuss decision for a given outcome+mode+override combo. */
+export type VermittlungResolution =
+  | { kind: "compromise" }                // impact haircut, bill proceeds through cleared path
+  | { kind: "einspruch_overridden" }      // Bundestag overrode Einspruch, bill proceeds
+  | { kind: "rejected" };                 // bill dies
 
 /** Zustimmungs- vs. Einspruchsgesetz classification (sub-decision S1). */
 export function getBundesratMode(category: BillCategory): BundesratMode {
@@ -153,4 +165,58 @@ export function voteBundesrat(bill: Bill, parties: Party[]): BundesratVoteResult
     passed,
     landResults,
   };
+}
+
+/**
+ * Scale every non-zero field of a BillImpact by `factor`. Undefined fields stay
+ * undefined; zero-valued fields stay zero. Used when the Vermittlungsausschuss
+ * compromises — the law proceeds but with a reduced impact footprint.
+ */
+export function applyImpactHaircut(impact: BillImpact, factor: number): BillImpact {
+  const result: BillImpact = {};
+  for (const [key, val] of Object.entries(impact)) {
+    if (val === undefined) continue;
+    result[key as keyof BillImpact] = val * factor;
+  }
+  return result;
+}
+
+/**
+ * Stochastic draw from VERMITTLUNG_OUTCOMES. Injectable RNG for deterministic
+ * tests; defaults to Math.random.
+ */
+export function rollVermittlungOutcome(rng: () => number = Math.random): VermittlungOutcome {
+  const r = rng();
+  if (r < VERMITTLUNG_OUTCOMES.compromise) return "compromise";
+  if (r < VERMITTLUNG_OUTCOMES.compromise + VERMITTLUNG_OUTCOMES.bundestagRejects) {
+    return "bundestag_rejects";
+  }
+  return "bundesrat_rejects";
+}
+
+/**
+ * Can the Bundestag override a Bundesrat-Einspruch? Art. 77 GG requires at
+ * minimum an absolute majority (Kanzlermehrheit, 368 seats) on the re-vote.
+ * The existing 3rd-reading vote is reused as a proxy for the override tally.
+ */
+export function canOverrideEinspruch(bill: Bill, parties: Party[]): boolean {
+  return tallyVotes(bill, parties).yesSeats >= MAJORITY_SEATS;
+}
+
+/**
+ * Map a Vermittlungsausschuss outcome + bill mode + override capability to the
+ * downstream resolution. See spec S4 and PR 2 landmine B2 — bundesrat_rejects
+ * on Zustimmungsgesetze kills the bill (no override path); on Einspruchsgesetze
+ * the Bundestag gets one more attempt.
+ */
+export function resolveVermittlungOutcome(
+  outcome: VermittlungOutcome,
+  mode: BundesratMode,
+  canOverride: boolean,
+): VermittlungResolution {
+  if (outcome === "compromise") return { kind: "compromise" };
+  if (outcome === "bundestag_rejects") return { kind: "rejected" };
+  // bundesrat_rejects
+  if (mode === "zustimmung") return { kind: "rejected" };
+  return canOverride ? { kind: "einspruch_overridden" } : { kind: "rejected" };
 }

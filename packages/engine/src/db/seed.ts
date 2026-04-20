@@ -103,6 +103,11 @@ export function migrateDatabase() {
   // canonical BUNDESRAT_MODE_BY_CATEGORY map so the SQL CASE stays in sync
   // with code. Historical rows get NULL if the table predates the column.
   // Idempotent: guarded by WHERE bundesrat_mode IS NULL.
+  //
+  // Migration steps 3–5 from the Cycle 2a spec (in-flight vote result, pending
+  // dwell, cleared state) are intentional no-ops: no retroactive vote emission
+  // for bills already past the voting gate, and in-flight pending rows just
+  // vote when dwell expires on the next pipeline tick.
   try {
     const cases = Object.entries(BUNDESRAT_MODE_BY_CATEGORY)
       .map(([cat, mode]) => `WHEN '${cat}' THEN '${mode}'`)
