@@ -26,6 +26,7 @@ import { applyDailyApprovalDrift, approvalFromBillOutcome, applySentimentDrift, 
 import { maybeTriggerCrisis, applyCrisisImpacts, resolveExpiredCrises } from "./crises.js";
 import { isPollDay, isMonthlyDay, isBudgetDay, weeklyOpinionRecalc, monthlyEconomicReport } from "./cycles.js";
 import { shouldTriggerElection, announceElection, advanceElectionPhase, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS, computeKonstituierendeSitzungDay } from "./elections.js";
+import { MAJORITY_SEATS, KANZLERWAHL_PHASE2_MAX_ROUNDS } from "../config/elections.js";
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
 import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
@@ -35,9 +36,12 @@ import { answerPendingQuestions } from "./questions.js";
 import { maybeGenerateBotQuestionPool } from "./bot-question-pool.js";
 import { maybeGenerateReferendum, resolveExpiredReferendums, buildReferendumBatchRequest, processReferendumBatchResult } from "./referendums.js";
 import { processInjections } from "./injections.js";
-import { updateFraktionen, getActiveFraktionen } from "./fraktionen.js";
+import { updateFraktionen, getActiveFraktionen, FRAKTION_LEADERS } from "./fraktionen.js";
 import { tallyMotionVotes, motionSentimentImpact } from "./motions.js";
 import { formCabinet, getActiveGovernment, dissolveGovernment, isGovernmentBill as checkIsGovernmentBill } from "./government.js";
+import { startKanzlerwahl, runPhase1, runPhase2Round, runPhase3 } from "./kanzlerwahl.js";
+import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus } from "@ki-bundestag/types";
+import { nextSitzungsTag, isSitzungsTag } from "./parliament-calendar.js";
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
@@ -97,6 +101,24 @@ function addEvent(
   ev: Omit<SimulationEvent, "id">,
 ) {
   events.push(ev);
+}
+
+/** Reconstruct a KanzlerwahlState from a Drizzle row — JSON columns come back
+ *  as unknown and need a narrowing cast. */
+function rowToKanzlerwahlState(row: typeof schema.kanzlerwahl.$inferSelect): KanzlerwahlState {
+  return {
+    id: row.id,
+    electionId: row.electionId,
+    startedOnDay: row.startedOnDay,
+    phase1: (row.phase1 as unknown as KanzlerwahlRound | null) ?? null,
+    phase2Rounds: (row.phase2Rounds as unknown as KanzlerwahlRound[] | null) ?? [],
+    phase2WindowEndDay: row.phase2WindowEndDay,
+    phase3: (row.phase3 as unknown as KanzlerwahlRound | null) ?? null,
+    status: row.status as KanzlerwahlStatus,
+    electedCandidatePartyId: row.electedCandidatePartyId,
+    electedCandidateName: row.electedCandidateName,
+    amtseidDay: row.amtseidDay,
+  };
 }
 
 /**
@@ -624,6 +646,23 @@ export async function runDay(): Promise<number> {
         data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
       });
 
+      // R13: insert a synthetic kanzlerwahl row so the new KS-gate Kanzlerwahl
+      // trigger doesn't re-fire Phase 1 for this electionId. Same semantic as
+      // the Misstrauensvotum carve-out (Art.-63-skipping recovery path).
+      db.insert(schema.kanzlerwahl).values({
+        id: `kw-fallback-${activeElection.id}`,
+        electionId: activeElection.id,
+        startedOnDay: currentDay,
+        phase1: null,
+        phase2Rounds: [] as unknown as string,
+        phase2WindowEndDay: null,
+        phase3: null,
+        status: "elected",
+        electedCandidatePartyId: cabinet.chancellorPartyId,
+        electedCandidateName: cabinet.chancellorName,
+        amtseidDay: currentDay,
+      }).onConflictDoNothing().run();
+
       const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
       resetAllSeats(currentDay);
       for (const result of activeElection.results!) {
@@ -772,18 +811,11 @@ export async function runDay(): Promise<number> {
 
       try { createNotificationForAll("government_formed", "Neue Regierung gebildet", `Koalition: ${coalitionNames}`, { coalition, opposition }, currentDay); } catch {}
 
-      // Form cabinet (Chancellor + Ministers)
-      const cabinet = formCabinet(coalition, allParties, activeElection.id, currentDay);
-      const ministerList = cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ");
-      addEvent(dayEvents, {
-        dayNumber: currentDay,
-        type: "government_cabinet_formed",
-        actor: "system",
-        title: `Kanzler/in ${cabinet.chancellorName} bildet Kabinett`,
-        description: `Kanzler/in: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Minister: ${ministerList}`,
-        data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
-      });
-      console.log(`  [Cabinet] Chancellor: ${cabinet.chancellorName}, ${cabinet.ministers.length} ministers`);
+      // Cycle 2a PR 4: cabinet formation is deferred to the Amtseid day (post
+      // Kanzlerwahl). The outgoing cabinet stays active=true until then,
+      // matching Art. 69 Abs. 3 GG (geschäftsführende Bundesregierung). Seat
+      // allocation stays here — it's administrative and independent of the
+      // Chancellor election.
 
       // Allocate Bundestag seats per party based on election results
       const timingPreset = (meta.timingPreset ?? "normal") as TimingPreset;
@@ -797,13 +829,6 @@ export async function runDay(): Promise<number> {
         const userSqlite = (await import("../db/index.js")).getUserSqlite();
         userSqlite.prepare("UPDATE mdb_applications SET status = 'expired' WHERE status = 'pending'").run();
       } catch { /* table may not exist yet */ }
-
-      // Seed committees if needed and assign memberships
-      try {
-        if (shouldSeedCommittees()) seedCommittees(currentDay);
-        assignCommitteeMemberships(currentDay);
-        console.log(`  [Committees] Assigned memberships after election`);
-      } catch (err) { console.warn(`  [Committees] Assignment failed:`, (err as Error).message); }
 
       console.log(`  [Election] New coalition: ${coalitionNames}`);
       activeElection = null;
@@ -922,6 +947,177 @@ export async function runDay(): Promise<number> {
         const fraktionResult = updateFraktionen(currentDay, allParties);
         for (const ev of fraktionResult.events) addEvent(dayEvents, ev);
         console.log(`  [Konstituierende Sitzung] Bundestag formally constituted; ${fraktionResult.formed.length} Fraktion(en) formed`);
+      }
+
+      // Cycle 2a PR 4 — Kanzlerwahl Phase 1 trigger (Art. 63 Abs. 1 GG).
+      // Strict === is load-bearing: migration step 3 and R13's synthetic row
+      // both rely on this never firing for past-dated ksDay values. Never
+      // loosen to >= without re-auditing the migration path.
+      if (currentDay === ksDay) {
+        const existingKw = db.select().from(schema.kanzlerwahl)
+          .where(eq(schema.kanzlerwahl.electionId, latestElectionForKS.id))
+          .all()[0];
+        const newCoalitionForKw = latestElectionForKS.newCoalition as unknown as string[] | null;
+        if (!existingKw && newCoalitionForKw && newCoalitionForKw.length > 0) {
+          const agreement = latestElectionForKS.coalitionAgreement as unknown as CoalitionAgreement | null;
+          const sitzungsTransform = startDate ? (d: number) => nextSitzungsTag(d, startDate) : undefined;
+          let kwState = startKanzlerwahl(latestElectionForKS.id, agreement, newCoalitionForKw, allParties, currentDay);
+          kwState = runPhase1(kwState, allParties, newCoalitionForKw, currentDay, { nextSitzungsTag: sitzungsTransform });
+          db.insert(schema.kanzlerwahl).values({
+            id: kwState.id,
+            electionId: kwState.electionId,
+            startedOnDay: kwState.startedOnDay,
+            phase1: kwState.phase1 as unknown as string,
+            phase2Rounds: kwState.phase2Rounds as unknown as string,
+            phase2WindowEndDay: kwState.phase2WindowEndDay,
+            phase3: kwState.phase3 as unknown as string,
+            status: kwState.status,
+            electedCandidatePartyId: kwState.electedCandidatePartyId,
+            electedCandidateName: kwState.electedCandidateName,
+            amtseidDay: kwState.amtseidDay,
+          }).run();
+          const p1 = kwState.phase1!;
+          addEvent(dayEvents, {
+            dayNumber: currentDay,
+            type: "kanzlerwahl_phase1",
+            actor: "system",
+            title: `Kanzlerwahl 1. Wahlgang — ${p1.candidateName} (${p1.candidatePartyId.toUpperCase()})`,
+            description: `${p1.votesYes} Ja, ${p1.votesNo} Nein, ${p1.votesAbstain} Enthaltung. Kanzlermehrheit ${MAJORITY_SEATS}. ${p1.outcome === "elected" ? "Gewählt — Amtseid am Tag " + kwState.amtseidDay + "." : "Nicht gewählt — 14-Tage-Frist läuft (2. Wahlphase)."}`,
+            data: { kanzlerwahlId: kwState.id, round: p1, outcome: p1.outcome },
+          });
+          console.log(`  [Kanzlerwahl] Phase 1: ${p1.candidateName} — ${p1.outcome}`);
+        }
+      }
+    }
+  }
+
+  // Cycle 2a PR 4 — daily Kanzlerwahl progression (Phase 2 rounds + Phase 3
+  // auto-resolution). Runs only when an active kanzlerwahl row is in phase2
+  // or phase3 for the current term.
+  {
+    const kwRow = db.select().from(schema.kanzlerwahl)
+      .orderBy(desc(schema.kanzlerwahl.startedOnDay))
+      .limit(1)
+      .all()[0];
+    if (kwRow && (kwRow.status === "phase2" || kwRow.status === "phase3")) {
+      const electionRow = db.select().from(schema.elections)
+        .where(eq(schema.elections.id, kwRow.electionId))
+        .all()[0];
+      const newCoalitionForKw = electionRow?.newCoalition as unknown as string[] | null;
+      if (newCoalitionForKw && newCoalitionForKw.length > 0) {
+        const sitzungsTransform = startDate ? (d: number) => nextSitzungsTag(d, startDate) : undefined;
+        let kwState = rowToKanzlerwahlState(kwRow);
+        const phase2RoundsBefore = kwState.phase2Rounds.length;
+        let didPhase2 = false;
+        let didPhase3 = false;
+
+        if (kwState.status === "phase2") {
+          const sitting = startDate ? isSitzungsTag(currentDay, startDate) : true;
+          const windowOpen = kwState.phase2WindowEndDay == null || currentDay <= kwState.phase2WindowEndDay;
+          const underCap = kwState.phase2Rounds.length < KANZLERWAHL_PHASE2_MAX_ROUNDS;
+          if (sitting && windowOpen && underCap) {
+            kwState = runPhase2Round(kwState, allParties, newCoalitionForKw, currentDay, { nextSitzungsTag: sitzungsTransform });
+            didPhase2 = true;
+          } else if (!windowOpen || !underCap) {
+            kwState = { ...kwState, status: "phase3" };
+          }
+        }
+        if (kwState.status === "phase3" && !kwState.phase3) {
+          kwState = runPhase3(kwState, allParties, newCoalitionForKw, currentDay, { nextSitzungsTag: sitzungsTransform });
+          didPhase3 = true;
+        }
+
+        if (didPhase2 || didPhase3) {
+          db.update(schema.kanzlerwahl)
+            .set({
+              phase1: kwState.phase1 as unknown as string,
+              phase2Rounds: kwState.phase2Rounds as unknown as string,
+              phase2WindowEndDay: kwState.phase2WindowEndDay,
+              phase3: kwState.phase3 as unknown as string,
+              status: kwState.status,
+              electedCandidatePartyId: kwState.electedCandidatePartyId,
+              electedCandidateName: kwState.electedCandidateName,
+              amtseidDay: kwState.amtseidDay,
+            })
+            .where(eq(schema.kanzlerwahl.id, kwState.id))
+            .run();
+
+          if (didPhase2 && kwState.phase2Rounds.length > phase2RoundsBefore) {
+            const round = kwState.phase2Rounds[kwState.phase2Rounds.length - 1];
+            addEvent(dayEvents, {
+              dayNumber: currentDay,
+              type: "kanzlerwahl_phase2",
+              actor: "system",
+              title: `Kanzlerwahl 2. Wahlphase, Runde ${kwState.phase2Rounds.length} — ${round.candidateName} (${round.candidatePartyId.toUpperCase()})`,
+              description: `${round.votesYes} Ja, ${round.votesNo} Nein, ${round.votesAbstain} Enthaltung. ${round.outcome === "elected" ? "Gewählt — Amtseid am Tag " + kwState.amtseidDay + "." : "Kanzlermehrheit verfehlt."}`,
+              data: { kanzlerwahlId: kwState.id, round, outcome: round.outcome },
+            });
+            console.log(`  [Kanzlerwahl] Phase 2 round ${kwState.phase2Rounds.length}: ${round.candidateName} — ${round.outcome}`);
+          }
+          if (didPhase3 && kwState.phase3) {
+            const round = kwState.phase3;
+            addEvent(dayEvents, {
+              dayNumber: currentDay,
+              type: "kanzlerwahl_phase3",
+              actor: "system",
+              title: `Kanzlerwahl 3. Wahlphase — ${round.candidateName} (${round.candidatePartyId.toUpperCase()})`,
+              description: `Relative Mehrheit: ${round.votesYes} Ja, ${round.votesNo} Nein. Der/Die Bundespräsident/in ernennt den/die gewählte/n Kandidat/in. Amtseid am Tag ${kwState.amtseidDay}.`,
+              data: { kanzlerwahlId: kwState.id, round, outcome: round.outcome },
+            });
+            console.log(`  [Kanzlerwahl] Phase 3: ${round.candidateName} — ${round.outcome}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Cycle 2a PR 4 — Amtseid day: new Chancellor is sworn in, cabinet forms,
+  // committees re-assign. Strict === for the same migration reason as the
+  // Phase 1 trigger above.
+  {
+    const amtseidRow = db.select().from(schema.kanzlerwahl)
+      .where(and(eq(schema.kanzlerwahl.amtseidDay, currentDay), eq(schema.kanzlerwahl.status, "elected")))
+      .all()[0];
+    if (amtseidRow) {
+      const electionRow = db.select().from(schema.elections)
+        .where(eq(schema.elections.id, amtseidRow.electionId))
+        .all()[0];
+      const newCoalitionForAmt = electionRow?.newCoalition as unknown as string[] | null;
+      const alreadySworn = db.select().from(schema.simulationEvents)
+        .where(and(
+          eq(schema.simulationEvents.type, "amtseid"),
+          gte(schema.simulationEvents.dayNumber, amtseidRow.startedOnDay),
+        ))
+        .all().length > 0;
+      if (!alreadySworn && newCoalitionForAmt && newCoalitionForAmt.length > 0) {
+        const chancellorName = amtseidRow.electedCandidateName ?? "Unknown";
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "amtseid",
+          actor: "system",
+          title: `Amtseid: ${chancellorName} wird als Bundeskanzler/in vereidigt`,
+          description: `Die/Der neue Bundeskanzler/in legt den Amtseid vor dem Bundestag ab. Das Kabinett tritt an.`,
+          data: { kanzlerwahlId: amtseidRow.id, electionId: amtseidRow.electionId, chancellorName },
+        });
+        try { createNotificationForAll("amtseid", "Amtseid geleistet", `${chancellorName} ist jetzt Bundeskanzler/in.`, { chancellorName }, currentDay); } catch {}
+
+        const cabinet = formCabinet(newCoalitionForAmt, allParties, amtseidRow.electionId, currentDay);
+        const ministerList = cabinet.ministers.map(m => `${m.name} (${m.partyId}) — ${m.portfolio}`).join(", ");
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "government_cabinet_formed",
+          actor: "system",
+          title: `Kanzler/in ${cabinet.chancellorName} bildet Kabinett`,
+          description: `Kanzler/in: ${cabinet.chancellorName} (${cabinet.chancellorPartyId}). Minister: ${ministerList}`,
+          data: { governmentId: cabinet.id, chancellorName: cabinet.chancellorName, ministers: cabinet.ministers },
+        });
+        console.log(`  [Cabinet] Chancellor: ${cabinet.chancellorName}, ${cabinet.ministers.length} ministers`);
+
+        try {
+          if (shouldSeedCommittees()) seedCommittees(currentDay);
+          assignCommitteeMemberships(currentDay);
+          console.log(`  [Committees] Assigned memberships after Amtseid`);
+        } catch (err) { console.warn(`  [Committees] Assignment failed:`, (err as Error).message); }
       }
     }
   }
@@ -1455,10 +1651,20 @@ export async function runDay(): Promise<number> {
       }
     }
 
-    // 10c. Process motions
+    // 10c. Process motions — R14 guard: skip if Kanzlerwahl is still in
+    // progress (phase1/phase2/phase3). A motion against the "government"
+    // is meaningless when no Chancellor is yet elected; the AI will propose
+    // again on the next day past Amtseid.
+    const kanzlerwahlPending = db.select().from(schema.kanzlerwahl)
+      .where(inArray(schema.kanzlerwahl.status, ["phase1", "phase2", "phase3"]))
+      .all().length > 0;
     for (const [partyId, actions] of partyActions) {
       for (const action of actions) {
         if (action.type !== "submit_motion") continue;
+        if (kanzlerwahlPending) {
+          console.log(`  [Motion] Deferred during active Kanzlerwahl — ${partyId} will re-propose after Amtseid.`);
+          continue;
+        }
 
         const motionId = `motion-${currentDay}-${generateId()}`;
         const motion: Motion = {
