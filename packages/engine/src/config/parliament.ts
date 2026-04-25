@@ -150,6 +150,21 @@ export const COMPLEX_BILL_PROBABILITY = 0.15;
  */
 export const GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3;
 
+/**
+ * Überweisung ohne Aussprache — probability that a non-government bill skips
+ * the 1. Lesung floor debate and goes directly to committee (Cycle 3 PR 4, Q8).
+ *
+ * Real Bundestag: ~60–70% of bills are silently referred to committee without
+ * any 1st-reading floor debate. Sim previously emitted `bill_first_reading`
+ * for every bill, over-stating plenary activity. With this flag, ~65% of new
+ * bills emit a compact `bill_ueberweisung_ohne_aussprache` event instead.
+ *
+ * Government bills are unaffected — they always skip 1. Lesung via the
+ * existing fast-track path. The roll only applies to opposition / member /
+ * coalition non-government bills.
+ */
+export const UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY = 0.65;
+
 // ── Post-3rd-reading timing ─────────────────────────────────────────
 /**
  * Bundesrat 2. Durchgang window (sim days). Cycle 1 models the phase as a

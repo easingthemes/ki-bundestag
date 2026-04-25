@@ -61,7 +61,8 @@ export type SimulationEventType =
   | "schriftliche_einzelfragen"
   | "petition_created"
   | "petition_quorum_reached"
-  | "petition_debated";
+  | "petition_debated"
+  | "bill_ueberweisung_ohne_aussprache";
 
 export interface SimulationEvent {
   id: string;

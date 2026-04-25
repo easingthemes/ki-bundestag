@@ -10,12 +10,32 @@ import { parseAgentResponse } from "../agent/action-parser.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { submitBatch, findResult, type BatchRequest, type BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
-import { MAJORITY_SEATS, BUNDESTAG_SIZE } from "../config/elections.js";
+import { MAJORITY_SEATS, BUNDESTAG_SIZE, MIN_NEGOTIATION_ROUND_DWELL_DAYS } from "../config/elections.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
 
 export function getMaxNegotiationRounds(): number {
   return MAX_NEGOTIATION_ROUNDS;
+}
+
+/**
+ * Cycle 3 PR 4 (Q7) — inter-round dwell guard.
+ *
+ * Returns true when the daily dispatch should be skipped because the
+ * previous round ran too recently. Round 1 always dispatches (no
+ * `lastRoundDay` to compare). Subsequent rounds need at least
+ * MIN_NEGOTIATION_ROUND_DWELL_DAYS sim days of breathing room.
+ *
+ * Pure function — for testability. Called from `loop.ts` per dispatch.
+ */
+export function shouldSkipNegotiationDispatch(
+  currentDay: number,
+  lastRoundDay: number | null,
+  roundNumber: number,
+): boolean {
+  if (roundNumber <= 1) return false;
+  if (lastRoundDay == null) return false;
+  return (currentDay - lastRoundDay) < MIN_NEGOTIATION_ROUND_DWELL_DAYS;
 }
 
 export function buildNegotiationPrompt(

@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { dwellDays, committeeRange } from "./bill-pipeline.js";
+import { dwellDays, committeeRange, shouldSkipFirstReading } from "./bill-pipeline.js";
 import {
   BILL_STAGE_DURATIONS,
   BUNDESRAT_DURATION,
   AUSFERTIGUNG_DURATION,
   INKRAFTTRETEN_OFFSET,
   GOVERNMENT_BILL_COMMITTEE_MULTIPLIER,
+  UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY,
 } from "../config/parliament.js";
 import type { Bill } from "@ki-bundestag/types";
 
@@ -79,6 +80,39 @@ describe("bill-pipeline helpers", () => {
 
     it("multiplier is 1.3 (real-data fit; revisit after a 4-year sim)", () => {
       expect(GOVERNMENT_BILL_COMMITTEE_MULTIPLIER).toBe(1.3);
+    });
+  });
+
+  // Cycle 3 PR 4 (Q8): 65% Überweisung-ohne-Aussprache skip
+  describe("shouldSkipFirstReading", () => {
+    it("skips when rng < 0.65", () => {
+      expect(shouldSkipFirstReading(() => 0)).toBe(true);
+      expect(shouldSkipFirstReading(() => 0.4)).toBe(true);
+      expect(shouldSkipFirstReading(() => 0.649)).toBe(true);
+    });
+
+    it("debates (no skip) when rng >= 0.65", () => {
+      expect(shouldSkipFirstReading(() => 0.65)).toBe(false);
+      expect(shouldSkipFirstReading(() => 0.8)).toBe(false);
+      expect(shouldSkipFirstReading(() => 0.999)).toBe(false);
+    });
+
+    it("threshold is 0.65 (real Bundestag: 60–70% of bills skip 1st reading)", () => {
+      expect(UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY).toBe(0.65);
+    });
+
+    it("converges to ~65% over many seeded trials", () => {
+      let s = 1;
+      const rng = () => { s = (s * 1103515245 + 12345) % 0x7fffffff; return s / 0x7fffffff; };
+      const trials = 50_000;
+      let skips = 0;
+      for (let i = 0; i < trials; i++) {
+        if (shouldSkipFirstReading(rng)) skips++;
+      }
+      const rate = skips / trials;
+      // Allow ±0.01 trial-noise window around 0.65
+      expect(rate).toBeGreaterThan(0.64);
+      expect(rate).toBeLessThan(0.66);
     });
   });
 
