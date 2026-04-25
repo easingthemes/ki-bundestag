@@ -58,6 +58,9 @@ export const nationalState = sqliteTable("national_state", {
   gdpGrowth: real("gdp_growth").notNull(),
   publicSentiment: real("public_sentiment").notNull(),
   provisionalBudget: integer("provisional_budget", { mode: "boolean" }).notNull().default(false),
+  // Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG). True while the
+  // structural debt brake is suspended. Auto-clears via checkSchuldenbremseExpiry.
+  schuldenbremseSuspended: integer("schuldenbremse_suspended", { mode: "boolean" }).notNull().default(false),
 });
 
 export const simulationEvents = sqliteTable("simulation_events", {
@@ -204,6 +207,14 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // 1 = migration ran (table created, columns added, R15 backfill done),
   // 0 = not yet (default for fresh DBs and pre-Cycle-4 DBs).
   cycle4Migrated: integer("cycle4_migrated").notNull().default(0),
+  // Cycle 4 PR 2 — sim day on which the active Schuldenbremse-Aussetzung
+  // expires. NULL = not currently suspended. Set by applySchuldenbremseAussetzung
+  // and cleared by checkSchuldenbremseExpiry.
+  schuldenbremseSuspendedUntilDay: integer("schuldenbremse_suspended_until_day"),
+  // Cycle 4 PR 2 — sim day on which `provisionalBudget` was last flipped TRUE.
+  // NULL when not in provisional state. Used by findFiscalEmergencyOpportunity
+  // to compute the 30-day streak gate. R15 backfill (PR 1) seeds in-flight rows.
+  provisionalBudgetSinceDay: integer("provisional_budget_since_day"),
 });
 
 export const partyHistory = sqliteTable("party_history", {

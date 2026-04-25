@@ -57,6 +57,10 @@ export interface AgentContext {
   // high-severity crisis maps to a coalition-held ministry (R5 heuristic). Absence
   // means agents should not file a Untersuchungsausschuss in a normal day.
   inquiryOpportunity?: { triggerCrisisId: string; targetPartyId: string; severity: string };
+  // Cycle 4 PR 2 — coalition-leader-side flag set when a high-severity active
+  // crisis exists OR provisionalBudget has been true for ≥ 30 sim days (Q5).
+  // Absence means coalition leader should NOT propose Schuldenbremse-Aussetzung.
+  fiscalEmergencyJustified?: { activeCrisisId?: string; provisionalBudgetDays: number };
 }
 
 export interface ProposeBillAction {
@@ -133,6 +137,19 @@ export interface FileInquiryCommitteeAction {
   targetMinistry?: MinistryPortfolio | null;
 }
 
+// Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG fiscal emergency).
+// Coalition leader proposes; vote happens same day; pass triggers a
+// Nachtragshaushalt injection (consumed by PR 3).
+export interface ProposeFiscalEmergencyAction {
+  type: "propose_fiscal_emergency";
+  title: string;
+  description: string;
+  /** Optional active-crisis ID that motivates the suspension. */
+  activeCrisisId?: string | null;
+  /** Free-text justification quoted in the proposal event. */
+  justification: string;
+}
+
 export interface NothingAction {
   type: "nothing";
 }
@@ -163,6 +180,7 @@ export type AgentAction =
   | FileMisstrauensvotumAction
   | FileConstitutionalChallengeAction
   | FileInquiryCommitteeAction
+  | ProposeFiscalEmergencyAction
   | NothingAction;
 
 export interface AgentResponse {

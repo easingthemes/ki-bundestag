@@ -105,6 +105,9 @@ export const CRITICAL_EVENTS = [
   "confidence_vote_filed",
   "budget_passed",
   "budget_rejected",
+  // Cycle 4 PR 2 — Schuldenbremse-Aussetzung passing is a structural fiscal-policy
+  // event (S15). Suspends Art. 115 GG for 365 sim days; queues a Nachtragshaushalt.
+  "schuldenbremse_aussetzung_passed",
 ] as const;
 
 export const IMPORTANT_EVENTS = [
@@ -136,6 +139,10 @@ export const IMPORTANT_EVENTS = [
   // the standard-tier classification is intentional, not accidental.
   "inquiry_filed",
   "inquiry_concluded",
+  // Cycle 4 PR 2 — fiscal emergency proposal + rejection (S15). The `_passed`
+  // event lives in CRITICAL_EVENTS instead.
+  "schuldenbremse_aussetzung_proposed",
+  "schuldenbremse_aussetzung_rejected",
 ] as const;
 
 export const ROUTINE_EVENTS = [

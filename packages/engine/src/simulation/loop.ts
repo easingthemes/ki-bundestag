@@ -66,7 +66,12 @@ import {
 import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact, vertrauensfrageGateOpen, misstrauensvotumGateOpen, nextLowGovernmentApprovalStreak } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
-import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
+import {
+  generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote,
+  applyBudgetEconomicEffect, BUDGET_TOTAL,
+  tallySchuldenbremseVote, applySchuldenbremseAussetzung, checkSchuldenbremseExpiry, findFiscalEmergencyOpportunity,
+} from "./budget.js";
+import { SCHULDENBREMSE_SUSPENSION_DURATION } from "../config/budget.js";
 import {
   fileInquiry, tickActiveInquiries, findInquiryOpportunity,
   buildInquiryHearingBatchRequest, processInquiryHearingBatchResult,
@@ -78,7 +83,7 @@ import {
   INQUIRY_MAX_ACTIVE, INQUIRY_MIN_DAYS_BETWEEN_FILINGS, INQUIRY_THRESHOLD_PERCENT,
 } from "../config/parliament.js";
 import { BUNDESTAG_SIZE } from "../config/elections.js";
-import type { InquiryValidationContext } from "../agent/action-parser.js";
+import type { FiscalEmergencyValidationContext, InquiryValidationContext } from "../agent/action-parser.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
@@ -270,6 +275,9 @@ export async function runDay(): Promise<number> {
     },
     publicSentiment: state.publicSentiment,
     provisionalBudget: (state as any).provisionalBudget ?? false,
+    // Cycle 4 PR 2 — Schuldenbremse-Aussetzung flag (Drizzle reads via the
+    // schema declaration on `nationalState.schuldenbremseSuspended`).
+    schuldenbremseSuspended: (state as any).schuldenbremseSuspended ?? false,
   };
 
   const allBills = db.select().from(schema.bills).all() as unknown as Bill[];
@@ -340,8 +348,13 @@ export async function runDay(): Promise<number> {
   const driftedEconomy = applyEconomicDrift(nationalState.economy);
   nationalState.economy = driftedEconomy;
 
-  // 3b. Provisional budget drag — uncertainty suppresses GDP growth
-  if (nationalState.provisionalBudget) {
+  // 3b. Provisional budget drag — uncertainty suppresses GDP growth.
+  //
+  // Cycle 4 PR 2 — suppressed when Schuldenbremse-Aussetzung is in force:
+  // suspending the debt brake removes the fiscal-pressure source that the
+  // drag is modeling. Keeps the model self-consistent — a coalition that
+  // chose Art. 115 GG should not pay both costs.
+  if (nationalState.provisionalBudget && !nationalState.schuldenbremseSuspended) {
     nationalState.economy.gdpGrowth = Math.max(-3, Math.round((nationalState.economy.gdpGrowth - 0.01) * 1000) / 1000);
   }
 
@@ -1448,6 +1461,20 @@ export async function runDay(): Promise<number> {
       .filter(p => !nationalState.coalitionParties.includes(p.id) && p.seatCount >= FRAKTION_THRESHOLD_FOR_INQUIRY)
       .reduce((s, p) => s + p.seatCount, 0);
 
+    // Cycle 4 PR 2 — fiscal-emergency justified flag for the coalition leader.
+    // Reads `meta.provisionalBudgetSinceDay` and `nationalState.schuldenbremseSuspended*`
+    // (Drizzle-typed; defined in PR 2 schema declarations).
+    const fiscalEmergencyOpportunity = findFiscalEmergencyOpportunity(
+      activeCrises,
+      {
+        provisionalBudget: nationalState.provisionalBudget,
+        schuldenbremseSuspended: nationalState.schuldenbremseSuspended,
+      },
+      (meta as any).provisionalBudgetSinceDay ?? null,
+      currentDay,
+    );
+    const schuldenbremseSuspendedUntilDay = (meta as any).schuldenbremseSuspendedUntilDay ?? null;
+
     // Build agent contexts for all parties
     const agentContexts: AgentContext[] = [];
     for (const party of allParties) {
@@ -1482,6 +1509,9 @@ export async function runDay(): Promise<number> {
         // Cycle 4 PR 1 — only opposition parties see the inquiry-opportunity
         // flag. Coalition parties can't file inquiries against themselves.
         inquiryOpportunity: party.coalitionRole === "opposition" && inquiryOpportunity ? inquiryOpportunity : undefined,
+        // Cycle 4 PR 2 — only the coalition leader sees the fiscal-emergency
+        // flag. The action-parser also enforces the leader-only check.
+        fiscalEmergencyJustified: party.coalitionRole === "leader" && fiscalEmergencyOpportunity ? fiscalEmergencyOpportunity : undefined,
       });
     }
 
@@ -1516,7 +1546,17 @@ export async function runDay(): Promise<number> {
         minDaysBetweenFilings: INQUIRY_MIN_DAYS_BETWEEN_FILINGS,
         thresholdPercent: INQUIRY_THRESHOLD_PERCENT,
       };
-      const actions = await processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills, inquiryCtx);
+      // Cycle 4 PR 2 — fiscal-emergency validation context. Same justification
+      // value across all parties (only the coalition leader can pass the
+      // leader-gate inside validateActions).
+      const fiscalEmergencyCtx: FiscalEmergencyValidationContext = {
+        justified: fiscalEmergencyOpportunity != null,
+        schuldenbremseSuspendedUntilDay,
+        currentDay,
+      };
+      const actions = await processPartyAgentResult(
+        result, ctx, thirdReadingBills, secondReadingBills, inquiryCtx, fiscalEmergencyCtx,
+      );
       partyActions.set(ctx.party.id, actions);
     }
 
@@ -2251,9 +2291,107 @@ export async function runDay(): Promise<number> {
         }
       }
     }
+
+    // 10h. Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG fiscal emergency).
+    //
+    // Coalition leader proposes; vote happens same day; pass triggers a
+    // Nachtragshaushalt injection (consumed by PR 3, drained on the next tick
+    // per R14 to avoid same-day double-budget compounding).
+    //
+    // Validation already happened in `validateActions` (leader gate, no-election
+    // gate, cooldown, justification gate). Max 1 proposal per day globally
+    // (first valid action wins).
+    let fiscalEmergencyProcessed = false;
+    for (const [partyId, actions] of partyActions) {
+      for (const action of actions) {
+        if (action.type !== "propose_fiscal_emergency" || fiscalEmergencyProcessed) continue;
+        fiscalEmergencyProcessed = true;
+
+        const party = allParties.find(p => p.id === partyId)!;
+        addEvent(dayEvents, {
+          dayNumber: currentDay,
+          type: "schuldenbremse_aussetzung_proposed",
+          actor: partyId,
+          title: `${party.name} beantragt Schuldenbremse-Aussetzung`,
+          description: `${action.title}: ${action.description} Begründung: ${action.justification}`,
+          data: {
+            activeCrisisId: action.activeCrisisId ?? null,
+            justification: action.justification,
+          },
+        });
+
+        // Same-day vote. Severity comes from the active high-severity crisis
+        // if any (matches `findFiscalEmergencyOpportunity` selection logic).
+        const triggerCrisis = action.activeCrisisId
+          ? activeCrises.find(c => c.id === action.activeCrisisId)
+          : null;
+        const crisisSeverity = triggerCrisis?.severity
+          ?? activeCrises.find(c => c.severity === "high" && !c.resolved)?.severity
+          ?? null;
+        const vote = tallySchuldenbremseVote(
+          allParties,
+          nationalState.coalitionParties,
+          nationalState.publicSentiment,
+          crisisSeverity ?? null,
+        );
+
+        if (vote.passed) {
+          applySchuldenbremseAussetzung(currentDay);
+          // Mirror the in-memory state so downstream code reads the new flag.
+          nationalState.schuldenbremseSuspended = true;
+          addEvent(dayEvents, {
+            dayNumber: currentDay,
+            type: "schuldenbremse_aussetzung_passed",
+            actor: "system",
+            title: `Schuldenbremse für ${SCHULDENBREMSE_SUSPENSION_DURATION} Tage ausgesetzt`,
+            description: `Bundestag mit ${vote.yesVotes}:${vote.noVotes} für Aussetzung der Schuldenbremse nach Art. 115 GG.`,
+            data: {
+              yesVotes: vote.yesVotes,
+              noVotes: vote.noVotes,
+              until: currentDay + SCHULDENBREMSE_SUSPENSION_DURATION,
+              activeCrisisId: action.activeCrisisId ?? null,
+            },
+          });
+
+          // S19: queue Nachtragshaushalt injection. PR 3 implements the
+          // consumer; this PR just queues the work item.
+          db.insert(schema.pendingInjections).values({
+            id: `inj-nachtrag-${currentDay}-${generateId()}`,
+            type: "nachtragshaushalt",
+            data: { activeCrisisId: action.activeCrisisId ?? null } as any,
+            consumed: false,
+          }).run();
+
+          console.log(`  [Schuldenbremse] PASSED (yes ${vote.yesVotes}, no ${vote.noVotes}) — Nachtragshaushalt queued`);
+        } else {
+          addEvent(dayEvents, {
+            dayNumber: currentDay,
+            type: "schuldenbremse_aussetzung_rejected",
+            actor: "system",
+            title: `Schuldenbremse-Aussetzung abgelehnt`,
+            description: `Bundestag lehnt Aussetzungsantrag mit ${vote.noVotes}:${vote.yesVotes} ab.`,
+            data: { yesVotes: vote.yesVotes, noVotes: vote.noVotes },
+          });
+          console.log(`  [Schuldenbremse] REJECTED (yes ${vote.yesVotes}, no ${vote.noVotes})`);
+        }
+      }
+    }
   }
 
-  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries)
+  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries, fiscal emergency)
+
+  // 10g3. Cycle 4 PR 2 — Schuldenbremse expiry check. Silent flag-clear at
+  // expiry (no event per spec — keeps the event-type list at the planned
+  // count). Runs unconditionally so the flag can clear during election phases.
+  try {
+    const cleared = checkSchuldenbremseExpiry(currentDay);
+    if (cleared) {
+      nationalState.schuldenbremseSuspended = false;
+      console.log("  [Schuldenbremse] expiry day reached — suspension cleared");
+    }
+  } catch (err) {
+    console.error("[Loop] Error in checkSchuldenbremseExpiry:", err);
+  }
 
   // 10g2. Cycle 4 PR 1 — Untersuchungsausschuss daily tick (hearings + watchdog +
   // scheduled-end conclusions). The tick:
@@ -2585,17 +2723,25 @@ export async function runDay(): Promise<number> {
       nationalState.publicSentiment = Math.max(5, Math.min(75, nationalState.publicSentiment + 0.5));
       economicEffect = budgetResult.effect;
       nationalState.provisionalBudget = false;
-      // Clear any pending retry
+      // Clear any pending retry. Cycle 4 PR 2 — also clear the
+      // provisional-budget-since-day stamp so the fiscal-emergency gate
+      // resets along with the flag.
       db.update(schema.simulationMeta)
-        .set({ budgetRetryDay: null } as any)
+        .set({ budgetRetryDay: null, provisionalBudgetSinceDay: null } as any)
         .where(eq(schema.simulationMeta.id, meta.id)).run();
     } else {
       // First rejection: provisional budget + schedule retry (snap to workday)
       nationalState.provisionalBudget = true;
       let retryDay = currentDay + 7;
       if (startDate) retryDay = snapToNextWorkday(retryDay, startDate);
+      // Cycle 4 PR 2 — stamp the since-day so findFiscalEmergencyOpportunity
+      // can compute the streak. Skip if non-null (preserves earlier streak
+      // start across multiple rejections).
       db.update(schema.simulationMeta)
-        .set({ budgetRetryDay: retryDay } as any)
+        .set({
+          budgetRetryDay: retryDay,
+          provisionalBudgetSinceDay: meta.provisionalBudgetSinceDay ?? currentDay,
+        } as any)
         .where(eq(schema.simulationMeta.id, meta.id)).run();
 
       // Asymmetric penalties: leader −0.5, junior partners −1.0, opposition +0.3
@@ -2665,6 +2811,10 @@ export async function runDay(): Promise<number> {
       nationalState.publicSentiment = Math.max(5, Math.min(75, nationalState.publicSentiment + 0.3));
       nationalState.provisionalBudget = false;
       economicEffect = budgetResult.effect;
+      // Cycle 4 PR 2 — clear the since-day stamp on revision pass.
+      db.update(schema.simulationMeta)
+        .set({ provisionalBudgetSinceDay: null } as any)
+        .where(eq(schema.simulationMeta.id, meta.id)).run();
     } else {
       nationalState.publicSentiment = Math.max(5, Math.min(75, nationalState.publicSentiment - 2.0));
       const sortedCoalition = [...coalitionParties].sort((a, b) => b.seatCount - a.seatCount);
@@ -2778,6 +2928,9 @@ export async function runDay(): Promise<number> {
       gdpGrowth: nationalState.economy.gdpGrowth,
       publicSentiment: nationalState.publicSentiment,
       provisionalBudget: nationalState.provisionalBudget,
+      // Cycle 4 PR 2 — persist Schuldenbremse-Aussetzung flag mutations made
+      // during step 10h (Aussetzung passed) and step 10g3 (expiry cleared).
+      schuldenbremseSuspended: nationalState.schuldenbremseSuspended ?? false,
     } as any)
     .where(eq(schema.nationalState.id, state.id))
     .run();
