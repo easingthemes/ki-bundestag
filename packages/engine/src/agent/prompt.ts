@@ -3,6 +3,7 @@ import type { ValidationError } from "./action-parser.js";
 import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
+import { MAJORITY_SEATS, BUNDESTAG_SIZE } from "../config/elections.js";
 
 /** Compact impact string: "B:+0.5 U:-0.1 I:+0.02 G:+0.1 S:+1" */
 function formatImpact(impact: BillImpact): string {
@@ -86,11 +87,11 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
   }
 
   if (caps.isCoalitionLeader && !caps.hasActiveElection) {
-    rules.push(`You may call a Vertrauensfrage (confidence vote). If fewer than 368 seats vote yes, snap election is triggered. Max 1 per turn.`);
+    rules.push(`You may call a Vertrauensfrage (confidence vote). If fewer than ${MAJORITY_SEATS} seats vote yes, snap election is triggered. Max 1 per turn.`);
   }
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
-    rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires 368 seats. If successful, opposition takes power immediately. Max 1 per turn.`);
+    rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires ${MAJORITY_SEATS} seats. If successful, opposition takes power immediately. Max 1 per turn.`);
   }
 
   // Negative capability instructions — prevent hallucinated actions
@@ -314,7 +315,7 @@ ${thirdReadingBills.map(b => `  - "${b.title}" (${b.category}) proposed by ${b.p
   const coreLines = `CURRENT DAY: ${ctx.currentDay}
 
 YOUR PARTY: ${ctx.party.name} (${ctx.party.coalitionRole})
-  Seats: ${ctx.party.seatCount}/735 | Approval: ${ctx.party.approvalRating}%
+  Seats: ${ctx.party.seatCount}/${BUNDESTAG_SIZE} | Approval: ${ctx.party.approvalRating}%
   Ideology: ${ctx.party.ideology}
   Priorities: ${JSON.stringify(ctx.party.policyPriorities)}${ctx.hasFraktion && ctx.fraktionLeader ? `
   Fraktion Leader: ${ctx.fraktionLeader}` : ""}${fraktionNote}

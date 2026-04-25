@@ -10,11 +10,32 @@ import { parseAgentResponse } from "../agent/action-parser.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { submitBatch, findResult, type BatchRequest, type BatchResult } from "../agent/batch-client.js";
 import type { Provider } from "../agent/model-config.js";
+import { MAJORITY_SEATS, BUNDESTAG_SIZE, MIN_NEGOTIATION_ROUND_DWELL_DAYS } from "../config/elections.js";
 
 const MAX_NEGOTIATION_ROUNDS = 3;
 
 export function getMaxNegotiationRounds(): number {
   return MAX_NEGOTIATION_ROUNDS;
+}
+
+/**
+ * Cycle 3 PR 4 (Q7) — inter-round dwell guard.
+ *
+ * Returns true when the daily dispatch should be skipped because the
+ * previous round ran too recently. Round 1 always dispatches (no
+ * `lastRoundDay` to compare). Subsequent rounds need at least
+ * MIN_NEGOTIATION_ROUND_DWELL_DAYS sim days of breathing room.
+ *
+ * Pure function — for testability. Called from `loop.ts` per dispatch.
+ */
+export function shouldSkipNegotiationDispatch(
+  currentDay: number,
+  lastRoundDay: number | null,
+  roundNumber: number,
+): boolean {
+  if (roundNumber <= 1) return false;
+  if (lastRoundDay == null) return false;
+  return (currentDay - lastRoundDay) < MIN_NEGOTIATION_ROUND_DWELL_DAYS;
 }
 
 export function buildNegotiationPrompt(
@@ -35,7 +56,7 @@ REGELN:
 2. Genau eine Aktion vom Typ "negotiation_position".
 3. Sei strategisch: berücksichtige ideologische Kompatibilität.
 4. Berücksichtige vorherige Runden bei Zugeständnissen.
-5. Eine Koalition braucht 368+ Sitze (Mehrheit von 735).
+5. Eine Koalition braucht ${MAJORITY_SEATS}+ Sitze (Mehrheit von ${BUNDESTAG_SIZE}).
 6. acceptablePartners darf nur gültige Partei-IDs aus der Liste enthalten.
 7. Antworte auf Deutsch.
 
@@ -186,7 +207,7 @@ Analysiere die Verhandlungsrunden und bestimme die tragfähigste Koalition.
 
 REGELN:
 1. Antworte NUR mit validem JSON. KEINE Markdown-Code-Blöcke.
-2. Eine Koalition braucht 368+ Sitze (Mehrheit von 735).
+2. Eine Koalition braucht ${MAJORITY_SEATS}+ Sitze (Mehrheit von ${BUNDESTAG_SIZE}).
 3. Bevorzuge Koalitionen, in denen sich die Parteien gegenseitig akzeptieren.
 4. Berücksichtige ideologische Kompatibilität und gemachte Zugeständnisse.
 5. Alle Partei-IDs in der Antwort müssen den IDs aus den WAHLERGEBNISSEN entsprechen.
@@ -259,13 +280,13 @@ Bestimme den Koalitionsvertrag. Antworte als JSON.`;
       return null;
     }
 
-    // Validate: coalition must have 368+ seats
+    // Validate: coalition must have absolute-majority seats
     const coalitionSeats = parsed.parties.reduce((sum, id) => {
       const r = results.find(rr => rr.partyId === id);
       return sum + (r?.seatsWon || 0);
     }, 0);
 
-    if (coalitionSeats >= 368 && parsed.parties.length >= 2) {
+    if (coalitionSeats >= MAJORITY_SEATS && parsed.parties.length >= 2) {
       logAICall({ task: "synthesis", model, provider, latencyMs: Date.now() - t0, parseOk: true, validationOk: true });
       return parsed;
     }

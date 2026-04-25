@@ -25,7 +25,7 @@ export const PARTIES: PartySeed[] = [
     name: "SPD",
     color: "#E3000F",
     ideology: "Center-left social democracy",
-    seatCount: 206,
+    seatCount: 177,
     approvalRating: 26,
     policyPriorities: { economy: -0.2, social: 0.6, environment: 0.3, immigration: 0.3, spending: 0.5 },
     coalitionRole: "leader",
@@ -35,7 +35,7 @@ export const PARTIES: PartySeed[] = [
     name: "CDU/CSU",
     color: "#000000",
     ideology: "Center-right Christian democracy",
-    seatCount: 197,
+    seatCount: 169,
     approvalRating: 28,
     policyPriorities: { economy: 0.5, social: -0.3, environment: -0.1, immigration: -0.3, spending: -0.4 },
     coalitionRole: "opposition",
@@ -45,7 +45,7 @@ export const PARTIES: PartySeed[] = [
     name: "Bündnis 90/Die Grünen",
     color: "#64A12D",
     ideology: "Green politics, progressive",
-    seatCount: 118,
+    seatCount: 101,
     approvalRating: 15,
     policyPriorities: { economy: -0.3, social: 0.7, environment: 0.9, immigration: 0.5, spending: 0.3 },
     coalitionRole: "junior",
@@ -55,7 +55,7 @@ export const PARTIES: PartySeed[] = [
     name: "FDP",
     color: "#FFED00",
     ideology: "Classical liberalism, free market",
-    seatCount: 92,
+    seatCount: 79,
     approvalRating: 8,
     policyPriorities: { economy: 0.8, social: 0.3, environment: -0.2, immigration: 0.2, spending: -0.7 },
     coalitionRole: "junior",
@@ -65,7 +65,7 @@ export const PARTIES: PartySeed[] = [
     name: "AfD",
     color: "#009EE0",
     ideology: "Right-wing populism",
-    seatCount: 83,
+    seatCount: 71,
     approvalRating: 14,
     policyPriorities: { economy: 0.3, social: -0.7, environment: -0.6, immigration: -0.9, spending: -0.1 },
     coalitionRole: "opposition",
@@ -75,7 +75,7 @@ export const PARTIES: PartySeed[] = [
     name: "Die Linke",
     color: "#BE3075",
     ideology: "Democratic socialism",
-    seatCount: 39,
+    seatCount: 33,
     approvalRating: 5,
     policyPriorities: { economy: -0.8, social: 0.8, environment: 0.5, immigration: 0.6, spending: 0.8 },
     coalitionRole: "opposition",
@@ -134,8 +134,8 @@ RELATIONSHIPS: Share social policy goals with SPD and Greens but push them furth
 
 // ── Fraktion configuration ──────────────────────────────────────────
 
-/** 5% of 735 seats = 36.75, rounded up */
-export const FRAKTION_THRESHOLD = 37;
+/** 5% of BUNDESTAG_SIZE (630) = 31.5, rounded up. Was 37 pre-2023-Wahlrechtsreform. */
+export const FRAKTION_THRESHOLD = 32;
 
 /** Real-name Fraktion leaders per party */
 export const FRAKTION_LEADERS: Record<string, string> = {

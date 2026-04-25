@@ -8,7 +8,9 @@ import { clampApproval } from "./opinion.js";
 /**
  * Presidential veto check on a bill that just passed third reading.
  *
- * Probability: 1–6% based on bill economic impact magnitude.
+ * Probability: two-stage filter — impact gate (summed |bill.impact|
+ * >= 0.6) + capped 0.05% probability. Calibrated to match the real
+ * ≈0.04% Bundespräsident veto rate (Cycle 3 PR 1, Q2 hybrid).
  * On veto: marks bill as rejected with vetoedByPresident, deducts 0.5 approval
  * from the proposing party, and emits a presidential_veto simulation event.
  *

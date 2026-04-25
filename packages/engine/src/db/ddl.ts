@@ -168,7 +168,12 @@ export const SIM_TABLE_DDL = `
     start_date TEXT,
     bots_enabled INTEGER NOT NULL DEFAULT 1,
     schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0,
-    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0
+    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0,
+    low_government_approval_streak INTEGER NOT NULL DEFAULT 0,
+    bundestag_size_migrated INTEGER NOT NULL DEFAULT 0,
+    last_negotiation_round_day INTEGER,
+    vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0,
+    misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -718,6 +723,17 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "schriftliche_einzelfragen_answered_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0" },
   // Cycle 2b (todo 043) — Petitions (öffentliche E-Petitionen)
   { table: "petitions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS petitions (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL, author_display_name TEXT NOT NULL, started_on_day INTEGER NOT NULL, public_window_end_day INTEGER NOT NULL, signature_count INTEGER NOT NULL DEFAULT 0, signature_quorum INTEGER NOT NULL DEFAULT 30000, status TEXT NOT NULL DEFAULT 'collecting', quorum_reached_on_day INTEGER, debated_on_day INTEGER, outcome TEXT)" },
+  // Cycle 3 PR 2 — Vertrauensfrage gate streak counter (mirrors low_sentiment_streak)
+  { table: "simulation_meta", column: "low_government_approval_streak", sql: "ALTER TABLE simulation_meta ADD COLUMN low_government_approval_streak INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 3 PR 3 — Idempotency flag for the 735→630 seat-reform shrink
+  { table: "simulation_meta", column: "bundestag_size_migrated", sql: "ALTER TABLE simulation_meta ADD COLUMN bundestag_size_migrated INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 3 PR 4 — Negotiation round-dispatch dwell tracker (NULL when no negotiation in flight)
+  { table: "simulation_meta", column: "last_negotiation_round_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_negotiation_round_day INTEGER" },
+  // Cycle 3 PR 2 follow-up — observability counters for gate-suppressed agent
+  // actions. Without these, a runaway party agent emitting daily Vertrauensfrage
+  // calls is invisible (suppression only logs to console). Cumulative; no reset.
+  { table: "simulation_meta", column: "vertrauensfrage_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0" },
+  { table: "simulation_meta", column: "misstrauensvotum_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */

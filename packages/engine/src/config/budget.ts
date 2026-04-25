@@ -56,18 +56,24 @@ export const BUDGET_ENVIRONMENT_INFLATION_EFFECT = -0.02;
 export const BUDGET_DEFENCE_THRESHOLD = 0.18;
 export const BUDGET_DEFENCE_GDP_EFFECT = 0.02;
 
-// ── Presidential veto ───────────────────────────────────────────────
-/** Base probability of presidential veto on any bill */
-export const VETO_BASE_PROBABILITY = 0.01;
-/** Additional veto probability if |publicSentiment| > this threshold */
-export const VETO_SENTIMENT_THRESHOLD = 1.5;
-export const VETO_SENTIMENT_BONUS = 0.02;
-/** Additional veto probability if |budget impact| > this threshold */
-export const VETO_BUDGET_THRESHOLD = 2;
-export const VETO_BUDGET_BONUS = 0.02;
-/** Additional veto probability if |GDP impact| > this threshold */
-export const VETO_GDP_THRESHOLD = 0.15;
-export const VETO_GDP_BONUS = 0.01;
+// ── Presidential veto (Cycle 3 PR 1: real-data-matched rate) ────────
+/**
+ * Two-stage veto filter (Q2 hybrid). Real Bundespräsident veto rate is
+ * ~0.04% (≈6 vetoes / 15_000 passed bills). Old impl rolled 1–6%, which
+ * over-fired by 2–3 orders of magnitude.
+ *
+ * Stage 1: impact gate. Only constitutional-stakes bills are eligible —
+ * `summedImpact = Σ |bill.impact[k]|` must reach this threshold. Below it,
+ * veto cannot fire. Most bills land 0.2–1.0 in this metric; 0.6 keeps the
+ * top tercile eligible. Tunable; revisit after a 4-year sim run.
+ */
+export const PRESIDENTIAL_VETO_IMPACT_THRESHOLD = 0.6;
+/**
+ * Stage 2: capped probability above the impact gate. Per term (≈320 passed
+ * bills, ~1/3 above gate ≈ 100 eligible), expected vetoes = 100 × 0.0005
+ * = 0.05 — matches the real ≈0.04% rate.
+ */
+export const PRESIDENTIAL_VETO_PROBABILITY = 0.0005;
 /** Approval penalty for proposer when bill is vetoed */
 export const VETO_PROPOSER_APPROVAL_PENALTY = 0.5;
 

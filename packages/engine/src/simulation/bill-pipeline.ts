@@ -8,7 +8,7 @@ import { isSitzungsTag } from "./parliament-calendar.js";
 import { checkPresidentialVeto } from "./veto.js";
 import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
-import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET } from "../config/parliament.js";
+import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET, GOVERNMENT_BILL_COMMITTEE_MULTIPLIER, UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY } from "../config/parliament.js";
 import { VERMITTLUNG_DURATION } from "../config/bundesrat.js";
 import {
   voteBundesrat,
@@ -41,13 +41,36 @@ export function dwellDays(bill: Bill, day: number): number {
 }
 
 /**
+ * Cycle 3 PR 4 (Q8) — Überweisung-ohne-Aussprache predicate.
+ *
+ * Returns true if a non-government bill should skip the 1. Lesung floor
+ * debate and go directly to committee. ~65% of real Bundestag bills follow
+ * this path. Pure function — defaults to Math.random in production;
+ * accepts a seeded RNG for unit tests.
+ */
+export function shouldSkipFirstReading(rng: () => number = Math.random): boolean {
+  return rng() < UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY;
+}
+
+/**
  * Committee range for this bill's complexity tier. Persisted per-bill at
  * committee entry so re-runs and late-readers see the same numbers.
+ *
+ * Cycle 3 PR 1 (Q4 flip-only): government bills are broader/harder in
+ * reality and spend MORE weeks in committee — scale by
+ * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER (1.3×).
  */
 export function committeeRange(bill: Bill): { min: number; max: number } {
-  return bill.isComplexBill
+  const base = bill.isComplexBill
     ? BILL_STAGE_DURATIONS.committee.complex
     : BILL_STAGE_DURATIONS.committee.ordinary;
+  if (bill.isGovernmentBill) {
+    return {
+      min: Math.round(base.min * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+      max: Math.round(base.max * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+    };
+  }
+  return base;
 }
 
 /**
@@ -154,7 +177,7 @@ export function advanceBillPipeline(
   //       reading and enter committee — no Sitzungstag gate required.
   const proposedBills = allBills.filter(b => b.status === "proposed" && dwellDays(b, day) >= BILL_STAGE_DURATIONS.proposed.min);
   for (const bill of proposedBills) {
-    if ((bill as any).isGovernmentBill) {
+    if (bill.isGovernmentBill) {
       const committeeName = assignCommittee(bill.category as BillCategory);
       const recommendation = generateRecommendation(bill, parties, coalitionParties);
       const range = committeeRange(bill);
@@ -192,34 +215,78 @@ export function advanceBillPipeline(
       });
       console.log(`  [Pipeline] "${bill.title}" → committee (Govt. Bill, min ${minDur}d)`);
     } else if (onSitzungsTag) {
-      const minDur = BILL_STAGE_DURATIONS.first_reading.min;
-      bill.status = "first_reading";
-      bill.reading = 1;
-      bill.statusChangedOnDay = day;
-      bill.stageEntryDay = day;
-      bill.stageMinDuration = minDur;
-      bill.stageMaxDuration = BILL_STAGE_DURATIONS.first_reading.max;
-      db.update(schema.bills)
-        .set({
-          status: "first_reading",
-          reading: 1,
-          statusChangedOnDay: day,
-          stageEntryDay: day,
-          stageMinDuration: minDur,
-          stageMaxDuration: BILL_STAGE_DURATIONS.first_reading.max,
-        })
-        .where(eq(schema.bills.id, bill.id))
-        .run();
+      // Cycle 3 PR 4 (Q8) — Überweisung ohne Aussprache. ~65% of non-government
+      // bills are silently referred to committee without floor debate. Emit a
+      // compact event the frontend can render as a one-line "Überwiesen" entry
+      // (NOT in IMPORTANT_EVENTS — see timing.ts).
+      const skipDebate = shouldSkipFirstReading();
+      if (skipDebate) {
+        const committeeName = assignCommittee(bill.category as BillCategory);
+        const recommendation = generateRecommendation(bill, parties, coalitionParties);
+        const range = committeeRange(bill);
+        const minDur = randomInRange(range.min, range.max);
 
-      events.push({
-        dayNumber: day,
-        type: "bill_first_reading",
-        actor: "system",
-        title: `"${bill.title}" — 1. Lesung`,
-        description: `Der Gesetzentwurf von ${bill.proposedBy} wurde im Bundestag eingebracht.`,
-        data: { billId: bill.id },
-      });
-      console.log(`  [Pipeline] "${bill.title}" → first_reading`);
+        bill.status = "committee";
+        bill.committeeName = committeeName;
+        bill.committeeRecommendation = recommendation as any;
+        bill.statusChangedOnDay = day;
+        bill.stageEntryDay = day;
+        bill.stageMinDuration = minDur;
+        bill.stageMaxDuration = range.max;
+
+        db.update(schema.bills)
+          .set({
+            status: "committee",
+            reading: null as any,
+            committeeName,
+            committeeRecommendation: recommendation,
+            statusChangedOnDay: day,
+            stageEntryDay: day,
+            stageMinDuration: minDur,
+            stageMaxDuration: range.max,
+          })
+          .where(eq(schema.bills.id, bill.id))
+          .run();
+
+        events.push({
+          dayNumber: day,
+          type: "bill_ueberweisung_ohne_aussprache",
+          actor: "system",
+          title: `"${bill.title}" — Überwiesen ohne Aussprache`,
+          description: `Direkt an den Ausschuss überwiesen — keine 1. Lesung im Plenum. Ausschuss: ${committeeName}, Empfehlung: ${recommendation}.`,
+          data: { billId: bill.id, committeeName, recommendation, isGovernmentBill: false, stageMinDuration: minDur },
+        });
+        console.log(`  [Pipeline] "${bill.title}" → committee (Überweisung ohne Aussprache, min ${minDur}d)`);
+      } else {
+        const minDur = BILL_STAGE_DURATIONS.first_reading.min;
+        bill.status = "first_reading";
+        bill.reading = 1;
+        bill.statusChangedOnDay = day;
+        bill.stageEntryDay = day;
+        bill.stageMinDuration = minDur;
+        bill.stageMaxDuration = BILL_STAGE_DURATIONS.first_reading.max;
+        db.update(schema.bills)
+          .set({
+            status: "first_reading",
+            reading: 1,
+            statusChangedOnDay: day,
+            stageEntryDay: day,
+            stageMinDuration: minDur,
+            stageMaxDuration: BILL_STAGE_DURATIONS.first_reading.max,
+          })
+          .where(eq(schema.bills.id, bill.id))
+          .run();
+
+        events.push({
+          dayNumber: day,
+          type: "bill_first_reading",
+          actor: "system",
+          title: `"${bill.title}" — 1. Lesung`,
+          description: `Der Gesetzentwurf von ${bill.proposedBy} wurde im Bundestag eingebracht.`,
+          data: { billId: bill.id },
+        });
+        console.log(`  [Pipeline] "${bill.title}" → first_reading`);
+      }
     }
   }
 
@@ -280,7 +347,7 @@ export function advanceBillPipeline(
     if (
       bill.committeeRecommendation === "reject" &&
       !isCoalitionBill &&
-      !(bill as any).isGovernmentBill &&
+      !bill.isGovernmentBill &&
       dwellDays(bill, day) === (bill.stageMinDuration ?? BILL_STAGE_DURATIONS.committee.ordinary.min) &&
       Math.random() < 0.40
     ) {

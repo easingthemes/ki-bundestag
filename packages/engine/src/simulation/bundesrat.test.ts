@@ -16,6 +16,7 @@ import {
   LAND_ABSTENTION_THRESHOLD,
   VERMITTLUNG_OUTCOMES,
 } from "../config/bundesrat.js";
+import { MAJORITY_SEATS } from "../config/elections.js";
 
 /** Party fixture — six federal parties with their seed policyPriorities. */
 const PARTIES: Party[] = [
@@ -352,35 +353,35 @@ describe("canOverrideEinspruch", () => {
     };
   }
 
-  it("true when yes-voting parties hold >= 368 seats (Kanzlermehrheit)", () => {
+  it("true when yes-voting parties hold >= MAJORITY_SEATS (Kanzlermehrheit)", () => {
     const bill = mkBill([
       { partyId: "spd", vote: "yes" },
       { partyId: "gruene", vote: "yes" },
       { partyId: "cdu", vote: "no" },
     ]);
     const parties: Party[] = [
-      { ...PARTIES[0], seatCount: 250 }, // spd
-      { ...PARTIES[2], seatCount: 150 }, // gruene — total yes = 400
-      { ...PARTIES[1], seatCount: 200 }, // cdu no
+      { ...PARTIES[0], seatCount: 200 }, // spd
+      { ...PARTIES[2], seatCount: 130 }, // gruene — total yes = 330 >= 316
+      { ...PARTIES[1], seatCount: 300 }, // cdu no
     ];
     expect(canOverrideEinspruch(bill, parties)).toBe(true);
   });
 
-  it("false when yes-voting parties hold < 368 seats", () => {
+  it("false when yes-voting parties hold < MAJORITY_SEATS", () => {
     const bill = mkBill([
       { partyId: "spd", vote: "yes" },
       { partyId: "cdu", vote: "no" },
     ]);
     const parties: Party[] = [
-      { ...PARTIES[0], seatCount: 300 }, // yes
-      { ...PARTIES[1], seatCount: 400 }, // no — yes < 368
+      { ...PARTIES[0], seatCount: 200 }, // yes < 316
+      { ...PARTIES[1], seatCount: 430 }, // no
     ];
     expect(canOverrideEinspruch(bill, parties)).toBe(false);
   });
 
-  it("exactly 368 yes seats passes (>=, not >)", () => {
+  it("exactly MAJORITY_SEATS yes seats passes (>=, not >)", () => {
     const bill = mkBill([{ partyId: "spd", vote: "yes" }]);
-    const parties: Party[] = [{ ...PARTIES[0], seatCount: 368 }];
+    const parties: Party[] = [{ ...PARTIES[0], seatCount: MAJORITY_SEATS }];
     expect(canOverrideEinspruch(bill, parties)).toBe(true);
   });
 });

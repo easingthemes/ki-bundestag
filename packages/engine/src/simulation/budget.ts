@@ -6,8 +6,7 @@ import {
   BUDGET_FINANCE_INFRA_THRESHOLD, BUDGET_FINANCE_INFRA_GDP_EFFECT,
   BUDGET_ENVIRONMENT_THRESHOLD, BUDGET_ENVIRONMENT_INFLATION_EFFECT,
   BUDGET_DEFENCE_THRESHOLD, BUDGET_DEFENCE_GDP_EFFECT,
-  VETO_BASE_PROBABILITY, VETO_SENTIMENT_THRESHOLD, VETO_SENTIMENT_BONUS,
-  VETO_BUDGET_THRESHOLD, VETO_BUDGET_BONUS, VETO_GDP_THRESHOLD, VETO_GDP_BONUS,
+  PRESIDENTIAL_VETO_IMPACT_THRESHOLD, PRESIDENTIAL_VETO_PROBABILITY,
   VETO_REASONS,
 } from "../config/index.js";
 
@@ -151,19 +150,44 @@ export function applyBudgetEconomicEffect(
 }
 
 /**
- * Presidential veto check. Returns whether the Bundespräsident vetoes the bill and a reason.
+ * Presidential veto check (Cycle 3 PR 1).
+ *
+ * Two-stage filter:
+ *   1. Impact gate — `summedImpact = Σ |bill.impact[k]|` must reach
+ *      PRESIDENTIAL_VETO_IMPACT_THRESHOLD. Below it, the Bundespräsident
+ *      cannot veto (matches reality: only constitutional-stakes bills get
+ *      vetoed).
+ *   2. Capped probability — above the gate, roll PRESIDENTIAL_VETO_PROBABILITY
+ *      (0.05%). Calibrated to match the real ≈0.04% lifetime rate.
+ *
+ * `rng` parameter accepts a seeded RNG for tests; defaults to Math.random
+ * in production (consistent with the rest of the codebase per Cycle 2b S10).
  */
-export function shouldPresidentVeto(bill: Bill): { veto: boolean; reason: string } {
+export function shouldPresidentVeto(
+  bill: Bill,
+  rng: () => number = Math.random,
+): { veto: boolean; reason: string } {
   const impact = bill.impact as BillImpact | undefined;
-  let prob = VETO_BASE_PROBABILITY;
+  // Skip non-finite values (NaN poisons the comparison — `NaN < 0.6` is false,
+  // so a single corrupt field would silently keep the gate open; Infinity
+  // would always trip the gate). Bill impacts come from agent-parsed JSON,
+  // so defending the boundary is cheap and worth it.
+  const summedImpact = impact
+    ? Object.values(impact).reduce((s, v) => {
+        const n = v ?? 0;
+        return Number.isFinite(n) ? s + Math.abs(n) : s;
+      }, 0)
+    : 0;
 
-  if (Math.abs(impact?.publicSentiment ?? 0) > VETO_SENTIMENT_THRESHOLD) prob += VETO_SENTIMENT_BONUS;
-  if (Math.abs(impact?.budget ?? 0) > VETO_BUDGET_THRESHOLD) prob += VETO_BUDGET_BONUS;
-  if (Math.abs(impact?.gdpGrowth ?? 0) > VETO_GDP_THRESHOLD) prob += VETO_GDP_BONUS;
+  if (summedImpact < PRESIDENTIAL_VETO_IMPACT_THRESHOLD) {
+    return { veto: false, reason: "" };
+  }
 
-  const veto = Math.random() < prob;
-  const reason = VETO_REASONS[Math.floor(Math.random() * VETO_REASONS.length)];
-  return { veto, reason };
+  const veto = rng() < PRESIDENTIAL_VETO_PROBABILITY;
+  if (!veto) return { veto: false, reason: "" };
+
+  const reason = VETO_REASONS[Math.floor(rng() * VETO_REASONS.length)];
+  return { veto: true, reason };
 }
 
 function clamp(value: number, min: number, max: number): number {
