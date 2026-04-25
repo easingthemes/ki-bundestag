@@ -86,6 +86,7 @@ import {
 import { BUNDESTAG_SIZE } from "../config/elections.js";
 import type { FiscalEmergencyValidationContext, InquiryValidationContext } from "../agent/action-parser.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
+import { detectDisciplineBreaks, type DisciplineBreakInput } from "./debate-formats.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
 import { reviewInternalProposals } from "./internal-proposals.js";
@@ -1753,6 +1754,27 @@ export async function runDay(): Promise<number> {
 
       // Tally and determine outcome
       const result = tallyVotes(bill, allParties, mdbVoteEntries.length > 0 ? mdbVoteEntries : undefined, Object.keys(humanSeatCountsForTally).length > 0 ? humanSeatCountsForTally : undefined);
+
+      // Cycle 4 PR 4 — Erklärung zur Abstimmung (S5/S22). Detect MdB seats
+      // that broke party discipline and emit one templated event per break.
+      // Only fires when MdB seat votes are present (PR 4 R7/R18: AI seats
+      // also have discipline_level, so the events fire even in ultra-fast
+      // / fast presets where all seats are AI).
+      if (mdbVoteEntries.length > 0) {
+        const partyLineByPartyId: Record<string, "yes" | "no" | "abstain"> = {};
+        for (const v of votes) {
+          partyLineByPartyId[v.partyId] = v.vote;
+        }
+        const breakInputs: DisciplineBreakInput[] = mdbVoteEntries.map(e => ({
+          seatId: e.seatId,
+          partyId: e.partyId,
+          vote: e.vote,
+          disciplineLevel: e.disciplineLevel,
+          mdbName: null, // R18 — graceful fallback to "MdB-Sitz #<seatId>"
+        }));
+        const breakEvents = detectDisciplineBreaks(bill, breakInputs, partyLineByPartyId, currentDay);
+        for (const ev of breakEvents) addEvent(dayEvents, ev);
+      }
 
       if (result.passed) {
         // Parliament approved — bill enters Bundesrat / Ausfertigung phase.
