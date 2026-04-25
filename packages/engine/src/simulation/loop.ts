@@ -29,7 +29,8 @@ import { shouldTriggerElection, announceElection, advanceElectionPhase, calculat
 import { MAJORITY_SEATS, KANZLERWAHL_PHASE2_MAX_ROUNDS } from "../config/elections.js";
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
-import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
+import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds, shouldSkipNegotiationDispatch } from "./negotiations.js";
+import { MAX_NEGOTIATION_DAYS } from "../config/elections.js";
 import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
 import { getRecentMedia, applyMediaSentiment, applyMediaSentimentFromArticles, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
@@ -637,8 +638,9 @@ export async function runDay(): Promise<number> {
     const daysSinceElection = currentDay - activeElection.electionDay;
 
     // Safety: if negotiations are stuck for too many days (e.g. API errors preventing
-    // round progression), force-complete with algorithmic coalition
-    const MAX_NEGOTIATION_DAYS = getMaxNegotiationRounds() + 5;
+    // round progression), force-complete with algorithmic coalition. Cycle 3 PR 4
+    // raises this from 8 to 90 days so real negotiations have room to span 4–12 sim
+    // weeks; the safety net should now fire only on genuinely stuck rounds.
     if (daysSinceElection > MAX_NEGOTIATION_DAYS && roundNumber <= getMaxNegotiationRounds()) {
       console.warn(`  [Negotiation] Stuck for ${daysSinceElection} days (still round ${roundNumber}), force-completing...`);
 
@@ -751,6 +753,16 @@ export async function runDay(): Promise<number> {
     }
 
     if (activeElection && activeElection.status === "negotiation") {
+      // Cycle 3 PR 4 (Q7) — inter-round dwell guard. Real coalition negotiations
+      // span weeks, not consecutive sim days. Skip dispatch if the previous
+      // round ran too recently. Round 1 always dispatches immediately.
+      const lastRoundDay = meta.lastNegotiationRoundDay;
+      const skipForDwell = shouldSkipNegotiationDispatch(currentDay, lastRoundDay, roundNumber);
+
+      if (skipForDwell) {
+        const elapsed = lastRoundDay != null ? currentDay - lastRoundDay : 0;
+        console.log(`  [Negotiation] Day ${currentDay}: Round ${roundNumber} pacing — ${elapsed}d since last round. Skipping dispatch.`);
+      } else {
       console.log(`  [Negotiation] Day ${currentDay}: Running negotiation round ${roundNumber}...`);
       progress.set(15); // Negotiation round starting
 
@@ -764,6 +776,13 @@ export async function runDay(): Promise<number> {
 
     progress.set(50); // Negotiation round complete
     const allRounds = [...previousRounds, roundResults];
+
+    // Cycle 3 PR 4 — record dispatch day so the dwell guard can pace
+    // subsequent rounds.
+    db.update(schema.simulationMeta)
+      .set({ lastNegotiationRoundDay: currentDay } as any)
+      .where(eq(schema.simulationMeta.id, meta.id))
+      .run();
 
     // Add negotiation events
     const negEvents = buildNegotiationEvents(roundResults, allParties, currentDay, roundNumber);
@@ -904,6 +923,7 @@ export async function runDay(): Promise<number> {
         .where(eq(schema.elections.id, activeElection.id))
         .run();
     }
+      } // end PR 4 dwell-skip else
     } // end inner negotiation guard
   }
 

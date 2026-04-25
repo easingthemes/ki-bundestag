@@ -475,21 +475,23 @@ PR-style commits on `claude/sim-fidelity-cycle3` branch, mirroring the Cycle 2a/
 
 **Deviation from earlier spec draft**: `bundestag_seats` rows are NOT shrunk in the migration. The table is per-MdB-row (one row per seat); shrinking would require deactivating active rows, potentially displacing users mid-term. Vote tallying reads `parties.seatCount` (not `bundestag_seats` row counts), so the engine is mathematically consistent post-migration. The `bundestag_seats` table converges to BUNDESTAG_SIZE-aligned state at the next election when `resetAllSeats` + `allocateSeats` run. Documented inline at the migration block in `seed.ts`.
 
-### PR 4 — Pieces 5+6+7 (election timing + Überweisung)
+### PR 4 — Pieces 5+6+7 (election timing + Überweisung) — **shipped**
 
 `feat(sim-fidelity): 60-day campaigns + 4-12wk negotiations + 65% Überweisung skip (Cycle 3 PR 4)`
 
-- `simulation/timing.ts`: `ELECTION_CAMPAIGN_DAYS: 60`
+- `simulation/timing.ts`: `ELECTION_CAMPAIGN_DAYS: 60` (was 21)
 - `config/elections.ts`: `MAX_NEGOTIATION_DAYS = 90`, `MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7`
-- `db/schema.ts` + `seed.ts::migrateDatabase()`: `simulation_meta.last_negotiation_round_day INTEGER`
-- `simulation/loop.ts`: switch from derived `MAX_NEGOTIATION_DAYS` to imported constant; insert dwell-guard on negotiation-round dispatch (skip if `currentDay - lastRoundDay < MIN_DWELL`); update `lastNegotiationRoundDay` after each dispatch
-- `simulation/bill-pipeline.ts`: 65%-probability Überweisung-ohne-Aussprache branch in Stage 1 non-government path; emit `bill_ueberweisung_ohne_aussprache` event
-- `types/meta.ts`: add `bill_ueberweisung_ohne_aussprache` to `SimulationEventType` union
-- `simulation/timing.ts`: confirm new event type is **NOT** in `IMPORTANT_EVENTS` (per S7)
-- Tests:
-  - `negotiations.test.ts` (new): dwell guard, 90-day cap, R13-safety-net interaction
-  - `bill-pipeline.test.ts`: deterministic skip-vs-debate branch under seeded RNG
-  - `elections.test.ts`: 60-day announce→vote arithmetic
+- `config/parliament.ts`: `UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY = 0.65`
+- `db/schema-sim.ts` + `db/ddl.ts`: `simulation_meta.last_negotiation_round_day INTEGER` (NULL when no negotiation in flight)
+- `simulation/negotiations.ts`: new pure helper `shouldSkipNegotiationDispatch(currentDay, lastRoundDay, roundNumber)` — Round 1 always dispatches; subsequent rounds skip when `currentDay - lastRoundDay < 7`
+- `simulation/loop.ts`: switch from derived `MAX_NEGOTIATION_DAYS` (was `getMaxNegotiationRounds() + 5 = 8`) to imported constant; insert dwell-guard wrap around the inner negotiation block; update `lastNegotiationRoundDay` after each successful dispatch
+- `simulation/bill-pipeline.ts`: new pure helper `shouldSkipFirstReading(rng?)`; non-government Stage 1 path now branches on this (65% → committee + `bill_ueberweisung_ohne_aussprache` event; 35% → existing `first_reading` path)
+- `types/meta.ts`: `bill_ueberweisung_ohne_aussprache` added to `SimulationEventType` union
+- `simulation/timing.ts`: new event type **NOT** in `IMPORTANT_EVENTS` (per S7) — frontend renders compactly
+- Tests (+12):
+  - `negotiations.test.ts` (new — 8 cases): Round-1 always dispatches; null-lastRoundDay never skips; dwell-window skip/dispatch boundaries; 3-round 14-day-minimum span; constant guards
+  - `bill-pipeline.test.ts` (+4 cases): seeded-RNG threshold boundary tests; constant guard; 50_000-trial convergence under LCG
+- Stale Cycle 1/2a/2b spec files deleted per the Cycle 2 housekeeping commitment
 
 ### Post-merge cleanup (separate concern)
 

@@ -187,6 +187,10 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // Cycle 3 PR 3 — idempotency flag for the 735 → 630 seat-reform shrink.
   // 1 = already migrated, 0 = not yet (default for fresh DBs and pre-PR3 DBs).
   bundestagSizeMigrated: integer("bundestag_size_migrated").notNull().default(0),
+  // Cycle 3 PR 4 — sim day on which the most-recent negotiation round was
+  // dispatched. Used by loop.ts to enforce MIN_NEGOTIATION_ROUND_DWELL_DAYS
+  // pacing between rounds. NULL = no negotiation in flight.
+  lastNegotiationRoundDay: integer("last_negotiation_round_day"),
 });
 
 export const partyHistory = sqliteTable("party_history", {

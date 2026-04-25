@@ -170,7 +170,8 @@ export const SIM_TABLE_DDL = `
     schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0,
     schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0,
     low_government_approval_streak INTEGER NOT NULL DEFAULT 0,
-    bundestag_size_migrated INTEGER NOT NULL DEFAULT 0
+    bundestag_size_migrated INTEGER NOT NULL DEFAULT 0,
+    last_negotiation_round_day INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -724,6 +725,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "low_government_approval_streak", sql: "ALTER TABLE simulation_meta ADD COLUMN low_government_approval_streak INTEGER NOT NULL DEFAULT 0" },
   // Cycle 3 PR 3 — Idempotency flag for the 735→630 seat-reform shrink
   { table: "simulation_meta", column: "bundestag_size_migrated", sql: "ALTER TABLE simulation_meta ADD COLUMN bundestag_size_migrated INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 3 PR 4 — Negotiation round-dispatch dwell tracker (NULL when no negotiation in flight)
+  { table: "simulation_meta", column: "last_negotiation_round_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_negotiation_round_day INTEGER" },
 ];
 
 /** Column migrations for user DB */

@@ -66,3 +66,27 @@ export const MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS = 180;
 // gate filter alone produces the target ~0.05/yr rate. Re-introduce as a forced
 // trigger if a 4-year sim shows agents systematically failing to fire during
 // open windows.
+
+// ── Coalition negotiation timing (Cycle 3 PR 4, Q7) ──────────────────
+/**
+ * Maximum sim days between Wahltag and forced negotiation completion.
+ * Real coalition negotiations take 4–12 sim weeks (e.g. 2021 Ampel: 72 days,
+ * 2017 Jamaica/GroKo: 171 days). Was implicitly 8 days in loop.ts (=
+ * `getMaxNegotiationRounds() + 5`); now an explicit constant at 90.
+ *
+ * Triggers the safety-net algorithmic-coalition branch in loop.ts when
+ * exceeded. With dwell pacing below, real negotiations should organically
+ * span 14–84 days; the safety net should fire only on stuck rounds.
+ */
+export const MAX_NEGOTIATION_DAYS = 90;
+
+/**
+ * Minimum sim days between consecutive negotiation-round dispatches.
+ * Replaces today's "one round per sim day" cadence (which compresses 3
+ * rounds into 3 days) with realistic pacing — 3 rounds spread over at
+ * least 14 sim days with this floor.
+ *
+ * Tracked via simulation_meta.last_negotiation_round_day; updated after
+ * each dispatch in loop.ts.
+ */
+export const MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7;
