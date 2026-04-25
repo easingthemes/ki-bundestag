@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, REVISED_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { BUNDESTAG_SIZE } from "@/lib/parliament";
 import { VoteBar } from "@/components/VoteBar";
 import { FilterPills } from "@/components/FilterPills";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -23,7 +24,7 @@ const MINISTRY_COLORS: Record<keyof BudgetAllocations, string> = {
   infrastructure: "#7f8c8d",
 };
 
-const TOTAL_SEATS = 735;
+const TOTAL_SEATS = BUNDESTAG_SIZE;
 
 export function Budget() {
   usePageMeta(ROUTE_SEO["/budget"] ?? { title: "Haushalt" });

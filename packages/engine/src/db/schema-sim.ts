@@ -191,6 +191,12 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // dispatched. Used by loop.ts to enforce MIN_NEGOTIATION_ROUND_DWELL_DAYS
   // pacing between rounds. NULL = no negotiation in flight.
   lastNegotiationRoundDay: integer("last_negotiation_round_day"),
+  // Cycle 3 PR 2 follow-up — cumulative observability counters for gate-
+  // suppressed Vertrauensfrage / Misstrauensvotum agent actions. Lets us
+  // answer "did the gate ever fire?" and "is a party agent spamming a blocked
+  // action?" from a SQL query, instead of relying on console-log scraping.
+  vertrauensfrageSuppressedTotal: integer("vertrauensfrage_suppressed_total").notNull().default(0),
+  misstrauensvotumSuppressedTotal: integer("misstrauensvotum_suppressed_total").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {

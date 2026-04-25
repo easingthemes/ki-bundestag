@@ -58,7 +58,7 @@
     "status.failed": "Gescheitert",
     "type.vertrauensfrage": "Vertrauensfrage",
     "type.misstrauensvotum": "Misstrauensvotum",
-    "threshold": "Schwellenwert: 368",
+    "threshold": "Schwellenwert: {{count}}",
     "voteYes": "Ja: {{count}}",
     "voteNo": "Nein: {{count}}",
     "filedBy.vertrauensfrage": "Gestellt von",

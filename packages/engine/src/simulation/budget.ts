@@ -168,8 +168,15 @@ export function shouldPresidentVeto(
   rng: () => number = Math.random,
 ): { veto: boolean; reason: string } {
   const impact = bill.impact as BillImpact | undefined;
+  // Skip non-finite values (NaN poisons the comparison — `NaN < 0.6` is false,
+  // so a single corrupt field would silently keep the gate open; Infinity
+  // would always trip the gate). Bill impacts come from agent-parsed JSON,
+  // so defending the boundary is cheap and worth it.
   const summedImpact = impact
-    ? Object.values(impact).reduce((s, v) => s + Math.abs(v ?? 0), 0)
+    ? Object.values(impact).reduce((s, v) => {
+        const n = v ?? 0;
+        return Number.isFinite(n) ? s + Math.abs(n) : s;
+      }, 0)
     : 0;
 
   if (summedImpact < PRESIDENTIAL_VETO_IMPACT_THRESHOLD) {

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, CONFIDENCE_TYPE_BADGE, SEMANTIC_HEX } from "@/lib/colors";
+import { MAJORITY_SEATS } from "@/lib/parliament";
 import { VoteBar } from "@/components/VoteBar";
 import { FilterPills } from "@/components/FilterPills";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -199,8 +200,8 @@ function ConfidenceVoteCard({
               <span style={{ color: SEMANTIC_HEX.positive }}>{t("confidenceVotes.voteYes", { count: totalYes })}</span>
               {" · "}
               <span style={{ color: SEMANTIC_HEX.negative }}>{t("confidenceVotes.voteNo", { count: totalNo })}</span>
-              {" · "}{t("confidenceVotes.threshold")}
-              {totalYes >= 368 && <span style={{ color: SEMANTIC_HEX.positive }}> ✓</span>}
+              {" · "}{t("confidenceVotes.threshold", { count: MAJORITY_SEATS })}
+              {totalYes >= MAJORITY_SEATS && <span style={{ color: SEMANTIC_HEX.positive }}> ✓</span>}
             </p>
           </div>
         )}

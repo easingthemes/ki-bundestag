@@ -9,6 +9,7 @@ import {
   VERTRAUENSFRAGE_HONEYMOON_DAYS,
   MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS,
   FRAKTION_THRESHOLD,
+  LOW_GOVERNMENT_APPROVAL_THRESHOLD,
 } from "../config/index.js";
 import { clampApproval } from "./opinion.js";
 
@@ -187,6 +188,31 @@ export function misstrauensvotumGateOpen(
   const oppositionSeats = parties.filter(p => !coalitionSet.has(p.id)).reduce((s, p) => s + p.seatCount, 0);
   if (oppositionSeats < MAJORITY_THRESHOLD - coalitionSeats + 1) return false;
   return pickKonstruktivCandidate(parties, coalitionPartyIds) !== null;
+}
+
+/**
+ * Compute the next-day low-government-approval streak that feeds
+ * `vertrauensfrageGateOpen`. Pure: no DB, no clock.
+ *
+ * Increment when coalition seat-weighted approval is below
+ * `LOW_GOVERNMENT_APPROVAL_THRESHOLD`. Reset to 0 when at/above it OR during
+ * an interregnum (`coalitionParties === null`). Total-seats == 0 falls into
+ * the same "low approval" bucket as the original inline implementation
+ * (weightedApproval defaults to 0 there) — kept identical to avoid changing
+ * gate semantics; flag for future review if interregnum-edge handling needs
+ * a sharper definition.
+ */
+export function nextLowGovernmentApprovalStreak(
+  prior: number,
+  coalitionParties: Array<{ approvalRating: number; seatCount: number }> | null,
+  threshold: number = LOW_GOVERNMENT_APPROVAL_THRESHOLD,
+): number {
+  if (!coalitionParties) return 0;
+  const totalSeats = coalitionParties.reduce((s, p) => s + p.seatCount, 0);
+  const weightedApproval = totalSeats > 0
+    ? coalitionParties.reduce((s, p) => s + p.approvalRating * p.seatCount, 0) / totalSeats
+    : 0;
+  return weightedApproval < threshold ? prior + 1 : 0;
 }
 
 /**

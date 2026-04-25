@@ -171,7 +171,9 @@ export const SIM_TABLE_DDL = `
     schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0,
     low_government_approval_streak INTEGER NOT NULL DEFAULT 0,
     bundestag_size_migrated INTEGER NOT NULL DEFAULT 0,
-    last_negotiation_round_day INTEGER
+    last_negotiation_round_day INTEGER,
+    vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0,
+    misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -727,6 +729,11 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "bundestag_size_migrated", sql: "ALTER TABLE simulation_meta ADD COLUMN bundestag_size_migrated INTEGER NOT NULL DEFAULT 0" },
   // Cycle 3 PR 4 — Negotiation round-dispatch dwell tracker (NULL when no negotiation in flight)
   { table: "simulation_meta", column: "last_negotiation_round_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_negotiation_round_day INTEGER" },
+  // Cycle 3 PR 2 follow-up — observability counters for gate-suppressed agent
+  // actions. Without these, a runaway party agent emitting daily Vertrauensfrage
+  // calls is invisible (suppression only logs to console). Cumulative; no reset.
+  { table: "simulation_meta", column: "vertrauensfrage_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0" },
+  { table: "simulation_meta", column: "misstrauensvotum_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */
