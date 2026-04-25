@@ -136,6 +136,20 @@ export const BILL_STAGE_DURATIONS = {
  */
 export const COMPLEX_BILL_PROBABILITY = 0.15;
 
+/**
+ * Government-bill committee multiplier (Cycle 3 PR 1, Q4 flip-only).
+ *
+ * Real Bundestag pattern: government bills tend to be broader and harder
+ * (ministries bundle multiple items), so they spend MORE weeks in committee,
+ * not fewer. The previous fast-track was structurally backwards. This
+ * multiplier scales `committeeRange()` for `isGovernmentBill === true`.
+ *
+ * Applied at committee-stage entry only; bills mid-committee at the multiplier-
+ * change moment keep their already-stored `stage_min/max_duration` (no
+ * retroactive update).
+ */
+export const GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3;
+
 // ── Post-3rd-reading timing ─────────────────────────────────────────
 /**
  * Bundesrat 2. Durchgang window (sim days). Cycle 1 models the phase as a

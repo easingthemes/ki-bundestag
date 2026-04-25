@@ -8,7 +8,7 @@ import { isSitzungsTag } from "./parliament-calendar.js";
 import { checkPresidentialVeto } from "./veto.js";
 import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
-import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET } from "../config/parliament.js";
+import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET, GOVERNMENT_BILL_COMMITTEE_MULTIPLIER } from "../config/parliament.js";
 import { VERMITTLUNG_DURATION } from "../config/bundesrat.js";
 import {
   voteBundesrat,
@@ -43,11 +43,22 @@ export function dwellDays(bill: Bill, day: number): number {
 /**
  * Committee range for this bill's complexity tier. Persisted per-bill at
  * committee entry so re-runs and late-readers see the same numbers.
+ *
+ * Cycle 3 PR 1 (Q4 flip-only): government bills are broader/harder in
+ * reality and spend MORE weeks in committee — scale by
+ * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER (1.3×).
  */
 export function committeeRange(bill: Bill): { min: number; max: number } {
-  return bill.isComplexBill
+  const base = bill.isComplexBill
     ? BILL_STAGE_DURATIONS.committee.complex
     : BILL_STAGE_DURATIONS.committee.ordinary;
+  if ((bill as any).isGovernmentBill) {
+    return {
+      min: Math.round(base.min * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+      max: Math.round(base.max * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+    };
+  }
+  return base;
 }
 
 /**
