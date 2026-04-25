@@ -143,6 +143,10 @@ export const IMPORTANT_EVENTS = [
   // event lives in CRITICAL_EVENTS instead.
   "schuldenbremse_aussetzung_proposed",
   "schuldenbremse_aussetzung_rejected",
+  // Cycle 4 PR 3 — Nachtragshaushalt (supplementary budget) (S15 — all 3 important).
+  "nachtragshaushalt_proposed",
+  "nachtragshaushalt_passed",
+  "nachtragshaushalt_rejected",
 ] as const;
 
 export const ROUTINE_EVENTS = [

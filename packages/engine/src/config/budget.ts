@@ -110,6 +110,18 @@ export const SCHULDENBREMSE_SEVERITY_BOOSTS: Record<"low" | "medium" | "high", n
  *  opposition unanimity is rare. */
 export const SCHULDENBREMSE_OPPOSITION_YES_CAP = 0.85;
 
+// ── Cycle 4 PR 3 — Nachtragshaushalt (supplementary budget) ──────────
+
+/** Min Nachtragshaushalt total (B EUR), uniform draw per S4. */
+export const NACHTRAGSHAUSHALT_TOTAL_MIN = 50;
+
+/** Max Nachtragshaushalt total (B EUR). */
+export const NACHTRAGSHAUSHALT_TOTAL_MAX = 150;
+
+/** S4: ministry-allocation boost share for the active-crisis category
+ *  (e.g. defense crisis → +30% to defence ministry over its base coalition share). */
+export const NACHTRAGSHAUSHALT_CRISIS_BOOST = 0.30;
+
 /** Random veto reason texts */
 export const VETO_REASONS = [
   "The Bundespräsident has expressed constitutional concerns about this legislation.",

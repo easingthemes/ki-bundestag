@@ -1,4 +1,4 @@
-import type { BudgetAllocations, BudgetVote, BillImpact, Crisis, CrisisSeverity, EconomyState, Party, Bill } from "@ki-bundestag/types";
+import type { BillCategory, BudgetAllocations, BudgetVote, BillImpact, Crisis, CrisisSeverity, EconomyState, Government, NationalState, Party, PendingInjection, SimulationEvent, Bill } from "@ki-bundestag/types";
 import {
   BUDGET_TOTAL, PARTY_MINISTRY_WEIGHTS, BUDGET_REVISION_CENTRIST_SHIFT,
   BUDGET_VOTE_TIERS, BUDGET_REVISION_BOOST,
@@ -14,7 +14,11 @@ import {
   SCHULDENBREMSE_SEVERITY_BOOSTS,
   SCHULDENBREMSE_OPPOSITION_YES_CAP,
   FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS,
+  NACHTRAGSHAUSHALT_TOTAL_MIN,
+  NACHTRAGSHAUSHALT_TOTAL_MAX,
+  NACHTRAGSHAUSHALT_CRISIS_BOOST,
 } from "../config/index.js";
+import { CRISIS_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
 import { getDb, getSqlite, schema } from "../db/index.js";
 import { MAJORITY_SEATS } from "../config/elections.js";
 
@@ -340,5 +344,143 @@ export function findFiscalEmergencyOpportunity(
   }
 
   return null;
+}
+
+// ── Cycle 4 PR 3 — Nachtragshaushalt (supplementary budget) ─────────────
+
+/**
+ * S13/S4: generate ministry-keyed allocations for a Nachtragshaushalt.
+ * Crisis-weighted: the ministry mapped to the active crisis category gets
+ * a `+NACHTRAGSHAUSHALT_CRISIS_BOOST` (30%) absolute boost on top of its
+ * base coalition share; remaining ministries scale down proportionally to
+ * keep the total at `total` (no extra spending beyond what was authorized).
+ *
+ * R4: this is the ONLY entry point for Nachtragshaushalt allocation.
+ *     Regular budget cycle uses `generateBudgetAllocations()`;
+ *     never call this from the `isBudgetDay()` flow.
+ *
+ * Pure: no DB. Caller is `processNachtragsInjection`.
+ */
+export function generateNachtragsAllocations(
+  coalitionParties: Party[],
+  crisisCategory: BillCategory | null,
+  total: number,
+): BudgetAllocations {
+  // Start from coalition-weighted base allocation (same shape as regular budget,
+  // just scaled to `total` instead of BUDGET_TOTAL).
+  const baseFromCoalition = generateBudgetAllocations(coalitionParties);
+  const scale = total / BUDGET_TOTAL;
+  const base: BudgetAllocations = MINISTRY_KEYS.reduce(
+    (acc, k) => ({ ...acc, [k]: Math.round(baseFromCoalition[k] * scale * 10) / 10 }),
+    {} as BudgetAllocations,
+  );
+
+  // No crisis category → return base (uniform-down-from-total) unchanged.
+  if (!crisisCategory) return base;
+  const boostedMinistry = CRISIS_CATEGORY_TO_MINISTRY[crisisCategory];
+  if (!boostedMinistry) return base;
+
+  // Boost target by `total * boost-rate` (so 30% of total goes extra to the
+  // mapped ministry); rescale all OTHER ministries proportionally to keep
+  // sum == total. Note we boost relative to TOTAL, not the ministry's base
+  // share, so the boost magnitude is predictable regardless of base weights.
+  const boostDelta = total * NACHTRAGSHAUSHALT_CRISIS_BOOST;
+  const baseBoosted = base[boostedMinistry];
+  const newBoostedAmount = baseBoosted + boostDelta;
+  const remainingTotal = total - newBoostedAmount;
+  const otherSum = MINISTRY_KEYS
+    .filter(k => k !== boostedMinistry)
+    .reduce((s, k) => s + base[k], 0);
+
+  const result: BudgetAllocations = { finance: 0, labour: 0, environment: 0, interior: 0, defence: 0, education: 0, health: 0, infrastructure: 0 };
+  for (const k of MINISTRY_KEYS) {
+    if (k === boostedMinistry) {
+      result[k] = Math.round(newBoostedAmount * 10) / 10;
+    } else if (otherSum > 0) {
+      result[k] = Math.round(((base[k] / otherSum) * remainingTotal) * 10) / 10;
+    } else {
+      result[k] = 0;
+    }
+  }
+  return result;
+}
+
+/**
+ * Consumes a `pending_injections` row of type "nachtragshaushalt".
+ *
+ * Generates allocations, runs the existing `tallyBudgetVote()` (no separate
+ * Nachtrag-specific tally — coalition discipline + opposition behavior is
+ * already encoded there), applies economic effect on pass.
+ *
+ * Mutates `state.economy` and `state.publicSentiment` in-memory; loop.ts
+ * persists at end-of-day. Returns events to push into dayEvents.
+ *
+ * Pure-ish (no DB writes other than via the injected `state`/`parties`):
+ * fully testable with vi.mock for `getDb`. Crisis lookup is done by id
+ * via the passed `crises` array (not via DB).
+ */
+export function processNachtragsInjection(
+  injection: PendingInjection,
+  parties: Party[],
+  government: Government,
+  state: NationalState,
+  crises: Crisis[],
+  currentDay: number,
+  rng: () => number = Math.random,
+): Array<Omit<SimulationEvent, "id">> {
+  const events: Array<Omit<SimulationEvent, "id">> = [];
+
+  const total = NACHTRAGSHAUSHALT_TOTAL_MIN
+    + Math.floor(rng() * (NACHTRAGSHAUSHALT_TOTAL_MAX - NACHTRAGSHAUSHALT_TOTAL_MIN + 1));
+  const activeCrisisId = (injection.data?.activeCrisisId as string | null | undefined) ?? null;
+  const triggerCrisis = activeCrisisId
+    ? crises.find(c => c.id === activeCrisisId) ?? null
+    : null;
+  const crisisCategory = triggerCrisis?.category ?? null;
+
+  const coalitionParties = parties.filter(p => state.coalitionParties.includes(p.id));
+  const allocations = generateNachtragsAllocations(coalitionParties, crisisCategory, total);
+
+  events.push({
+    dayNumber: currentDay,
+    type: "nachtragshaushalt_proposed",
+    actor: "government",
+    title: `Nachtragshaushalt: ${total} Mrd. EUR`,
+    description: triggerCrisis
+      ? `Coalition legt Nachtragshaushalt mit Krisenfokus (${triggerCrisis.name}) vor.`
+      : `Coalition legt Nachtragshaushalt vor.`,
+    data: { total, allocations, activeCrisisId, crisisCategory },
+  });
+
+  // Reuse existing tallyBudgetVote — Nachtragshaushalt has no revision
+  // concept (single-shot vote), so isRevision=false.
+  const vote = tallyBudgetVote(parties, state.coalitionParties, state.publicSentiment, false);
+
+  if (vote.passed) {
+    // R4 invariant: this is the ONLY same-day economic effect path for
+    // Nachtragshaushalt — drained on a non-budget day, no double-apply
+    // possible (budget cycle runs in step 11d/e, after step 3 injections).
+    const result = applyBudgetEconomicEffect(state.economy, allocations);
+    state.economy = result.economy;
+    state.publicSentiment = Math.max(5, Math.min(75, state.publicSentiment + 0.3));
+    events.push({
+      dayNumber: currentDay,
+      type: "nachtragshaushalt_passed",
+      actor: "government",
+      title: `Nachtragshaushalt verabschiedet (${total} Mrd. EUR)`,
+      description: `Bundestag mit ${vote.yesSeats}:${vote.noSeats} für Nachtragshaushalt.`,
+      data: { total, yesSeats: vote.yesSeats, noSeats: vote.noSeats, economicEffect: result.effect },
+    });
+  } else {
+    events.push({
+      dayNumber: currentDay,
+      type: "nachtragshaushalt_rejected",
+      actor: "government",
+      title: `Nachtragshaushalt abgelehnt`,
+      description: `Bundestag lehnt Nachtragshaushalt mit ${vote.noSeats}:${vote.yesSeats} ab.`,
+      data: { total, yesSeats: vote.yesSeats, noSeats: vote.noSeats },
+    });
+  }
+  return events;
 }
 

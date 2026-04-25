@@ -70,6 +70,7 @@ import {
   generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote,
   applyBudgetEconomicEffect, BUDGET_TOTAL,
   tallySchuldenbremseVote, applySchuldenbremseAussetzung, checkSchuldenbremseExpiry, findFiscalEmergencyOpportunity,
+  processNachtragsInjection,
 } from "./budget.js";
 import { SCHULDENBREMSE_SUSPENSION_DURATION } from "../config/budget.js";
 import {
@@ -389,6 +390,26 @@ export async function runDay(): Promise<number> {
       resolved: false,
     }).run();
     console.log(`  [Injection] Crisis: ${injections.crisis.name}`);
+  }
+
+  // Cycle 4 PR 3 — process queued Nachtragshaushalt injections. Drains on
+  // the day AFTER Schuldenbremse-Aussetzung passed (R14 — same-day double-
+  // budget compounding is impossible by construction). Per S19, the regular
+  // budget cycle (`isBudgetDay()` flow) is a different code path — Nachtrags-
+  // haushalt enters EXCLUSIVELY here, never via step 11d.
+  if (injections.pendingNachtragshaushaltInjections && injections.pendingNachtragshaushaltInjections.length > 0) {
+    const govForNachtrag = getActiveGovernment();
+    if (!govForNachtrag) {
+      console.warn(`  [Nachtragshaushalt] injection drained with no government — skipping ${injections.pendingNachtragshaushaltInjections.length} item(s)`);
+    } else {
+      for (const injection of injections.pendingNachtragshaushaltInjections) {
+        const nachtragsEvents = processNachtragsInjection(
+          injection, allParties, govForNachtrag, nationalState,
+          allCrisesForInjection, currentDay,
+        );
+        for (const ev of nachtragsEvents) addEvent(dayEvents, ev);
+      }
+    }
   }
 
   // Apply injected economic shock

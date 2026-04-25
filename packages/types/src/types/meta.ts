@@ -70,7 +70,12 @@ export type SimulationEventType =
   // Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG fiscal emergency)
   | "schuldenbremse_aussetzung_proposed"
   | "schuldenbremse_aussetzung_passed"
-  | "schuldenbremse_aussetzung_rejected";
+  | "schuldenbremse_aussetzung_rejected"
+  // Cycle 4 PR 3 — Nachtragshaushalt (supplementary budget) consumed via
+  // pending_injections after a Schuldenbremse-Aussetzung passes (S19).
+  | "nachtragshaushalt_proposed"
+  | "nachtragshaushalt_passed"
+  | "nachtragshaushalt_rejected";
 
 export interface SimulationEvent {
   id: string;
@@ -100,7 +105,7 @@ export interface PartyHistoryEntry {
 
 export interface PendingInjection {
   id: string;
-  type: "crisis" | "election" | "economic_shock" | "invalidate_election" | "budget";
+  type: "crisis" | "election" | "economic_shock" | "invalidate_election" | "budget" | "nachtragshaushalt";
   data: Record<string, unknown>;
   consumed: boolean;
 }
