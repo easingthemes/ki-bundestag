@@ -129,6 +129,13 @@ export const IMPORTANT_EVENTS = [
   "aktuelle_stunde",
   "petition_quorum_reached",
   "petition_debated",
+  // Cycle 4 PR 1 — Untersuchungsausschuss filing + conclusion are headline-tier
+  // (S15). The intermediate `inquiry_hearing_held` events stay default/standard
+  // tier — they fire ~6–18 times per inquiry and would dominate the night-mode
+  // queue otherwise. Documented inline rather than added to ROUTINE_EVENTS so
+  // the standard-tier classification is intentional, not accidental.
+  "inquiry_filed",
+  "inquiry_concluded",
 ] as const;
 
 export const ROUTINE_EVENTS = [

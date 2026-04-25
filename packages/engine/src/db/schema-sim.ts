@@ -197,6 +197,13 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // action?" from a SQL query, instead of relying on console-log scraping.
   vertrauensfrageSuppressedTotal: integer("vertrauensfrage_suppressed_total").notNull().default(0),
   misstrauensvotumSuppressedTotal: integer("misstrauensvotum_suppressed_total").notNull().default(0),
+  // Cycle 4 PR 1 — last sim day on which a Untersuchungsausschuss was filed.
+  // Powers the S8 60-day rate-limit. NULL = no inquiry has been filed yet.
+  lastInquiryFiledDay: integer("last_inquiry_filed_day"),
+  // Cycle 4 PR 1 — idempotency flag for the cycle-4 migration block (S7).
+  // 1 = migration ran (table created, columns added, R15 backfill done),
+  // 0 = not yet (default for fresh DBs and pre-Cycle-4 DBs).
+  cycle4Migrated: integer("cycle4_migrated").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {
@@ -505,6 +512,27 @@ export const daySummaries = sqliteTable("day_summaries", {
   mood: text("mood"),
   preview: text("preview"),        // start-of-day preview (deterministic)
   createdAt: text("created_at").notNull(),
+});
+
+// Cycle 4 PR 1 — Untersuchungsausschuss (parliamentary inquiry committee).
+// Dedicated table per S11 (NOT reusing `committees` — different lifecycle, no
+// member-roster, no bill-routing role). At least one of `targetPartyId` /
+// `targetMinistry` must be non-null at filing time (S17 invariant, enforced
+// by `fileInquiry()` and asserted by tests).
+export const inquiryCommittees = sqliteTable("inquiry_committees", {
+  id: text("id").primaryKey(),
+  subject: text("subject").notNull(),
+  filingPartyId: text("filing_party_id").notNull().references(() => parties.id),
+  targetPartyId: text("target_party_id").references(() => parties.id),
+  targetMinistry: text("target_ministry"),
+  filedOnDay: integer("filed_on_day").notNull(),
+  scheduledEndDay: integer("scheduled_end_day").notNull(),
+  concludedOnDay: integer("concluded_on_day"),
+  status: text("status").notNull().default("active"),         // "active" | "concluded"
+  outcome: text("outcome"),                                    // "wrongdoing_found" | "cleared" | null while active
+  finalReport: text("final_report"),                           // populated at conclusion (S21)
+  hearingCount: integer("hearing_count").notNull().default(0),
+  lastHearingDay: integer("last_hearing_day"),
 });
 
 export const eraSummaries = sqliteTable("era_summaries", {

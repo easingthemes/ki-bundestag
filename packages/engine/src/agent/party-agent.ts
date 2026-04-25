@@ -4,7 +4,7 @@ import { logAICall } from "./ai-json.js";
 import { buildSystemPrompt, buildUserPrompt, buildValidationRetryPrompt } from "./prompt.js";
 import type { PartyCapabilities } from "./prompt.js";
 import { parseAgentResponse, validateActions } from "./action-parser.js";
-import type { ValidationResult } from "./action-parser.js";
+import type { InquiryValidationContext, ValidationResult } from "./action-parser.js";
 import type { BatchRequest, BatchResult } from "./batch-client.js";
 import type { Provider } from "./model-config.js";
 import type { DepthConfig } from "./context-depth.js";
@@ -34,6 +34,7 @@ async function attemptSemanticRetry(
   validationResult: ValidationResult,
   votableBills: Bill[],
   secondReadingBills: Bill[] | undefined,
+  inquiryContext?: InquiryValidationContext,
 ): Promise<{ actions: AgentAction[]; retried: boolean }> {
   const hasFixable = validationResult.errors.some(e => e.fixable);
   if (!hasFixable) {
@@ -66,6 +67,7 @@ async function attemptSemanticRetry(
       secondReadingBills,
       ctx.party.coalitionRole === "opposition",
       ctx.party.coalitionRole === "leader",
+      inquiryContext,
     );
 
     const retryOk = retryValidation.errors.length === 0;
@@ -103,6 +105,7 @@ export async function runPartyAgent(
   ctx: AgentContext,
   votableBills: Bill[],
   secondReadingBills?: Bill[],
+  inquiryContext?: InquiryValidationContext,
 ): Promise<AgentAction[]> {
   const systemPrompt = buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions);
   const userPrompt = buildUserPrompt(ctx);
@@ -144,6 +147,7 @@ export async function runPartyAgent(
       secondReadingBills,
       ctx.party.coalitionRole === "opposition",
       ctx.party.coalitionRole === "leader",
+      inquiryContext,
     );
 
     if (validationResult.errors.length > 0) {
@@ -154,7 +158,7 @@ export async function runPartyAgent(
 
     // Semantic retry: re-prompt once if there are fixable errors
     const { actions: finalActions } = await attemptSemanticRetry(
-      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills,
+      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills, inquiryContext,
     );
     return finalActions;
   } catch (error) {
@@ -219,6 +223,7 @@ export async function processPartyAgentResult(
   ctx: AgentContext,
   votableBills: Bill[],
   secondReadingBills?: Bill[],
+  inquiryContext?: InquiryValidationContext,
 ): Promise<AgentAction[]> {
   const abstainFallback = () => votableBills.map(bill => ({
     type: "vote" as const,
@@ -312,7 +317,7 @@ export async function processPartyAgentResult(
     const systemPrompt = buildSystemPrompt(ctx.party.id, deriveCapabilities(ctx), ctx.realPartyPositions);
     const userPrompt = buildUserPrompt(ctx);
     const { actions: finalActions } = await attemptSemanticRetry(
-      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills,
+      ctx, systemPrompt, userPrompt, validationResult, votableBills, secondReadingBills, inquiryContext,
     );
     return finalActions;
   }

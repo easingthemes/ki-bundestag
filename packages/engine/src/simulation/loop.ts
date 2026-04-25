@@ -67,6 +67,18 @@ import { answerPendingInterpellations } from "./interpellations.js";
 import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact, vertrauensfrageGateOpen, misstrauensvotumGateOpen, nextLowGovernmentApprovalStreak } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
+import {
+  fileInquiry, tickActiveInquiries, findInquiryOpportunity,
+  buildInquiryHearingBatchRequest, processInquiryHearingBatchResult,
+  buildInquiryFinalReportBatchRequest, processInquiryFinalReportBatchResult,
+  countActiveInquiries, countActiveInquiriesByParty,
+} from "./inquiry-committees.js";
+import { FRAKTION_THRESHOLD as FRAKTION_THRESHOLD_FOR_INQUIRY } from "./fraktionen.js";
+import {
+  INQUIRY_MAX_ACTIVE, INQUIRY_MIN_DAYS_BETWEEN_FILINGS, INQUIRY_THRESHOLD_PERCENT,
+} from "../config/parliament.js";
+import { BUNDESTAG_SIZE } from "../config/elections.js";
+import type { InquiryValidationContext } from "../agent/action-parser.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
@@ -1420,6 +1432,22 @@ export async function runDay(): Promise<number> {
       }
     }
 
+    // Cycle 4 PR 1 — compute the Untersuchungsausschuss opportunity flag (R5)
+    // and the per-day inquiry validation context base. The opportunity flag
+    // is shared across all opposition parties; only the `partyActiveInquiryCount`
+    // value of the validation context is per-party.
+    const inquiryOpportunity = findInquiryOpportunity(activeCrises, activeGov ?? null, allParties);
+    const inquiryActiveCount = countActiveInquiries();
+    const inquiryLastFiledDay = (() => {
+      try {
+        const row = getSqlite().prepare("SELECT last_inquiry_filed_day FROM simulation_meta LIMIT 1").get() as { last_inquiry_filed_day: number | null } | undefined;
+        return row?.last_inquiry_filed_day ?? null;
+      } catch { return null; }
+    })();
+    const oppositionFraktionSeats = allParties
+      .filter(p => !nationalState.coalitionParties.includes(p.id) && p.seatCount >= FRAKTION_THRESHOLD_FOR_INQUIRY)
+      .reduce((s, p) => s + p.seatCount, 0);
+
     // Build agent contexts for all parties
     const agentContexts: AgentContext[] = [];
     for (const party of allParties) {
@@ -1451,6 +1479,9 @@ export async function runDay(): Promise<number> {
         realWorldContext: realWorldCtx ?? undefined,
         realPartyPositions: depthConfig.enableKnowledgeGrounding ? (getPartyPositions(party.id) ?? undefined) : undefined,
         eraSummaries: hasEraSummaries ? eraSummaryList : undefined,
+        // Cycle 4 PR 1 — only opposition parties see the inquiry-opportunity
+        // flag. Coalition parties can't file inquiries against themselves.
+        inquiryOpportunity: party.coalitionRole === "opposition" && inquiryOpportunity ? inquiryOpportunity : undefined,
       });
     }
 
@@ -1472,7 +1503,20 @@ export async function runDay(): Promise<number> {
 
     for (const ctx of agentContexts) {
       const result = findResult(agentResults, `agent-${ctx.party.id}-day${currentDay}`);
-      const actions = await processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills);
+      // Cycle 4 PR 1 — per-party inquiry validation context. Same global
+      // numbers + per-party R8 cap snapshot.
+      const inquiryCtx: InquiryValidationContext = {
+        oppositionSeats: oppositionFraktionSeats,
+        currentDay,
+        activeInquiryCount: inquiryActiveCount,
+        partyActiveInquiryCount: countActiveInquiriesByParty(ctx.party.id),
+        lastInquiryFiledDay: inquiryLastFiledDay,
+        bundestagSize: BUNDESTAG_SIZE,
+        maxActive: INQUIRY_MAX_ACTIVE,
+        minDaysBetweenFilings: INQUIRY_MIN_DAYS_BETWEEN_FILINGS,
+        thresholdPercent: INQUIRY_THRESHOLD_PERCENT,
+      };
+      const actions = await processPartyAgentResult(result, ctx, thirdReadingBills, secondReadingBills, inquiryCtx);
       partyActions.set(ctx.party.id, actions);
     }
 
@@ -2176,9 +2220,83 @@ export async function runDay(): Promise<number> {
         constitutionalCourtApprovalImpact(struckDown, allParties, partyId, targetBill.proposedBy);
       }
     }
+
+    // 10g. Cycle 4 PR 1 — Untersuchungsausschuss filings.
+    //
+    // Validation already happened in `validateActions` (Fraktion gate, opposition
+    // gate, threshold gate, S9 cap, S8 rate-limit, S17 invariant, R8 per-party).
+    // The `fileInquiry` call defends-in-depth on S17/S8/S9 and throws if any
+    // invariant is violated (e.g. another party filed in the same tick — first
+    // one wins, second falls through into the throw).
+    let inquiryProcessed = false;
+    for (const [partyId, actions] of partyActions) {
+      for (const action of actions) {
+        if (action.type !== "file_inquiry_committee" || inquiryProcessed) continue;
+        try {
+          const { event } = fileInquiry(
+            {
+              filingPartyId: partyId,
+              subject: action.subject,
+              targetPartyId: action.targetPartyId ?? null,
+              targetMinistry: action.targetMinistry ?? null,
+            },
+            currentDay,
+            allParties,
+          );
+          inquiryProcessed = true;
+          addEvent(dayEvents, event);
+          console.log(`  [Inquiry] Filed by ${partyId}: "${action.subject}" → ${action.targetPartyId ?? action.targetMinistry}`);
+        } catch (err) {
+          console.warn(`  [Inquiry] fileInquiry rejected for ${partyId}: ${(err as Error).message}`);
+        }
+      }
+    }
   }
 
-  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes)
+  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries)
+
+  // 10g2. Cycle 4 PR 1 — Untersuchungsausschuss daily tick (hearings + watchdog +
+  // scheduled-end conclusions). The tick:
+  //   1. Applies the per-day target-party drag (S2)
+  //   2. Watchdog-concludes inquiries past `scheduledEndDay + grace` with no
+  //      hearing in the prior 60 days (Q9)
+  //   3. Concludes inquiries that hit `scheduledEndDay` (outcome via S1 roll)
+  //   4. Collects active hearings due today (every INQUIRY_HEARING_INTERVAL days)
+  //
+  // Conclusion events are emitted directly. Hearing events fire only after the
+  // AI summary returns from batch group D (graceful skip on batch failure —
+  // the watchdog will sweep stuck inquiries on a future day).
+  try {
+    const tickResult = tickActiveInquiries(currentDay, allParties, nationalState.coalitionParties);
+    for (const ev of tickResult.events) {
+      addEvent(dayEvents, ev);
+    }
+    // Build batch group D: hearing summaries + final reports for non-watchdog
+    // conclusions (watchdog conclusions get a templated description, no AI).
+    const hearingItems = buildInquiryHearingBatchRequest(tickResult.hearingsToBatch, currentDay);
+    const reportableConclusions = tickResult.concludedToReport.filter(c => !c.watchdog);
+    const reportItems = buildInquiryFinalReportBatchRequest(reportableConclusions, currentDay);
+    const groupD: import("../agent/batch-client.js").BatchRequest[] = [...hearingItems, ...reportItems];
+    if (groupD.length > 0) {
+      let groupDResults: import("../agent/batch-client.js").BatchResult[] = [];
+      try {
+        groupDResults = await submitBatch(groupD);
+      } catch (err) {
+        if (err instanceof AIProviderLimitError) {
+          console.warn(`  [Inquiry] batch group D blocked — ${err.message}`);
+        } else {
+          console.warn(`  [Inquiry] batch group D failed: ${(err as Error).message}`);
+        }
+      }
+      const hearingEvents = processInquiryHearingBatchResult(
+        groupDResults, tickResult.hearingsToBatch, currentDay,
+      );
+      for (const ev of hearingEvents) addEvent(dayEvents, ev);
+      processInquiryFinalReportBatchResult(groupDResults, reportableConclusions);
+    }
+  } catch (err) {
+    console.error("[Loop] Error in inquiry-committees tick:", err);
+  }
 
   // 10a2. Process MdB speeches (AI-evaluated: +0.1 / 0 / -0.1)
   try {

@@ -62,7 +62,11 @@ export type SimulationEventType =
   | "petition_created"
   | "petition_quorum_reached"
   | "petition_debated"
-  | "bill_ueberweisung_ohne_aussprache";
+  | "bill_ueberweisung_ohne_aussprache"
+  // Cycle 4 PR 1 — Untersuchungsausschuss lifecycle
+  | "inquiry_filed"
+  | "inquiry_hearing_held"
+  | "inquiry_concluded";
 
 export interface SimulationEvent {
   id: string;

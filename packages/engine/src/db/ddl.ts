@@ -503,6 +503,24 @@ export const SIM_TABLE_DDL = `
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS inquiry_committees (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    filing_party_id TEXT NOT NULL,
+    target_party_id TEXT,
+    target_ministry TEXT,
+    filed_on_day INTEGER NOT NULL,
+    scheduled_end_day INTEGER NOT NULL,
+    concluded_on_day INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    outcome TEXT,
+    final_report TEXT,
+    hearing_count INTEGER NOT NULL DEFAULT 0,
+    last_hearing_day INTEGER,
+    FOREIGN KEY (filing_party_id) REFERENCES parties(id),
+    FOREIGN KEY (target_party_id) REFERENCES parties(id)
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -734,6 +752,16 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   // calls is invisible (suppression only logs to console). Cumulative; no reset.
   { table: "simulation_meta", column: "vertrauensfrage_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0" },
   { table: "simulation_meta", column: "misstrauensvotum_suppressed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 4 — all schema additions ship here in PR 1 so the migrateDatabase()
+  // cycle4Migrated-guarded block (which only runs the R15 backfill + flag-set)
+  // can rely on the columns existing. PR 2/3 add Drizzle type declarations
+  // matching these but do NOT touch this array.
+  { table: "simulation_meta", column: "last_inquiry_filed_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_inquiry_filed_day INTEGER" },
+  { table: "simulation_meta", column: "cycle4_migrated", sql: "ALTER TABLE simulation_meta ADD COLUMN cycle4_migrated INTEGER NOT NULL DEFAULT 0" },
+  { table: "simulation_meta", column: "schuldenbremse_suspended_until_day", sql: "ALTER TABLE simulation_meta ADD COLUMN schuldenbremse_suspended_until_day INTEGER" },
+  { table: "simulation_meta", column: "provisional_budget_since_day", sql: "ALTER TABLE simulation_meta ADD COLUMN provisional_budget_since_day INTEGER" },
+  { table: "national_state", column: "schuldenbremse_suspended", sql: "ALTER TABLE national_state ADD COLUMN schuldenbremse_suspended INTEGER NOT NULL DEFAULT 0" },
+  { table: "inquiry_committees", column: "_table", sql: "CREATE TABLE IF NOT EXISTS inquiry_committees (id TEXT PRIMARY KEY, subject TEXT NOT NULL, filing_party_id TEXT NOT NULL REFERENCES parties(id), target_party_id TEXT REFERENCES parties(id), target_ministry TEXT, filed_on_day INTEGER NOT NULL, scheduled_end_day INTEGER NOT NULL, concluded_on_day INTEGER, status TEXT NOT NULL DEFAULT 'active', outcome TEXT, final_report TEXT, hearing_count INTEGER NOT NULL DEFAULT 0, last_hearing_day INTEGER)" },
 ];
 
 /** Column migrations for user DB */
@@ -779,6 +807,9 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_aktuelle_stunde_sessions_emitted", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_emitted ON aktuelle_stunde_sessions(emitted_on_day)" },
   { name: "idx_petitions_status_started", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_status_started ON petitions(status, started_on_day)" },
   { name: "idx_petitions_category", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_category ON petitions(category)" },
+  // Cycle 4 PR 1 — active-cap lookups + per-party cap (R8) queries.
+  { name: "idx_inquiry_committees_status", sql: "CREATE INDEX IF NOT EXISTS idx_inquiry_committees_status ON inquiry_committees(status)" },
+  { name: "idx_inquiry_committees_filing_party", sql: "CREATE INDEX IF NOT EXISTS idx_inquiry_committees_filing_party ON inquiry_committees(filing_party_id, status)" },
 ];
 
 /** Index migrations for user DB */
