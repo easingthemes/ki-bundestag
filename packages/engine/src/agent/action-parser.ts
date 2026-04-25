@@ -53,6 +53,25 @@ export interface InquiryValidationContext {
   thresholdPercent: number;
 }
 
+/**
+ * Cycle 4 PR 2 — context required to validate `propose_fiscal_emergency`.
+ *
+ * The justification gate matches the result of `findFiscalEmergencyOpportunity`
+ * — if that helper returned null, the agent cannot file. The cooldown gate
+ * blocks re-filing while a previous suspension is still in force (since
+ * cooldown == suspension duration, a coalition leader can re-file the day
+ * after expiry).
+ */
+export interface FiscalEmergencyValidationContext {
+  /** Whether the justification gate is open (a high-severity crisis exists OR
+   *  provisionalBudget streak ≥ 30 days). Computed by loop.ts. */
+  justified: boolean;
+  /** Sim day on which a previous Schuldenbremse-Aussetzung expires (or null). */
+  schuldenbremseSuspendedUntilDay: number | null;
+  /** Current sim day (for the cooldown check). */
+  currentDay: number;
+}
+
 const VALID_CATEGORIES: BillCategory[] = [
   "economy", "social", "environment", "immigration",
   "defense", "education", "healthcare", "infrastructure",
@@ -108,6 +127,7 @@ export function validateActions(
   isOpposition: boolean = false,
   isCoalitionLeader: boolean = false,
   inquiryContext?: InquiryValidationContext,
+  fiscalEmergencyContext?: FiscalEmergencyValidationContext,
 ): ValidationResult {
   const validated: AgentAction[] = [];
   const errors: ValidationError[] = [];
@@ -122,6 +142,7 @@ export function validateActions(
   let misstrauensvotumCount = 0;
   let constitutionalChallengeCount = 0;
   let inquiryCount = 0;
+  let fiscalEmergencyCount = 0;
   const votedBills = new Set<string>();
   const inParliament = hasFraktion;
 
@@ -475,6 +496,57 @@ export function validateActions(
           }
         }
         inquiryCount++;
+        validated.push(action);
+        break;
+      }
+
+      case "propose_fiscal_emergency": {
+        // Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG). Coalition
+        // leader only; vote happens same day; pass triggers Nachtragshaushalt
+        // (PR 3). Mirrors the `call_vertrauensfrage` validation shape.
+        if (!inParliament) {
+          console.warn(`[${partyId}] Fiscal emergency without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency proposals require Fraktion", fixable: false });
+          continue;
+        }
+        if (!isCoalitionLeader) {
+          console.warn(`[${partyId}] Fiscal emergency from non-coalition-leader, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Only the coalition leader may propose Schuldenbremse-Aussetzung (Art. 115 GG)", fixable: false });
+          continue;
+        }
+        if (activeElection) {
+          console.warn(`[${partyId}] Fiscal emergency during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency proposals not allowed during active election", fixable: false });
+          continue;
+        }
+        if (fiscalEmergencyCount >= 1) {
+          console.warn(`[${partyId}] More than 1 fiscal emergency proposal, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Maximum 1 fiscal emergency proposal per turn", fixable: true });
+          continue;
+        }
+        if (!action.title || !action.description || !action.justification) {
+          console.warn(`[${partyId}] Fiscal emergency missing title/description/justification, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency missing required title, description, or justification", fixable: false });
+          continue;
+        }
+        if (fiscalEmergencyContext) {
+          // Cooldown gate: can't re-file while a previous Aussetzung is still
+          // in force. Once it expires, the gate opens immediately.
+          if (fiscalEmergencyContext.schuldenbremseSuspendedUntilDay != null
+              && fiscalEmergencyContext.currentDay < fiscalEmergencyContext.schuldenbremseSuspendedUntilDay) {
+            const remaining = fiscalEmergencyContext.schuldenbremseSuspendedUntilDay - fiscalEmergencyContext.currentDay;
+            console.warn(`[${partyId}] Fiscal emergency blocked by cooldown (${remaining}d remaining)`);
+            errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: `Schuldenbremse already suspended until day ${fiscalEmergencyContext.schuldenbremseSuspendedUntilDay} (${remaining}d remaining); cannot re-file before expiry`, fixable: false });
+            continue;
+          }
+          // Justification gate: must match findFiscalEmergencyOpportunity.
+          if (!fiscalEmergencyContext.justified) {
+            console.warn(`[${partyId}] Fiscal emergency rejected — no justification (no high-severity crisis AND provisionalBudget streak < 30 days)`);
+            errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "No fiscal emergency justification (requires high-severity crisis OR provisionalBudget streak ≥ 30 days)", fixable: false });
+            continue;
+          }
+        }
+        fiscalEmergencyCount++;
         validated.push(action);
         break;
       }

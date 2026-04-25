@@ -66,7 +66,11 @@ export type SimulationEventType =
   // Cycle 4 PR 1 — Untersuchungsausschuss lifecycle
   | "inquiry_filed"
   | "inquiry_hearing_held"
-  | "inquiry_concluded";
+  | "inquiry_concluded"
+  // Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG fiscal emergency)
+  | "schuldenbremse_aussetzung_proposed"
+  | "schuldenbremse_aussetzung_passed"
+  | "schuldenbremse_aussetzung_rejected";
 
 export interface SimulationEvent {
   id: string;

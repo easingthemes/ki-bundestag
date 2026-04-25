@@ -77,6 +77,39 @@ export const PRESIDENTIAL_VETO_PROBABILITY = 0.0005;
 /** Approval penalty for proposer when bill is vetoed */
 export const VETO_PROPOSER_APPROVAL_PENALTY = 0.5;
 
+// ── Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG) ──────────
+
+/** Sim days a Schuldenbremse-Aussetzung remains in force (S3). 365 = annual
+ *  re-declaration matching real Bundestag practice. */
+export const SCHULDENBREMSE_SUSPENSION_DURATION = 365;
+
+/** Sim days the coalition must wait after a successful Aussetzung before
+ *  re-filing. Currently equal to `SCHULDENBREMSE_SUSPENSION_DURATION`, so the
+ *  cooldown only blocks while the suspension is active (re-filing immediately
+ *  on expiry is allowed; re-filing while still active extends the expiry). */
+export const FISCAL_EMERGENCY_COOLDOWN = 365;
+
+/** Min consecutive sim days `provisionalBudget === true` before the
+ *  fiscal-emergency justification gate opens (Q5). */
+export const FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS = 30;
+
+/** Vote-tally tuning for tallySchuldenbremseVote (S12). Pure constants —
+ *  no DB. Calibrated so that with sentiment 45 (baseline) and a high-severity
+ *  crisis active, opposition yes share is ~45% (alongside the 95% coalition
+ *  yes rate, suspension passes comfortably). With a low-severity crisis and
+ *  sentiment 20 (very low), suspension narrowly fails. */
+export const SCHULDENBREMSE_COALITION_YES_RATE = 0.95;
+export const SCHULDENBREMSE_OPPOSITION_YES_BASE = 0.15;
+/** Map crisis severity → opposition-yes-share boost. */
+export const SCHULDENBREMSE_SEVERITY_BOOSTS: Record<"low" | "medium" | "high", number> = {
+  low: 0.05,
+  medium: 0.15,
+  high: 0.30,
+};
+/** Cap on opposition yes share — even with max sentiment + high severity,
+ *  opposition unanimity is rare. */
+export const SCHULDENBREMSE_OPPOSITION_YES_CAP = 0.85;
+
 /** Random veto reason texts */
 export const VETO_REASONS = [
   "The Bundespräsident has expressed constitutional concerns about this legislation.",

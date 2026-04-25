@@ -1,4 +1,4 @@
-import type { BudgetAllocations, BudgetVote, BillImpact, EconomyState, Party, Bill } from "@ki-bundestag/types";
+import type { BudgetAllocations, BudgetVote, BillImpact, Crisis, CrisisSeverity, EconomyState, Party, Bill } from "@ki-bundestag/types";
 import {
   BUDGET_TOTAL, PARTY_MINISTRY_WEIGHTS, BUDGET_REVISION_CENTRIST_SHIFT,
   BUDGET_VOTE_TIERS, BUDGET_REVISION_BOOST,
@@ -8,7 +8,15 @@ import {
   BUDGET_DEFENCE_THRESHOLD, BUDGET_DEFENCE_GDP_EFFECT,
   PRESIDENTIAL_VETO_IMPACT_THRESHOLD, PRESIDENTIAL_VETO_PROBABILITY,
   VETO_REASONS,
+  SCHULDENBREMSE_SUSPENSION_DURATION,
+  SCHULDENBREMSE_COALITION_YES_RATE,
+  SCHULDENBREMSE_OPPOSITION_YES_BASE,
+  SCHULDENBREMSE_SEVERITY_BOOSTS,
+  SCHULDENBREMSE_OPPOSITION_YES_CAP,
+  FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS,
 } from "../config/index.js";
+import { getDb, getSqlite, schema } from "../db/index.js";
+import { MAJORITY_SEATS } from "../config/elections.js";
 
 // Re-export for external consumers
 export { BUDGET_TOTAL } from "../config/index.js";
@@ -193,3 +201,144 @@ export function shouldPresidentVeto(
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+// ── Cycle 4 PR 2 — Schuldenbremse-Aussetzung helpers ────────────────────
+
+/** Result returned by tallySchuldenbremseVote (S12). */
+export interface SchuldenbremseVoteResult {
+  yesVotes: number;
+  noVotes: number;
+  passed: boolean;
+}
+
+/**
+ * S12: simple-majority vote tally for Schuldenbremse-Aussetzung. One-shot
+ * (no revision concept — unlike tallyBudgetVote).
+ *
+ * Coalition typically yes (`SCHULDENBREMSE_COALITION_YES_RATE`); opposition
+ * yes share scales with public sentiment + crisis severity. Each Fraktion-
+ * bearing party rolls a Bernoulli — if yes, ALL the party's seats count yes
+ * (matches the codebase's whole-party voting model).
+ *
+ * Pure: accepts a seeded RNG for tests. Production uses Math.random.
+ *
+ * R2 caveat: real Bundestag requires QUALIFIED majority for Art. 115 GG
+ * suspension. We use simple majority as a pragmatic simplification (no
+ * qualified-majority primitive in the engine yet). Documented in the
+ * spec's Open Items as a Cycle 5+ refinement.
+ */
+export function tallySchuldenbremseVote(
+  parties: Party[],
+  coalitionPartyIds: string[],
+  publicSentiment: number,
+  crisisSeverity: CrisisSeverity | null,
+  rng: () => number = Math.random,
+): SchuldenbremseVoteResult {
+  const sentimentAdj = (publicSentiment - 45) / 100; // [-0.40, +0.30] over [5, 75]
+  const severityAdj = crisisSeverity ? SCHULDENBREMSE_SEVERITY_BOOSTS[crisisSeverity] : 0;
+  const oppositionYesShare = Math.min(
+    SCHULDENBREMSE_OPPOSITION_YES_CAP,
+    Math.max(0, SCHULDENBREMSE_OPPOSITION_YES_BASE + sentimentAdj + severityAdj),
+  );
+
+  const coalitionSet = new Set(coalitionPartyIds);
+  let yesVotes = 0;
+  let noVotes = 0;
+  for (const p of parties) {
+    if (p.seatCount <= 0) continue;
+    const yesProb = coalitionSet.has(p.id)
+      ? SCHULDENBREMSE_COALITION_YES_RATE
+      : oppositionYesShare;
+    if (rng() < yesProb) yesVotes += p.seatCount;
+    else noVotes += p.seatCount;
+  }
+  return { yesVotes, noVotes, passed: yesVotes >= MAJORITY_SEATS };
+}
+
+/**
+ * S3: applies the suspension flag + sets expiry on simulation_meta.
+ * Idempotent — re-filing while already suspended extends the expiry day
+ * (annual re-declaration matches real-world Bundestag practice).
+ */
+export function applySchuldenbremseAussetzung(currentDay: number): void {
+  const expiryDay = currentDay + SCHULDENBREMSE_SUSPENSION_DURATION;
+  getSqlite().transaction(() => {
+    getDb().update(schema.nationalState)
+      .set({ schuldenbremseSuspended: true })
+      .run();
+    getDb().update(schema.simulationMeta)
+      .set({ schuldenbremseSuspendedUntilDay: expiryDay })
+      .run();
+  })();
+}
+
+/**
+ * Q9 daily check. Auto-clears the suspension when the expiry day arrives.
+ * Returns true if the flag was cleared this tick (caller may emit an event,
+ * though the spec keeps the auto-restore moment silent — Open Item).
+ *
+ * No-op when:
+ *   - schuldenbremseSuspendedUntilDay is null (not suspended), OR
+ *   - currentDay < expiry.
+ */
+export function checkSchuldenbremseExpiry(currentDay: number): boolean {
+  const meta = getSqlite()
+    .prepare("SELECT schuldenbremse_suspended_until_day FROM simulation_meta LIMIT 1")
+    .get() as { schuldenbremse_suspended_until_day: number | null } | undefined;
+  if (!meta || meta.schuldenbremse_suspended_until_day == null) return false;
+  if (currentDay < meta.schuldenbremse_suspended_until_day) return false;
+
+  getSqlite().transaction(() => {
+    getDb().update(schema.nationalState)
+      .set({ schuldenbremseSuspended: false })
+      .run();
+    getDb().update(schema.simulationMeta)
+      .set({ schuldenbremseSuspendedUntilDay: null })
+      .run();
+  })();
+  return true;
+}
+
+/**
+ * Q5 / R5 heuristic: returns the populated AgentContext flag when the
+ * coalition leader has a justifiable case to propose Schuldenbremse-Aussetzung.
+ *
+ * Two paths:
+ *   1. Active high-severity crisis (any category) — populated with `activeCrisisId`.
+ *   2. provisionalBudget streak ≥ FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS days.
+ *
+ * Returns null when neither holds — coalition leader cannot file.
+ *
+ * Pure: takes the relevant slices of state directly so the helper is
+ * unit-testable without a DB. Loop computes `provisionalBudgetSinceDay`
+ * once per day and passes it in.
+ */
+export function findFiscalEmergencyOpportunity(
+  crises: Crisis[],
+  state: { provisionalBudget: boolean; schuldenbremseSuspended?: boolean },
+  provisionalBudgetSinceDay: number | null,
+  currentDay: number,
+): { activeCrisisId?: string; provisionalBudgetDays: number } | null {
+  // Already suspended → no point in opening the gate again. (Re-filing is
+  // technically allowed for expiry-extension but the agent prompt only
+  // surfaces the flag when there's a reason to file in the first place.)
+  if (state.schuldenbremseSuspended) return null;
+
+  const provisionalDays = state.provisionalBudget && provisionalBudgetSinceDay != null
+    ? Math.max(0, currentDay - provisionalBudgetSinceDay)
+    : 0;
+
+  // Path 1: high-severity crisis trumps everything.
+  const highSeverity = crises.find(c => c.severity === "high" && !c.resolved);
+  if (highSeverity) {
+    return { activeCrisisId: highSeverity.id, provisionalBudgetDays: provisionalDays };
+  }
+
+  // Path 2: provisional-budget streak.
+  if (provisionalDays >= FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS) {
+    return { provisionalBudgetDays: provisionalDays };
+  }
+
+  return null;
+}
+
