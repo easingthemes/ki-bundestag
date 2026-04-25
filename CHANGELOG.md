@@ -1,3 +1,18 @@
+# [1.11.0](https://github.com/easingthemes/ki-bundestag/compare/v1.10.0...v1.11.0) (2026-04-25)
+
+
+### Bug Fixes
+
+* **sim-fidelity:** PR [#165](https://github.com/easingthemes/ki-bundestag/issues/165) review round 1 — DDL hygiene, WHERE safety, error surfacing, polish ([78f8bf4](https://github.com/easingthemes/ki-bundestag/commit/78f8bf46d44753d906ecd38251f4c342995f9a77))
+
+
+### Features
+
+* **sim-fidelity:** Art. 115 GG fiscal emergency vote (Cycle 4 PR 2) ([3392620](https://github.com/easingthemes/ki-bundestag/commit/3392620813f0d121330f0b34af9dda0d4e28190f)), closes [hi#severity](https://github.com/hi/issues/severity) [hi#severity](https://github.com/hi/issues/severity)
+* **sim-fidelity:** Kurzintervention + Zwischenfrage + Erklärung zur Abstimmung (Cycle 4 PR 4) ([6ae567e](https://github.com/easingthemes/ki-bundestag/commit/6ae567e71b30ce450631df6dbc52c848a447ba38))
+* **sim-fidelity:** Nachtragshaushalt supplementary budget via emergency suspension (Cycle 4 PR 3) ([5c23452](https://github.com/easingthemes/ki-bundestag/commit/5c234521738f5815570b76570e61e0743452eec2))
+* **sim-fidelity:** Untersuchungsausschuss lifecycle + AI hearing summaries (Cycle 4 PR 1) ([18c2008](https://github.com/easingthemes/ki-bundestag/commit/18c2008ef465bfca0b68d3e20a06837e7b361847)), closes [hi#severity](https://github.com/hi/issues/severity)
+
 # [1.10.0](https://github.com/easingthemes/ki-bundestag/compare/v1.9.0...v1.10.0) (2026-04-25)
 
 
