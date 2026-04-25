@@ -29,6 +29,19 @@ export const SIM_TABLE_DDL = `
     original_impact TEXT,
     status_changed_on_day INTEGER,
     vetoed_by_president INTEGER NOT NULL DEFAULT 0,
+    stage_entry_day INTEGER,
+    stage_min_duration INTEGER,
+    stage_max_duration INTEGER,
+    is_complex_bill INTEGER NOT NULL DEFAULT 0,
+    bundesrat_state TEXT,
+    bundesrat_entry_day INTEGER,
+    ausfertigung_day INTEGER,
+    inkrafttreten_day INTEGER,
+    bundesrat_mode TEXT,
+    bundesrat_vote_result TEXT,
+    vermittlung_entry_day INTEGER,
+    vermittlung_min_duration INTEGER,
+    vermittlung_outcome TEXT,
     FOREIGN KEY (proposed_by) REFERENCES parties(id)
   );
 
@@ -79,7 +92,63 @@ export const SIM_TABLE_DDL = `
     new_coalition TEXT,
     new_opposition TEXT,
     negotiation_rounds TEXT,
-    coalition_agreement TEXT
+    coalition_agreement TEXT,
+    konstituierende_sitzung_day INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS kanzlerwahl (
+    id TEXT PRIMARY KEY,
+    election_id TEXT NOT NULL,
+    started_on_day INTEGER NOT NULL,
+    phase1 TEXT,
+    phase2_rounds TEXT NOT NULL DEFAULT '[]',
+    phase2_window_end_day INTEGER,
+    phase3 TEXT,
+    status TEXT NOT NULL,
+    elected_candidate_party_id TEXT,
+    elected_candidate_name TEXT,
+    amtseid_day INTEGER,
+    FOREIGN KEY (election_id) REFERENCES elections(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS parliamentary_qa_sessions (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    day INTEGER NOT NULL,
+    questions TEXT NOT NULL,
+    batch_request_id TEXT,
+    batch_attempts INTEGER NOT NULL DEFAULT 0,
+    answered_on_day INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS aktuelle_stunde_sessions (
+    id TEXT PRIMARY KEY,
+    scheduled_day INTEGER NOT NULL,
+    topic TEXT NOT NULL,
+    trigger_kind TEXT NOT NULL,
+    crisis_id TEXT,
+    government_party_id TEXT NOT NULL,
+    opposition_party_id TEXT NOT NULL,
+    positions TEXT,
+    batch_request_id TEXT,
+    batch_attempts INTEGER NOT NULL DEFAULT 0,
+    emitted_on_day INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS petitions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    author_display_name TEXT NOT NULL,
+    started_on_day INTEGER NOT NULL,
+    public_window_end_day INTEGER NOT NULL,
+    signature_count INTEGER NOT NULL DEFAULT 0,
+    signature_quorum INTEGER NOT NULL DEFAULT 30000,
+    status TEXT NOT NULL DEFAULT 'collecting',
+    quorum_reached_on_day INTEGER,
+    debated_on_day INTEGER,
+    outcome TEXT
   );
 
   CREATE TABLE IF NOT EXISTS simulation_meta (
@@ -97,7 +166,9 @@ export const SIM_TABLE_DDL = `
     timing_preset TEXT NOT NULL DEFAULT 'normal',
     context_depth TEXT NOT NULL DEFAULT 'normal',
     start_date TEXT,
-    bots_enabled INTEGER NOT NULL DEFAULT 1
+    bots_enabled INTEGER NOT NULL DEFAULT 1,
+    schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0,
+    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -620,6 +691,33 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "parties", column: "inactive_days", sql: "ALTER TABLE parties ADD COLUMN inactive_days INTEGER NOT NULL DEFAULT 0" },
   { table: "bot_question_pool", column: "_table", sql: "CREATE TABLE IF NOT EXISTS bot_question_pool (id TEXT PRIMARY KEY, question TEXT NOT NULL, topic TEXT NOT NULL, target_party_id TEXT NOT NULL REFERENCES parties(id), tags TEXT NOT NULL DEFAULT '[]', relevant_for_parties TEXT NOT NULL DEFAULT '[]', generated_on_day INTEGER NOT NULL, used_by_bot_id TEXT, used_on_day INTEGER)" },
   { table: "simulation_meta", column: "bots_enabled", sql: "ALTER TABLE simulation_meta ADD COLUMN bots_enabled INTEGER NOT NULL DEFAULT 1" },
+  // Cycle 1 (todo 043) — bill pipeline stage timing
+  { table: "bills", column: "stage_entry_day", sql: "ALTER TABLE bills ADD COLUMN stage_entry_day INTEGER" },
+  { table: "bills", column: "stage_min_duration", sql: "ALTER TABLE bills ADD COLUMN stage_min_duration INTEGER" },
+  { table: "bills", column: "stage_max_duration", sql: "ALTER TABLE bills ADD COLUMN stage_max_duration INTEGER" },
+  { table: "bills", column: "is_complex_bill", sql: "ALTER TABLE bills ADD COLUMN is_complex_bill INTEGER NOT NULL DEFAULT 0" },
+  { table: "bills", column: "bundesrat_state", sql: "ALTER TABLE bills ADD COLUMN bundesrat_state TEXT" },
+  { table: "bills", column: "bundesrat_entry_day", sql: "ALTER TABLE bills ADD COLUMN bundesrat_entry_day INTEGER" },
+  { table: "bills", column: "ausfertigung_day", sql: "ALTER TABLE bills ADD COLUMN ausfertigung_day INTEGER" },
+  { table: "bills", column: "inkrafttreten_day", sql: "ALTER TABLE bills ADD COLUMN inkrafttreten_day INTEGER" },
+  { table: "elections", column: "konstituierende_sitzung_day", sql: "ALTER TABLE elections ADD COLUMN konstituierende_sitzung_day INTEGER" },
+  // Cycle 2a (todo 043) — Bundesrat voting + Vermittlungsausschuss schema
+  { table: "bills", column: "bundesrat_mode", sql: "ALTER TABLE bills ADD COLUMN bundesrat_mode TEXT" },
+  { table: "bills", column: "bundesrat_vote_result", sql: "ALTER TABLE bills ADD COLUMN bundesrat_vote_result TEXT" },
+  { table: "bills", column: "vermittlung_entry_day", sql: "ALTER TABLE bills ADD COLUMN vermittlung_entry_day INTEGER" },
+  { table: "bills", column: "vermittlung_min_duration", sql: "ALTER TABLE bills ADD COLUMN vermittlung_min_duration INTEGER" },
+  { table: "bills", column: "vermittlung_outcome", sql: "ALTER TABLE bills ADD COLUMN vermittlung_outcome TEXT" },
+  // Cycle 2a (todo 043) — Kanzlerwahl table (idempotent create for upgrade path)
+  { table: "kanzlerwahl", column: "_table", sql: "CREATE TABLE IF NOT EXISTS kanzlerwahl (id TEXT PRIMARY KEY, election_id TEXT NOT NULL REFERENCES elections(id), started_on_day INTEGER NOT NULL, phase1 TEXT, phase2_rounds TEXT NOT NULL DEFAULT '[]', phase2_window_end_day INTEGER, phase3 TEXT, status TEXT NOT NULL, elected_candidate_party_id TEXT, elected_candidate_name TEXT, amtseid_day INTEGER)" },
+  // Cycle 2b (todo 043) — Parliamentary-QA sessions (Regierungsbefragung + Fragestunde)
+  { table: "parliamentary_qa_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS parliamentary_qa_sessions (id TEXT PRIMARY KEY, kind TEXT NOT NULL, day INTEGER NOT NULL, questions TEXT NOT NULL, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, answered_on_day INTEGER)" },
+  // Cycle 2b (todo 043) — Aktuelle Stunde sessions (crisis-hooked + baseline)
+  { table: "aktuelle_stunde_sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS aktuelle_stunde_sessions (id TEXT PRIMARY KEY, scheduled_day INTEGER NOT NULL, topic TEXT NOT NULL, trigger_kind TEXT NOT NULL, crisis_id TEXT, government_party_id TEXT NOT NULL, opposition_party_id TEXT NOT NULL, positions TEXT, batch_request_id TEXT, batch_attempts INTEGER NOT NULL DEFAULT 0, emitted_on_day INTEGER)" },
+  // Cycle 2b (todo 043) — Schriftliche-Einzelfragen cumulative counters on simulation_meta
+  { table: "simulation_meta", column: "schriftliche_einzelfragen_filed_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0" },
+  { table: "simulation_meta", column: "schriftliche_einzelfragen_answered_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 2b (todo 043) — Petitions (öffentliche E-Petitionen)
+  { table: "petitions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS petitions (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL, author_display_name TEXT NOT NULL, started_on_day INTEGER NOT NULL, public_window_end_day INTEGER NOT NULL, signature_count INTEGER NOT NULL DEFAULT 0, signature_quorum INTEGER NOT NULL DEFAULT 30000, status TEXT NOT NULL DEFAULT 'collecting', quorum_reached_on_day INTEGER, debated_on_day INTEGER, outcome TEXT)" },
 ];
 
 /** Column migrations for user DB */
@@ -659,6 +757,12 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_lobbying_events_party", sql: "CREATE INDEX IF NOT EXISTS idx_lobbying_events_party ON lobbying_events(target_party_id)" },
   { name: "idx_party_donations_party", sql: "CREATE INDEX IF NOT EXISTS idx_party_donations_party ON party_donations(party_id)" },
   { name: "idx_party_donations_day", sql: "CREATE INDEX IF NOT EXISTS idx_party_donations_day ON party_donations(day_number)" },
+  { name: "idx_parliamentary_qa_sessions_day", sql: "CREATE INDEX IF NOT EXISTS idx_parliamentary_qa_sessions_day ON parliamentary_qa_sessions(day)" },
+  { name: "idx_parliamentary_qa_sessions_answered", sql: "CREATE INDEX IF NOT EXISTS idx_parliamentary_qa_sessions_answered ON parliamentary_qa_sessions(answered_on_day)" },
+  { name: "idx_aktuelle_stunde_sessions_day", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_day ON aktuelle_stunde_sessions(scheduled_day)" },
+  { name: "idx_aktuelle_stunde_sessions_emitted", sql: "CREATE INDEX IF NOT EXISTS idx_aktuelle_stunde_sessions_emitted ON aktuelle_stunde_sessions(emitted_on_day)" },
+  { name: "idx_petitions_status_started", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_status_started ON petitions(status, started_on_day)" },
+  { name: "idx_petitions_category", sql: "CREATE INDEX IF NOT EXISTS idx_petitions_category ON petitions(category)" },
 ];
 
 /** Index migrations for user DB */

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { shouldTriggerElection, calculateResults, formGovernment, ELECTION_COOLDOWN_DAYS } from "./elections.js";
+import {
+  shouldTriggerElection,
+  calculateResults,
+  formGovernment,
+  ELECTION_COOLDOWN_DAYS,
+  computeKonstituierendeSitzungDay,
+  KONSTITUIERENDE_SITZUNG_MAX_OFFSET,
+} from "./elections.js";
 import type { Election, Party, PolicyPriorities } from "@ki-bundestag/types";
 
 const POLICY: PolicyPriorities = { economy: 5, social: 5, environment: 5, immigration: 5, spending: 5 };
@@ -73,6 +80,31 @@ describe("shouldTriggerElection", () => {
 
   it("cooldown period is 30 days", () => {
     expect(ELECTION_COOLDOWN_DAYS).toBe(30);
+  });
+});
+
+describe("computeKonstituierendeSitzungDay", () => {
+  const start = new Date(2025, 0, 1);
+
+  it("targets electionDay + 21 when no calendar awareness is needed", () => {
+    expect(computeKonstituierendeSitzungDay(100)).toBe(121);
+  });
+
+  it("never returns later than electionDay + 30 (Art. 39 Abs. 2 GG)", () => {
+    for (let electionDay = 0; electionDay < 365; electionDay++) {
+      const ks = computeKonstituierendeSitzungDay(electionDay, start);
+      expect(ks - electionDay).toBeLessThanOrEqual(KONSTITUIERENDE_SITZUNG_MAX_OFFSET);
+      expect(ks - electionDay).toBeGreaterThanOrEqual(21);
+    }
+  });
+
+  it("snaps off weekends/holidays when startDate is provided", () => {
+    // Election on Sun 2025-09-28 → +21 = Sun 2025-10-19 → snap to Mon Oct 20
+    const electionDay = Math.round((new Date(2025, 8, 28).getTime() - start.getTime()) / 86_400_000);
+    const ks = computeKonstituierendeSitzungDay(electionDay, start);
+    const ksDate = new Date(start.getTime() + ks * 86_400_000);
+    expect(ksDate.getDay()).not.toBe(0); // not Sunday
+    expect(ksDate.getDay()).not.toBe(6); // not Saturday
   });
 });
 

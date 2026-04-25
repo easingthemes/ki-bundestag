@@ -105,3 +105,63 @@ export const VALID_MOODS: string[] = [
   "Stabile Mehrheit", "Koalitionsreibung", "Politischer Druck",
   "Krisenreaktion", "Wahlkampf", "Haushaltsstreit", "Regierungswechsel",
 ];
+
+// ── Bill pipeline stage durations ───────────────────────────────────
+/**
+ * Per-stage minimum dwell time (in sim days) before a bill can advance.
+ *
+ * Committee phase has two tiers:
+ *   - ordinary: 6–12 weeks (matches 20. WP median)
+ *   - complex:  3–6 months (constitutional amendments, structural reforms)
+ *
+ * First/second readings advance on the next Sitzungstag (gating handled by
+ * the pipeline). Third reading follows the second on the same sitting day
+ * (GO-BT §81 — standard practice is 2./3. Lesung back-to-back).
+ */
+export const BILL_STAGE_DURATIONS = {
+  proposed:       { min: 0, max: 0 },
+  first_reading:  { min: 1, max: 1 },
+  committee: {
+    ordinary: { min: 42, max: 84 },
+    complex:  { min: 90, max: 180 },
+  },
+  second_reading: { min: 1, max: 1 },
+  third_reading:  { min: 0, max: 0 },
+} as const;
+
+/**
+ * Baseline probability that a newly-proposed bill is drawn on the complex
+ * committee tier. Reserved for constitutional amendments, Steuerreformen,
+ * Rentenreformen. Actual categorisation heuristic lives in bill-pipeline.ts.
+ */
+export const COMPLEX_BILL_PROBABILITY = 0.15;
+
+// ── Post-3rd-reading timing ─────────────────────────────────────────
+/**
+ * Bundesrat 2. Durchgang window (sim days). Cycle 1 models the phase as a
+ * dwell timer only — Zustimmungsgesetz / Einspruchsgesetz and Vermittlungs-
+ * ausschuss voting logic are P1. Real range per 20. WP: 3–6 weeks.
+ */
+export const BUNDESRAT_DURATION = { min: 21, max: 42 } as const;
+
+/** Ausfertigung (Kanzler + ressortverantwortlicher Minister signature) + Verkündung im BGBl. */
+export const AUSFERTIGUNG_DURATION = { min: 14, max: 42 } as const;
+
+/** Default offset between Verkündung and Inkrafttreten when the bill doesn't specify. */
+export const INKRAFTTRETEN_OFFSET = 14;
+
+// ── Parliamentary calendar ──────────────────────────────────────────
+/**
+ * Abstract calendar rule: even ISO weeks are Sitzungswochen, minus recess
+ * periods, plus one forced Haushaltswoche per year. Matches real Bundestag
+ * density of ~20–22 sitting weeks per year without requiring an externally
+ * maintained Sitzungskalender JSON.
+ */
+export const CALENDAR = {
+  /** Expected Sitzungswochen per year (for reference / tests). */
+  SITZUNGS_WEEKS_PER_YEAR_TARGET: 22,
+  /** Month (0-indexed) that holds the Haushaltswoche. */
+  HAUSHALTS_WEEK_MONTH: 10, // November
+  /** 1-indexed ordinal of the Monday-week within HAUSHALTS_WEEK_MONTH. */
+  HAUSHALTS_WEEK_OF_MONTH: 2,
+} as const;

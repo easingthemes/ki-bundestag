@@ -32,6 +32,20 @@ export const bills = sqliteTable("bills", {
   vetoedByPresident: integer("vetoed_by_president", { mode: "boolean" }).default(false),
   memberInitiative: integer("member_initiative", { mode: "boolean" }).default(false),
   proposerDisplayName: text("proposer_display_name"),
+  stageEntryDay: integer("stage_entry_day"),
+  stageMinDuration: integer("stage_min_duration"),
+  stageMaxDuration: integer("stage_max_duration"),
+  isComplexBill: integer("is_complex_bill", { mode: "boolean" }).default(false),
+  bundesratState: text("bundesrat_state"),
+  bundesratEntryDay: integer("bundesrat_entry_day"),
+  ausfertigungDay: integer("ausfertigung_day"),
+  inkrafttretenDay: integer("inkrafttreten_day"),
+  // Cycle 2a — Bundesrat voting + Vermittlungsausschuss
+  bundesratMode: text("bundesrat_mode"),
+  bundesratVoteResult: text("bundesrat_vote_result", { mode: "json" }),
+  vermittlungEntryDay: integer("vermittlung_entry_day"),
+  vermittlungMinDuration: integer("vermittlung_min_duration"),
+  vermittlungOutcome: text("vermittlung_outcome"),
 });
 
 export const nationalState = sqliteTable("national_state", {
@@ -82,6 +96,70 @@ export const elections = sqliteTable("elections", {
   newOpposition: text("new_opposition", { mode: "json" }),
   negotiationRounds: text("negotiation_rounds", { mode: "json" }),
   coalitionAgreement: text("coalition_agreement", { mode: "json" }),
+  konstituierendeSitzungDay: integer("konstituierende_sitzung_day"),
+});
+
+// Cycle 2a — Kanzlerwahl (Art. 63 GG) 3-phase chancellor election.
+export const kanzlerwahl = sqliteTable("kanzlerwahl", {
+  id: text("id").primaryKey(),
+  electionId: text("election_id").notNull().references(() => elections.id),
+  startedOnDay: integer("started_on_day").notNull(),
+  phase1: text("phase1", { mode: "json" }),
+  phase2Rounds: text("phase2_rounds", { mode: "json" }).notNull().default("[]"),
+  phase2WindowEndDay: integer("phase2_window_end_day"),
+  phase3: text("phase3", { mode: "json" }),
+  status: text("status").notNull(),
+  electedCandidatePartyId: text("elected_candidate_party_id"),
+  electedCandidateName: text("elected_candidate_name"),
+  amtseidDay: integer("amtseid_day"),
+});
+
+// Cycle 2b — Parliamentary-QA (Regierungsbefragung + Fragestunde).
+// One row per session. `questions` holds the Q+A list (JSON). `answered_on_day`
+// is set when the weekly AI batch result is processed back onto the row.
+export const parliamentaryQaSessions = sqliteTable("parliamentary_qa_sessions", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  day: integer("day").notNull(),
+  questions: text("questions", { mode: "json" }).notNull(),
+  batchRequestId: text("batch_request_id"),
+  batchAttempts: integer("batch_attempts").notNull().default(0),
+  answeredOnDay: integer("answered_on_day"),
+});
+
+// Cycle 2b — Petitions (öffentliche E-Petitionen). One row per petition.
+export const petitions = sqliteTable("petitions", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  authorDisplayName: text("author_display_name").notNull(),
+  startedOnDay: integer("started_on_day").notNull(),
+  publicWindowEndDay: integer("public_window_end_day").notNull(),
+  signatureCount: integer("signature_count").notNull().default(0),
+  signatureQuorum: integer("signature_quorum").notNull().default(30_000),
+  status: text("status").notNull().default("collecting"),
+  quorumReachedOnDay: integer("quorum_reached_on_day"),
+  debatedOnDay: integer("debated_on_day"),
+  outcome: text("outcome"),
+});
+
+// Cycle 2b — Aktuelle Stunde (crisis-hooked + baseline). One row per session.
+// `positions` holds {government, opposition} AI-generated statements, null
+// until the weekly batch result lands. `emitted_on_day` is set when the event
+// has been fired into simulation_events on/after `scheduled_day`.
+export const aktuelleStundeSessions = sqliteTable("aktuelle_stunde_sessions", {
+  id: text("id").primaryKey(),
+  scheduledDay: integer("scheduled_day").notNull(),
+  topic: text("topic").notNull(),
+  triggerKind: text("trigger_kind").notNull(),
+  crisisId: text("crisis_id"),
+  governmentPartyId: text("government_party_id").notNull(),
+  oppositionPartyId: text("opposition_party_id").notNull(),
+  positions: text("positions", { mode: "json" }),
+  batchRequestId: text("batch_request_id"),
+  batchAttempts: integer("batch_attempts").notNull().default(0),
+  emittedOnDay: integer("emitted_on_day"),
 });
 
 export const simulationMeta = sqliteTable("simulation_meta", {
@@ -100,6 +178,9 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   contextDepth: text("context_depth").notNull().default("normal"),
   startDate: text("start_date"),
   botsEnabled: integer("bots_enabled").notNull().default(1),
+  // Cycle 2b — Schriftliche-Einzelfragen cumulative counters (PR 7).
+  schriftlicheEinzelfragenFiledTotal: integer("schriftliche_einzelfragen_filed_total").notNull().default(0),
+  schriftlicheEinzelfragenAnsweredTotal: integer("schriftliche_einzelfragen_answered_total").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {

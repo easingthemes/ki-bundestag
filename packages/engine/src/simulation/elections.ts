@@ -6,7 +6,7 @@ import type {
   SimulationEvent,
 } from "@ki-bundestag/types";
 import { TIME_CONFIG } from "./timing.js";
-import { snapToNextSunday } from "./calendar.js";
+import { snapToNextSunday, snapToNextWorkday } from "./calendar.js";
 import {
   TOTAL_SEATS,
   MAJORITY_SEATS,
@@ -17,6 +17,26 @@ import {
 
 // Re-export for external consumers
 export { ELECTION_COOLDOWN_DAYS } from "../config/index.js";
+
+/**
+ * Konstituierende Sitzung — Art. 39 Abs. 2 GG: spätestens 30 Tage nach der Wahl.
+ *
+ * We pick electionDay + 21 (mid-range), snap to the next workday so the formal
+ * sitting doesn't fall on a weekend or public holiday, then clamp to the +30
+ * constitutional ceiling.
+ */
+export const KONSTITUIERENDE_SITZUNG_TARGET_OFFSET = 21;
+export const KONSTITUIERENDE_SITZUNG_MAX_OFFSET = 30;
+
+export function computeKonstituierendeSitzungDay(
+  electionDay: number,
+  startDate?: Date,
+): number {
+  const target = electionDay + KONSTITUIERENDE_SITZUNG_TARGET_OFFSET;
+  const ceiling = electionDay + KONSTITUIERENDE_SITZUNG_MAX_OFFSET;
+  const candidate = startDate ? snapToNextWorkday(target, startDate) : target;
+  return Math.min(candidate, ceiling);
+}
 
 // Gaussian noise using Box-Muller transform
 function gaussianNoise(stddev: number): number {
