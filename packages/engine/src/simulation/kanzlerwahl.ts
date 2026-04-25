@@ -2,7 +2,7 @@
  * Kanzlerwahl (Art. 63 GG) — 3-phase chancellor election, pure state machine.
  *
  *   Phase 1: Bundeskanzler-Kandidat from the coalition agreement stands for a
- *            Kanzlermehrheit vote (>= 368 seats).
+ *            Kanzlermehrheit vote (>= MAJORITY_SEATS, currently 316 of 630).
  *   Phase 2: 14-day window (KANZLERWAHL_PHASE2_WINDOW_DAYS) for further absolute-
  *            majority rounds. Sim-cap at KANZLERWAHL_PHASE2_MAX_ROUNDS to prevent
  *            runaway rounds. Candidate picked per round from the next-largest

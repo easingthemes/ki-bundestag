@@ -23,7 +23,7 @@ export interface ConfidenceTallyResult {
  * Vertrauensfrage: Chancellor requests confidence.
  * Coalition votes YES with 90% probability (10% defection risk).
  * Opposition always votes NO.
- * Passes if yesSeats >= 368.
+ * Passes if yesSeats >= MAJORITY_SEATS (currently 316 of 630).
  */
 export function tallyVertrauensfrage(
   allParties: Party[],
@@ -62,7 +62,7 @@ export function tallyVertrauensfrage(
  * Konstruktives Misstrauensvotum: Opposition proposes replacement Chancellor.
  * Proposing party always YES. Other opposition YES with 85% probability.
  * Coalition always NO.
- * Passes if yesSeats >= 368 → new government formed without election.
+ * Passes if yesSeats >= MAJORITY_SEATS → new government formed without election.
  */
 export function tallyMisstrauensvotum(
   allParties: Party[],

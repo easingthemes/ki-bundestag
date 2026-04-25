@@ -218,7 +218,7 @@ export function migrateDatabase() {
     if (electionCount.cnt === 0 && partyRows.length > 0 && partyRows.some(p => p.seat_count > 0)) {
       const coalition = partyRows.filter(p => p.coalition_role === "leader" || p.coalition_role === "junior").map(p => p.id);
       const opposition = partyRows.filter(p => p.coalition_role === "opposition").map(p => p.id);
-      const results = partyRows.map(p => ({ partyId: p.id, seatsWon: p.seat_count, voteShare: +(p.seat_count / 735 * 100).toFixed(1) }));
+      const results = partyRows.map(p => ({ partyId: p.id, seatsWon: p.seat_count, voteShare: +(p.seat_count / BUNDESTAG_SIZE * 100).toFixed(1) }));
       const electionId = "election-initial";
 
       sqlite.prepare(

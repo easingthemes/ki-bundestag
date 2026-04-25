@@ -659,6 +659,13 @@ export async function runDay(): Promise<number> {
         .where(eq(schema.elections.id, activeElection.id))
         .run();
 
+      // Cycle 3 PR 4 — clear negotiation dwell tracker on safety-net completion
+      // so the column semantic ("NULL when no negotiation in flight") holds.
+      db.update(schema.simulationMeta)
+        .set({ lastNegotiationRoundDay: null } as any)
+        .where(eq(schema.simulationMeta.id, meta.id))
+        .run();
+
       for (const result of activeElection.results!) {
         const role = coalition[0] === result.partyId
           ? "leader"
@@ -827,6 +834,13 @@ export async function runDay(): Promise<number> {
           newOpposition: opposition as any,
         })
         .where(eq(schema.elections.id, activeElection.id))
+        .run();
+
+      // Cycle 3 PR 4 — clear negotiation dwell tracker on normal completion
+      // so the column semantic ("NULL when no negotiation in flight") holds.
+      db.update(schema.simulationMeta)
+        .set({ lastNegotiationRoundDay: null } as any)
+        .where(eq(schema.simulationMeta.id, meta.id))
         .run();
 
       // Update party seats and roles
