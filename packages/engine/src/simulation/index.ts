@@ -27,4 +27,6 @@ export { shouldFetchKnowledge, fetchAllSources, buildKnowledgeDigestRequest, pro
 export { shouldGenerateSidejobs, buildSidejobBatchRequest, processSidejobResult, applySidejobScandalImpact } from "./sidejobs.js";
 export { dayToDate, easterSunday, germanPublicHolidays, isWeekend, isPublicHoliday, getPublicHoliday, isWorkday, snapToNextWorkday, snapToNextSunday, isRecessDay, isRealisticSessionDay, getHolidaysInRange } from "./calendar.js";
 export type { PublicHoliday } from "./calendar.js";
+export { isSitzungsWoche, isSitzungsTag, nextSitzungsTag, isHaushaltsWoche, getWeekdaySemantic } from "./parliament-calendar.js";
+export type { WeekdaySemantic } from "./parliament-calendar.js";
 export { calculateMatch, calculateAllMatches, type QuizAnswer, type QuizResult } from "./quiz-match.js";

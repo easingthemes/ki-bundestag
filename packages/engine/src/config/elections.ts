@@ -19,6 +19,14 @@ export const ELECTION_COOLDOWN_DAYS = 30;
 /** Consecutive low-sentiment days needed to trigger snap election */
 export const LOW_SENTIMENT_STREAK_THRESHOLD = 5;
 
+// ── Kanzlerwahl (Art. 63 GG, Cycle 2a) ───────────────────────────────
+/** Phase-2 window (Art. 63 Abs. 3 GG): 14 days for parliament to elect a
+ *  Chancellor with absolute majority before the final phase triggers. */
+export const KANZLERWAHL_PHASE2_WINDOW_DAYS = 14;
+/** Sim-only cap to prevent infinite Phase-2 rounds when the AI keeps losing
+ *  ties. Real Art. 63 has no explicit round cap but sim drama needs one. */
+export const KANZLERWAHL_PHASE2_MAX_ROUNDS = 3;
+
 /**
  * Parties that all others refuse to form a coalition with (Brandmauer).
  * Only considered as a last resort when no other majority is possible.

@@ -4,6 +4,7 @@ import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/governme
 import { getHumanSeatRatio } from "../simulation/timing.js";
 import { PARTIES, INITIAL_NATIONAL_STATE } from "./seed-data.js";
 import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS, SIM_INDEX_MIGRATIONS, USER_INDEX_MIGRATIONS } from "./ddl.js";
+import { BUNDESRAT_MODE_BY_CATEGORY } from "../config/bundesrat.js";
 
 /**
  * Ensure all tables and columns exist without touching data.
@@ -49,6 +50,101 @@ export function migrateDatabase() {
     }
   } catch {
     // bills table might not have the new columns yet
+  }
+
+  // Cycle 1 (todo 043) — backfill bill stage timing for in-flight bills.
+  // Idempotent: each UPDATE is guarded by WHERE col IS NULL.
+  try {
+    // 1. stage_entry_day defaults to status_changed_on_day, falling back to proposed_on_day
+    const entryBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_entry_day = COALESCE(status_changed_on_day, proposed_on_day) WHERE stage_entry_day IS NULL",
+    ).run();
+    if (entryBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled stage_entry_day on ${entryBackfill.changes} bill(s)`);
+    }
+
+    // 2. Committee-stage bills without a drawn stage_min_duration — assign
+    //    the ordinary-tier minimum (42 days). Existing bills already past this
+    //    threshold will simply advance on the next Sitzungstag, which matches
+    //    the Cycle 1 spec Q3 ("backfill + force-advance").
+    const committeeBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_min_duration = 42, stage_max_duration = 84 WHERE status = 'committee' AND stage_min_duration IS NULL",
+    ).run();
+    if (committeeBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled committee stage_min_duration on ${committeeBackfill.changes} bill(s)`);
+    }
+
+    // 2b. 1st/2nd reading bills get the 1-day min/max from BILL_STAGE_DURATIONS.
+    //     Pipeline reads from config directly, so this is cosmetic parity with
+    //     committee rows — keeps row-level state self-describing and makes DB
+    //     inspection less ambiguous. third_reading excluded: legacy rows there
+    //     may be mid-tally, pre-tally, or post-vote, and their intended
+    //     stage_min_duration depends on which sub-phase they're in.
+    const readingBackfill = sqlite.prepare(
+      "UPDATE bills SET stage_min_duration = 1, stage_max_duration = 1 WHERE status IN ('first_reading','second_reading') AND stage_min_duration IS NULL",
+    ).run();
+    if (readingBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled reading-stage stage_min_duration on ${readingBackfill.changes} bill(s)`);
+    }
+
+    // 3. Pre-PR-3 passed bills: treat as already in force (Inkrafttreten == status change day).
+    //    Impact was applied at the old bill_passed emission point so no re-application needed.
+    const passedBackfill = sqlite.prepare(
+      "UPDATE bills SET bundesrat_state = 'cleared', inkrafttreten_day = COALESCE(status_changed_on_day, proposed_on_day) WHERE status = 'passed' AND bundesrat_state IS NULL",
+    ).run();
+    if (passedBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled Bundesrat/Inkrafttreten state on ${passedBackfill.changes} already-passed bill(s)`);
+    }
+  } catch {
+    // bills table might not have the new columns yet on very old DBs
+  }
+
+  // Cycle 2a (todo 043) — backfill bundesrat_mode from category using the
+  // canonical BUNDESRAT_MODE_BY_CATEGORY map so the SQL CASE stays in sync
+  // with code. Historical rows get NULL if the table predates the column.
+  // Idempotent: guarded by WHERE bundesrat_mode IS NULL.
+  //
+  // Migration steps 3–5 from the Cycle 2a spec (in-flight vote result, pending
+  // dwell, cleared state) are intentional no-ops: no retroactive vote emission
+  // for bills already past the voting gate, and in-flight pending rows just
+  // vote when dwell expires on the next pipeline tick.
+
+  // Cycle 2a (todo 043) — synthetic kanzlerwahl rows for pre-PR-4 active
+  // governments. Without this, the new KS-gate Phase-1 trigger would re-fire
+  // on the next sim day for terms that already had formCabinet() run. Load-
+  // bearing only if the strict === guards are ever loosened to >= — see the
+  // spec migration section for the invariant. Idempotent: WHERE NOT EXISTS.
+  try {
+    const activeGovs = sqlite.prepare(
+      "SELECT election_id, chancellor_party_id, chancellor_name, formed_on_day FROM government WHERE active = 1 AND election_id IS NOT NULL",
+    ).all() as Array<{ election_id: string; chancellor_party_id: string; chancellor_name: string; formed_on_day: number }>;
+    let inserted = 0;
+    for (const gov of activeGovs) {
+      const hasKw = sqlite.prepare(
+        "SELECT 1 FROM kanzlerwahl WHERE election_id = ?",
+      ).get(gov.election_id);
+      if (hasKw) continue;
+      sqlite.prepare(
+        "INSERT INTO kanzlerwahl (id, election_id, started_on_day, phase1, phase2_rounds, phase2_window_end_day, phase3, status, elected_candidate_party_id, elected_candidate_name, amtseid_day) VALUES (?, ?, ?, NULL, '[]', NULL, NULL, 'elected', ?, ?, ?)",
+      ).run(`kw-migrate-${gov.election_id}`, gov.election_id, gov.formed_on_day, gov.chancellor_party_id, gov.chancellor_name, gov.formed_on_day);
+      inserted++;
+    }
+    if (inserted > 0) {
+      console.log(`[Migrate] Backfilled ${inserted} synthetic kanzlerwahl row(s) for pre-Cycle-2a active governments`);
+    }
+  } catch { /* government or kanzlerwahl table may not exist on fresh DBs */ }
+  try {
+    const cases = Object.entries(BUNDESRAT_MODE_BY_CATEGORY)
+      .map(([cat, mode]) => `WHEN '${cat}' THEN '${mode}'`)
+      .join(" ");
+    const modeBackfill = sqlite.prepare(
+      `UPDATE bills SET bundesrat_mode = CASE category ${cases} END WHERE bundesrat_mode IS NULL`,
+    ).run();
+    if (modeBackfill.changes > 0) {
+      console.log(`[Migrate] Backfilled bundesrat_mode on ${modeBackfill.changes} bill(s)`);
+    }
+  } catch {
+    // bundesrat_mode column may not exist yet on very old DBs
   }
 
   // Auto-populate fraktionen if table exists but is empty and parties have seats

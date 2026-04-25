@@ -4,6 +4,7 @@ import {
   AMENDMENT_OPPOSITION_YES_RATE,
   AMENDMENT_CROSS_YES_RATE,
   DISCIPLINE_FORCE_LEVEL,
+  MAJORITY_SEATS,
 } from "../config/index.js";
 
 export interface MdbVoteEntry {
@@ -193,4 +194,41 @@ export function applyAmendmentToBill(bill: Bill, amendment: Amendment): void {
   if (change.inflation != null) bill.impact.inflation = (bill.impact.inflation ?? 0) + change.inflation;
   if (change.gdpGrowth != null) bill.impact.gdpGrowth = (bill.impact.gdpGrowth ?? 0) + change.gdpGrowth;
   if (change.publicSentiment != null) bill.impact.publicSentiment = (bill.impact.publicSentiment ?? 0) + change.publicSentiment;
+}
+
+/**
+ * Tally a Kanzlerwahl vote (Art. 63 GG) on a single chancellor candidate.
+ *
+ * Voting pattern (Fraktionsdisziplin):
+ *   - Candidate's own party: yes.
+ *   - Other coalition parties: yes IFF the candidate is in the coalition.
+ *   - Everyone else: no.
+ *
+ * Modes:
+ *   - "absolute": passes if yes >= MAJORITY_SEATS (Kanzlermehrheit, Art. 63 Abs. 1/3).
+ *   - "relative": passes if yes > no (Art. 63 Abs. 4 Satz 2; strict).
+ */
+export function tallyChancellorVote(
+  candidatePartyId: string,
+  parties: Party[],
+  coalitionParties: string[],
+  mode: "absolute" | "relative",
+): { yes: number; no: number; abstain: number; passed: boolean } {
+  const candidateInCoalition = coalitionParties.includes(candidatePartyId);
+  let yes = 0;
+  let no = 0;
+  const abstain = 0;
+
+  for (const p of parties) {
+    if (p.id === candidatePartyId) {
+      yes += p.seatCount;
+    } else if (candidateInCoalition && coalitionParties.includes(p.id)) {
+      yes += p.seatCount;
+    } else {
+      no += p.seatCount;
+    }
+  }
+
+  const passed = mode === "absolute" ? yes >= MAJORITY_SEATS : yes > no;
+  return { yes, no, abstain, passed };
 }

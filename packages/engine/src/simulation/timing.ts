@@ -112,6 +112,19 @@ export const IMPORTANT_EVENTS = [
   "government_dissolved",
   "government_formed",
   "constitutional_court_ruled",
+  "konstituierende_sitzung",
+  "bundesrat_vote",
+  "vermittlungsausschuss_invoked",
+  "vermittlungsausschuss_resolved",
+  "kanzlerwahl_phase1",
+  "kanzlerwahl_phase2",
+  "kanzlerwahl_phase3",
+  "amtseid",
+  "regierungsbefragung",
+  "fragestunde",
+  "aktuelle_stunde",
+  "petition_quorum_reached",
+  "petition_debated",
 ] as const;
 
 export const ROUTINE_EVENTS = [

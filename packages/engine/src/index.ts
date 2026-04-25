@@ -21,3 +21,5 @@ export { generateQuestionSuggestions } from "./simulation/index.js";
 export type { PublicHoliday } from "./simulation/index.js";
 export { calculateMatch, calculateAllMatches } from "./simulation/index.js";
 export type { QuizAnswer, QuizResult } from "./simulation/index.js";
+export { listPetitions, getPetition } from "./simulation/petitions.js";
+export type { Petition, PetitionStatus, PetitionOutcome } from "./simulation/petitions.js";
