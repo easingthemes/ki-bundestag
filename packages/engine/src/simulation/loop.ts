@@ -277,9 +277,8 @@ export async function runDay(): Promise<number> {
     },
     publicSentiment: state.publicSentiment,
     provisionalBudget: (state as any).provisionalBudget ?? false,
-    // Cycle 4 PR 2 — Schuldenbremse-Aussetzung flag (Drizzle reads via the
-    // schema declaration on `nationalState.schuldenbremseSuspended`).
-    schuldenbremseSuspended: (state as any).schuldenbremseSuspended ?? false,
+    // Cycle 4 PR 2 — Schuldenbremse-Aussetzung flag.
+    schuldenbremseSuspended: state.schuldenbremseSuspended,
   };
 
   const allBills = db.select().from(schema.bills).all() as unknown as Bill[];
@@ -1471,7 +1470,7 @@ export async function runDay(): Promise<number> {
     // and the per-day inquiry validation context base. The opportunity flag
     // is shared across all opposition parties; only the `partyActiveInquiryCount`
     // value of the validation context is per-party.
-    const inquiryOpportunity = findInquiryOpportunity(activeCrises, activeGov ?? null, allParties);
+    const inquiryOpportunity = findInquiryOpportunity(activeCrises, activeGov ?? null);
     const inquiryActiveCount = countActiveInquiries();
     const inquiryLastFiledDay = (() => {
       try {
@@ -1492,10 +1491,10 @@ export async function runDay(): Promise<number> {
         provisionalBudget: nationalState.provisionalBudget,
         schuldenbremseSuspended: nationalState.schuldenbremseSuspended,
       },
-      (meta as any).provisionalBudgetSinceDay ?? null,
+      meta.provisionalBudgetSinceDay,
       currentDay,
     );
-    const schuldenbremseSuspendedUntilDay = (meta as any).schuldenbremseSuspendedUntilDay ?? null;
+    const schuldenbremseSuspendedUntilDay = meta.schuldenbremseSuspendedUntilDay;
 
     // Build agent contexts for all parties
     const agentContexts: AgentContext[] = [];
@@ -1765,12 +1764,23 @@ export async function runDay(): Promise<number> {
         for (const v of votes) {
           partyLineByPartyId[v.partyId] = v.vote;
         }
+        // Join user displayNames for the human/bot seats that voted on this
+        // bill — `mdb_votes` is only written by the API for human-controlled
+        // seats, so every entry here has a populated `userId` (R18 fallback
+        // still applies if the user row is somehow missing).
+        const userIds = Array.from(new Set(mdbVoteEntries.map(e => e.userId)));
+        const userRows = userIds.length > 0
+          ? getUserDb().select().from(schema.users)
+              .where(inArray(schema.users.id, userIds))
+              .all()
+          : [];
+        const nameByUserId = new Map(userRows.map(u => [u.id, u.displayName]));
         const breakInputs: DisciplineBreakInput[] = mdbVoteEntries.map(e => ({
           seatId: e.seatId,
           partyId: e.partyId,
           vote: e.vote,
           disciplineLevel: e.disciplineLevel,
-          mdbName: null, // R18 — graceful fallback to "MdB-Sitz #<seatId>"
+          mdbName: nameByUserId.get(e.userId) ?? null,
         }));
         const breakEvents = detectDisciplineBreaks(bill, breakInputs, partyLineByPartyId, currentDay);
         for (const ev of breakEvents) addEvent(dayEvents, ev);
@@ -2308,30 +2318,27 @@ export async function runDay(): Promise<number> {
     //
     // Validation already happened in `validateActions` (Fraktion gate, opposition
     // gate, threshold gate, S9 cap, S8 rate-limit, S17 invariant, R8 per-party).
-    // The `fileInquiry` call defends-in-depth on S17/S8/S9 and throws if any
-    // invariant is violated (e.g. another party filed in the same tick — first
-    // one wins, second falls through into the throw).
+    // First valid action wins; subsequent attempts in the same tick are skipped
+    // before reaching `fileInquiry` so the defense-in-depth throws inside
+    // `fileInquiry` only fire on genuine invariant violations (which we want to
+    // surface, not swallow).
     let inquiryProcessed = false;
     for (const [partyId, actions] of partyActions) {
       for (const action of actions) {
         if (action.type !== "file_inquiry_committee" || inquiryProcessed) continue;
-        try {
-          const { event } = fileInquiry(
-            {
-              filingPartyId: partyId,
-              subject: action.subject,
-              targetPartyId: action.targetPartyId ?? null,
-              targetMinistry: action.targetMinistry ?? null,
-            },
-            currentDay,
-            allParties,
-          );
-          inquiryProcessed = true;
-          addEvent(dayEvents, event);
-          console.log(`  [Inquiry] Filed by ${partyId}: "${action.subject}" → ${action.targetPartyId ?? action.targetMinistry}`);
-        } catch (err) {
-          console.warn(`  [Inquiry] fileInquiry rejected for ${partyId}: ${(err as Error).message}`);
-        }
+        const { event } = fileInquiry(
+          {
+            filingPartyId: partyId,
+            subject: action.subject,
+            targetPartyId: action.targetPartyId ?? null,
+            targetMinistry: action.targetMinistry ?? null,
+          },
+          currentDay,
+          allParties,
+        );
+        inquiryProcessed = true;
+        addEvent(dayEvents, event);
+        console.log(`  [Inquiry] Filed by ${partyId}: "${action.subject}" → ${action.targetPartyId ?? action.targetMinistry}`);
       }
     }
 

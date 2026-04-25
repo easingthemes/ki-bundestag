@@ -761,7 +761,6 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "schuldenbremse_suspended_until_day", sql: "ALTER TABLE simulation_meta ADD COLUMN schuldenbremse_suspended_until_day INTEGER" },
   { table: "simulation_meta", column: "provisional_budget_since_day", sql: "ALTER TABLE simulation_meta ADD COLUMN provisional_budget_since_day INTEGER" },
   { table: "national_state", column: "schuldenbremse_suspended", sql: "ALTER TABLE national_state ADD COLUMN schuldenbremse_suspended INTEGER NOT NULL DEFAULT 0" },
-  { table: "inquiry_committees", column: "_table", sql: "CREATE TABLE IF NOT EXISTS inquiry_committees (id TEXT PRIMARY KEY, subject TEXT NOT NULL, filing_party_id TEXT NOT NULL REFERENCES parties(id), target_party_id TEXT REFERENCES parties(id), target_ministry TEXT, filed_on_day INTEGER NOT NULL, scheduled_end_day INTEGER NOT NULL, concluded_on_day INTEGER, status TEXT NOT NULL DEFAULT 'active', outcome TEXT, final_report TEXT, hearing_count INTEGER NOT NULL DEFAULT 0, last_hearing_day INTEGER)" },
 ];
 
 /** Column migrations for user DB */

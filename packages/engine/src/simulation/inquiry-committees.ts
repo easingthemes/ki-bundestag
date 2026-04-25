@@ -155,7 +155,6 @@ export function shouldWatchdogConclude(
 export function findInquiryOpportunity(
   crises: Crisis[],
   government: Government | null,
-  _parties: Party[],
 ): InquiryOpportunity | null {
   if (!government) return null;
   for (const crisis of crises) {
