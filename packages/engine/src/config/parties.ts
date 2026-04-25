@@ -134,8 +134,8 @@ RELATIONSHIPS: Share social policy goals with SPD and Greens but push them furth
 
 // ── Fraktion configuration ──────────────────────────────────────────
 
-/** 5% of 735 seats = 36.75, rounded up */
-export const FRAKTION_THRESHOLD = 37;
+/** 5% of BUNDESTAG_SIZE (630) = 31.5, rounded up. Was 37 pre-2023-Wahlrechtsreform. */
+export const FRAKTION_THRESHOLD = 32;
 
 /** Real-name Fraktion leaders per party */
 export const FRAKTION_LEADERS: Record<string, string> = {

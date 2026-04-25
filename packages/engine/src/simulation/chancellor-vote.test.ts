@@ -13,31 +13,31 @@ function makeParty(id: string, seatCount: number, role: Party["coalitionRole"] =
 }
 
 describe("tallyChancellorVote — absolute mode (Kanzlermehrheit, Art. 63 Abs. 1/3)", () => {
-  it("passes when coalition seats >= 368", () => {
+  it("passes when coalition seats >= MAJORITY_SEATS", () => {
     const parties = [
-      makeParty("spd", 200, "leader"),
-      makeParty("gruene", 180, "junior"),
-      makeParty("cdu", 355, "opposition"),
+      makeParty("spd", 180, "leader"),
+      makeParty("gruene", 150, "junior"),    // coalition = 330 >= 316
+      makeParty("cdu", 300, "opposition"),
     ];
     const result = tallyChancellorVote("spd", parties, ["spd", "gruene"], "absolute");
     expect(result.passed).toBe(true);
-    expect(result.yes).toBe(380);
-    expect(result.no).toBe(355);
+    expect(result.yes).toBe(330);
+    expect(result.no).toBe(300);
   });
 
-  it("fails when coalition seats < 368 even with plurality", () => {
+  it("fails when coalition seats < MAJORITY_SEATS even with plurality", () => {
     const parties = [
-      makeParty("spd", 200, "leader"),
-      makeParty("gruene", 100, "junior"),     // coalition = 300
-      makeParty("cdu", 435, "opposition"),
+      makeParty("spd", 180, "leader"),
+      makeParty("gruene", 100, "junior"),    // coalition = 280 < 316
+      makeParty("cdu", 350, "opposition"),
     ];
     const result = tallyChancellorVote("spd", parties, ["spd", "gruene"], "absolute");
     expect(result.passed).toBe(false);
-    expect(result.yes).toBe(300);
+    expect(result.yes).toBe(280);
   });
 
-  it("exactly 368 passes (inclusive threshold)", () => {
-    const parties = [makeParty("spd", 368, "leader"), makeParty("cdu", 367, "opposition")];
+  it("exactly MAJORITY_SEATS passes (inclusive threshold)", () => {
+    const parties = [makeParty("spd", MAJORITY_SEATS, "leader"), makeParty("cdu", 314, "opposition")];
     const result = tallyChancellorVote("spd", parties, ["spd"], "absolute");
     expect(result.passed).toBe(true);
     expect(result.yes).toBe(MAJORITY_SEATS);

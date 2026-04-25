@@ -184,6 +184,9 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // Cycle 3 PR 2 — gates Vertrauensfrage when government parties' weighted
   // approval is below 25 for >= 30 sim days. Mirrors lowSentimentStreak.
   lowGovernmentApprovalStreak: integer("low_government_approval_streak").notNull().default(0),
+  // Cycle 3 PR 3 — idempotency flag for the 735 → 630 seat-reform shrink.
+  // 1 = already migrated, 0 = not yet (default for fresh DBs and pre-PR3 DBs).
+  bundestagSizeMigrated: integer("bundestag_size_migrated").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {

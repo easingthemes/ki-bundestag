@@ -5,10 +5,16 @@
  * snap election triggers, and pariah party designations.
  */
 
-/** Total seats in the Bundestag */
-export const TOTAL_SEATS = 735;
-/** Absolute majority threshold (>50%) */
-export const MAJORITY_SEATS = 368;
+/**
+ * Total seats in the Bundestag (Cycle 3 PR 3, Q5).
+ * 2023 Wahlrechtsreform caps the Bundestag at 630 seats — no more
+ * Überhang/Ausgleichsmandate. Was 735 pre-reform.
+ */
+export const BUNDESTAG_SIZE = 630;
+/** Absolute majority threshold (>50%): Math.ceil(630/2) + 1 = 316. Was 368. */
+export const MAJORITY_SEATS = 316;
+/** @deprecated Use BUNDESTAG_SIZE. Kept as alias for one cycle to avoid touching every callsite at once. */
+export const TOTAL_SEATS = BUNDESTAG_SIZE;
 /** Minimum vote share to enter parliament */
 export const ELECTORAL_THRESHOLD = 5;
 /** Gaussian noise stddev on vote shares during election */

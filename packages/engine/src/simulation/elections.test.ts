@@ -7,6 +7,7 @@ import {
   computeKonstituierendeSitzungDay,
   KONSTITUIERENDE_SITZUNG_MAX_OFFSET,
 } from "./elections.js";
+import { BUNDESTAG_SIZE, MAJORITY_SEATS } from "../config/elections.js";
 import type { Election, Party, PolicyPriorities } from "@ki-bundestag/types";
 
 const POLICY: PolicyPriorities = { economy: 5, social: 5, environment: 5, immigration: 5, spending: 5 };
@@ -109,12 +110,12 @@ describe("computeKonstituierendeSitzungDay", () => {
 });
 
 describe("calculateResults", () => {
-  it("always assigns exactly 735 total seats", () => {
+  it("always assigns exactly BUNDESTAG_SIZE total seats", () => {
     // Run multiple times due to randomness
     for (let i = 0; i < 50; i++) {
       const results = calculateResults(PARTIES);
       const totalSeats = results.reduce((s, r) => s + r.seatsWon, 0);
-      expect(totalSeats).toBe(735);
+      expect(totalSeats).toBe(BUNDESTAG_SIZE);
     }
   });
 
@@ -156,7 +157,7 @@ describe("formGovernment", () => {
     const coalitionSeats = results
       .filter(r => coalition.includes(r.partyId))
       .reduce((s, r) => s + r.seatsWon, 0);
-    expect(coalitionSeats).toBeGreaterThanOrEqual(368); // majority
+    expect(coalitionSeats).toBeGreaterThanOrEqual(MAJORITY_SEATS); // majority
     expect(coalition.length).toBeGreaterThanOrEqual(1);
     expect(opposition.length).toBeGreaterThanOrEqual(1);
   });

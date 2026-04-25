@@ -459,16 +459,21 @@ PR-style commits on `claude/sim-fidelity-cycle3` branch, mirroring the Cycle 2a/
 - `config/elections.ts`: add `VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS = 30`, `VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN = 5`, `MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS = 180`, `CONFIDENCE_VOTE_DAILY_PROBABILITY = 0.005`, `VERTRAUENSFRAGE_HONEYMOON_DAYS = 90`
 - Unit tests: gate-open/closed under all 4 conditions; streak reset; konstruktiv candidate selection deterministic
 
-### PR 3 — Piece 4 (seat reform)
+### PR 3 — Piece 4 (seat reform) — **shipped**
 
 `feat(sim-fidelity): 735→630 Bundestag seat reform (Cycle 3 PR 3)`
 
-- `config/elections.ts`: `BUNDESTAG_SIZE = 630`, `MAJORITY_SEATS = 316`, deprecation comment on `TOTAL_SEATS` alias
-- `simulation/seats.ts`: parameterise allocation against `BUNDESTAG_SIZE`; export `rescaleSeatsToBundestag()` helper
-- `seed.ts::migrateDatabase()`: largest-remainder seat shrink for `parties` + `bundestag_seats`, guarded by `meta.bundestagSizeMigrated`
-- `simulation/negotiations.ts:38`: replace hardcoded `"368+ Sitze (Mehrheit von 735)"` with template literal using constants
-- Tests touching `MAJORITY_SEATS`: `kanzlerwahl.test.ts`, `chancellor-vote.test.ts` — verify they pass against 316 (they import the constant, so should auto-update)
-- New unit test: `rescaleSeatsToBundestag()` invariant — sum equals 630, no negative seats, deterministic tie-break
+- `config/elections.ts`: `BUNDESTAG_SIZE = 630`, `MAJORITY_SEATS = 316`; `TOTAL_SEATS` becomes deprecated alias for `BUNDESTAG_SIZE`
+- `config/parties.ts`: `FRAKTION_THRESHOLD = 32` (was 37 — 5% of 630 vs 5% of 735)
+- `simulation/seats.ts`: pure helper `rescaleSeatsToBundestag()` exported; uses largest-remainder rounding with deterministic tie-break (descending remainder → descending input → lex id)
+- `seed.ts::migrateDatabase()`: idempotent shrink of `parties.seat_count` only (NOT `bundestag_seats`), guarded by `simulation_meta.bundestag_size_migrated`. **Ordering** runs after `parties` table creation, before Cycle 1's stage-entry-day backfill (S4)
+- `db/schema-sim.ts` + `db/ddl.ts`: new `bundestag_size_migrated INTEGER NOT NULL DEFAULT 0` column on `simulation_meta`
+- `simulation/negotiations.ts`: replace hardcoded `368`/`735` at lines 38, 189, 268 with template literals using constants
+- `simulation/chancellor-vote.test.ts`: rewrite the 3 absolute-mode tests using the constant + 630-aligned seat counts
+- `simulation/elections.test.ts`: `BUNDESTAG_SIZE`/`MAJORITY_SEATS` imports replace hardcoded `735`/`368` in two assertions
+- `simulation/seats.test.ts` (new — 8 cases): `rescaleSeatsToBundestag` invariants — sum-preserving, never grows a party, tie-break determinism, edge cases (empty, all-zero, exact-target no-op)
+
+**Deviation from earlier spec draft**: `bundestag_seats` rows are NOT shrunk in the migration. The table is per-MdB-row (one row per seat); shrinking would require deactivating active rows, potentially displacing users mid-term. Vote tallying reads `parties.seatCount` (not `bundestag_seats` row counts), so the engine is mathematically consistent post-migration. The `bundestag_seats` table converges to BUNDESTAG_SIZE-aligned state at the next election when `resetAllSeats` + `allocateSeats` run. Documented inline at the migration block in `seed.ts`.
 
 ### PR 4 — Pieces 5+6+7 (election timing + Überweisung)
 
