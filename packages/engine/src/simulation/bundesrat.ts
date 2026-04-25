@@ -196,7 +196,7 @@ export function rollVermittlungOutcome(rng: () => number = Math.random): Vermitt
 
 /**
  * Can the Bundestag override a Bundesrat-Einspruch? Art. 77 GG requires at
- * minimum an absolute majority (Kanzlermehrheit, 368 seats) on the re-vote.
+ * minimum an absolute majority (Kanzlermehrheit, MAJORITY_SEATS) on the re-vote.
  * The existing 3rd-reading vote is reused as a proxy for the override tally.
  */
 export function canOverrideEinspruch(bill: Bill, parties: Party[]): boolean {

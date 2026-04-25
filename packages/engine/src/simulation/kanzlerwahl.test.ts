@@ -82,7 +82,7 @@ describe("runPhase1 — absolute majority", () => {
     return { state, parties, coalition };
   }
 
-  it("elects when the Phase-1 candidate reaches Kanzlermehrheit (>=368)", () => {
+  it("elects when the Phase-1 candidate reaches Kanzlermehrheit (>= MAJORITY_SEATS)", () => {
     const { state, parties, coalition } = setup(400);
     const result = runPhase1(state, parties, coalition, 101);
     expect(result.status).toBe("elected");
@@ -94,7 +94,7 @@ describe("runPhase1 — absolute majority", () => {
     expect(result.amtseidDay).toBe(102); // day + 1 via default nextWorkingDay
   });
 
-  it("falls through to phase2 when Phase 1 fails (yes < 368)", () => {
+  it("falls through to phase2 when Phase 1 fails (yes < MAJORITY_SEATS)", () => {
     const { state, parties, coalition } = setup(300);
     const result = runPhase1(state, parties, coalition, 101);
     expect(result.status).toBe("phase2");
@@ -133,12 +133,12 @@ describe("runPhase2Round — candidate iteration + window", () => {
       chancellorCandidate: { partyId: "spd", name: "S1" },
     }, coalition, parties, 100);
     state = runPhase1(state, parties, coalition, 101);
-    expect(state.status).toBe("phase2");  // 300 < 368
+    expect(state.status).toBe("phase2");  // 300 < MAJORITY_SEATS
 
     const r1 = runPhase2Round(state, parties, coalition, 105);
     expect(r1.phase2Rounds.length).toBe(1);
     expect(r1.phase2Rounds[0].candidatePartyId).toBe("cdu");  // largest untried
-    expect(r1.phase2Rounds[0].outcome).toBe("failed");        // cdu alone doesn't hit 368
+    expect(r1.phase2Rounds[0].outcome).toBe("failed");        // cdu alone doesn't hit MAJORITY_SEATS
   });
 
   it("elects a Phase-2 candidate with Kanzlermehrheit", () => {

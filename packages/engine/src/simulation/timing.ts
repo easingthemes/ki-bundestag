@@ -143,6 +143,9 @@ export const ROUTINE_EVENTS = [
   "day_start",
   "weekly_report",
   "monthly_report",
+  // Cycle 3 PR 4 — Überweisung ohne Aussprache renders as a one-line entry
+  // (S7); routine-tier classification matches `bill_first_reading`.
+  "bill_ueberweisung_ohne_aussprache",
 ] as const;
 
 /**

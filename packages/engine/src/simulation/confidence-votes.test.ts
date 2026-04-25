@@ -27,9 +27,9 @@ const PARTIES_DEFAULT: Party[] = [
   makeParty("spd", 200, 28), // coalition leader
   makeParty("gruene", 100, 22), // coalition
   makeParty("cdu", 250, 30), // opposition (Fraktion)
-  makeParty("fdp", 60, 18), // opposition (Fraktion at 735, falls below at 630)
+  makeParty("fdp", 60, 18), // opposition (Fraktion: 60 >= FRAKTION_THRESHOLD=32)
   makeParty("afd", 80, 14), // opposition (Fraktion)
-  makeParty("linke", 45, 12), // opposition (Fraktion at 735)
+  makeParty("linke", 45, 12), // opposition (Fraktion: 45 >= FRAKTION_THRESHOLD=32)
 ];
 const COALITION = ["spd", "gruene"];
 
