@@ -29,7 +29,8 @@ import { shouldTriggerElection, announceElection, advanceElectionPhase, calculat
 import { MAJORITY_SEATS, KANZLERWAHL_PHASE2_MAX_ROUNDS } from "../config/elections.js";
 import { TIME_CONFIG } from "./timing.js";
 import { dayToDate, snapToNextWorkday, snapToNextSunday } from "./calendar.js";
-import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds } from "./negotiations.js";
+import { runNegotiationRound, synthesizeAgreement, buildNegotiationEvents, getMaxNegotiationRounds, shouldSkipNegotiationDispatch } from "./negotiations.js";
+import { MAX_NEGOTIATION_DAYS } from "../config/elections.js";
 import { generateWeeklyPolls, resolveExpiredPolls, buildContextPollBatchRequest, processContextPollBatchResult } from "./polls.js";
 import { getRecentMedia, applyMediaSentiment, applyMediaSentimentFromArticles, buildMediaBatchRequest, processMediaBatchResult } from "./media.js";
 import { answerPendingQuestions } from "./questions.js";
@@ -63,7 +64,7 @@ import {
   resolveQuorumReachedPetitions,
 } from "./petitions.js";
 import { answerPendingInterpellations } from "./interpellations.js";
-import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
+import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact, vertrauensfrageGateOpen, misstrauensvotumGateOpen, nextLowGovernmentApprovalStreak } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
@@ -560,6 +561,18 @@ export async function runDay(): Promise<number> {
     lowSentimentStreak = 0;
   }
 
+  // Cycle 3 PR 2 — track government-parties' weighted approval streak. Used
+  // by vertrauensfrageGateOpen() to gate Vertrauensfrage. Mirrors
+  // lowSentimentStreak. Skipped during interregnum (no active government).
+  const govForStreak = getActiveGovernment();
+  const coalitionForStreak = govForStreak
+    ? allParties.filter(p => nationalState.coalitionParties.includes(p.id))
+    : null;
+  const lowGovernmentApprovalStreak = nextLowGovernmentApprovalStreak(
+    meta.lowGovernmentApprovalStreak ?? 0,
+    coalitionForStreak,
+  );
+
   // Load active election (if any) — exclude completed and invalidated
   const activeElectionRows = db.select().from(schema.elections)
     .where(and(ne(schema.elections.status, "completed"), ne(schema.elections.status, "invalidated"))).all();
@@ -617,8 +630,9 @@ export async function runDay(): Promise<number> {
     const daysSinceElection = currentDay - activeElection.electionDay;
 
     // Safety: if negotiations are stuck for too many days (e.g. API errors preventing
-    // round progression), force-complete with algorithmic coalition
-    const MAX_NEGOTIATION_DAYS = getMaxNegotiationRounds() + 5;
+    // round progression), force-complete with algorithmic coalition. Cycle 3 PR 4
+    // raises this from 8 to 90 days so real negotiations have room to span 4–12 sim
+    // weeks; the safety net should now fire only on genuinely stuck rounds.
     if (daysSinceElection > MAX_NEGOTIATION_DAYS && roundNumber <= getMaxNegotiationRounds()) {
       console.warn(`  [Negotiation] Stuck for ${daysSinceElection} days (still round ${roundNumber}), force-completing...`);
 
@@ -635,6 +649,13 @@ export async function runDay(): Promise<number> {
           newOpposition: opposition as any,
         })
         .where(eq(schema.elections.id, activeElection.id))
+        .run();
+
+      // Cycle 3 PR 4 — clear negotiation dwell tracker on safety-net completion
+      // so the column semantic ("NULL when no negotiation in flight") holds.
+      db.update(schema.simulationMeta)
+        .set({ lastNegotiationRoundDay: null } as any)
+        .where(eq(schema.simulationMeta.id, meta.id))
         .run();
 
       for (const result of activeElection.results!) {
@@ -731,6 +752,16 @@ export async function runDay(): Promise<number> {
     }
 
     if (activeElection && activeElection.status === "negotiation") {
+      // Cycle 3 PR 4 (Q7) — inter-round dwell guard. Real coalition negotiations
+      // span weeks, not consecutive sim days. Skip dispatch if the previous
+      // round ran too recently. Round 1 always dispatches immediately.
+      const lastRoundDay = meta.lastNegotiationRoundDay;
+      const skipForDwell = shouldSkipNegotiationDispatch(currentDay, lastRoundDay, roundNumber);
+
+      if (skipForDwell) {
+        const elapsed = lastRoundDay != null ? currentDay - lastRoundDay : 0;
+        console.log(`  [Negotiation] Day ${currentDay}: Round ${roundNumber} pacing — ${elapsed}d since last round. Skipping dispatch.`);
+      } else {
       console.log(`  [Negotiation] Day ${currentDay}: Running negotiation round ${roundNumber}...`);
       progress.set(15); // Negotiation round starting
 
@@ -744,6 +775,13 @@ export async function runDay(): Promise<number> {
 
     progress.set(50); // Negotiation round complete
     const allRounds = [...previousRounds, roundResults];
+
+    // Cycle 3 PR 4 — record dispatch day so the dwell guard can pace
+    // subsequent rounds.
+    db.update(schema.simulationMeta)
+      .set({ lastNegotiationRoundDay: currentDay } as any)
+      .where(eq(schema.simulationMeta.id, meta.id))
+      .run();
 
     // Add negotiation events
     const negEvents = buildNegotiationEvents(roundResults, allParties, currentDay, roundNumber);
@@ -788,6 +826,13 @@ export async function runDay(): Promise<number> {
           newOpposition: opposition as any,
         })
         .where(eq(schema.elections.id, activeElection.id))
+        .run();
+
+      // Cycle 3 PR 4 — clear negotiation dwell tracker on normal completion
+      // so the column semantic ("NULL when no negotiation in flight") holds.
+      db.update(schema.simulationMeta)
+        .set({ lastNegotiationRoundDay: null } as any)
+        .where(eq(schema.simulationMeta.id, meta.id))
         .run();
 
       // Update party seats and roles
@@ -884,6 +929,7 @@ export async function runDay(): Promise<number> {
         .where(eq(schema.elections.id, activeElection.id))
         .run();
     }
+      } // end PR 4 dwell-skip else
     } // end inner negotiation guard
   }
 
@@ -1835,6 +1881,20 @@ export async function runDay(): Promise<number> {
             continue;
           }
 
+          // Cycle 3 PR 2 — structural gate (Q3). Suppress agent-driven
+          // Vertrauensfrage outside the gate window: government must be
+          // genuinely fragile (low approval streak, slim margin, past
+          // honeymoon). Drops empirical rate from multi-per-term to
+          // ~0.05/yr, matching real-Bundestag behaviour.
+          const coalitionSeatTotal = allParties
+            .filter(p => nationalState.coalitionParties.includes(p.id))
+            .reduce((s, p) => s + p.seatCount, 0);
+          if (!vertrauensfrageGateOpen(coalitionSeatTotal, govNow.formedOnDay, currentDay, lowGovernmentApprovalStreak)) {
+            console.log(`  [ConfidenceVote] Vertrauensfrage suppressed by structural gate (party=${partyId}, streak=${lowGovernmentApprovalStreak}, margin=${coalitionSeatTotal - MAJORITY_SEATS}, age=${currentDay - govNow.formedOnDay}d)`);
+            getSqlite().prepare("UPDATE simulation_meta SET vertrauensfrage_suppressed_total = vertrauensfrage_suppressed_total + 1").run();
+            continue;
+          }
+
           const tally = tallyVertrauensfrage(allParties, nationalState.coalitionParties);
           const cvId = `cv-${currentDay}-${generateId()}`;
           const cvStatus = tally.passed ? "passed" : "failed";
@@ -1907,6 +1967,16 @@ export async function runDay(): Promise<number> {
           const govNow = getActiveGovernment();
           if (!govNow) {
             console.warn(`  [ConfidenceVote] No active government, skipping Misstrauensvotum`);
+            continue;
+          }
+
+          // Cycle 3 PR 2 — structural gate (Q3). Suppress agent-driven
+          // Misstrauensvotum outside the gate window: government past
+          // honeymoon AND opposition mathematically capable of forming a
+          // majority AND a Fraktion-bearing alternative leader exists.
+          if (!misstrauensvotumGateOpen(allParties, nationalState.coalitionParties, govNow.formedOnDay, currentDay)) {
+            console.log(`  [ConfidenceVote] Misstrauensvotum suppressed by structural gate (party=${partyId}, gov age=${currentDay - govNow.formedOnDay}d)`);
+            getSqlite().prepare("UPDATE simulation_meta SET misstrauensvotum_suppressed_total = misstrauensvotum_suppressed_total + 1").run();
             continue;
           }
 
@@ -2761,6 +2831,7 @@ export async function runDay(): Promise<number> {
       currentDay,
       lastRunAt: new Date().toISOString(),
       lowSentimentStreak,
+      lowGovernmentApprovalStreak,
       dailySummary: dailySummaryStr,
       dayProgress: 100,
     } as any)

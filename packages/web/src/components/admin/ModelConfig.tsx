@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
+import { MAJORITY_SEATS } from "@/lib/parliament";
 
 const MODEL_CONFIG = [
   {
@@ -82,7 +83,7 @@ const MODEL_CONFIG = [
     usedFor: "Koalitionsvertragssynthese nach allen 3 Verhandlungsrunden",
     systemPrompt: "Synthesize a realistic German coalition agreement",
     userContext: "All 3 rounds of all party positions and concessions, election seat counts",
-    notes: "1 call total after round 3. Must produce ≥2 parties with ≥368 seats. Falls back to algorithmic formGovernment() on failure.",
+    notes: `1 call total after round 3. Must produce ≥2 parties with ≥${MAJORITY_SEATS} seats. Falls back to algorithmic formGovernment() on failure.`,
   },
   {
     key: "Tagesbriefing",

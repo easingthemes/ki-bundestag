@@ -37,7 +37,11 @@ export const TIME_CONFIG = {
 
   // Election campaign timeline (in sim days)
   ELECTION_CAMPAIGN_START: 7,   // campaign starts N days after announcement
-  ELECTION_CAMPAIGN_DAYS: 21,   // total days from announcement to election
+  // Cycle 3 PR 4 (Q6): real Bundestag campaign window is 42–84 days by law
+  // (Art. 39 GG + BWahlG). Fixed at median 60 (was 21). No retroactive
+  // adjustment — active elections at migration time keep their existing
+  // electionDay; only new announcements use the 60-day window.
+  ELECTION_CAMPAIGN_DAYS: 60,   // total days from announcement to election
 
   // Night hours (Europe/Berlin local time)
   nightStart: 22,               // 10 PM
@@ -139,6 +143,9 @@ export const ROUTINE_EVENTS = [
   "day_start",
   "weekly_report",
   "monthly_report",
+  // Cycle 3 PR 4 — Überweisung ohne Aussprache renders as a one-line entry
+  // (S7); routine-tier classification matches `bill_first_reading`.
+  "bill_ueberweisung_ohne_aussprache",
 ] as const;
 
 /**

@@ -2,9 +2,11 @@ import { getDb, getSqlite, getUserDb, getUserSqlite, getUserDbPath, schema } fro
 import { FRAKTION_LEADERS, FRAKTION_THRESHOLD } from "../simulation/fraktionen.js";
 import { MINISTER_CANDIDATES, MINISTRY_PORTFOLIOS } from "../simulation/government.js";
 import { getHumanSeatRatio } from "../simulation/timing.js";
+import { rescaleSeatsToBundestag } from "../simulation/seats.js";
 import { PARTIES, INITIAL_NATIONAL_STATE } from "./seed-data.js";
 import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS, SIM_INDEX_MIGRATIONS, USER_INDEX_MIGRATIONS } from "./ddl.js";
 import { BUNDESRAT_MODE_BY_CATEGORY } from "../config/bundesrat.js";
+import { BUNDESTAG_SIZE } from "../config/elections.js";
 
 /**
  * Ensure all tables and columns exist without touching data.
@@ -50,6 +52,76 @@ export function migrateDatabase() {
     }
   } catch {
     // bills table might not have the new columns yet
+  }
+
+  // Cycle 3 PR 3 (todo 043) — 735 → 630 seat reform.
+  //
+  // Ordering (S4): runs BEFORE Cycle 1's stage-entry-day backfill so that
+  // stage durations stay seat-independent. AFTER `parties` table creation
+  // (above, in SIM_TABLE_DDL).
+  //
+  // Idempotent via `simulation_meta.bundestag_size_migrated`. No-op when:
+  //   - flag already 1 (migration ran in a prior pass)
+  //   - parties table empty (fresh DB; seedDatabase will write 630-aligned counts)
+  //   - sum(parties.seat_count) === BUNDESTAG_SIZE already
+  //
+  // bundestag_seats deliberately NOT shrunk here — the table is per-MdB-row;
+  // shrinking would deactivate active rows (potentially displacing users mid-
+  // term). The next election's `resetAllSeats` + `allocateSeats` reconciles
+  // bundestag_seats to 630 cleanly. Vote tallying reads `parties.seatCount`,
+  // so the engine is consistent post-migration; bundestag_seats is a UI/MdB-
+  // engagement layer that converges at next election.
+  try {
+    const meta = sqlite.prepare("SELECT bundestag_size_migrated FROM simulation_meta LIMIT 1").get() as { bundestag_size_migrated: number } | undefined;
+    if (meta && !meta.bundestag_size_migrated) {
+      const partyRows = sqlite.prepare("SELECT id, seat_count FROM parties").all() as Array<{ id: string; seat_count: number }>;
+      const total = partyRows.reduce((s, r) => s + r.seat_count, 0);
+      const needsRescale = partyRows.length > 0 && total > 0 && total !== BUNDESTAG_SIZE;
+
+      if (needsRescale) {
+        const rescaled = rescaleSeatsToBundestag(
+          partyRows.map(r => ({ id: r.id, seatCount: r.seat_count })),
+          BUNDESTAG_SIZE,
+        );
+        // Sum-preservation is asserted by seats.test.ts, but a future refactor
+        // (or NaN input) breaking that invariant would write partial seat
+        // counts AND set the idempotency flag — locking in corruption. Verify
+        // before writing.
+        const rescaledTotal = rescaled.reduce((s, r) => s + r.seatCount, 0);
+        if (rescaledTotal !== BUNDESTAG_SIZE) {
+          throw new Error(
+            `rescaleSeatsToBundestag invariant violation: expected sum ${BUNDESTAG_SIZE}, got ${rescaledTotal}`,
+          );
+        }
+        // Atomic: better-sqlite3's transaction ROLLBACKs on throw, so a mid-
+        // loop UPDATE failure can never leave the DB partially shrunk with
+        // the flag set (which would force the next migrate to rescale from
+        // a corrupt baseline).
+        const updateSeats = sqlite.prepare("UPDATE parties SET seat_count = ? WHERE id = ?");
+        const setFlag = sqlite.prepare("UPDATE simulation_meta SET bundestag_size_migrated = 1");
+        sqlite.transaction(() => {
+          for (const p of rescaled) {
+            updateSeats.run(p.seatCount, p.id);
+          }
+          setFlag.run();
+        })();
+        console.log(`[Migrate] Cycle 3 PR 3 — rescaled parties.seat_count from ${total} to ${BUNDESTAG_SIZE} across ${rescaled.length} parties (largest-remainder)`);
+      } else {
+        // Already aligned (or no parties yet) — just claim the migration as done.
+        sqlite.prepare("UPDATE simulation_meta SET bundestag_size_migrated = 1").run();
+      }
+    }
+  } catch (err: any) {
+    // Narrow-catch matching the SIM_COLUMN_MIGRATIONS idiom above. Only swallow
+    // the schema-not-yet-present case; SQLITE_BUSY, FK violations, disk errors,
+    // and the invariant-violation throw above must propagate — silently
+    // swallowing them and setting bundestag_size_migrated would make the
+    // corruption permanent.
+    const msg = err?.message ?? "";
+    if (!msg.includes("no such table") && !msg.includes("no such column")) {
+      throw err;
+    }
+    console.warn(`[Migrate] Bundestag-size shrink skipped (schema not ready): ${msg}`);
   }
 
   // Cycle 1 (todo 043) — backfill bill stage timing for in-flight bills.
@@ -175,7 +247,7 @@ export function migrateDatabase() {
     if (electionCount.cnt === 0 && partyRows.length > 0 && partyRows.some(p => p.seat_count > 0)) {
       const coalition = partyRows.filter(p => p.coalition_role === "leader" || p.coalition_role === "junior").map(p => p.id);
       const opposition = partyRows.filter(p => p.coalition_role === "opposition").map(p => p.id);
-      const results = partyRows.map(p => ({ partyId: p.id, seatsWon: p.seat_count, voteShare: +(p.seat_count / 735 * 100).toFixed(1) }));
+      const results = partyRows.map(p => ({ partyId: p.id, seatsWon: p.seat_count, voteShare: +(p.seat_count / BUNDESTAG_SIZE * 100).toFixed(1) }));
       const electionId = "election-initial";
 
       sqlite.prepare(

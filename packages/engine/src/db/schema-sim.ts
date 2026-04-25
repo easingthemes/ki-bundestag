@@ -181,6 +181,22 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // Cycle 2b — Schriftliche-Einzelfragen cumulative counters (PR 7).
   schriftlicheEinzelfragenFiledTotal: integer("schriftliche_einzelfragen_filed_total").notNull().default(0),
   schriftlicheEinzelfragenAnsweredTotal: integer("schriftliche_einzelfragen_answered_total").notNull().default(0),
+  // Cycle 3 PR 2 — gates Vertrauensfrage when government parties' weighted
+  // approval is below 25 for >= 30 sim days. Mirrors lowSentimentStreak.
+  lowGovernmentApprovalStreak: integer("low_government_approval_streak").notNull().default(0),
+  // Cycle 3 PR 3 — idempotency flag for the 735 → 630 seat-reform shrink.
+  // 1 = already migrated, 0 = not yet (default for fresh DBs and pre-PR3 DBs).
+  bundestagSizeMigrated: integer("bundestag_size_migrated").notNull().default(0),
+  // Cycle 3 PR 4 — sim day on which the most-recent negotiation round was
+  // dispatched. Used by loop.ts to enforce MIN_NEGOTIATION_ROUND_DWELL_DAYS
+  // pacing between rounds. NULL = no negotiation in flight.
+  lastNegotiationRoundDay: integer("last_negotiation_round_day"),
+  // Cycle 3 PR 2 follow-up — cumulative observability counters for gate-
+  // suppressed Vertrauensfrage / Misstrauensvotum agent actions. Lets us
+  // answer "did the gate ever fire?" and "is a party agent spamming a blocked
+  // action?" from a SQL query, instead of relying on console-log scraping.
+  vertrauensfrageSuppressedTotal: integer("vertrauensfrage_suppressed_total").notNull().default(0),
+  misstrauensvotumSuppressedTotal: integer("misstrauensvotum_suppressed_total").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {
