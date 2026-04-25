@@ -22,7 +22,7 @@ vi.mock("../db/index.js", () => {
       return {
         get: () => {
           if (sql.includes("schuldenbremse_suspended_until_day")) {
-            return { schuldenbremse_suspended_until_day: dbMockState.schuldenbremseUntilDay };
+            return { id: 1, schuldenbremse_suspended_until_day: dbMockState.schuldenbremseUntilDay };
           }
           return undefined;
         },
@@ -34,16 +34,32 @@ vi.mock("../db/index.js", () => {
     },
   };
   const fakeDb = {
+    select: () => ({
+      from: (tbl: unknown) => ({
+        get: () => {
+          const isMeta = String((tbl as { _?: { name?: string } })?._?.name ?? "").includes("simulation_meta");
+          return isMeta ? { id: 1 } : undefined;
+        },
+      }),
+    }),
     update: (tbl: unknown) => {
       const isMeta = String((tbl as { _?: { name?: string } })?._?.name ?? "").includes("simulation_meta");
+      const record = (set: Record<string, unknown>) => {
+        if (isMeta) dbMockState.recordedMetaUpdates.push(set);
+        else dbMockState.recordedNationalStateUpdates.push(set);
+      };
       return {
         set: (set: Record<string, unknown>) => ({
           run: () => {
-            if (isMeta) dbMockState.recordedMetaUpdates.push(set);
-            else dbMockState.recordedNationalStateUpdates.push(set);
+            record(set);
             return { changes: 1 };
           },
-          where: () => ({ run: () => ({ changes: 1 }) }),
+          where: () => ({
+            run: () => {
+              record(set);
+              return { changes: 1 };
+            },
+          }),
         }),
       };
     },

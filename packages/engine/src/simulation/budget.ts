@@ -20,6 +20,7 @@ import {
 } from "../config/index.js";
 import { CRISIS_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
 import { getDb, getSqlite, schema } from "../db/index.js";
+import { eq } from "drizzle-orm";
 import { MAJORITY_SEATS } from "../config/elections.js";
 
 // Re-export for external consumers
@@ -271,12 +272,15 @@ export function tallySchuldenbremseVote(
  */
 export function applySchuldenbremseAussetzung(currentDay: number): void {
   const expiryDay = currentDay + SCHULDENBREMSE_SUSPENSION_DURATION;
+  const meta = getDb().select().from(schema.simulationMeta).get();
+  if (!meta) throw new Error("simulation_meta row missing");
   getSqlite().transaction(() => {
     getDb().update(schema.nationalState)
       .set({ schuldenbremseSuspended: true })
       .run();
     getDb().update(schema.simulationMeta)
       .set({ schuldenbremseSuspendedUntilDay: expiryDay })
+      .where(eq(schema.simulationMeta.id, meta.id))
       .run();
   })();
 }
@@ -292,8 +296,8 @@ export function applySchuldenbremseAussetzung(currentDay: number): void {
  */
 export function checkSchuldenbremseExpiry(currentDay: number): boolean {
   const meta = getSqlite()
-    .prepare("SELECT schuldenbremse_suspended_until_day FROM simulation_meta LIMIT 1")
-    .get() as { schuldenbremse_suspended_until_day: number | null } | undefined;
+    .prepare("SELECT id, schuldenbremse_suspended_until_day FROM simulation_meta LIMIT 1")
+    .get() as { id: number; schuldenbremse_suspended_until_day: number | null } | undefined;
   if (!meta || meta.schuldenbremse_suspended_until_day == null) return false;
   if (currentDay < meta.schuldenbremse_suspended_until_day) return false;
 
@@ -303,6 +307,7 @@ export function checkSchuldenbremseExpiry(currentDay: number): boolean {
       .run();
     getDb().update(schema.simulationMeta)
       .set({ schuldenbremseSuspendedUntilDay: null })
+      .where(eq(schema.simulationMeta.id, meta.id))
       .run();
   })();
   return true;

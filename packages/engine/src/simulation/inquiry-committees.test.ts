@@ -446,14 +446,13 @@ describe("findInquiryOpportunity", () => {
   // Test 15: returns null when no high-severity crisis OR no coalition match;
   // returns a populated opportunity otherwise.
   it("returns null when no government", () => {
-    expect(findInquiryOpportunity([makeCrisis()], null, [])).toBeNull();
+    expect(findInquiryOpportunity([makeCrisis()], null)).toBeNull();
   });
 
   it("returns null when crisis is not high-severity", () => {
     const result = findInquiryOpportunity(
       [makeCrisis({ severity: "medium" })],
       makeGovernment(),
-      [],
     );
     expect(result).toBeNull();
   });
@@ -463,7 +462,6 @@ describe("findInquiryOpportunity", () => {
     const result = findInquiryOpportunity(
       [makeCrisis({ category: "economy" })],
       makeGovernment(),
-      [],
     );
     expect(result).toBeNull();
   });
@@ -472,7 +470,6 @@ describe("findInquiryOpportunity", () => {
     const result = findInquiryOpportunity(
       [makeCrisis({ category: "defense", severity: "high" })], // defense → defence
       makeGovernment(),
-      [],
     );
     expect(result).not.toBeNull();
     expect(result?.targetPartyId).toBe("spd");
@@ -484,7 +481,6 @@ describe("findInquiryOpportunity", () => {
     const result = findInquiryOpportunity(
       [makeCrisis({ resolved: true })],
       makeGovernment(),
-      [],
     );
     expect(result).toBeNull();
   });
