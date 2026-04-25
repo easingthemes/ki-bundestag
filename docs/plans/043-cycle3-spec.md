@@ -115,9 +115,10 @@ lowGovernmentApprovalStreak: integer("low_government_approval_streak").notNull()
 export const VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS = 30;
 export const VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN = 5;
 export const MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS = 180;
-export const CONFIDENCE_VOTE_DAILY_PROBABILITY = 0.005;
 export const VERTRAUENSFRAGE_HONEYMOON_DAYS = 90;
 ```
+
+`CONFIDENCE_VOTE_DAILY_PROBABILITY = 0.005` (residual roll inside open gates) is **deferred** in PR 2. Rationale: the gate filter applied to existing agent actions empirically rate-limits to the target ~0.05/yr — agents already fire `call_vertrauensfrage` / `file_misstrauensvotum` actions; gating those is sufficient. Re-introduce as a forced trigger only if a 4-year sim shows agents systematically failing to fire during open windows.
 
 ## Design — Piece 3: Government-bill committee multiplier flip
 

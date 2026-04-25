@@ -32,3 +32,31 @@ export const KANZLERWAHL_PHASE2_MAX_ROUNDS = 3;
  * Only considered as a last resort when no other majority is possible.
  */
 export const PARIAH_PARTIES = new Set(["afd"]);
+
+// ── Confidence-vote gates (Cycle 3 PR 2, Q3 hybrid) ──────────────────
+/**
+ * Vertrauensfrage gate (Q3): only open when government is genuinely fragile.
+ * Real Bundestag fires Vertrauensfrage ~4× / 75 yr ≈ 0.05/yr; the old impl
+ * over-fired by 100×. Three concurrent conditions must hold for the gate
+ * to be open.
+ */
+/** Government parties' weighted approval must be < 25 for at least this many sim days. */
+export const VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS = 30;
+/** Coalition seat margin above majority threshold beyond which Vertrauensfrage is structurally pointless. */
+export const VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN = 5;
+/** Government honeymoon — no Vertrauensfrage in the first N sim days after Amtseid. */
+export const VERTRAUENSFRAGE_HONEYMOON_DAYS = 90;
+
+/**
+ * Konstruktives Misstrauensvotum gate (Q3): only open when an alternative
+ * coalition is mathematically possible AND the government has been in office
+ * long enough for opposition to coordinate.
+ */
+/** No Misstrauensvotum in the first N sim days after Amtseid. */
+export const MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS = 180;
+
+// Note: spec piece 2 also mentions CONFIDENCE_VOTE_DAILY_PROBABILITY = 0.005
+// as a residual probability roll inside open gates. Deferred — the agent-action
+// gate filter alone produces the target ~0.05/yr rate. Re-introduce as a forced
+// trigger if a 4-year sim shows agents systematically failing to fire during
+// open windows.
