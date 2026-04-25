@@ -218,6 +218,28 @@ export function scheduleAktuelleStundeForCrisis(
 }
 
 /**
+ * R8: predicate version of {@link scheduleAktuelleStundeForCrisis} — returns
+ * `true` iff scheduling would have succeeded except for the same-week dedup.
+ * Used by the crisis-start path in `loop.ts` to surface a `aktuelleStundeSkipped`
+ * breadcrumb on the parent `crisis_start` event when a second high-severity
+ * crisis lands in the same Sitzungswoche.
+ *
+ * Must be called BEFORE `scheduleAktuelleStundeForCrisis` (after, the just-
+ * persisted session would always make `hasSessionInWeek` true).
+ */
+export function wouldDedupAktuelleStundeForCrisis(
+  crisis: Crisis,
+  government: Government | null,
+  startDate: Date,
+  day: number,
+): boolean {
+  if (!crisisMeetsThreshold(crisis.severity)) return false;
+  if (!government) return false;
+  const scheduledDay = nextAktuelleStundeDay(day, startDate);
+  return hasSessionInWeek(scheduledDay, startDate);
+}
+
+/**
  * Baseline weekly scheduler. Call at Sitzungswoche start. Uses a Poisson
  * tick to decide; picks a topic from the most recently-active-bill title
  * if available, else a generic "Aktuelle Lage" topic.
