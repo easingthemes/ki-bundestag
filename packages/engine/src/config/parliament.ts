@@ -5,6 +5,8 @@
  * and related approval impacts.
  */
 
+import type { BillCategory, MinistryPortfolio } from "@ki-bundestag/types";
+
 // ── Constitutional court ────────────────────────────────────────────
 /** Probability that a challenged bill is struck down */
 export const COURT_STRIKE_DOWN_PROBABILITY = 0.30;
@@ -178,6 +180,77 @@ export const AUSFERTIGUNG_DURATION = { min: 14, max: 42 } as const;
 
 /** Default offset between Verkündung and Inkrafttreten when the bill doesn't specify. */
 export const INKRAFTTRETEN_OFFSET = 14;
+
+// ── Cycle 4 PR 1 — Untersuchungsausschuss ───────────────────────────
+
+/** Min sim days an Untersuchungsausschuss runs before scheduled conclusion. */
+export const INQUIRY_DURATION_MIN = 180;
+
+/** Max sim days an Untersuchungsausschuss runs before scheduled conclusion. */
+export const INQUIRY_DURATION_MAX = 540;
+
+/** Hearings fire every N sim days while an inquiry is active (Q7 cadence). */
+export const INQUIRY_HEARING_INTERVAL = 30;
+
+/** Max simultaneously-active inquiries across all parties (S9). */
+export const INQUIRY_MAX_ACTIVE = 2;
+
+/** Min sim days between inquiry filings globally (S8 rate-limit). */
+export const INQUIRY_MIN_DAYS_BETWEEN_FILINGS = 60;
+
+/** Combined opposition seat-share threshold to file (Bundestag rule: 25%). */
+export const INQUIRY_THRESHOLD_PERCENT = 0.25;
+
+/** One-time approval bonus for filing party at filing time (S2). */
+export const INQUIRY_FILER_FILING_BONUS = 0.3;
+
+/** Per-day approval drag on target party while inquiry is active (S2).
+ *  Negative = drag. Clamping handled by `clampApproval()` in opinion.ts (R1). */
+export const INQUIRY_TARGET_DAILY_DRAG = -0.05;
+
+/** Conclusion: wrongdoing-found impacts on target / filer (S2). */
+export const INQUIRY_WRONGDOING_TARGET_IMPACT = -1.5;
+export const INQUIRY_WRONGDOING_FILER_IMPACT = 0.8;
+
+/** Conclusion: cleared impacts on target / filer (S2). */
+export const INQUIRY_CLEARED_TARGET_IMPACT = 0.5;
+export const INQUIRY_CLEARED_FILER_IMPACT = -0.3;
+
+/** Watchdog (Q9): auto-conclude as cleared if past scheduled-end + this many
+ *  days AND no hearing in the prior `INQUIRY_WATCHDOG_HEARING_GAP_DAYS`. */
+export const INQUIRY_WATCHDOG_GRACE_DAYS = 30;
+export const INQUIRY_WATCHDOG_HEARING_GAP_DAYS = 60;
+
+// ── Cycle 4 PR 4 — Debate sub-formats (S6) ──────────────────────────
+
+/** Probability per bill-reading event of a Kurzintervention firing.
+ *  Independent roll from Zwischenfrage. */
+export const KURZINTERVENTION_PROBABILITY = 0.30;
+
+/** Probability per bill-reading event of a Zwischenfrage firing. */
+export const ZWISCHENFRAGE_PROBABILITY = 0.30;
+
+/**
+ * Maps each `crises.category` (= BillCategory) to a ministry portfolio.
+ * Used by:
+ *   - PR 3 (S4): Nachtragshaushalt allocation crisis-boost
+ *   - PR 1 (R5): findInquiryOpportunity — does this crisis embarrass govt?
+ * Single source of truth (S18). All 8 BillCategory values mapped exhaustively.
+ *
+ * Note on spellings: BillCategory uses US spelling (`defense`, `healthcare`),
+ * MinistryPortfolio uses UK spelling (`defence`, `health`) — preserved as the
+ * codebase has shipped both for several cycles now.
+ */
+export const CRISIS_CATEGORY_TO_MINISTRY: Record<BillCategory, MinistryPortfolio> = {
+  economy:        "finance",
+  social:         "labour",
+  environment:    "environment",
+  immigration:    "interior",
+  defense:        "defence",
+  education:      "education",
+  healthcare:     "health",
+  infrastructure: "infrastructure",
+};
 
 // ── Parliamentary calendar ──────────────────────────────────────────
 /**

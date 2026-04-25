@@ -21,6 +21,57 @@ export interface ValidationResult {
   autoAbstainBillIds: string[];
 }
 
+/**
+ * Cycle 4 PR 1 — context required to validate `file_inquiry_committee`.
+ *
+ * Caller (loop.ts) computes these from current DB state once per day and passes
+ * the same bag to every party's `validateActions` call. Computing them once
+ * here rather than re-querying inside the validator keeps the parser DB-free
+ * and unit-testable.
+ *
+ * Threshold: combined opposition Fraktion seat share ≥ 25% of `bundestagSize`
+ * (real Bundestag rule for triggering an Untersuchungsausschuss).
+ */
+export interface InquiryValidationContext {
+  /** Sum of `seatCount` across all opposition Fraktion-bearing parties. */
+  oppositionSeats: number;
+  /** Current sim day (for S8 rate-limit check). */
+  currentDay: number;
+  /** Active inquiry count globally (S9 cap). */
+  activeInquiryCount: number;
+  /** Active inquiry count for THIS party (R8 per-party cap). */
+  partyActiveInquiryCount: number;
+  /** Last sim day on which any inquiry was filed (S8 rate-limit). NULL = none yet. */
+  lastInquiryFiledDay: number | null;
+  /** BUNDESTAG_SIZE — for the 25% threshold calculation. */
+  bundestagSize: number;
+  /** S9 cap (for the error-message text — passed in to avoid coupling to constants). */
+  maxActive: number;
+  /** S8 cooldown days (for the error-message text). */
+  minDaysBetweenFilings: number;
+  /** S6 threshold percent — fraction (e.g. 0.25). */
+  thresholdPercent: number;
+}
+
+/**
+ * Cycle 4 PR 2 — context required to validate `propose_fiscal_emergency`.
+ *
+ * The justification gate matches the result of `findFiscalEmergencyOpportunity`
+ * — if that helper returned null, the agent cannot file. The cooldown gate
+ * blocks re-filing while a previous suspension is still in force (since
+ * cooldown == suspension duration, a coalition leader can re-file the day
+ * after expiry).
+ */
+export interface FiscalEmergencyValidationContext {
+  /** Whether the justification gate is open (a high-severity crisis exists OR
+   *  provisionalBudget streak ≥ 30 days). Computed by loop.ts. */
+  justified: boolean;
+  /** Sim day on which a previous Schuldenbremse-Aussetzung expires (or null). */
+  schuldenbremseSuspendedUntilDay: number | null;
+  /** Current sim day (for the cooldown check). */
+  currentDay: number;
+}
+
 const VALID_CATEGORIES: BillCategory[] = [
   "economy", "social", "environment", "immigration",
   "defense", "education", "healthcare", "infrastructure",
@@ -75,6 +126,8 @@ export function validateActions(
   secondReadingBills?: Bill[],
   isOpposition: boolean = false,
   isCoalitionLeader: boolean = false,
+  inquiryContext?: InquiryValidationContext,
+  fiscalEmergencyContext?: FiscalEmergencyValidationContext,
 ): ValidationResult {
   const validated: AgentAction[] = [];
   const errors: ValidationError[] = [];
@@ -88,6 +141,8 @@ export function validateActions(
   let vertrauensfrageCount = 0;
   let misstrauensvotumCount = 0;
   let constitutionalChallengeCount = 0;
+  let inquiryCount = 0;
+  let fiscalEmergencyCount = 0;
   const votedBills = new Set<string>();
   const inParliament = hasFraktion;
 
@@ -368,6 +423,130 @@ export function validateActions(
           continue;
         }
         constitutionalChallengeCount++;
+        validated.push(action);
+        break;
+      }
+
+      case "file_inquiry_committee": {
+        // Cycle 4 PR 1 — Untersuchungsausschuss filing. Mirrors the
+        // `file_misstrauensvotum` validation pattern.
+        if (!inParliament) {
+          console.warn(`[${partyId}] Inquiry without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Inquiry committees require Fraktion (party has no seats in parliament)", fixable: false });
+          continue;
+        }
+        if (!isOpposition) {
+          console.warn(`[${partyId}] Inquiry from non-opposition party, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Inquiry committees can only be filed by opposition parties", fixable: false });
+          continue;
+        }
+        if (activeElection) {
+          console.warn(`[${partyId}] Inquiry during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Inquiry committees not allowed during active election", fixable: false });
+          continue;
+        }
+        if (inquiryCount >= 1) {
+          console.warn(`[${partyId}] More than 1 inquiry, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Maximum 1 inquiry committee filing per turn", fixable: true });
+          continue;
+        }
+        if (!action.subject || typeof action.subject !== "string") {
+          console.warn(`[${partyId}] Inquiry missing subject, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Inquiry missing required subject", fixable: false });
+          continue;
+        }
+        // S17 invariant: must target a party OR a ministry (or both — but at least one).
+        if ((action.targetPartyId == null || action.targetPartyId === "") && (action.targetMinistry == null || (action.targetMinistry as unknown) === "")) {
+          console.warn(`[${partyId}] Inquiry missing target, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: "Inquiry must specify targetPartyId or targetMinistry (at least one)", fixable: true });
+          continue;
+        }
+        if (action.targetMinistry != null && !VALID_MINISTRY_PORTFOLIOS.includes(action.targetMinistry)) {
+          console.warn(`[${partyId}] Invalid inquiry targetMinistry ${action.targetMinistry}, skipping`);
+          errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: `Invalid targetMinistry "${action.targetMinistry}" — valid: ${VALID_MINISTRY_PORTFOLIOS.join(", ")}`, fixable: true });
+          continue;
+        }
+        if (inquiryContext) {
+          // Combined opposition seat threshold (Bundestag rule: 25%).
+          const requiredSeats = inquiryContext.bundestagSize * inquiryContext.thresholdPercent;
+          if (inquiryContext.oppositionSeats < requiredSeats) {
+            console.warn(`[${partyId}] Inquiry below opposition seat threshold (${inquiryContext.oppositionSeats} < ${requiredSeats.toFixed(0)})`);
+            errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: `Combined opposition Fraktion seats (${inquiryContext.oppositionSeats}) below ${(inquiryContext.thresholdPercent * 100).toFixed(0)}% threshold (${requiredSeats.toFixed(0)})`, fixable: false });
+            continue;
+          }
+          // S9 active-cap (global).
+          if (inquiryContext.activeInquiryCount >= inquiryContext.maxActive) {
+            console.warn(`[${partyId}] Inquiry blocked by active-cap (${inquiryContext.activeInquiryCount}/${inquiryContext.maxActive})`);
+            errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: `Inquiry committee cap reached: max ${inquiryContext.maxActive} active`, fixable: false });
+            continue;
+          }
+          // R8 per-party cap.
+          if (inquiryContext.partyActiveInquiryCount >= 1) {
+            console.warn(`[${partyId}] Inquiry blocked by per-party cap`);
+            errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: `Party ${partyId} already has 1 active inquiry`, fixable: false });
+            continue;
+          }
+          // S8 rate-limit.
+          if (inquiryContext.lastInquiryFiledDay != null
+              && inquiryContext.currentDay - inquiryContext.lastInquiryFiledDay < inquiryContext.minDaysBetweenFilings) {
+            const remaining = inquiryContext.minDaysBetweenFilings - (inquiryContext.currentDay - inquiryContext.lastInquiryFiledDay);
+            console.warn(`[${partyId}] Inquiry blocked by ${inquiryContext.minDaysBetweenFilings}-day cooldown (${remaining}d remaining)`);
+            errors.push({ actionIndex: i, actionType: "file_inquiry_committee", message: `Inquiry rate-limit: ${inquiryContext.minDaysBetweenFilings}-day cooldown (${remaining}d remaining)`, fixable: false });
+            continue;
+          }
+        }
+        inquiryCount++;
+        validated.push(action);
+        break;
+      }
+
+      case "propose_fiscal_emergency": {
+        // Cycle 4 PR 2 — Schuldenbremse-Aussetzung (Art. 115 GG). Coalition
+        // leader only; vote happens same day; pass triggers Nachtragshaushalt
+        // (PR 3). Mirrors the `call_vertrauensfrage` validation shape.
+        if (!inParliament) {
+          console.warn(`[${partyId}] Fiscal emergency without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency proposals require Fraktion", fixable: false });
+          continue;
+        }
+        if (!isCoalitionLeader) {
+          console.warn(`[${partyId}] Fiscal emergency from non-coalition-leader, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Only the coalition leader may propose Schuldenbremse-Aussetzung (Art. 115 GG)", fixable: false });
+          continue;
+        }
+        if (activeElection) {
+          console.warn(`[${partyId}] Fiscal emergency during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency proposals not allowed during active election", fixable: false });
+          continue;
+        }
+        if (fiscalEmergencyCount >= 1) {
+          console.warn(`[${partyId}] More than 1 fiscal emergency proposal, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Maximum 1 fiscal emergency proposal per turn", fixable: true });
+          continue;
+        }
+        if (!action.title || !action.description || !action.justification) {
+          console.warn(`[${partyId}] Fiscal emergency missing title/description/justification, skipping`);
+          errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "Fiscal emergency missing required title, description, or justification", fixable: false });
+          continue;
+        }
+        if (fiscalEmergencyContext) {
+          // Cooldown gate: can't re-file while a previous Aussetzung is still
+          // in force. Once it expires, the gate opens immediately.
+          if (fiscalEmergencyContext.schuldenbremseSuspendedUntilDay != null
+              && fiscalEmergencyContext.currentDay < fiscalEmergencyContext.schuldenbremseSuspendedUntilDay) {
+            const remaining = fiscalEmergencyContext.schuldenbremseSuspendedUntilDay - fiscalEmergencyContext.currentDay;
+            console.warn(`[${partyId}] Fiscal emergency blocked by cooldown (${remaining}d remaining)`);
+            errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: `Schuldenbremse already suspended until day ${fiscalEmergencyContext.schuldenbremseSuspendedUntilDay} (${remaining}d remaining); cannot re-file before expiry`, fixable: false });
+            continue;
+          }
+          // Justification gate: must match findFiscalEmergencyOpportunity.
+          if (!fiscalEmergencyContext.justified) {
+            console.warn(`[${partyId}] Fiscal emergency rejected — no justification (no high-severity crisis AND provisionalBudget streak < 30 days)`);
+            errors.push({ actionIndex: i, actionType: "propose_fiscal_emergency", message: "No fiscal emergency justification (requires high-severity crisis OR provisionalBudget streak ≥ 30 days)", fixable: false });
+            continue;
+          }
+        }
+        fiscalEmergencyCount++;
         validated.push(action);
         break;
       }

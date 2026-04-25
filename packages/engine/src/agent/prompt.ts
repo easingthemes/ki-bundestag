@@ -4,6 +4,8 @@ import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
 import { MAJORITY_SEATS, BUNDESTAG_SIZE } from "../config/elections.js";
+import { INQUIRY_MAX_ACTIVE, INQUIRY_THRESHOLD_PERCENT } from "../config/parliament.js";
+import { SCHULDENBREMSE_SUSPENSION_DURATION, FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS } from "../config/budget.js";
 
 /** Compact impact string: "B:+0.5 U:-0.1 I:+0.02 G:+0.1 S:+1" */
 function formatImpact(impact: BillImpact): string {
@@ -88,10 +90,19 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
 
   if (caps.isCoalitionLeader && !caps.hasActiveElection) {
     rules.push(`You may call a Vertrauensfrage (confidence vote). If fewer than ${MAJORITY_SEATS} seats vote yes, snap election is triggered. Max 1 per turn.`);
+    // Cycle 4 PR 2 — Schuldenbremse-Aussetzung. Coalition-leader-only fiscal
+    // emergency vote per Art. 115 GG. Justified ONLY when there's an active
+    // high-severity crisis OR provisionalBudget streak ≥ 30 days. Pass triggers
+    // a Nachtragshaushalt (supplementary budget) on the next tick.
+    rules.push(`You may propose a Schuldenbremse-Aussetzung (Art. 115 GG fiscal emergency suspension) — ONLY when justified by an active high-severity crisis OR ≥ ${FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS} days of provisional budget. The fiscal-emergency-justified flag in your context tells you when. Suspends the structural debt brake for ${SCHULDENBREMSE_SUSPENSION_DURATION} sim days; pass triggers a Nachtragshaushalt. Simple-majority vote happens same day. Max 1 per turn.`);
   }
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
     rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires ${MAJORITY_SEATS} seats. If successful, opposition takes power immediately. Max 1 per turn.`);
+    // Cycle 4 PR 1 — Untersuchungsausschuss. Real Bundestag rule: combined
+    // opposition seat-share must reach 25% to trigger an inquiry. Cap at
+    // INQUIRY_MAX_ACTIVE simultaneous inquiries to prevent spam.
+    rules.push(`You may file a Untersuchungsausschuss (parliamentary inquiry committee) targeting a coalition party OR a ministry portfolio. Requires combined opposition Fraktion seats ≥ ${(INQUIRY_THRESHOLD_PERCENT * 100).toFixed(0)}%, max ${INQUIRY_MAX_ACTIVE} active simultaneously across the Bundestag, 60-day cooldown between filings. Use this when a high-severity crisis embarrasses the government — the inquiry-opportunity flag in your context tells you when the moment is right. Max 1 per turn.`);
   }
 
   // Negative capability instructions — prevent hallucinated actions
@@ -147,10 +158,14 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
 
   if (caps.isCoalitionLeader && !caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"call_vertrauensfrage","title":"<title>","description":"<1-2 sentences>"}`);
+    // Cycle 4 PR 2 — Schuldenbremse-Aussetzung schema entry.
+    schemaEntries.push(`    {"type":"propose_fiscal_emergency","title":"<title>","description":"<1-2 sentences>","activeCrisisId":"<crisis id or null>","justification":"<1-2 sentence Art. 115 GG case>"}`);
   }
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"file_misstrauensvotum","title":"<title>","description":"<1-2 sentences>","proposedChancellor":"<name>","proposedChancellorPartyId":"<party id>"}`);
+    // Cycle 4 PR 1 — at least one of targetPartyId / targetMinistry must be present (S17).
+    schemaEntries.push(`    {"type":"file_inquiry_committee","subject":"<1-line German subject>","targetPartyId":"<coalition party id or null>","targetMinistry":"finance"|"labour"|"environment"|"interior"|"defence"|"education"|"health"|"infrastructure"|null}`);
   }
 
   if (caps.hasFraktion && !caps.hasActiveElection) {
@@ -392,6 +407,26 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
   // Priority 2: high-value context (events, media, proposals, recently proposed bills, own actions)
   const p2Sections: string[] = [];
+
+  // Cycle 4 PR 1 — Untersuchungsausschuss opportunity flag (R5). Surfaced
+  // at the top of p2 because it's actionable: the opposition agent should
+  // weigh whether to spend its turn filing the inquiry.
+  if (ctx.inquiryOpportunity) {
+    p2Sections.push(`UNTERSUCHUNGSAUSSCHUSS OPPORTUNITY:\n  A high-severity crisis (id ${ctx.inquiryOpportunity.triggerCrisisId}, severity ${ctx.inquiryOpportunity.severity}) affects a coalition-held ministry. Government party "${ctx.inquiryOpportunity.targetPartyId}" is politically embarrassed. You may file a Untersuchungsausschuss against them. Max ${INQUIRY_MAX_ACTIVE} active inquiries simultaneously across the Bundestag — file only if the moment is genuinely valuable.`);
+  }
+
+  // Cycle 4 PR 2 — fiscal-emergency justified flag (Q5). Coalition leader
+  // only — surfaced at top of p2 because triggering a Schuldenbremse-Aussetzung
+  // is a structural decision that should weigh against status quo.
+  if (ctx.fiscalEmergencyJustified) {
+    const crisisHook = ctx.fiscalEmergencyJustified.activeCrisisId
+      ? `Active high-severity crisis: ${ctx.fiscalEmergencyJustified.activeCrisisId}. `
+      : "";
+    const provisionalHook = ctx.fiscalEmergencyJustified.provisionalBudgetDays > 0
+      ? `Provisional budget has been in effect for ${ctx.fiscalEmergencyJustified.provisionalBudgetDays} days. `
+      : "";
+    p2Sections.push(`FISKALNOTLAGE JUSTIFIED:\n  ${crisisHook}${provisionalHook}You (the coalition leader) may propose a Schuldenbremse-Aussetzung (Art. 115 GG). Pass triggers a Nachtragshaushalt — file only if the fiscal case is real, since opposition will scrutinize.`);
+  }
 
   // Own recent actions (cross-day memory) — controlled by depth
   if (depth.ownActionsLookbackDays > 0 && ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {

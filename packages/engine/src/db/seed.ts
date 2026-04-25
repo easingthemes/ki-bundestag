@@ -308,6 +308,37 @@ export function migrateDatabase() {
     // tables might not exist yet — that's fine
   }
 
+  // Cycle 4 PR 1 (todo 043) — R15 backfill + idempotency-flag write.
+  //
+  // Schema-side changes (inquiry_committees table + 5 columns) ship in
+  // SIM_TABLE_DDL / SIM_COLUMN_MIGRATIONS above so they're applied BEFORE this
+  // block runs (matches the Cycle 3 bundestag_size_migrated pattern).
+  //
+  // R15 backfill: existing provisional-budget rows get a since-day stamp.
+  // Without this, the PR 2 fiscal-emergency gate would see 0 days of
+  // provisional-budget streak for DBs that already had provisionalBudget=1
+  // and the gate would stay closed forever.
+  //
+  // Idempotency: gated on `simulation_meta.cycle4_migrated` (S7).
+  try {
+    const cycle4Row = sqlite.prepare("SELECT cycle4_migrated FROM simulation_meta LIMIT 1").get() as { cycle4_migrated?: number } | undefined;
+    if (cycle4Row && !cycle4Row.cycle4_migrated) {
+      sqlite.transaction(() => {
+        sqlite.exec("UPDATE simulation_meta SET provisional_budget_since_day = (SELECT current_day FROM national_state LIMIT 1) WHERE provisional_budget_since_day IS NULL AND EXISTS (SELECT 1 FROM national_state WHERE provisional_budget = 1)");
+        sqlite.exec("UPDATE simulation_meta SET cycle4_migrated = 1");
+      })();
+      console.log("[Migrate] Cycle 4 — applied R15 provisional-budget backfill, set cycle4_migrated");
+    }
+  } catch (err: any) {
+    // Mirror bundestag_size_migrated pattern: only swallow "schema not yet
+    // present" cases. Real DDL errors (FK/disk/etc.) must propagate.
+    const msg = err?.message ?? "";
+    if (!msg.includes("no such table") && !msg.includes("no such column")) {
+      throw err;
+    }
+    console.warn(`[Migrate] Cycle 4 backfill skipped (schema not ready): ${msg}`);
+  }
+
   // ── User DB ──
   const userSqlite = getUserSqlite();
   userSqlite.exec(USER_TABLE_DDL);

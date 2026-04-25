@@ -1,4 +1,4 @@
-import type { BudgetAllocations, BudgetVote, BillImpact, EconomyState, Party, Bill } from "@ki-bundestag/types";
+import type { BillCategory, BudgetAllocations, BudgetVote, BillImpact, Crisis, CrisisSeverity, EconomyState, Government, NationalState, Party, PendingInjection, SimulationEvent, Bill } from "@ki-bundestag/types";
 import {
   BUDGET_TOTAL, PARTY_MINISTRY_WEIGHTS, BUDGET_REVISION_CENTRIST_SHIFT,
   BUDGET_VOTE_TIERS, BUDGET_REVISION_BOOST,
@@ -8,7 +8,20 @@ import {
   BUDGET_DEFENCE_THRESHOLD, BUDGET_DEFENCE_GDP_EFFECT,
   PRESIDENTIAL_VETO_IMPACT_THRESHOLD, PRESIDENTIAL_VETO_PROBABILITY,
   VETO_REASONS,
+  SCHULDENBREMSE_SUSPENSION_DURATION,
+  SCHULDENBREMSE_COALITION_YES_RATE,
+  SCHULDENBREMSE_OPPOSITION_YES_BASE,
+  SCHULDENBREMSE_SEVERITY_BOOSTS,
+  SCHULDENBREMSE_OPPOSITION_YES_CAP,
+  FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS,
+  NACHTRAGSHAUSHALT_TOTAL_MIN,
+  NACHTRAGSHAUSHALT_TOTAL_MAX,
+  NACHTRAGSHAUSHALT_CRISIS_BOOST,
 } from "../config/index.js";
+import { CRISIS_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
+import { getDb, getSqlite, schema } from "../db/index.js";
+import { eq } from "drizzle-orm";
+import { MAJORITY_SEATS } from "../config/elections.js";
 
 // Re-export for external consumers
 export { BUDGET_TOTAL } from "../config/index.js";
@@ -53,12 +66,17 @@ export function generateBudgetAllocations(coalitionParties: Party[]): BudgetAllo
  * Tally algorithmic budget vote.
  * Coalition yes rate scales with public sentiment. Opposition rate is inverse.
  * When isRevision=true (retry after rejection), coalition gets +5pp boost.
+ *
+ * `rng` parameter (Cycle 4 PR 4) accepts a seeded RNG for deterministic
+ * tests. Defaults to `Math.random` in production. Existing callers continue
+ * to omit it; new callers (processNachtragsInjection) pass it through.
  */
 export function tallyBudgetVote(
   allParties: Party[],
   coalitionIds: string[],
   publicSentiment: number,
   isRevision = false,
+  rng: () => number = Math.random,
 ): {
   votes: BudgetVote[];
   yesSeats: number;
@@ -84,7 +102,7 @@ export function tallyBudgetVote(
 
   for (const party of allParties) {
     const isCoalition = coalitionIds.includes(party.id);
-    const voteChoice: "yes" | "no" = Math.random() < (isCoalition ? coalitionYesRate : oppositionYesRate)
+    const voteChoice: "yes" | "no" = rng() < (isCoalition ? coalitionYesRate : oppositionYesRate)
       ? "yes" : "no";
     votes.push({ partyId: party.id, vote: voteChoice, seats: party.seatCount });
     if (voteChoice === "yes") yesSeats += party.seatCount;
@@ -193,3 +211,287 @@ export function shouldPresidentVeto(
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+// ── Cycle 4 PR 2 — Schuldenbremse-Aussetzung helpers ────────────────────
+
+/** Result returned by tallySchuldenbremseVote (S12). */
+export interface SchuldenbremseVoteResult {
+  yesVotes: number;
+  noVotes: number;
+  passed: boolean;
+}
+
+/**
+ * S12: simple-majority vote tally for Schuldenbremse-Aussetzung. One-shot
+ * (no revision concept — unlike tallyBudgetVote).
+ *
+ * Coalition typically yes (`SCHULDENBREMSE_COALITION_YES_RATE`); opposition
+ * yes share scales with public sentiment + crisis severity. Each Fraktion-
+ * bearing party rolls a Bernoulli — if yes, ALL the party's seats count yes
+ * (matches the codebase's whole-party voting model).
+ *
+ * Pure: accepts a seeded RNG for tests. Production uses Math.random.
+ *
+ * R2 caveat: real Bundestag requires QUALIFIED majority for Art. 115 GG
+ * suspension. We use simple majority as a pragmatic simplification (no
+ * qualified-majority primitive in the engine yet). Documented in the
+ * spec's Open Items as a Cycle 5+ refinement.
+ */
+export function tallySchuldenbremseVote(
+  parties: Party[],
+  coalitionPartyIds: string[],
+  publicSentiment: number,
+  crisisSeverity: CrisisSeverity | null,
+  rng: () => number = Math.random,
+): SchuldenbremseVoteResult {
+  const sentimentAdj = (publicSentiment - 45) / 100; // [-0.40, +0.30] over [5, 75]
+  const severityAdj = crisisSeverity ? SCHULDENBREMSE_SEVERITY_BOOSTS[crisisSeverity] : 0;
+  const oppositionYesShare = Math.min(
+    SCHULDENBREMSE_OPPOSITION_YES_CAP,
+    Math.max(0, SCHULDENBREMSE_OPPOSITION_YES_BASE + sentimentAdj + severityAdj),
+  );
+
+  const coalitionSet = new Set(coalitionPartyIds);
+  let yesVotes = 0;
+  let noVotes = 0;
+  for (const p of parties) {
+    if (p.seatCount <= 0) continue;
+    const yesProb = coalitionSet.has(p.id)
+      ? SCHULDENBREMSE_COALITION_YES_RATE
+      : oppositionYesShare;
+    if (rng() < yesProb) yesVotes += p.seatCount;
+    else noVotes += p.seatCount;
+  }
+  return { yesVotes, noVotes, passed: yesVotes >= MAJORITY_SEATS };
+}
+
+/**
+ * S3: applies the suspension flag + sets expiry on simulation_meta.
+ * Idempotent — re-filing while already suspended extends the expiry day
+ * (annual re-declaration matches real-world Bundestag practice).
+ */
+export function applySchuldenbremseAussetzung(currentDay: number): void {
+  const expiryDay = currentDay + SCHULDENBREMSE_SUSPENSION_DURATION;
+  const meta = getDb().select().from(schema.simulationMeta).get();
+  if (!meta) throw new Error("simulation_meta row missing");
+  getSqlite().transaction(() => {
+    getDb().update(schema.nationalState)
+      .set({ schuldenbremseSuspended: true })
+      .run();
+    getDb().update(schema.simulationMeta)
+      .set({ schuldenbremseSuspendedUntilDay: expiryDay })
+      .where(eq(schema.simulationMeta.id, meta.id))
+      .run();
+  })();
+}
+
+/**
+ * Q9 daily check. Auto-clears the suspension when the expiry day arrives.
+ * Returns true if the flag was cleared this tick (caller may emit an event,
+ * though the spec keeps the auto-restore moment silent — Open Item).
+ *
+ * No-op when:
+ *   - schuldenbremseSuspendedUntilDay is null (not suspended), OR
+ *   - currentDay < expiry.
+ */
+export function checkSchuldenbremseExpiry(currentDay: number): boolean {
+  const meta = getSqlite()
+    .prepare("SELECT id, schuldenbremse_suspended_until_day FROM simulation_meta LIMIT 1")
+    .get() as { id: number; schuldenbremse_suspended_until_day: number | null } | undefined;
+  if (!meta || meta.schuldenbremse_suspended_until_day == null) return false;
+  if (currentDay < meta.schuldenbremse_suspended_until_day) return false;
+
+  getSqlite().transaction(() => {
+    getDb().update(schema.nationalState)
+      .set({ schuldenbremseSuspended: false })
+      .run();
+    getDb().update(schema.simulationMeta)
+      .set({ schuldenbremseSuspendedUntilDay: null })
+      .where(eq(schema.simulationMeta.id, meta.id))
+      .run();
+  })();
+  return true;
+}
+
+/**
+ * Q5 / R5 heuristic: returns the populated AgentContext flag when the
+ * coalition leader has a justifiable case to propose Schuldenbremse-Aussetzung.
+ *
+ * Two paths:
+ *   1. Active high-severity crisis (any category) — populated with `activeCrisisId`.
+ *   2. provisionalBudget streak ≥ FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS days.
+ *
+ * Returns null when neither holds — coalition leader cannot file.
+ *
+ * Pure: takes the relevant slices of state directly so the helper is
+ * unit-testable without a DB. Loop computes `provisionalBudgetSinceDay`
+ * once per day and passes it in.
+ */
+export function findFiscalEmergencyOpportunity(
+  crises: Crisis[],
+  state: { provisionalBudget: boolean; schuldenbremseSuspended?: boolean },
+  provisionalBudgetSinceDay: number | null,
+  currentDay: number,
+): { activeCrisisId?: string; provisionalBudgetDays: number } | null {
+  // Already suspended → no point in opening the gate again. (Re-filing is
+  // technically allowed for expiry-extension but the agent prompt only
+  // surfaces the flag when there's a reason to file in the first place.)
+  if (state.schuldenbremseSuspended) return null;
+
+  const provisionalDays = state.provisionalBudget && provisionalBudgetSinceDay != null
+    ? Math.max(0, currentDay - provisionalBudgetSinceDay)
+    : 0;
+
+  // Path 1: high-severity crisis trumps everything.
+  const highSeverity = crises.find(c => c.severity === "high" && !c.resolved);
+  if (highSeverity) {
+    return { activeCrisisId: highSeverity.id, provisionalBudgetDays: provisionalDays };
+  }
+
+  // Path 2: provisional-budget streak.
+  if (provisionalDays >= FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS) {
+    return { provisionalBudgetDays: provisionalDays };
+  }
+
+  return null;
+}
+
+// ── Cycle 4 PR 3 — Nachtragshaushalt (supplementary budget) ─────────────
+
+/**
+ * S13/S4: generate ministry-keyed allocations for a Nachtragshaushalt.
+ * Crisis-weighted: the ministry mapped to the active crisis category gets
+ * a `+NACHTRAGSHAUSHALT_CRISIS_BOOST` (30%) absolute boost on top of its
+ * base coalition share; remaining ministries scale down proportionally to
+ * keep the total at `total` (no extra spending beyond what was authorized).
+ *
+ * R4: this is the ONLY entry point for Nachtragshaushalt allocation.
+ *     Regular budget cycle uses `generateBudgetAllocations()`;
+ *     never call this from the `isBudgetDay()` flow.
+ *
+ * Pure: no DB. Caller is `processNachtragsInjection`.
+ */
+export function generateNachtragsAllocations(
+  coalitionParties: Party[],
+  crisisCategory: BillCategory | null,
+  total: number,
+): BudgetAllocations {
+  // Start from coalition-weighted base allocation (same shape as regular budget,
+  // just scaled to `total` instead of BUDGET_TOTAL).
+  const baseFromCoalition = generateBudgetAllocations(coalitionParties);
+  const scale = total / BUDGET_TOTAL;
+  const base: BudgetAllocations = MINISTRY_KEYS.reduce(
+    (acc, k) => ({ ...acc, [k]: Math.round(baseFromCoalition[k] * scale * 10) / 10 }),
+    {} as BudgetAllocations,
+  );
+
+  // No crisis category → return base (uniform-down-from-total) unchanged.
+  if (!crisisCategory) return base;
+  const boostedMinistry = CRISIS_CATEGORY_TO_MINISTRY[crisisCategory];
+  if (!boostedMinistry) return base;
+
+  // Boost target by `total * boost-rate` (so 30% of total goes extra to the
+  // mapped ministry); rescale all OTHER ministries proportionally to keep
+  // sum == total. Note we boost relative to TOTAL, not the ministry's base
+  // share, so the boost magnitude is predictable regardless of base weights.
+  const boostDelta = total * NACHTRAGSHAUSHALT_CRISIS_BOOST;
+  const baseBoosted = base[boostedMinistry];
+  const newBoostedAmount = baseBoosted + boostDelta;
+  const remainingTotal = total - newBoostedAmount;
+  const otherSum = MINISTRY_KEYS
+    .filter(k => k !== boostedMinistry)
+    .reduce((s, k) => s + base[k], 0);
+
+  const result: BudgetAllocations = { finance: 0, labour: 0, environment: 0, interior: 0, defence: 0, education: 0, health: 0, infrastructure: 0 };
+  for (const k of MINISTRY_KEYS) {
+    if (k === boostedMinistry) {
+      result[k] = Math.round(newBoostedAmount * 10) / 10;
+    } else if (otherSum > 0) {
+      result[k] = Math.round(((base[k] / otherSum) * remainingTotal) * 10) / 10;
+    } else {
+      result[k] = 0;
+    }
+  }
+  return result;
+}
+
+/**
+ * Consumes a `pending_injections` row of type "nachtragshaushalt".
+ *
+ * Generates allocations, runs the existing `tallyBudgetVote()` (no separate
+ * Nachtrag-specific tally — coalition discipline + opposition behavior is
+ * already encoded there), applies economic effect on pass.
+ *
+ * Mutates `state.economy` and `state.publicSentiment` in-memory; loop.ts
+ * persists at end-of-day. Returns events to push into dayEvents.
+ *
+ * Pure-ish (no DB writes other than via the injected `state`/`parties`):
+ * fully testable with vi.mock for `getDb`. Crisis lookup is done by id
+ * via the passed `crises` array (not via DB).
+ */
+export function processNachtragsInjection(
+  injection: PendingInjection,
+  parties: Party[],
+  government: Government,
+  state: NationalState,
+  crises: Crisis[],
+  currentDay: number,
+  rng: () => number = Math.random,
+): Array<Omit<SimulationEvent, "id">> {
+  const events: Array<Omit<SimulationEvent, "id">> = [];
+
+  const total = NACHTRAGSHAUSHALT_TOTAL_MIN
+    + Math.floor(rng() * (NACHTRAGSHAUSHALT_TOTAL_MAX - NACHTRAGSHAUSHALT_TOTAL_MIN + 1));
+  const activeCrisisId = (injection.data?.activeCrisisId as string | null | undefined) ?? null;
+  const triggerCrisis = activeCrisisId
+    ? crises.find(c => c.id === activeCrisisId) ?? null
+    : null;
+  const crisisCategory = triggerCrisis?.category ?? null;
+
+  const coalitionParties = parties.filter(p => state.coalitionParties.includes(p.id));
+  const allocations = generateNachtragsAllocations(coalitionParties, crisisCategory, total);
+
+  events.push({
+    dayNumber: currentDay,
+    type: "nachtragshaushalt_proposed",
+    actor: "government",
+    title: `Nachtragshaushalt: ${total} Mrd. EUR`,
+    description: triggerCrisis
+      ? `Coalition legt Nachtragshaushalt mit Krisenfokus (${triggerCrisis.name}) vor.`
+      : `Coalition legt Nachtragshaushalt vor.`,
+    data: { total, allocations, activeCrisisId, crisisCategory },
+  });
+
+  // Reuse existing tallyBudgetVote — Nachtragshaushalt has no revision
+  // concept (single-shot vote), so isRevision=false. Pass through the rng
+  // so tests can deterministically force pass/fail outcomes.
+  const vote = tallyBudgetVote(parties, state.coalitionParties, state.publicSentiment, false, rng);
+
+  if (vote.passed) {
+    // R4 invariant: this is the ONLY same-day economic effect path for
+    // Nachtragshaushalt — drained on a non-budget day, no double-apply
+    // possible (budget cycle runs in step 11d/e, after step 3 injections).
+    const result = applyBudgetEconomicEffect(state.economy, allocations);
+    state.economy = result.economy;
+    state.publicSentiment = Math.max(5, Math.min(75, state.publicSentiment + 0.3));
+    events.push({
+      dayNumber: currentDay,
+      type: "nachtragshaushalt_passed",
+      actor: "government",
+      title: `Nachtragshaushalt verabschiedet (${total} Mrd. EUR)`,
+      description: `Bundestag mit ${vote.yesSeats}:${vote.noSeats} für Nachtragshaushalt.`,
+      data: { total, yesSeats: vote.yesSeats, noSeats: vote.noSeats, economicEffect: result.effect },
+    });
+  } else {
+    events.push({
+      dayNumber: currentDay,
+      type: "nachtragshaushalt_rejected",
+      actor: "government",
+      title: `Nachtragshaushalt abgelehnt`,
+      description: `Bundestag lehnt Nachtragshaushalt mit ${vote.noSeats}:${vote.yesSeats} ab.`,
+      data: { total, yesSeats: vote.yesSeats, noSeats: vote.noSeats },
+    });
+  }
+  return events;
+}
+
