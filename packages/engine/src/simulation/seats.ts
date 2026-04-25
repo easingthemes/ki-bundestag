@@ -14,6 +14,61 @@ import { buildApplicationSelectPrompt, preFilterApplications, type ApplicationIt
 import { createNotification } from "./event-queue.js";
 import { getHumanSeatRatio, getBotSeatRatio, type TimingPreset } from "./timing.js";
 
+// ── Cycle 3 PR 3: 735 → 630 seat reform ───────────────────────────────
+
+/**
+ * Largest-remainder proportional rescale of party seat counts to a target
+ * total. Used by the 2023-Wahlrechtsreform migration to shrink an in-flight
+ * Bundestag from 735 → BUNDESTAG_SIZE (630).
+ *
+ * Invariants:
+ *   - ∑output.seatCount === target (sum-preserving)
+ *   - No party gains seats (only proportional cuts; output ≤ input per party)
+ *   - Deterministic tie-break: parties with equal raw shares get leftover
+ *     seats by descending integer share, then descending input seatCount,
+ *     then lexicographic id
+ *   - No-op when input total === target (returns input objects unchanged)
+ *
+ * Pure function — no DB access. Called from `seed.ts::migrateDatabase()`.
+ */
+export function rescaleSeatsToBundestag(
+  parties: Array<{ id: string; seatCount: number }>,
+  target: number,
+): Array<{ id: string; seatCount: number }> {
+  const total = parties.reduce((s, p) => s + p.seatCount, 0);
+  if (total === target || total === 0) {
+    return parties.map(p => ({ id: p.id, seatCount: p.seatCount }));
+  }
+  // Compute fractional target per party + integer floor + remainder
+  const scaled = parties.map(p => {
+    const raw = (p.seatCount / total) * target;
+    const intSeats = Math.floor(raw);
+    return { id: p.id, intSeats, remainder: raw - intSeats, originalSeats: p.seatCount };
+  });
+  const sumFloors = scaled.reduce((s, p) => s + p.intSeats, 0);
+  let leftover = target - sumFloors;
+  // Distribute leftover seats by descending remainder, then by descending
+  // original seatCount, then lexicographic id (deterministic).
+  const ranking = scaled.slice().sort((a, b) => {
+    if (a.remainder !== b.remainder) return b.remainder - a.remainder;
+    if (a.originalSeats !== b.originalSeats) return b.originalSeats - a.originalSeats;
+    return a.id.localeCompare(b.id);
+  });
+  for (let i = 0; i < ranking.length && leftover > 0; i++) {
+    ranking[i].intSeats += 1;
+    leftover -= 1;
+  }
+  // Pathological tie-saturation: still leftover after all parties got a bonus
+  // round. Vanishingly rare with 16-decimal-bit floats; defensive belt.
+  if (leftover > 0) {
+    ranking.sort((a, b) => b.intSeats - a.intSeats);
+    ranking[0].intSeats += leftover;
+  }
+  // Re-key by id and preserve input order
+  const byId = new Map(scaled.map(p => [p.id, p.intSeats]));
+  return parties.map(p => ({ id: p.id, seatCount: byId.get(p.id) ?? 0 }));
+}
+
 /**
  * Allocate seats for a party after an election.
  * Creates `seatCount` rows split three ways:
