@@ -161,6 +161,137 @@ describe("validateActions", () => {
   });
 });
 
+// ── Cycle 4 PR 1 — file_inquiry_committee validation ────────────────────
+
+describe("validateActions — file_inquiry_committee", () => {
+  const makeBill = (id: string): Bill => ({
+    id, title: "T", description: "D", category: "economy",
+    proposedBy: "spd", status: "third_reading",
+    impact: {}, votes: [], proposedOnDay: 1,
+  });
+
+  // Inquiry context with all gates open (passes by default).
+  const okCtx = {
+    oppositionSeats: 200,           // > 25% of 630
+    currentDay: 100,
+    activeInquiryCount: 0,
+    partyActiveInquiryCount: 0,
+    lastInquiryFiledDay: null,
+    bundestagSize: 630,
+    maxActive: 2,
+    minDaysBetweenFilings: 60,
+    thresholdPercent: 0.25,
+  };
+
+  const validInquiry: AgentAction = {
+    type: "file_inquiry_committee",
+    subject: "Maskenaffäre",
+    targetPartyId: "spd",
+    targetMinistry: null,
+  };
+
+  it("rejects when not opposition (Fraktion gate is open but coalition role blocks)", () => {
+    // Same shape as file_misstrauensvotum gate — coalition party trying to
+    // file an inquiry against itself fails with a non-fixable error.
+    const result = validateActions(
+      [validInquiry], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      /* isOpposition */ false, false,
+      okCtx,
+    );
+    // The inquiry rejection emits a non-fixable error; the bill still gets an auto-abstain
+    // entry. Filter to only inquiry-related entries to keep the assertion focused.
+    const inquiryErrors = result.errors.filter(e => e.actionType === "file_inquiry_committee");
+    expect(inquiryErrors).toHaveLength(1);
+    expect(inquiryErrors[0].fixable).toBe(false);
+    expect(inquiryErrors[0].message).toContain("opposition");
+    const inquiryActions = result.valid.filter(a => a.type === "file_inquiry_committee");
+    expect(inquiryActions).toHaveLength(0);
+  });
+
+  it("rejects when combined opposition seats are below the 25% threshold", () => {
+    const tightCtx = { ...okCtx, oppositionSeats: 50 }; // < 25% of 630
+    const result = validateActions(
+      [validInquiry], [makeBill("b-1")], "linke",
+      undefined, true, [],
+      /* isOpposition */ true, false,
+      tightCtx,
+    );
+    const inquiryErrors = result.errors.filter(e => e.actionType === "file_inquiry_committee");
+    expect(inquiryErrors).toHaveLength(1);
+    expect(inquiryErrors[0].fixable).toBe(false);
+    expect(inquiryErrors[0].message).toMatch(/threshold|25%/i);
+  });
+
+  it("rejects when active inquiry cap is full (S9)", () => {
+    const fullCtx = { ...okCtx, activeInquiryCount: 2 };
+    const result = validateActions(
+      [validInquiry], [makeBill("b-1")], "linke",
+      undefined, true, [],
+      /* isOpposition */ true, false,
+      fullCtx,
+    );
+    const inquiryErrors = result.errors.filter(e => e.actionType === "file_inquiry_committee");
+    expect(inquiryErrors).toHaveLength(1);
+    expect(inquiryErrors[0].fixable).toBe(false);
+    expect(inquiryErrors[0].message).toMatch(/cap|max/i);
+  });
+});
+
+// ── Cycle 4 PR 2 — propose_fiscal_emergency validation ──────────────────
+
+describe("validateActions — propose_fiscal_emergency", () => {
+  const makeBill = (id: string): Bill => ({
+    id, title: "T", description: "D", category: "economy",
+    proposedBy: "spd", status: "third_reading",
+    impact: {}, votes: [], proposedOnDay: 1,
+  });
+
+  const validProposal: AgentAction = {
+    type: "propose_fiscal_emergency",
+    title: "Sondervermögen Verteidigung",
+    description: "Aussetzung der Schuldenbremse zur Krisenfinanzierung.",
+    activeCrisisId: "c-1",
+    justification: "Hochintensive Verteidigungskrise erfordert kurzfristige Mehrausgaben.",
+  };
+
+  it("rejects when blocked by cooldown (Schuldenbremse already in force)", () => {
+    const cooldownCtx = {
+      justified: true,
+      schuldenbremseSuspendedUntilDay: 200, // future
+      currentDay: 100,
+    };
+    const result = validateActions(
+      [validProposal], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      false, /* isCoalitionLeader */ true,
+      undefined, cooldownCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "propose_fiscal_emergency");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(false);
+    expect(errs[0].message).toMatch(/already suspended|cooldown|cannot re-file/i);
+  });
+
+  it("rejects when justification gate is closed (no crisis, no streak)", () => {
+    const closedCtx = {
+      justified: false,
+      schuldenbremseSuspendedUntilDay: null,
+      currentDay: 100,
+    };
+    const result = validateActions(
+      [validProposal], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      false, /* isCoalitionLeader */ true,
+      undefined, closedCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "propose_fiscal_emergency");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(false);
+    expect(errs[0].message).toMatch(/justification|emergency/i);
+  });
+});
+
 describe("buildValidationRetryPrompt", () => {
   it("includes original prompt and error details", () => {
     const errors: ValidationError[] = [

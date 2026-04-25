@@ -14,6 +14,10 @@ export interface NationalState {
   publicSentiment: number; // 0-100
   provisionalBudget: boolean;
   coalitionCohesion?: number | null;
+  // Cycle 4 PR 2 — true while Schuldenbremse-Aussetzung (Art. 115 GG) is in force.
+  // Auto-cleared on `schuldenbremseSuspendedUntilDay` by checkSchuldenbremseExpiry.
+  // While true, the loop's provisional-budget GDP drag is suppressed.
+  schuldenbremseSuspended?: boolean;
 }
 
 export type CrisisSeverity = "low" | "medium" | "high";
