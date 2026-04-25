@@ -1,3 +1,19 @@
+# [1.10.0](https://github.com/easingthemes/ki-bundestag/compare/v1.9.0...v1.10.0) (2026-04-25)
+
+
+### Bug Fixes
+
+* **sim-fidelity:** address PR [#164](https://github.com/easingthemes/ki-bundestag/issues/164) review — seed seats, prompt drift, classifications ([727700f](https://github.com/easingthemes/ki-bundestag/commit/727700fb337bed83f09f2bb49d665224f87dc8d6))
+* **sim-fidelity:** PR [#164](https://github.com/easingthemes/ki-bundestag/issues/164) review round 2 — migration safety, observability, frontend sweep ([06a407b](https://github.com/easingthemes/ki-bundestag/commit/06a407b127e68a4250c5a70b3ba365687e94d3ea))
+
+
+### Features
+
+* **sim-fidelity:** 60d campaigns + 90d negotiation cap + 65% Überweisung skip (Cycle 3 PR 4) ([52ca675](https://github.com/easingthemes/ki-bundestag/commit/52ca6751a95637e01a765423650e32a4562cdadf)), closes [#163](https://github.com/easingthemes/ki-bundestag/issues/163)
+* **sim-fidelity:** 735→630 Bundestag seat reform (Cycle 3 PR 3) ([657b4bf](https://github.com/easingthemes/ki-bundestag/commit/657b4bfa0b543d4984d2b25612f58eff4c668ae4))
+* **sim-fidelity:** structural gates for Vertrauensfrage + Misstrauensvotum (Cycle 3 PR 2) ([d7d3a03](https://github.com/easingthemes/ki-bundestag/commit/d7d3a03c99e1a5215d90d4bfb2bf8f1a636c06d0))
+* **sim-fidelity:** veto cap + gov-bill committee multiplier (Cycle 3 PR 1) ([d60a8b5](https://github.com/easingthemes/ki-bundestag/commit/d60a8b52ae1ad310709a1391bb70db8c08268cd7))
+
 # [1.9.0](https://github.com/easingthemes/ki-bundestag/compare/v1.8.0...v1.9.0) (2026-04-25)
 
 
