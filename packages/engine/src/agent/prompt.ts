@@ -4,6 +4,7 @@ import { getPartyProfile } from "./party-profiles.js";
 import type { DepthConfig } from "./context-depth.js";
 import { getDepthConfig } from "./context-depth.js";
 import { MAJORITY_SEATS, BUNDESTAG_SIZE } from "../config/elections.js";
+import { INQUIRY_MAX_ACTIVE, INQUIRY_THRESHOLD_PERCENT } from "../config/parliament.js";
 
 /** Compact impact string: "B:+0.5 U:-0.1 I:+0.02 G:+0.1 S:+1" */
 function formatImpact(impact: BillImpact): string {
@@ -92,6 +93,10 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
     rules.push(`You may file a Konstruktives Misstrauensvotum. Name a replacement Chancellor. Requires ${MAJORITY_SEATS} seats. If successful, opposition takes power immediately. Max 1 per turn.`);
+    // Cycle 4 PR 1 — Untersuchungsausschuss. Real Bundestag rule: combined
+    // opposition seat-share must reach 25% to trigger an inquiry. Cap at
+    // INQUIRY_MAX_ACTIVE simultaneous inquiries to prevent spam.
+    rules.push(`You may file a Untersuchungsausschuss (parliamentary inquiry committee) targeting a coalition party OR a ministry portfolio. Requires combined opposition Fraktion seats ≥ ${(INQUIRY_THRESHOLD_PERCENT * 100).toFixed(0)}%, max ${INQUIRY_MAX_ACTIVE} active simultaneously across the Bundestag, 60-day cooldown between filings. Use this when a high-severity crisis embarrasses the government — the inquiry-opportunity flag in your context tells you when the moment is right. Max 1 per turn.`);
   }
 
   // Negative capability instructions — prevent hallucinated actions
@@ -151,6 +156,8 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"file_misstrauensvotum","title":"<title>","description":"<1-2 sentences>","proposedChancellor":"<name>","proposedChancellorPartyId":"<party id>"}`);
+    // Cycle 4 PR 1 — at least one of targetPartyId / targetMinistry must be present (S17).
+    schemaEntries.push(`    {"type":"file_inquiry_committee","subject":"<1-line German subject>","targetPartyId":"<coalition party id or null>","targetMinistry":"finance"|"labour"|"environment"|"interior"|"defence"|"education"|"health"|"infrastructure"|null}`);
   }
 
   if (caps.hasFraktion && !caps.hasActiveElection) {
@@ -392,6 +399,13 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
 
   // Priority 2: high-value context (events, media, proposals, recently proposed bills, own actions)
   const p2Sections: string[] = [];
+
+  // Cycle 4 PR 1 — Untersuchungsausschuss opportunity flag (R5). Surfaced
+  // at the top of p2 because it's actionable: the opposition agent should
+  // weigh whether to spend its turn filing the inquiry.
+  if (ctx.inquiryOpportunity) {
+    p2Sections.push(`UNTERSUCHUNGSAUSSCHUSS OPPORTUNITY:\n  A high-severity crisis (id ${ctx.inquiryOpportunity.triggerCrisisId}, severity ${ctx.inquiryOpportunity.severity}) affects a coalition-held ministry. Government party "${ctx.inquiryOpportunity.targetPartyId}" is politically embarrassed. You may file a Untersuchungsausschuss against them. Max ${INQUIRY_MAX_ACTIVE} active inquiries simultaneously across the Bundestag — file only if the moment is genuinely valuable.`);
+  }
 
   // Own recent actions (cross-day memory) — controlled by depth
   if (depth.ownActionsLookbackDays > 0 && ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {

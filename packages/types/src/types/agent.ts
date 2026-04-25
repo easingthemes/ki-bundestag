@@ -53,7 +53,10 @@ export interface AgentContext {
   realWorldContext?: string;
   realPartyPositions?: string;
   eraSummaries?: Array<{ startDay: number; endDay: number; summary: string; caseFacts?: EraCaseFacts }>;
-
+  // Cycle 4 PR 1 — opposition-side flag set by loop.ts before agent dispatch when a
+  // high-severity crisis maps to a coalition-held ministry (R5 heuristic). Absence
+  // means agents should not file a Untersuchungsausschuss in a normal day.
+  inquiryOpportunity?: { triggerCrisisId: string; targetPartyId: string; severity: string };
 }
 
 export interface ProposeBillAction {
@@ -121,6 +124,15 @@ export interface FileConstitutionalChallengeAction {
   arguments: string;
 }
 
+// Cycle 4 PR 1 — Untersuchungsausschuss agent action. At least one of
+// targetPartyId / targetMinistry must be provided (S17 invariant).
+export interface FileInquiryCommitteeAction {
+  type: "file_inquiry_committee";
+  subject: string;
+  targetPartyId?: string | null;
+  targetMinistry?: MinistryPortfolio | null;
+}
+
 export interface NothingAction {
   type: "nothing";
 }
@@ -150,6 +162,7 @@ export type AgentAction =
   | CallVertrauensfrageAction
   | FileMisstrauensvotumAction
   | FileConstitutionalChallengeAction
+  | FileInquiryCommitteeAction
   | NothingAction;
 
 export interface AgentResponse {
