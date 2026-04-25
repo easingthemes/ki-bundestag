@@ -181,6 +181,9 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // Cycle 2b — Schriftliche-Einzelfragen cumulative counters (PR 7).
   schriftlicheEinzelfragenFiledTotal: integer("schriftliche_einzelfragen_filed_total").notNull().default(0),
   schriftlicheEinzelfragenAnsweredTotal: integer("schriftliche_einzelfragen_answered_total").notNull().default(0),
+  // Cycle 3 PR 2 — gates Vertrauensfrage when government parties' weighted
+  // approval is below 25 for >= 30 sim days. Mirrors lowSentimentStreak.
+  lowGovernmentApprovalStreak: integer("low_government_approval_streak").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {

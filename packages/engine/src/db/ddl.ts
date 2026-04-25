@@ -168,7 +168,8 @@ export const SIM_TABLE_DDL = `
     start_date TEXT,
     bots_enabled INTEGER NOT NULL DEFAULT 1,
     schriftliche_einzelfragen_filed_total INTEGER NOT NULL DEFAULT 0,
-    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0
+    schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0,
+    low_government_approval_streak INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -718,6 +719,8 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "schriftliche_einzelfragen_answered_total", sql: "ALTER TABLE simulation_meta ADD COLUMN schriftliche_einzelfragen_answered_total INTEGER NOT NULL DEFAULT 0" },
   // Cycle 2b (todo 043) — Petitions (öffentliche E-Petitionen)
   { table: "petitions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS petitions (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL, author_display_name TEXT NOT NULL, started_on_day INTEGER NOT NULL, public_window_end_day INTEGER NOT NULL, signature_count INTEGER NOT NULL DEFAULT 0, signature_quorum INTEGER NOT NULL DEFAULT 30000, status TEXT NOT NULL DEFAULT 'collecting', quorum_reached_on_day INTEGER, debated_on_day INTEGER, outcome TEXT)" },
+  // Cycle 3 PR 2 — Vertrauensfrage gate streak counter (mirrors low_sentiment_streak)
+  { table: "simulation_meta", column: "low_government_approval_streak", sql: "ALTER TABLE simulation_meta ADD COLUMN low_government_approval_streak INTEGER NOT NULL DEFAULT 0" },
 ];
 
 /** Column migrations for user DB */

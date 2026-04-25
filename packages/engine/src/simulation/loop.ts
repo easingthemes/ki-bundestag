@@ -63,7 +63,7 @@ import {
   resolveQuorumReachedPetitions,
 } from "./petitions.js";
 import { answerPendingInterpellations } from "./interpellations.js";
-import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact } from "./confidence-votes.js";
+import { tallyVertrauensfrage, tallyMisstrauensvotum, confidenceVoteSentimentImpact, vertrauensfrageGateOpen, misstrauensvotumGateOpen } from "./confidence-votes.js";
 import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./constitutional-court.js";
 import { generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote, applyBudgetEconomicEffect, BUDGET_TOTAL } from "./budget.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
@@ -558,6 +558,26 @@ export async function runDay(): Promise<number> {
     lowSentimentStreak++;
   } else {
     lowSentimentStreak = 0;
+  }
+
+  // Cycle 3 PR 2 — track government-parties' weighted approval streak. Used
+  // by vertrauensfrageGateOpen() to gate Vertrauensfrage. Mirrors
+  // lowSentimentStreak. Skipped during interregnum (no active government).
+  let lowGovernmentApprovalStreak = meta.lowGovernmentApprovalStreak ?? 0;
+  {
+    const govNow = getActiveGovernment();
+    if (govNow) {
+      const coalitionSet = new Set(nationalState.coalitionParties);
+      const coalitionParties = allParties.filter(p => coalitionSet.has(p.id));
+      const totalSeats = coalitionParties.reduce((s, p) => s + p.seatCount, 0);
+      const weightedApproval = totalSeats > 0
+        ? coalitionParties.reduce((s, p) => s + p.approvalRating * p.seatCount, 0) / totalSeats
+        : 0;
+      if (weightedApproval < 25) lowGovernmentApprovalStreak++;
+      else lowGovernmentApprovalStreak = 0;
+    } else {
+      lowGovernmentApprovalStreak = 0;
+    }
   }
 
   // Load active election (if any) — exclude completed and invalidated
@@ -1835,6 +1855,19 @@ export async function runDay(): Promise<number> {
             continue;
           }
 
+          // Cycle 3 PR 2 — structural gate (Q3). Suppress agent-driven
+          // Vertrauensfrage outside the gate window: government must be
+          // genuinely fragile (low approval streak, slim margin, past
+          // honeymoon). Drops empirical rate from multi-per-term to
+          // ~0.05/yr, matching real-Bundestag behaviour.
+          const coalitionSeatTotal = allParties
+            .filter(p => nationalState.coalitionParties.includes(p.id))
+            .reduce((s, p) => s + p.seatCount, 0);
+          if (!vertrauensfrageGateOpen(coalitionSeatTotal, govNow.formedOnDay, currentDay, lowGovernmentApprovalStreak)) {
+            console.log(`  [ConfidenceVote] Vertrauensfrage suppressed by structural gate (streak=${lowGovernmentApprovalStreak}, margin=${coalitionSeatTotal - MAJORITY_SEATS}, age=${currentDay - govNow.formedOnDay}d)`);
+            continue;
+          }
+
           const tally = tallyVertrauensfrage(allParties, nationalState.coalitionParties);
           const cvId = `cv-${currentDay}-${generateId()}`;
           const cvStatus = tally.passed ? "passed" : "failed";
@@ -1907,6 +1940,15 @@ export async function runDay(): Promise<number> {
           const govNow = getActiveGovernment();
           if (!govNow) {
             console.warn(`  [ConfidenceVote] No active government, skipping Misstrauensvotum`);
+            continue;
+          }
+
+          // Cycle 3 PR 2 — structural gate (Q3). Suppress agent-driven
+          // Misstrauensvotum outside the gate window: government past
+          // honeymoon AND opposition mathematically capable of forming a
+          // majority AND a Fraktion-bearing alternative leader exists.
+          if (!misstrauensvotumGateOpen(allParties, nationalState.coalitionParties, govNow.formedOnDay, currentDay)) {
+            console.log(`  [ConfidenceVote] Misstrauensvotum suppressed by structural gate (gov age=${currentDay - govNow.formedOnDay}d)`);
             continue;
           }
 
@@ -2761,6 +2803,7 @@ export async function runDay(): Promise<number> {
       currentDay,
       lastRunAt: new Date().toISOString(),
       lowSentimentStreak,
+      lowGovernmentApprovalStreak,
       dailySummary: dailySummaryStr,
       dayProgress: 100,
     } as any)

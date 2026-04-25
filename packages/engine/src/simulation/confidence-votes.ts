@@ -4,6 +4,11 @@ import {
   VERTRAUENSFRAGE_COALITION_YES_RATE,
   MISSTRAUENSVOTUM_OPPOSITION_YES_RATE,
   CONFIDENCE_IMPACTS,
+  VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS,
+  VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN,
+  VERTRAUENSFRAGE_HONEYMOON_DAYS,
+  MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS,
+  FRAKTION_THRESHOLD,
 } from "../config/index.js";
 import { clampApproval } from "./opinion.js";
 
@@ -133,4 +138,76 @@ export function confidenceVoteSentimentImpact(
       party.approvalRating = clampApproval(party.approvalRating + delta);
     }
   }
+}
+
+// ── Cycle 3 PR 2: structural gates (Q3 hybrid) ───────────────────────
+
+/**
+ * Vertrauensfrage gate. Three concurrent conditions for the gate to open:
+ *   1. Government parties' weighted approval has been below 25 for
+ *      ≥ VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS (default 30) sim days
+ *   2. Coalition seat margin is below MAJORITY_SEATS + 5 (genuinely fragile)
+ *   3. Government has been in office for ≥ VERTRAUENSFRAGE_HONEYMOON_DAYS
+ *      (default 90) — Chancellor doesn't call confidence vote in honeymoon
+ *
+ * `coalitionSeats` is the sum of seat counts across all coalition parties.
+ * `lowGovernmentApprovalStreak` is read from `simulation_meta`.
+ */
+export function vertrauensfrageGateOpen(
+  coalitionSeats: number,
+  governmentFormedOnDay: number,
+  currentDay: number,
+  lowGovernmentApprovalStreak: number,
+): boolean {
+  if (lowGovernmentApprovalStreak < VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS) return false;
+  if (coalitionSeats >= MAJORITY_THRESHOLD + VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN) return false;
+  if (currentDay - governmentFormedOnDay < VERTRAUENSFRAGE_HONEYMOON_DAYS) return false;
+  return true;
+}
+
+/**
+ * Konstruktives Misstrauensvotum gate. Two conditions:
+ *   1. Government has been in office ≥ MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS
+ *      (default 180) — opposition needs time to coordinate alternative
+ *   2. Opposition holds enough seats AND a Fraktion-bearing candidate
+ *      exists to potentially beat the coalition
+ *
+ * Path-to-majority math: opposition seats + 1 must reach MAJORITY_THRESHOLD,
+ * which is equivalent to oppositionSeats >= MAJORITY_THRESHOLD - coalitionSeats + 1.
+ */
+export function misstrauensvotumGateOpen(
+  parties: Party[],
+  coalitionPartyIds: string[],
+  governmentFormedOnDay: number,
+  currentDay: number,
+): boolean {
+  if (currentDay - governmentFormedOnDay < MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS) return false;
+  const coalitionSet = new Set(coalitionPartyIds);
+  const coalitionSeats = parties.filter(p => coalitionSet.has(p.id)).reduce((s, p) => s + p.seatCount, 0);
+  const oppositionSeats = parties.filter(p => !coalitionSet.has(p.id)).reduce((s, p) => s + p.seatCount, 0);
+  if (oppositionSeats < MAJORITY_THRESHOLD - coalitionSeats + 1) return false;
+  return pickKonstruktivCandidate(parties, coalitionPartyIds) !== null;
+}
+
+/**
+ * Pick the largest Fraktion-bearing opposition party as the konstruktiv
+ * candidate (S3). Tie-break: higher approval, then lexicographic party id
+ * (deterministic — important for reproducible regression tests).
+ *
+ * Returns null if no opposition party meets the Fraktion threshold.
+ */
+export function pickKonstruktivCandidate(
+  parties: Party[],
+  coalitionPartyIds: string[],
+): Party | null {
+  const coalitionSet = new Set(coalitionPartyIds);
+  const eligible = parties.filter(p => !coalitionSet.has(p.id) && p.seatCount >= FRAKTION_THRESHOLD);
+  if (eligible.length === 0) return null;
+  return eligible
+    .slice()
+    .sort((a, b) => {
+      if (a.seatCount !== b.seatCount) return b.seatCount - a.seatCount;
+      if (a.approvalRating !== b.approvalRating) return b.approvalRating - a.approvalRating;
+      return a.id.localeCompare(b.id);
+    })[0];
 }
