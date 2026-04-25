@@ -1,3 +1,26 @@
+# [1.9.0](https://github.com/easingthemes/ki-bundestag/compare/v1.8.0...v1.9.0) (2026-04-25)
+
+
+### Bug Fixes
+
+* **sim-fidelity:** address PR [#163](https://github.com/easingthemes/ki-bundestag/issues/163) review — R8 breadcrumb + spec wording + cleanup ([ddf8fd8](https://github.com/easingthemes/ki-bundestag/commit/ddf8fd85038ab3c6e8e97dd719bc55bb406e7364)), closes [hi#severity](https://github.com/hi/issues/severity)
+
+
+### Features
+
+* **bundesrat:** 16-Länder voting config + schema (Cycle 2a PR 1) ([c824db6](https://github.com/easingthemes/ki-bundestag/commit/c824db6789811ae2e98fa4f8dec7478d90e48902))
+* **einzelfragen:** Schriftliche Einzelfragen daily counter (Cycle 2b PR 7) ([22c2e71](https://github.com/easingthemes/ki-bundestag/commit/22c2e715df272248e55f48dce70a8acfbe61a785))
+* **elections:** konstituierende Sitzung + interregnum (Cycle 1 PR 4) ([386d5cb](https://github.com/easingthemes/ki-bundestag/commit/386d5cb180e73fd59eb04a1a7afe4bc84bf737ad))
+* **kanzlerwahl:** Art. 63 GG 3-phase scaffold (Cycle 2a PR 3) ([e1d73e3](https://github.com/easingthemes/ki-bundestag/commit/e1d73e3c6b64f9cbb67f1997a999cafeb042f3c1))
+* **loop:** wire Kanzlerwahl + Amtseid into runDay (Cycle 2a PR 4) ([fa18d7c](https://github.com/easingthemes/ki-bundestag/commit/fa18d7c6df8c13576ebacaade97e95e61fabf2a9))
+* **loop:** wire Parliamentary-QA + Aktuelle Stunde (Cycle 2b PR 6) ([ea3a477](https://github.com/easingthemes/ki-bundestag/commit/ea3a4776bc6a777a18cb0d1b2e74d89a797dd80a))
+* **parliamentary-qa:** Regierungsbefragung + Fragestunde scaffold (Cycle 2b PR 5) ([5d0c2cd](https://github.com/easingthemes/ki-bundestag/commit/5d0c2cd7d8b9e174e1ceeb520f6bff670a8b9a03))
+* **petitions:** öffentliche E-Petitionen with 30k quorum (Cycle 2b PR 8) ([2438434](https://github.com/easingthemes/ki-bundestag/commit/24384349993e17ba6fb9b034c5a8cc9596d06888))
+* **pipeline:** bill stage-duration gating (Cycle 1 PR 2) ([86bd811](https://github.com/easingthemes/ki-bundestag/commit/86bd81196195d904ec4cbf765cbd484519aacd26))
+* **pipeline:** Bundesrat + Inkrafttreten timing (Cycle 1 PR 3) ([99d6a8e](https://github.com/easingthemes/ki-bundestag/commit/99d6a8e22fe9e30230e2a55c082cc72b99dd3806))
+* **pipeline:** Bundesrat vote + Vermittlungsausschuss (Cycle 2a PR 2) ([5d4669b](https://github.com/easingthemes/ki-bundestag/commit/5d4669b0372bab4cea4fe54a656e6d94b7739a37))
+* **simulation:** add parliament-calendar (Cycle 1 PR 1) ([a04970c](https://github.com/easingthemes/ki-bundestag/commit/a04970c031e772610785598f640f02a78035cbbb))
+
 # [1.8.0](https://github.com/easingthemes/ki-bundestag/compare/v1.7.10...v1.8.0) (2026-04-09)
 
 
