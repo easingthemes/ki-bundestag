@@ -5,6 +5,7 @@ import {
   BUNDESRAT_DURATION,
   AUSFERTIGUNG_DURATION,
   INKRAFTTRETEN_OFFSET,
+  GOVERNMENT_BILL_COMMITTEE_MULTIPLIER,
 } from "../config/parliament.js";
 import type { Bill } from "@ki-bundestag/types";
 
@@ -55,6 +56,29 @@ describe("bill-pipeline helpers", () => {
     it("returns complex range when isComplexBill is true", () => {
       const bill = makeBill({ isComplexBill: true });
       expect(committeeRange(bill)).toEqual(BILL_STAGE_DURATIONS.committee.complex);
+    });
+
+    // Cycle 3 PR 1 (Q4 flip-only): government bills get a 1.3× committee window
+    it("scales ordinary committee by 1.3× for government bills", () => {
+      const bill = makeBill({ isGovernmentBill: true } as Partial<Bill>);
+      const base = BILL_STAGE_DURATIONS.committee.ordinary;
+      expect(committeeRange(bill)).toEqual({
+        min: Math.round(base.min * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+        max: Math.round(base.max * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+      });
+    });
+
+    it("scales complex committee by 1.3× for government bills", () => {
+      const bill = makeBill({ isGovernmentBill: true, isComplexBill: true } as Partial<Bill>);
+      const base = BILL_STAGE_DURATIONS.committee.complex;
+      expect(committeeRange(bill)).toEqual({
+        min: Math.round(base.min * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+        max: Math.round(base.max * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
+      });
+    });
+
+    it("multiplier is 1.3 (real-data fit; revisit after a 4-year sim)", () => {
+      expect(GOVERNMENT_BILL_COMMITTEE_MULTIPLIER).toBe(1.3);
     });
   });
 
