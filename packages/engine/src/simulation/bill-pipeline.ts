@@ -64,7 +64,7 @@ export function committeeRange(bill: Bill): { min: number; max: number } {
   const base = bill.isComplexBill
     ? BILL_STAGE_DURATIONS.committee.complex
     : BILL_STAGE_DURATIONS.committee.ordinary;
-  if ((bill as any).isGovernmentBill) {
+  if (bill.isGovernmentBill) {
     return {
       min: Math.round(base.min * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
       max: Math.round(base.max * GOVERNMENT_BILL_COMMITTEE_MULTIPLIER),
@@ -177,7 +177,7 @@ export function advanceBillPipeline(
   //       reading and enter committee — no Sitzungstag gate required.
   const proposedBills = allBills.filter(b => b.status === "proposed" && dwellDays(b, day) >= BILL_STAGE_DURATIONS.proposed.min);
   for (const bill of proposedBills) {
-    if ((bill as any).isGovernmentBill) {
+    if (bill.isGovernmentBill) {
       const committeeName = assignCommittee(bill.category as BillCategory);
       const recommendation = generateRecommendation(bill, parties, coalitionParties);
       const range = committeeRange(bill);
@@ -347,7 +347,7 @@ export function advanceBillPipeline(
     if (
       bill.committeeRecommendation === "reject" &&
       !isCoalitionBill &&
-      !(bill as any).isGovernmentBill &&
+      !bill.isGovernmentBill &&
       dwellDays(bill, day) === (bill.stageMinDuration ?? BILL_STAGE_DURATIONS.committee.ordinary.min) &&
       Math.random() < 0.40
     ) {

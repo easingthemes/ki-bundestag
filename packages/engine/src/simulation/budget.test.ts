@@ -63,6 +63,35 @@ describe("shouldPresidentVeto", () => {
     expect(shouldPresidentVeto(bill, () => 0)).toEqual({ veto: false, reason: "" });
   });
 
+  it("skips NaN impact values rather than poisoning the sum", () => {
+    // Without the finite guard, Math.abs(NaN) = NaN → summedImpact = NaN →
+    // `NaN < 0.6` is false → gate stays open → could fire veto on corrupt data.
+    // With the guard, NaN is treated as 0 contribution; valid 0.5 alone is
+    // below threshold → no veto, regardless of rng.
+    const bill = makeBill({ publicSentiment: NaN as unknown as number, budget: 0.5 });
+    expect(shouldPresidentVeto(bill, () => 0)).toEqual({ veto: false, reason: "" });
+  });
+
+  it("skips Infinity impact values rather than tripping the gate", () => {
+    // Without the finite guard, |Infinity| = Infinity → gate trivially passes
+    // → 0.0005 chance of veto on a bill with corrupt impact data. With the
+    // guard, Infinity contributes 0; remaining 0.1 is below threshold → no veto.
+    const bill = makeBill({ publicSentiment: Infinity as unknown as number, budget: 0.1 });
+    expect(shouldPresidentVeto(bill, () => 0)).toEqual({ veto: false, reason: "" });
+  });
+
+  it("still counts valid fields when one field is non-finite", () => {
+    // Mixed input: NaN dropped, but legitimate 1.0 + 0.5 = 1.5 ≥ 0.6 still trips
+    // the gate. Confirms the guard is per-field, not all-or-nothing.
+    const bill = makeBill({
+      publicSentiment: NaN as unknown as number,
+      budget: 1.0,
+      gdpGrowth: 0.5,
+    });
+    const result = shouldPresidentVeto(bill, () => 0.0001);
+    expect(result.veto).toBe(true);
+  });
+
   it("matches the locked Q2 thresholds", () => {
     expect(PRESIDENTIAL_VETO_IMPACT_THRESHOLD).toBe(0.6);
     expect(PRESIDENTIAL_VETO_PROBABILITY).toBe(0.0005);

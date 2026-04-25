@@ -3,6 +3,7 @@ import {
   vertrauensfrageGateOpen,
   misstrauensvotumGateOpen,
   pickKonstruktivCandidate,
+  nextLowGovernmentApprovalStreak,
 } from "./confidence-votes.js";
 import {
   MAJORITY_SEATS,
@@ -11,6 +12,7 @@ import {
   VERTRAUENSFRAGE_HONEYMOON_DAYS,
   MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS,
   FRAKTION_THRESHOLD,
+  LOW_GOVERNMENT_APPROVAL_THRESHOLD,
 } from "../config/index.js";
 import type { Party } from "@ki-bundestag/types";
 
@@ -141,5 +143,56 @@ describe("pickKonstruktivCandidate", () => {
       makeParty("cdu", 250, 25),
     ];
     expect(pickKonstruktivCandidate(fullyTied, ["spd"])?.id).toBe("cdu");
+  });
+});
+
+// ── nextLowGovernmentApprovalStreak ────────────────────────────────────
+
+describe("nextLowGovernmentApprovalStreak", () => {
+  // Helper: just the two fields the function actually reads.
+  const coalitionAt = (pairs: Array<[number, number]>) =>
+    pairs.map(([approval, seats]) => ({ approvalRating: approval, seatCount: seats }));
+
+  it("increments when seat-weighted coalition approval is below the threshold", () => {
+    // 200 seats × 20 + 100 seats × 22 = 4000 + 2200 = 6200; / 300 = 20.67 < 25
+    const next = nextLowGovernmentApprovalStreak(7, coalitionAt([[20, 200], [22, 100]]));
+    expect(next).toBe(8);
+  });
+
+  it("resets to 0 when seat-weighted approval is at or above the threshold", () => {
+    // 200 × 30 + 100 × 25 = 6000 + 2500 = 8500; / 300 = 28.33 >= 25
+    expect(nextLowGovernmentApprovalStreak(15, coalitionAt([[30, 200], [25, 100]]))).toBe(0);
+  });
+
+  it("resets to 0 during interregnum (null coalition)", () => {
+    expect(nextLowGovernmentApprovalStreak(42, null)).toBe(0);
+  });
+
+  it("uses seat-weighted (not unweighted) approval", () => {
+    // Unweighted mean of [50, 5] = 27.5 (above threshold). Seat-weighted with
+    // 1000 seats at approval 5 vs 1 seat at approval 50 → ~5.04 (well below).
+    // The streak must reflect the weighted value.
+    expect(nextLowGovernmentApprovalStreak(0, coalitionAt([[50, 1], [5, 1000]]))).toBe(1);
+  });
+
+  it("treats zero-seat coalition the same as the original inline impl (counts as low)", () => {
+    // Pre-extraction loop.ts had `weightedApproval = 0` when totalSeats === 0,
+    // so the gate counted it as below threshold. Documented in the helper's
+    // docstring; this test pins the behaviour so any future tightening is
+    // an explicit decision, not a silent change.
+    expect(nextLowGovernmentApprovalStreak(3, coalitionAt([[40, 0], [50, 0]]))).toBe(4);
+  });
+
+  it("crosses the LOW_GOVERNMENT_APPROVAL_THRESHOLD boundary correctly", () => {
+    // Just below threshold → increment
+    const justBelow = LOW_GOVERNMENT_APPROVAL_THRESHOLD - 0.01;
+    expect(nextLowGovernmentApprovalStreak(0, coalitionAt([[justBelow, 100]]))).toBe(1);
+    // Exactly at threshold → reset (strict-less semantic)
+    expect(nextLowGovernmentApprovalStreak(99, coalitionAt([[LOW_GOVERNMENT_APPROVAL_THRESHOLD, 100]]))).toBe(0);
+  });
+
+  it("accepts a custom threshold parameter for testability", () => {
+    expect(nextLowGovernmentApprovalStreak(0, coalitionAt([[40, 100]]), 50)).toBe(1);
+    expect(nextLowGovernmentApprovalStreak(7, coalitionAt([[40, 100]]), 30)).toBe(0);
   });
 });

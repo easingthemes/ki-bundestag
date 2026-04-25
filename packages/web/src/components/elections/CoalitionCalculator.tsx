@@ -3,8 +3,7 @@ import { type Party } from "../../api";
 import { fixColor } from "@/lib/utils";
 import { SEMANTIC_HEX } from "@/lib/colors";
 import { Card, CardContent } from "@/components/ui/card";
-
-const MAJORITY_THRESHOLD = 368;
+import { BUNDESTAG_SIZE, MAJORITY_SEATS } from "@/lib/parliament";
 
 function ideologicalSpread(selected: Party[]): number | null {
   if (selected.length < 2) return null;
@@ -29,10 +28,10 @@ export function CoalitionCalculator({ parties, currentCoalitionIds }: CoalitionC
   const [selected, setSelected] = useState<Set<string>>(() => new Set(currentCoalitionIds));
 
   const seatedParties = [...parties].filter(p => p.seatCount > 0).sort((a, b) => b.seatCount - a.seatCount);
-  const totalSeats = seatedParties.reduce((s, p) => s + p.seatCount, 0) || 735;
+  const totalSeats = seatedParties.reduce((s, p) => s + p.seatCount, 0) || BUNDESTAG_SIZE;
   const selectedParties = seatedParties.filter(p => selected.has(p.id));
   const selectedSeats = selectedParties.reduce((s, p) => s + p.seatCount, 0);
-  const hasMajority = selectedSeats >= MAJORITY_THRESHOLD;
+  const hasMajority = selectedSeats >= MAJORITY_SEATS;
   const spread = ideologicalSpread(selectedParties);
   const spreadLabel = spread == null ? null : spread <= 1.0 ? "Kompatibel" : spread <= 2.0 ? "Moderat" : "Fragmentiert";
   const spreadColor = spread == null ? SEMANTIC_HEX.neutral : spread <= 1.0 ? SEMANTIC_HEX.positive : spread <= 2.0 ? SEMANTIC_HEX.warning : SEMANTIC_HEX.negative;

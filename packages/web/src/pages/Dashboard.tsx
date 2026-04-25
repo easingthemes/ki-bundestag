@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api, type Bill, type CalendarData, type Crisis, type Election, type Government, type MediaArticle, type NationalState, type Party, type Poll, type SimulationEvent, type SimulationStatus, type BundestagSeat, type MdbApplication, type UpcomingCalendarData } from "../api";
 import { MDB_BADGE } from "@/lib/colors";
+import { MAJORITY_SEATS } from "@/lib/parliament";
 import { CalendarWidget } from "../components/CalendarWidget";
 import { UpcomingCalendar } from "../components/UpcomingCalendar";
 import { Hemicycle } from "../components/Hemicycle";
@@ -232,8 +233,8 @@ export function Dashboard() {
                     <div className="flex flex-col gap-2 items-center">
                       <div className="text-[13px] font-bold uppercase tracking-wide text-emerald-600">
                         {t("koalition")}
-                        <span className={cn("ml-1.5", coalitionSeats >= 368 ? "text-emerald-600" : "text-destructive")}>
-                          {coalitionSeats} Sitze {coalitionSeats >= 368 ? "✓" : "✗"}
+                        <span className={cn("ml-1.5", coalitionSeats >= MAJORITY_SEATS ? "text-emerald-600" : "text-destructive")}>
+                          {coalitionSeats} Sitze {coalitionSeats >= MAJORITY_SEATS ? "✓" : "✗"}
                         </span>
                       </div>
                       <div className="flex flex-wrap justify-center gap-2">

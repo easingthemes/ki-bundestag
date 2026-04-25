@@ -46,8 +46,10 @@ export const PARIAH_PARTIES = new Set(["afd"]);
  * over-fired by 100×. Three concurrent conditions must hold for the gate
  * to be open.
  */
-/** Government parties' weighted approval must be < 25 for at least this many sim days. */
+/** Government parties' weighted approval must be < LOW_GOVERNMENT_APPROVAL_THRESHOLD for at least this many sim days. */
 export const VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS = 30;
+/** Threshold for the daily streak update — coalition seat-weighted approval below this counts as "low". */
+export const LOW_GOVERNMENT_APPROVAL_THRESHOLD = 25;
 /** Coalition seat margin above majority threshold beyond which Vertrauensfrage is structurally pointless. */
 export const VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN = 5;
 /** Government honeymoon — no Vertrauensfrage in the first N sim days after Amtseid. */

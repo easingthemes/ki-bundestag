@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MODEL_TYPE_BADGE } from "@/lib/colors";
+import { BUNDESTAG_SIZE, MAJORITY_SEATS, FRAKTION_THRESHOLD } from "@/lib/parliament";
 import { FilterPills } from "@/components/FilterPills";
 
 type ActionType = "AI — Haiku" | "AI — Sonnet" | "Algorithmic";
@@ -64,7 +65,7 @@ const ACTIONS: ActionRow[] = [
     type: "AI — Haiku",
     triggeredBy: "Koalitionsführer-Agent (max 1/Tag global)",
     summary: "Stellt Vertrauensfrage an den Kanzler (max 1/Runde)",
-    detail: "Available only to the coalition leader party. Model is instructed to use after a crisis, controversial bill, or to seek a fresh mandate. If fewer than 368 seats vote yes (with 10% coalition defection risk), the government falls and a snap election is triggered.",
+    detail: `Available only to the coalition leader party. Model is instructed to use after a crisis, controversial bill, or to seek a fresh mandate. If fewer than ${MAJORITY_SEATS} seats vote yes (with 10% coalition defection risk), the government falls and a snap election is triggered.`,
   },
   {
     action: "file_misstrauensvotum",
@@ -72,7 +73,7 @@ const ACTIONS: ActionRow[] = [
     type: "AI — Haiku",
     triggeredBy: "Oppositions-Agent (max 1/Tag global)",
     summary: "Konstruktives Misstrauensvotum mit Benennung eines Ersatzkanzlers",
-    detail: "Opposition proposes a replacement Chancellor (must name person + party). 85% of other opposition parties automatically join. Requires 368-seat absolute majority. If passed, opposition takes power immediately with no election.",
+    detail: `Opposition proposes a replacement Chancellor (must name person + party). 85% of other opposition parties automatically join. Requires ${MAJORITY_SEATS}-seat absolute majority. If passed, opposition takes power immediately with no election.`,
   },
   {
     action: "file_constitutional_challenge",
@@ -112,7 +113,7 @@ const ACTIONS: ActionRow[] = [
     type: "AI — Sonnet",
     triggeredBy: "Nach 3 Verhandlungsrunden",
     summary: "Fasst alle Verhandlungsrunden in einen Koalitionsvertrag zusammen",
-    detail: "Uses the 'synthesis' model key (Sonnet, 4096 tokens). Receives all 3 rounds of positions and concessions from all parties. Produces a coalition with key policies, per-party concessions, and a summary. Must have 368+ seats and 2+ parties — otherwise falls back to algorithmic formGovernment().",
+    detail: `Uses the 'synthesis' model key (Sonnet, 4096 tokens). Receives all 3 rounds of positions and concessions from all parties. Produces a coalition with key policies, per-party concessions, and a summary. Must have ${MAJORITY_SEATS}+ seats and 2+ parties — otherwise falls back to algorithmic formGovernment().`,
   },
   {
     action: "answer_citizen_question",
@@ -200,7 +201,7 @@ const ACTIONS: ActionRow[] = [
     type: "Algorithmic",
     triggeredBy: "Abstimmungsphase — Wahltag",
     summary: "Berechnet Sitzverteilung aus Parteizustimmungswerten",
-    detail: "Approval ratings + Gaussian noise (σ ≈ 2%) → normalize → drop parties below 5% threshold → proportional seat allocation across 735 total seats. Coalition formation: largest mainstream party + ideologically closest partners until 368+ seats. AfD excluded from coalition (Brandmauer) unless no mainstream majority is possible.",
+    detail: `Approval ratings + Gaussian noise (σ ≈ 2%) → normalize → drop parties below 5% threshold → proportional seat allocation across ${BUNDESTAG_SIZE} total seats. Coalition formation: largest mainstream party + ideologically closest partners until ${MAJORITY_SEATS}+ seats. AfD excluded from coalition (Brandmauer) unless no mainstream majority is possible.`,
   },
   {
     action: "confidence_vote_tally",
@@ -208,7 +209,7 @@ const ACTIONS: ActionRow[] = [
     type: "Algorithmic",
     triggeredBy: "Pro Vertrauensfrage oder Misstrauensvotum",
     summary: "Zählt Sitze für/gegen die Regierung",
-    detail: "Vertrauensfrage: coalition votes yes with 90% probability (10% defection risk). Opposition votes no. Threshold: 368 seats. Failed → dissolve government + snap election. Misstrauensvotum: initiating party + 85% of other opposition join. Threshold: 368. Passed → instant power transfer, form new cabinet.",
+    detail: `Vertrauensfrage: coalition votes yes with 90% probability (10% defection risk). Opposition votes no. Threshold: ${MAJORITY_SEATS} seats. Failed → dissolve government + snap election. Misstrauensvotum: initiating party + 85% of other opposition join. Threshold: ${MAJORITY_SEATS}. Passed → instant power transfer, form new cabinet.`,
   },
   {
     action: "motion_vote",
@@ -264,7 +265,7 @@ const ACTIONS: ActionRow[] = [
     type: "Algorithmic",
     triggeredBy: "Nach jeder Wahl",
     summary: "Erstellt/löst Fraktionen automatisch bei 5%-Sitzgrenze",
-    detail: "Threshold: 37 seats (5% of 735). Parties above threshold get/keep a Fraktion (using FRAKTION_LEADERS map). Parties below have their Fraktion dissolved. Parties without Fraktion can only issue statements.",
+    detail: `Threshold: ${FRAKTION_THRESHOLD} seats (5% of ${BUNDESTAG_SIZE}). Parties above threshold get/keep a Fraktion (using FRAKTION_LEADERS map). Parties below have their Fraktion dissolved. Parties without Fraktion can only issue statements.`,
   },
   {
     action: "referendum_resolve",
