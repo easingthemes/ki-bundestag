@@ -221,6 +221,15 @@ export const INQUIRY_CLEARED_FILER_IMPACT = -0.3;
 export const INQUIRY_WATCHDOG_GRACE_DAYS = 30;
 export const INQUIRY_WATCHDOG_HEARING_GAP_DAYS = 60;
 
+// ── Cycle 4 PR 4 — Debate sub-formats (S6) ──────────────────────────
+
+/** Probability per bill-reading event of a Kurzintervention firing.
+ *  Independent roll from Zwischenfrage. */
+export const KURZINTERVENTION_PROBABILITY = 0.30;
+
+/** Probability per bill-reading event of a Zwischenfrage firing. */
+export const ZWISCHENFRAGE_PROBABILITY = 0.30;
+
 /**
  * Maps each `crises.category` (= BillCategory) to a ministry portfolio.
  * Used by:

@@ -75,7 +75,14 @@ export type SimulationEventType =
   // pending_injections after a Schuldenbremse-Aussetzung passes (S19).
   | "nachtragshaushalt_proposed"
   | "nachtragshaushalt_passed"
-  | "nachtragshaushalt_rejected";
+  | "nachtragshaushalt_rejected"
+  // Cycle 4 PR 4 — debate sub-formats (Q6). Two pure deterministic flavor
+  // events (Kurzintervention, Zwischenfrage) at bill_first_reading /
+  // bill_second_reading; one data-hooked (Erklärung zur Abstimmung) for
+  // discipline-level ≥ 1 MdB seats voting against the party line.
+  | "kurzintervention"
+  | "zwischenfrage"
+  | "erklaerung_zur_abstimmung";
 
 export interface SimulationEvent {
   id: string;

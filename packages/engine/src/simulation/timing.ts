@@ -164,6 +164,12 @@ export const ROUTINE_EVENTS = [
   // Cycle 3 PR 4 — Überweisung ohne Aussprache renders as a one-line entry
   // (S7); routine-tier classification matches `bill_first_reading`.
   "bill_ueberweisung_ohne_aussprache",
+  // Cycle 4 PR 4 — debate sub-formats (S15). All three are flavor events
+  // that fire alongside readings; routine-tier keeps them out of the
+  // night-mode queue and renders compactly in the UI.
+  "kurzintervention",
+  "zwischenfrage",
+  "erklaerung_zur_abstimmung",
 ] as const;
 
 /**

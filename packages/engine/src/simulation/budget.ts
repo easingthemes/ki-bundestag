@@ -65,12 +65,17 @@ export function generateBudgetAllocations(coalitionParties: Party[]): BudgetAllo
  * Tally algorithmic budget vote.
  * Coalition yes rate scales with public sentiment. Opposition rate is inverse.
  * When isRevision=true (retry after rejection), coalition gets +5pp boost.
+ *
+ * `rng` parameter (Cycle 4 PR 4) accepts a seeded RNG for deterministic
+ * tests. Defaults to `Math.random` in production. Existing callers continue
+ * to omit it; new callers (processNachtragsInjection) pass it through.
  */
 export function tallyBudgetVote(
   allParties: Party[],
   coalitionIds: string[],
   publicSentiment: number,
   isRevision = false,
+  rng: () => number = Math.random,
 ): {
   votes: BudgetVote[];
   yesSeats: number;
@@ -96,7 +101,7 @@ export function tallyBudgetVote(
 
   for (const party of allParties) {
     const isCoalition = coalitionIds.includes(party.id);
-    const voteChoice: "yes" | "no" = Math.random() < (isCoalition ? coalitionYesRate : oppositionYesRate)
+    const voteChoice: "yes" | "no" = rng() < (isCoalition ? coalitionYesRate : oppositionYesRate)
       ? "yes" : "no";
     votes.push({ partyId: party.id, vote: voteChoice, seats: party.seatCount });
     if (voteChoice === "yes") yesSeats += party.seatCount;
@@ -453,8 +458,9 @@ export function processNachtragsInjection(
   });
 
   // Reuse existing tallyBudgetVote — Nachtragshaushalt has no revision
-  // concept (single-shot vote), so isRevision=false.
-  const vote = tallyBudgetVote(parties, state.coalitionParties, state.publicSentiment, false);
+  // concept (single-shot vote), so isRevision=false. Pass through the rng
+  // so tests can deterministically force pass/fail outcomes.
+  const vote = tallyBudgetVote(parties, state.coalitionParties, state.publicSentiment, false, rng);
 
   if (vote.passed) {
     // R4 invariant: this is the ONLY same-day economic effect path for

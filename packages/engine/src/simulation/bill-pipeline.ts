@@ -9,6 +9,7 @@ import { checkPresidentialVeto } from "./veto.js";
 import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
 import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET, GOVERNMENT_BILL_COMMITTEE_MULTIPLIER, UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY } from "../config/parliament.js";
+import { rollKurzintervention, rollZwischenfrage } from "./debate-formats.js";
 import { VERMITTLUNG_DURATION } from "../config/bundesrat.js";
 import {
   voteBundesrat,
@@ -285,6 +286,12 @@ export function advanceBillPipeline(
           description: `Der Gesetzentwurf von ${bill.proposedBy} wurde im Bundestag eingebracht.`,
           data: { billId: bill.id },
         });
+        // Cycle 4 PR 4 — Kurzintervention + Zwischenfrage flavor events
+        // (independent 30% rolls per S6).
+        const ki1 = rollKurzintervention(bill, parties, "first", day);
+        if (ki1) events.push(ki1);
+        const zf1 = rollZwischenfrage(bill, parties, "first", day);
+        if (zf1) events.push(zf1);
         console.log(`  [Pipeline] "${bill.title}" → first_reading`);
       }
     }
@@ -404,6 +411,11 @@ export function advanceBillPipeline(
       description: `Der Gesetzentwurf geht in die 2. Lesung. Parteien können Änderungsanträge stellen.`,
       data: { billId: bill.id },
     });
+    // Cycle 4 PR 4 — Kurzintervention + Zwischenfrage flavor events.
+    const ki2 = rollKurzintervention(bill, parties, "second", day);
+    if (ki2) events.push(ki2);
+    const zf2 = rollZwischenfrage(bill, parties, "second", day);
+    if (zf2) events.push(zf2);
     console.log(`  [Pipeline] "${bill.title}" → second_reading`);
   }
 
