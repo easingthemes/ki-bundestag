@@ -50,6 +50,7 @@ import {
 } from "./parliamentary-qa.js";
 import {
   scheduleAktuelleStundeForCrisis,
+  wouldDedupAktuelleStundeForCrisis,
   maybeScheduleBaselineAktuelleStunde,
   getPendingAktuelleStundeSessions,
   buildAktuelleStundeBatchRequests,
@@ -516,14 +517,24 @@ export async function runDay(): Promise<number> {
     try { createNotificationForAll("crisis_alert", `Krise: ${newCrisis.name}`, `${newCrisis.description} (Schweregrad: ${newCrisis.severity})`, { crisisId: newCrisis.id, severity: newCrisis.severity }, currentDay); } catch {}
 
     // Cycle 2b PR 6 — Aktuelle-Stunde crisis hook. Only schedules if severity
-    // >= MIN and no session already exists this Sitzungswoche. Silent on dedup
-    // to avoid noise when multiple high-severity crises cluster.
+    // >= MIN and no session already exists this Sitzungswoche. R8: when a
+    // would-be schedule is suppressed by same-week dedup, append a breadcrumb
+    // (`aktuelleStundeSkipped: true`) to the just-emitted `crisis_start` event
+    // so viewers see "weitere Aktuelle Stunde zurückgestellt" instead of a
+    // silent drop.
     if (startDate) {
       try {
         const gov = getActiveGovernment();
+        const willDedup = wouldDedupAktuelleStundeForCrisis(newCrisis, gov, startDate, currentDay);
         const scheduled = scheduleAktuelleStundeForCrisis(newCrisis, gov, allParties, startDate, currentDay);
         if (scheduled) {
           console.log(`  [Aktuelle Stunde] Scheduled for day ${scheduled.scheduledDay} (crisis: ${newCrisis.name})`);
+        } else if (willDedup) {
+          const lastEvent = dayEvents[dayEvents.length - 1];
+          if (lastEvent && lastEvent.type === "crisis_start" && lastEvent.data?.crisisId === newCrisis.id) {
+            lastEvent.data = { ...lastEvent.data, aktuelleStundeSkipped: true };
+          }
+          console.log(`  [Aktuelle Stunde] Skipped (same-week dedup) for crisis: ${newCrisis.name}`);
         }
       } catch (err) {
         console.warn(`  [Aktuelle Stunde] crisis-hook skipped: ${(err as Error).message}`);

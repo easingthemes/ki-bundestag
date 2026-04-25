@@ -14,7 +14,7 @@
  */
 
 import type { BillCategory, Crisis } from "@ki-bundestag/types";
-import { and, eq, gte, lte, ne, isNull, desc } from "drizzle-orm";
+import { and, eq, lte, desc } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import {
   PETITION_QUORUM,

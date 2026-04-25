@@ -16,13 +16,14 @@ import {
   baselineTick,
   buildAktuelleStundeBatchRequest,
   parseAktuelleStundePositions,
+  wouldDedupAktuelleStundeForCrisis,
   type AktuelleStundeSession,
 } from "./aktuelle-stunde.js";
 import {
   AKTUELLE_STUNDE_BASELINE_MONTHLY_RATE,
   AKTUELLE_STUNDE_FALLBACK,
 } from "../config/aktuelle-stunde.js";
-import type { Party } from "@ki-bundestag/types";
+import type { Crisis, Government, Party } from "@ki-bundestag/types";
 
 function makeParty(id: string, approval: number): Party {
   return {
@@ -210,5 +211,27 @@ describe("AKTUELLE_STUNDE_FALLBACK", () => {
   it("provides non-empty government + opposition strings", () => {
     expect(AKTUELLE_STUNDE_FALLBACK.government.length).toBeGreaterThan(0);
     expect(AKTUELLE_STUNDE_FALLBACK.opposition.length).toBeGreaterThan(0);
+  });
+});
+
+// ── wouldDedupAktuelleStundeForCrisis (R8 breadcrumb predicate) ────────
+
+describe("wouldDedupAktuelleStundeForCrisis", () => {
+  const startDate = new Date("2026-01-05"); // Mon, sim-day 0 anchor
+  const gov = { id: "g1", chancellorPartyId: "spd", ministers: [] } as unknown as Government;
+  function crisis(severity: string): Crisis {
+    return {
+      id: "c1", name: "test", description: "", category: "economy",
+      severity, startDay: 1, endDay: 30,
+    } as unknown as Crisis;
+  }
+
+  it("returns false when severity is below threshold (no breadcrumb owed)", () => {
+    expect(wouldDedupAktuelleStundeForCrisis(crisis("medium"), gov, startDate, 5)).toBe(false);
+    expect(wouldDedupAktuelleStundeForCrisis(crisis("low"), gov, startDate, 5)).toBe(false);
+  });
+
+  it("returns false during interregnum (no government)", () => {
+    expect(wouldDedupAktuelleStundeForCrisis(crisis("high"), null, startDate, 5)).toBe(false);
   });
 });

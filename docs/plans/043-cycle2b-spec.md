@@ -473,7 +473,7 @@ Each PR runs `npm run typecheck && npm test && npm run build` before pushing the
 - `sqlite3 data/simulation.db "SELECT COUNT(*) FROM parliamentary_qa_sessions WHERE answered_on_day IS NOT NULL"` returns a row count consistent with ≥95% of scheduled sessions getting an answer (fallback text counts as answered).
 - `sqlite3 data/simulation.db "SELECT SUM(schriftliche_einzelfragen_filed_total) FROM simulation_meta"` after 1461 days returns a value between 22_000 and 87_000 (matches the Poisson-expected range for λ=33 over 1461 days, ±2σ).
 - `sqlite3 data/simulation.db "SELECT status, COUNT(*) FROM petitions GROUP BY 1"` after 1461 days returns a distribution where `quorum_reached + debated + rejected ≈ 30% ± 10%` of total.
-- Re-seed + `simulate 100` under a fixed RNG seed produces identical Schriftliche-Einzelfragen counter sequence AND identical petition spawn sequence (regression guard — both use the shared seeded RNG).
+- Unit tests in `petitions.test.ts` and `schriftliche-einzelfragen.test.ts` pass a seeded RNG directly to module functions and assert deterministic spawn / counter sequences. End-to-end determinism through `runDay()` is **not** in scope this cycle — production runs default to `Math.random` and are non-deterministic by design. Plumbing a sim-meta seed through the daily loop is deferred (tracked under "Open items surfaced for later cycles" below).
 - Added AI spend measured via `logAICall` output stays below +$0.004/sim-day (averaged over a week).
 - `sqlite3 data/simulation.db "SELECT type, COUNT(*) FROM simulation_events WHERE type IN ('regierungsbefragung','fragestunde','aktuelle_stunde') GROUP BY 1"` after a year (≈365 sim days) returns counts roughly `(22, 22, 18–24)` — matches real Bundestag cadence.
 
@@ -486,6 +486,7 @@ Each PR runs `npm run typecheck && npm test && npm run build` before pushing the
 - **Dringliche Fragen** — urgent-question format, short-fuse. Interacts with crisis-hook infrastructure (same code path as Aktuelle Stunde but different event type). Cycle 3.
 - **Petition signature-momentum modeling** — real petitions often spike on media coverage. Hooking petition growth to `media_articles` sentiment would add drama but introduces cross-module coupling this cycle didn't budget for. Cycle 3+.
 - **Minister response latency on Schriftliche Einzelfragen** — real answers are due within 7 days. Sim currently treats filed + answered as independent counters; a queueing model would be more realistic. P3 polish.
+- **End-to-end seeded RNG through `runDay()`** — petitions / Einzelfragen / Aktuelle-Stunde-baseline modules accept an `rng` argument and are deterministic in unit tests, but `loop.ts` calls them without one (defaulting to `Math.random`). Plumbing a sim-meta `randomSeed` column through the daily loop would unlock end-to-end snapshot regression tests. Cycle 3+.
 
 
 
