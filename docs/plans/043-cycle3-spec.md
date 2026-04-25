@@ -46,12 +46,14 @@ Restated from the brainstorm + sub-decisions surfaced while designing.
 
 Net effect: real-data-matched veto frequency. Most bills (`summedImpact < 0.6`) are immune; only constitutional-stakes bills are eligible, and even then only ~1-in-2000 fires. Over a full term (~80 passed bills/year * 4 years = 320), expected vetoes ≈ 0.05 — matching the historical ~0.04% rate.
 
-Constants live in `packages/engine/src/config/voting.ts` (or `veto.ts` directly):
+Constants live in `packages/engine/src/config/budget.ts` (next to existing veto-related config like `VETO_REASONS` and `VETO_PROPOSER_APPROVAL_PENALTY`):
 
 ```ts
 export const PRESIDENTIAL_VETO_PROBABILITY = 0.0005;
 export const PRESIDENTIAL_VETO_IMPACT_THRESHOLD = 0.6;
 ```
+
+The 7 old veto-tuning constants (`VETO_BASE_PROBABILITY`, `VETO_SENTIMENT_THRESHOLD/_BONUS`, `VETO_BUDGET_THRESHOLD/_BONUS`, `VETO_GDP_THRESHOLD/_BONUS`) are removed in the same commit — only `shouldPresidentVeto` consumed them.
 
 `checkPresidentialVeto()` rewritten:
 
@@ -132,11 +134,13 @@ if (stage === "committee" && isGovernmentBill(bill)) {
 }
 ```
 
-Constant in `config/elections.ts` (no `config/parliament.ts` exists; existing parliament-shape constants live there):
+Constant in `config/parliament.ts` (next to `BILL_STAGE_DURATIONS`, where bill-pipeline timing constants already live):
 
 ```ts
 export const GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3;
 ```
+
+Applied at the single edit point `committeeRange()` in `bill-pipeline.ts:47-51`, which is the choke-point for both the proposed→committee (gov bill direct path) and first_reading→committee (non-gov path) flows.
 
 No event-type change, no schema change. Bills mid-flight at migration time keep their already-stored `stage_min_duration` — the multiplier only applies on new committee entries.
 
@@ -363,12 +367,12 @@ The non-government branch at `bill-pipeline.ts:194-222` currently always advance
 
 `rng()` defaults to `Math.random` consistent with project pattern (and the I2 spec wording from Cycle 2b: deterministic in tests, non-deterministic in production).
 
-### Constant (`config/elections.ts` or new `config/bill-pipeline.ts`)
+### Constant (`config/parliament.ts`)
 
-Cleanest in a new dedicated file given existing `BILL_STAGE_DURATIONS` already lives module-local in `bill-pipeline.ts`. To keep the change small, add to `bill-pipeline.ts` directly:
+Lives next to `BILL_STAGE_DURATIONS` and `GOVERNMENT_BILL_COMMITTEE_MULTIPLIER` — the canonical home for bill-pipeline tuning:
 
 ```ts
-const UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY = 0.65;
+export const UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY = 0.65;
 ```
 
 ### New event type
@@ -432,14 +436,16 @@ No order dependency between pieces 1, 2, 3, 5, 7 (constant-only / probability-on
 
 PR-style commits on `claude/sim-fidelity-cycle3` branch, mirroring the Cycle 2a/2b pattern.
 
-### PR 1 — Pieces 1+3 (single-file knob tunes)
+### PR 1 — Pieces 1+3 (single-file knob tunes) — **shipped in `d60a8b5`**
 
 `feat(sim-fidelity): veto cap + gov-bill committee multiplier (Cycle 3 PR 1)`
 
-- `config/elections.ts`: add `PRESIDENTIAL_VETO_PROBABILITY = 0.0005`, `PRESIDENTIAL_VETO_IMPACT_THRESHOLD = 0.6`, `GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3`
-- `simulation/veto.ts`: rewrite `checkPresidentialVeto()` with two-stage filter
-- `simulation/bill-pipeline.ts`: insert multiplier on committee-stage entry for `isGovernmentBill === true`
-- Unit tests: veto returns false below threshold; veto rolls 0.05% above; committee duration scales 1.3× for gov bills
+- `config/budget.ts`: add `PRESIDENTIAL_VETO_PROBABILITY = 0.0005`, `PRESIDENTIAL_VETO_IMPACT_THRESHOLD = 0.6`; remove 7 dead `VETO_*` constants
+- `config/parliament.ts`: add `GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3`
+- `simulation/budget.ts`: rewrite `shouldPresidentVeto()` with two-stage filter, optional `rng` param
+- `simulation/bill-pipeline.ts`: scale `committeeRange()` by 1.3× when `bill.isGovernmentBill`
+- `simulation/veto.ts`: update docstring (probability comment was stale)
+- Unit tests (+11): `budget.test.ts` (new — 8 cases incl. 50_000-trial convergence under seeded LCG); `bill-pipeline.test.ts` (3 new committeeRange cases)
 
 ### PR 2 — Piece 2 (confidence-vote gates + tracker column)
 
