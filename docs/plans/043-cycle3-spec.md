@@ -132,7 +132,7 @@ if (stage === "committee" && isGovernmentBill(bill)) {
 }
 ```
 
-Constant in `config/parliament.ts`:
+Constant in `config/elections.ts` (no `config/parliament.ts` exists; existing parliament-shape constants live there):
 
 ```ts
 export const GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3;
@@ -140,4 +140,383 @@ export const GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3;
 
 No event-type change, no schema change. Bills mid-flight at migration time keep their already-stored `stage_min_duration` — the multiplier only applies on new committee entries.
 
+## Design — Piece 4: 735 → 630 seats (2023 Wahlrecht reform)
+
+Today `config/elections.ts` exports `TOTAL_SEATS = 735` and `MAJORITY_SEATS = 368`. The 2023 Wahlrechtsreform caps the Bundestag at 630 seats (no Überhang/Ausgleichsmandate). Majority becomes 316.
+
+### Constant changes (`config/elections.ts`)
+
+```ts
+// Rename + revalue. Both names continue to work via re-export to avoid
+// touching every callsite in one PR — see migration ordering below.
+export const BUNDESTAG_SIZE = 630;
+export const MAJORITY_SEATS = 316;
+
+/** @deprecated Use BUNDESTAG_SIZE. Kept as alias for one cycle. */
+export const TOTAL_SEATS = BUNDESTAG_SIZE;
+```
+
+`MAJORITY_SEATS` is consumed by 9+ sites — `voting.ts`, `loop.ts` (kanzlerwahl description), `elections.ts` (coalition formation), `confidence-votes.ts`, `kanzlerwahl.ts`, `bundesrat.ts`, plus tests. All read the constant; none hardcode the number, so a single edit propagates.
+
+`TOTAL_SEATS` has fewer consumers but is referenced in the hardcoded German prompt at `negotiations.ts:38` (`"Eine Koalition braucht 368+ Sitze (Mehrheit von 735)"`). That string must be updated to `"316+ Sitze (Mehrheit von 630)"` — the prompt-side change is a separate concern from the constant rename and is grouped with this piece.
+
+### Seat reapportionment
+
+Algorithm in `seats.ts::allocateBundestagSeats()` reapportions seats from vote share for new elections — its output dimension is parameterised on a constant. Switching that constant from `TOTAL_SEATS=735` to `BUNDESTAG_SIZE=630` is sufficient for all post-migration elections.
+
+For mid-flight `parties.seat_count` rows (i.e. the currently-sitting Bundestag at migration time), proportional shrink:
+
+```ts
+function rescaleSeatsToBundestag(parties: Party[], target: number): Party[] {
+  const total = parties.reduce((s, p) => s + p.seatCount, 0);
+  if (total === target) return parties;                       // already aligned
+  const scaled = parties.map(p => ({
+    ...p,
+    rawSeats: (p.seatCount / total) * target,
+  }));
+  // Largest-remainder rounding
+  const floors = scaled.map(p => ({ ...p, intSeats: Math.floor(p.rawSeats), remainder: p.rawSeats - Math.floor(p.rawSeats) }));
+  const sumFloors = floors.reduce((s, p) => s + p.intSeats, 0);
+  let leftover = target - sumFloors;
+  const sortedByRemainder = [...floors].sort((a, b) => b.remainder - a.remainder);
+  for (let i = 0; i < sortedByRemainder.length && leftover > 0; i++) {
+    sortedByRemainder[i].intSeats += 1;
+    leftover -= 1;
+  }
+  // Tie-break: any remaining leftover goes to the party with the highest seat
+  // count after the round (deterministic; only relevant when remainders are
+  // exactly equal — vanishingly rare with 16-decimal-bit floats).
+  if (leftover > 0) {
+    sortedByRemainder.sort((a, b) => b.intSeats - a.intSeats);
+    sortedByRemainder[0].intSeats += leftover;
+  }
+  return parties.map(p => ({ ...p, seatCount: floors.find(f => f.id === p.id)!.intSeats }));
+}
+```
+
+Identical helper applied to `bundestagSeats` (MdB-seat) rows for the same proportional rescale. Sum-invariant: ∑seats == 630 after the rescale.
+
+### Migration block (in `seed.ts::migrateDatabase()`)
+
+Order matters per S4: **runs AFTER the `parties` table exists, BEFORE Cycle 1's stage-entry-day backfill, BEFORE Cycle 2a's kanzlerwahl synthetic-row backfill.** Idempotency: guarded by `meta.bundestagSizeMigrated === true`.
+
+```ts
+// Cycle 3 — proportional shrink to 630 seats
+if (!meta.bundestagSizeMigrated) {
+  const partyRows = db.select().from(schema.parties).all();
+  const total = partyRows.reduce((s, r) => s + r.seatCount, 0);
+  if (total > 0 && total !== BUNDESTAG_SIZE) {
+    const rescaled = rescaleSeatsToBundestag(partyRows, BUNDESTAG_SIZE);
+    for (const p of rescaled) {
+      db.update(schema.parties).set({ seatCount: p.seatCount }).where(eq(schema.parties.id, p.id)).run();
+    }
+    // Same operation for bundestag_seats (MdB seats)
+    const seatRows = db.select().from(schema.bundestagSeats).all();
+    if (seatRows.length > 0) {
+      const seatTotal = seatRows.reduce((s, r) => s + r.totalSeats, 0);
+      if (seatTotal !== BUNDESTAG_SIZE) {
+        // Per-party proportional cut on bundestagSeats.totalSeats (party-level grouping)
+        // ...same largest-remainder algorithm
+      }
+    }
+  }
+  setMetaFlag("bundestagSizeMigrated", true);
+}
+```
+
+No schema change; all operations are UPDATE-in-place on existing rows. Tests that hardcode `368` (kanzlerwahl.test.ts, chancellor-vote.test.ts, voting.ts internal docstrings) get updated to `316` in this PR. No tests should reference `MAJORITY_SEATS` literally — they all import the constant.
+
+## Design — Piece 5: Campaign duration 21 → 60 days
+
+Today `TIME_CONFIG.ELECTION_CAMPAIGN_DAYS = 21` (timing.ts:40). Real Bundestag campaign window is 42–84 days by law (Art. 39 GG + BWahlG). Q6 locked at fixed 60.
+
+### Constant change (`timing.ts`)
+
+```ts
+ELECTION_CAMPAIGN_DAYS: 60,   // total days from announcement to election (was 21)
+ELECTION_CAMPAIGN_START: 7,   // unchanged — rally start still ~7d after announce
+```
+
+That's the only edit. `announceElection()` (`elections.ts:69-86`) reads `TIME_CONFIG.ELECTION_CAMPAIGN_DAYS` to compute `electionDay = currentDay + 60`, then snaps to next Sunday via `snapToNextSunday()`. The downstream snap behaviour is unchanged.
+
+### Migration (per S5)
+
+**No retroactive adjustment.** Active elections (status `announced` or `campaign`) at migration time keep their existing `electionDay`. Only elections announced after this constant change use the 60-day window.
+
+This is a one-line guard in the migration block:
+
+```ts
+// Cycle 3 — campaign-duration constant change is automatic on new elections
+// only. No DB action needed; just document that the constant flipped.
+```
+
+### Test impact
+
+`elections.test.ts:94-103` tests `snapToNextSunday()` over a 365-day range — unaffected. Any test that asserts a specific `electionDay` arithmetic (currently none search the codebase for `+ 21` or `+ 60` over `electionDay`) would need updating. Re-running tests should reveal any drift; the brainstorm scoped this as a one-constant change.
+
+## Design — Piece 6: Negotiation duration cap + dwell
+
+Today `MAX_NEGOTIATION_ROUNDS = 3` (negotiations.ts:14) and `MAX_NEGOTIATION_DAYS = getMaxNegotiationRounds() + 5 = 8` (loop.ts:621). Real coalition negotiations: 2017 Jamaica/GroKo took 171 days, 2021 Ampel took 72 days. Q7 locked at: raise cap to 90, add 7-day inter-round dwell.
+
+### Constant changes (`negotiations.ts` + `config/elections.ts`)
+
+```ts
+// negotiations.ts
+const MAX_NEGOTIATION_ROUNDS = 3;          // unchanged
+export const MAX_NEGOTIATION_DAYS = 90;    // was implicitly 8 in loop.ts
+export const MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7;   // new — inter-round pacing
+```
+
+`MAX_NEGOTIATION_DAYS` moves from a derived value (`getMaxNegotiationRounds() + 5`) to an explicit constant. `loop.ts:621` switches from the derived expression to the import.
+
+### Round-dispatch dwell guard (`loop.ts:610–650`)
+
+Today: each call to `runDay()` during negotiation dispatches the next round. Result: 3 rounds finish in 3 sim days.
+
+Change: dispatch a round only if `currentDay - lastRoundDay >= MIN_NEGOTIATION_ROUND_DWELL_DAYS`. The first round runs immediately on the negotiation-start day (no prior `lastRoundDay` to compare against), then rounds 2 and 3 spread over 14+ days. With cap=90 and dwell=7, 3 rounds organically span 14–21 sim days minimum, with the safety-net branch firing only on stuck negotiations beyond that.
+
+```ts
+// In the negotiation-dispatch block (loop.ts:~620)
+const previousRounds = (activeElection.negotiationRounds || []) as NegotiationRound[][];
+const roundNumber = previousRounds.length + 1;
+const lastRoundDay = previousRounds.length > 0
+  ? Math.max(...previousRounds[previousRounds.length - 1].map(r => r.day ?? activeElection.electionDay))
+  : activeElection.electionDay;
+const dwell = currentDay - lastRoundDay;
+if (roundNumber > 1 && dwell < MIN_NEGOTIATION_ROUND_DWELL_DAYS) {
+  // Skip dispatch this day — let the world breathe
+  return;
+}
+// (existing dispatch logic continues)
+```
+
+Note: `NegotiationRound.day` does not currently exist on the type. Either:
+- **(a)** Add `day: number` to `NegotiationRound` in `types/elections.ts` and persist it from `loop.ts` when constructing a round. Schema change.
+- **(b)** Track `lastNegotiationRoundDay` on `simulation_meta` (single integer, updated each dispatch). No schema change to types.
+
+**(b) is simpler and avoids an array-shape migration.** Spec locks (b).
+
+### Constant: pacing dwell
+
+Add to `config/elections.ts`:
+
+```ts
+export const MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7;
+```
+
+### Schema change
+
+Add column to `simulation_meta`:
+
+```ts
+lastNegotiationRoundDay: integer("last_negotiation_round_day").default(null)
+```
+
+Migration: `ALTER TABLE simulation_meta ADD COLUMN last_negotiation_round_day INTEGER` (idempotent via duplicate-column catch).
+
+### Cycle 2a R13 interaction
+
+The stuck-negotiation safety-net branch at `loop.ts:621-647` triggers when `daysSinceElection > MAX_NEGOTIATION_DAYS && roundNumber <= MAX_NEGOTIATION_ROUNDS`. With `MAX_NEGOTIATION_DAYS = 90` (was ≈ 8), the branch should fire **rarely** — only on genuinely unresolvable negotiations. Its synthetic-kanzlerwahl-row fallback continues to function. Test the new threshold by feeding a 90+ day stuck negotiation in a unit test.
+
+### Migration (per S6)
+
+**No retroactive adjustment.** Active negotiations (round in flight when this cycle ships) finish under the old timing. The new dwell + cap apply only to negotiations that begin after migration.
+
+### Test impact
+
+`negotiations` doesn't have its own test file today; `elections.test.ts` and `chancellor-vote.test.ts` cover adjacent ground. Add `negotiations.test.ts` covering: (1) round-dwell skip behaviour, (2) cap-at-90 guard, (3) safety-net branch firing path.
+
+## Design — Piece 7: Überweisung ohne Aussprache (65% skip)
+
+Today every bill flows `proposed → first_reading (plenary event) → committee → 2nd → 3rd`. Real Bundestag: ~60–70% of bills are silently referred to committee (Überweisung ohne Aussprache) without any 1st-reading floor debate. Q8 locked at flat 65% probability.
+
+### Logic change (`bill-pipeline.ts:152–225`)
+
+The non-government branch at `bill-pipeline.ts:194-222` currently always advances `proposed → first_reading` and emits `bill_first_reading`. Replace with a gated coin-flip:
+
+```ts
+} else {
+  const skipDebate = rng() < UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY;
+  if (skipDebate) {
+    const minDur = BILL_STAGE_DURATIONS.committee.min;
+    bill.status = "committee";
+    bill.stageEntryDay = day;
+    bill.stageMinDuration = minDur;
+    bill.stageMaxDuration = BILL_STAGE_DURATIONS.committee.max;
+    db.update(schema.bills)
+      .set({ status: "committee", stageEntryDay: day, stageMinDuration: minDur, stageMaxDuration: BILL_STAGE_DURATIONS.committee.max })
+      .where(eq(schema.bills.id, bill.id)).run();
+    addEvent(events, {
+      dayNumber: day,
+      type: "bill_ueberweisung_ohne_aussprache",
+      actor: "bundestag",
+      title: `Überwiesen: ${bill.title}`,
+      description: "Direkt an den Ausschuss überwiesen — keine 1. Lesung im Plenum.",
+      data: { billId: bill.id, isGovernmentBill: false, stageMinDuration: minDur },
+    });
+    console.log(`  [Pipeline] "${bill.title}" → committee (Überweisung ohne Aussprache)`);
+  } else {
+    // existing first_reading branch (unchanged)
+  }
+}
+```
+
+`rng()` defaults to `Math.random` consistent with project pattern (and the I2 spec wording from Cycle 2b: deterministic in tests, non-deterministic in production).
+
+### Constant (`config/elections.ts` or new `config/bill-pipeline.ts`)
+
+Cleanest in a new dedicated file given existing `BILL_STAGE_DURATIONS` already lives module-local in `bill-pipeline.ts`. To keep the change small, add to `bill-pipeline.ts` directly:
+
+```ts
+const UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY = 0.65;
+```
+
+### New event type
+
+Add to `SimulationEventType` union (`types/meta.ts`):
+
+```ts
+| "bill_ueberweisung_ohne_aussprache"
+```
+
+Per S7: **NOT** in `IMPORTANT_EVENTS`. Frontend treats this as a one-line compact entry, not a full event card.
+
+### Migration (no migration needed)
+
+Bills mid-flight at status `proposed` continue under the new probability gate next time the pipeline ticks. No data migration. No schema change.
+
+### Test impact
+
+Add cases to `bill-pipeline.test.ts`:
+- Bill at `proposed`, RNG returning 0.4 → goes straight to `committee`, emits `bill_ueberweisung_ohne_aussprache`.
+- Bill at `proposed`, RNG returning 0.8 → goes to `first_reading`, emits `bill_first_reading` (existing behaviour).
+- Government bills unaffected — always skip 1st reading via the existing fast-track.
+
+## Interaction risks
+
+| # | Risk | Mitigation |
+|---|------|------------|
+| R1 | Piece 4 seat shrink corrupts `bundestag_seats` MdB rows mid-term — humans + AI seats already allocated against 735, now recalibrated to 630. | Largest-remainder shrink applied to `bundestag_seats.totalSeats` (party-level), then per-party human/AI/proxy splits recomputed proportionally. Existing applications stay valid; pending applications rejected if quota dropped below current allocations. Document in migration block. |
+| R2 | `MAJORITY_SEATS = 316` change breaks confidence-vote gates added in Piece 2 (which use `MAJORITY_SEATS + 5` for fragile-margin). | Both pieces ship in the same cycle. `MAJORITY_SEATS + 5` becomes `321` automatically. Verify the gate-test in `confidence-votes.test.ts` doesn't hardcode 373. |
+| R3 | Piece 5 60-day campaign + Piece 6 90-day negotiations cap stretch the post-election interregnum to potentially 60+90+30 = 180 sim days. Geschäftsführende Bundesregierung holds for ~6 sim months. | Acceptable per Cycle 2a R4 model — outgoing cabinet stays active throughout. No new gating needed. Interregnum-skip behaviours (RB+FS skip per 2b S12) work identically. Long interregnum is realistic, not a bug. |
+| R4 | Piece 6 dwell guard interacts with Cycle 2a R13 stuck-negotiation safety net. If `MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7` and `MAX_NEGOTIATION_ROUNDS = 3`, the earliest 3-round completion is day 14. The 90-day cap fires only after that. | Safety net at `loop.ts:621-647` continues to work — its trigger condition is `daysSinceElection > MAX_NEGOTIATION_DAYS && roundNumber <= MAX_NEGOTIATION_ROUNDS`. Dwell guard delays dispatch but doesn't change the trigger. Add a unit test exercising both gates simultaneously. |
+| R5 | Piece 7 Überweisung skip emits a new event type that any analytics queries grouping by `bill_first_reading` will silently miss. | None of the existing queries / dashboard tiles grep `bill_first_reading` by name (they read `bills.status`). Frontend changes (compact "Überwiesen" rendering) are out of scope for this cycle — backend change is safe. Add a follow-up task for the frontend. |
+| R6 | Piece 1 veto rate cap (0.05% × impact gate) may go to ~zero vetoes per term. Loss of viewer drama. | Real-data target is ≈0.05/term. Acceptable per the brainstorm — the goal is fidelity. If after a 4-year sim the count is exactly zero across many runs, raise probability to 0.001 in a follow-up. |
+| R7 | Piece 2 confidence-vote gates depend on a new `low_government_approval_streak` counter. If the counter logic has a reset bug, gates either never open or never close. | Single integer, written in `loop.ts` once per day, mirrors the proven pattern of `low_sentiment_streak`. Add a unit test for both reset paths. |
+| R8 | Piece 3 government-bill committee multiplier raises stage durations only for new committee entries. Bills mid-committee at migration time don't get retroactively extended. | Acceptable — applies new physics going forward. Document in migration block. The same migration was used for Cycle 1 stage-entry-day backfill. |
+| R9 | The hardcoded German prompt at `negotiations.ts:38` ("368+ Sitze (Mehrheit von 735)") drifts from the new constants. AI agents will continue saying "735 Sitze" if not updated. | Sweep `negotiations.ts` for hardcoded numerics in the prompt and replace with template literals using the constants. Verify by grepping for `735\|368` after the change. |
+| R10 | Piece 6's switch from derived `MAX_NEGOTIATION_DAYS` to explicit constant breaks any caller that imported `getMaxNegotiationRounds()` expecting the old +5 derivation. | One caller (`loop.ts:621`). One-line update. Any test mocking the function continues to work. |
+| R11 | Piece 7 RNG is non-deterministic in production (per Cycle 2b precedent). Two consecutive `npm run simulate 30` runs produce different Überweisung sequences. | Documented as the project's RNG model. Unit tests pass a seeded RNG; that's the contract. |
+| R12 | Piece 4 migration order — if seat shrink runs AFTER kanzlerwahl synthetic-row backfill, the kanzlerwahl row still contains old vote tallies (368). Internal vote rounds are historical; this is fine. | No retroactive update of historical kanzlerwahl rows. New kanzlerwahls (post-migration) compute against `MAJORITY_SEATS = 316`. |
+| R13 | If a snap election happens to be `announced` at migration moment, S5 says it keeps its 21-day window — the next election uses 60. A user observing two consecutive elections will see different campaign lengths. | Acceptable, single-shot transition. Document in release notes. |
+| R14 | `TOTAL_SEATS` alias-export means downstream code touching the alias still compiles, but the constant is wrong if anyone treats it as the literal number 735. | Search the codebase for `TOTAL_SEATS` callsites — only `negotiations.ts:38` (the prompt string) appears, and that's already on the fix list. Add a deprecation comment. |
+| R15 | Piece 4 reapportionment uses largest-remainder rounding. With 6 parties, total of 630 always reachable but in degenerate cases (all parties identical share) the tie-break (largest-after-rounding wins leftover) produces an arbitrary winner. | Happens only when all parties have integer-equal vote shares. Probability ~0 in practice. Tie-break is deterministic on party id, so test runs are reproducible. |
+
+## Migration strategy
+
+All Cycle 3 migrations are **inline** in `seed.ts::migrateDatabase()`, idempotent per their own meta-flag. Per S4, ordering inside `migrateDatabase()`:
+
+1. (existing) Cycle 1 stage-entry-day backfill
+2. (existing) Cycle 1 stage-min/max bill backfill
+3. **NEW: Cycle 3 piece 4 — seat reapportionment (proportional shrink to 630)**
+4. (existing) Cycle 2a synthetic kanzlerwahl-row backfill
+5. (existing) Cycle 2a bundesrat_mode backfill
+6. (existing) Cycle 2b counter-column inits
+7. **NEW: Cycle 3 piece 6 — `last_negotiation_round_day` column add (no data backfill)**
+
+No order dependency between pieces 1, 2, 3, 5, 7 (constant-only / probability-only changes).
+
+`meta` flags added: `bundestagSizeMigrated: boolean`. Existing meta-flag plumbing in `simulation_meta` accommodates a new boolean column.
+
+## Implementation plan — 4 PRs (commits, no PRs until user says otherwise)
+
+PR-style commits on `claude/sim-fidelity-cycle3` branch, mirroring the Cycle 2a/2b pattern.
+
+### PR 1 — Pieces 1+3 (single-file knob tunes)
+
+`feat(sim-fidelity): veto cap + gov-bill committee multiplier (Cycle 3 PR 1)`
+
+- `config/elections.ts`: add `PRESIDENTIAL_VETO_PROBABILITY = 0.0005`, `PRESIDENTIAL_VETO_IMPACT_THRESHOLD = 0.6`, `GOVERNMENT_BILL_COMMITTEE_MULTIPLIER = 1.3`
+- `simulation/veto.ts`: rewrite `checkPresidentialVeto()` with two-stage filter
+- `simulation/bill-pipeline.ts`: insert multiplier on committee-stage entry for `isGovernmentBill === true`
+- Unit tests: veto returns false below threshold; veto rolls 0.05% above; committee duration scales 1.3× for gov bills
+
+### PR 2 — Piece 2 (confidence-vote gates + tracker column)
+
+`feat(sim-fidelity): structural gates for Vertrauensfrage + Misstrauensvotum (Cycle 3 PR 2)`
+
+- `db/schema.ts` + `db/ddl.ts`: add `simulation_meta.low_government_approval_streak INTEGER NOT NULL DEFAULT 0`
+- `seed.ts::migrateDatabase()`: idempotent column-add
+- `simulation/confidence-votes.ts`: add `vertrauensfrageGateOpen()` + `misstrauensvotumGateOpen()` + `pickKonstruktivCandidate()` per S3
+- `simulation/loop.ts`: increment streak when gov-weighted approval < 25, reset otherwise; gate confidence-vote dispatch on the new helpers; roll `0.005` daily probability inside the gate
+- `config/elections.ts`: add `VERTRAUENSFRAGE_GATE_LOW_APPROVAL_DAYS = 30`, `VERTRAUENSFRAGE_GATE_FRAGILE_MARGIN = 5`, `MISSTRAUENSVOTUM_GATE_HONEYMOON_DAYS = 180`, `CONFIDENCE_VOTE_DAILY_PROBABILITY = 0.005`, `VERTRAUENSFRAGE_HONEYMOON_DAYS = 90`
+- Unit tests: gate-open/closed under all 4 conditions; streak reset; konstruktiv candidate selection deterministic
+
+### PR 3 — Piece 4 (seat reform)
+
+`feat(sim-fidelity): 735→630 Bundestag seat reform (Cycle 3 PR 3)`
+
+- `config/elections.ts`: `BUNDESTAG_SIZE = 630`, `MAJORITY_SEATS = 316`, deprecation comment on `TOTAL_SEATS` alias
+- `simulation/seats.ts`: parameterise allocation against `BUNDESTAG_SIZE`; export `rescaleSeatsToBundestag()` helper
+- `seed.ts::migrateDatabase()`: largest-remainder seat shrink for `parties` + `bundestag_seats`, guarded by `meta.bundestagSizeMigrated`
+- `simulation/negotiations.ts:38`: replace hardcoded `"368+ Sitze (Mehrheit von 735)"` with template literal using constants
+- Tests touching `MAJORITY_SEATS`: `kanzlerwahl.test.ts`, `chancellor-vote.test.ts` — verify they pass against 316 (they import the constant, so should auto-update)
+- New unit test: `rescaleSeatsToBundestag()` invariant — sum equals 630, no negative seats, deterministic tie-break
+
+### PR 4 — Pieces 5+6+7 (election timing + Überweisung)
+
+`feat(sim-fidelity): 60-day campaigns + 4-12wk negotiations + 65% Überweisung skip (Cycle 3 PR 4)`
+
+- `simulation/timing.ts`: `ELECTION_CAMPAIGN_DAYS: 60`
+- `config/elections.ts`: `MAX_NEGOTIATION_DAYS = 90`, `MIN_NEGOTIATION_ROUND_DWELL_DAYS = 7`
+- `db/schema.ts` + `seed.ts::migrateDatabase()`: `simulation_meta.last_negotiation_round_day INTEGER`
+- `simulation/loop.ts`: switch from derived `MAX_NEGOTIATION_DAYS` to imported constant; insert dwell-guard on negotiation-round dispatch (skip if `currentDay - lastRoundDay < MIN_DWELL`); update `lastNegotiationRoundDay` after each dispatch
+- `simulation/bill-pipeline.ts`: 65%-probability Überweisung-ohne-Aussprache branch in Stage 1 non-government path; emit `bill_ueberweisung_ohne_aussprache` event
+- `types/meta.ts`: add `bill_ueberweisung_ohne_aussprache` to `SimulationEventType` union
+- `simulation/timing.ts`: confirm new event type is **NOT** in `IMPORTANT_EVENTS` (per S7)
+- Tests:
+  - `negotiations.test.ts` (new): dwell guard, 90-day cap, R13-safety-net interaction
+  - `bill-pipeline.test.ts`: deterministic skip-vs-debate branch under seeded RNG
+  - `elections.test.ts`: 60-day announce→vote arithmetic
+
+### Post-merge cleanup (separate concern)
+
+Per the prior PR's housekeeping plan, this PR-set will also delete the four stale Cycle 1/2a/2b spec files:
+
+- `docs/plans/043-cycle1-spec.md`
+- `docs/plans/043-cycle2-brainstorm.md`
+- `docs/plans/043-cycle2a-spec.md`
+- `docs/plans/043-cycle2b-spec.md`
+
+Cycle 3 spec + brainstorm stay until cycle 3 itself ships.
+
+## Success criteria
+
+- `npm run typecheck && npm test && npm run build` green on each of the 4 PR-commits.
+- Seed + `simulate 1461` completes without error after all 4 commits.
+- After migrate of an existing 735-seat DB:
+  - `sqlite3 data/simulation.db "SELECT SUM(seat_count) FROM parties"` returns `630`.
+  - `sqlite3 data/simulation.db "SELECT SUM(total_seats) FROM bundestag_seats"` returns `630`.
+- After a fresh `simulate 1461` (one full term, ~4 years):
+  - Presidential veto count is 0–1 (down from typical 5–15 today). Probability gate working.
+  - Vertrauensfrage events: 0–2 (down from typical 6–12 today). Structural gate working.
+  - Misstrauensvotum events: 0–1 (down from typical 3–6 today).
+  - Bills with status flow `proposed → committee → 2nd → 3rd` (skipped 1st reading) ≈ 60–70% of total bills.
+  - `bill_ueberweisung_ohne_aussprache` event count ≈ 60–70% of `bill_proposed` count.
+  - Average post-election interregnum length 60–120 sim days (was ~30 today).
+- `negotiations.test.ts` passes: dwell guard skips dispatch when `currentDay - lastRoundDay < 7`.
+- `confidence-votes.test.ts` passes: gates open and close per spec; gates closed during honeymoon.
+- Hardcoded seat numbers (`735`, `368`) removed from `negotiations.ts:38` German prompt — `grep -E '735|368' packages/engine/src/simulation/negotiations.ts` returns no matches.
+- AI cost: `logAICall` averages stay flat ±$0.0005/sim-day vs. pre-Cycle-3 baseline. No new AI calls added.
+- Wall-clock per term: similar ±10% to Cycle 2b baseline (longer interregnums offset by fewer 1st-reading speech batches).
+
+## Open items surfaced for later cycles
+
+- **End-to-end seeded RNG plumbing through `runDay()`** — petitions / Einzelfragen / Aktuelle-Stunde-baseline / Überweisung / veto / confidence-vote-roll all default to `Math.random` in production. A single sim-meta `randomSeed` column threaded through `runDay()` would unlock end-to-end snapshot regression tests. Cycle 4+.
+- **Stochastic campaign duration draw** (Q6 option B) — sample uniform [42, 84] per election rather than fixed 60. Trivial change, deferred per Q6 brainstorm decision. Cycle 3 polish.
+- **Category-aware Überweisung skip** (Q8 option B) — high-impact bills always debate; routine bills skip. Requires impact-magnitude classification. Cycle 4+.
+- **Full BWahlG seat reapportionment** (Q5 option B) — Zweitstimmendeckung, exact 2023-reform mechanics. Requires Wahlrecht voting model maturity. Cycle 4+ structural work, blocked on a P3 voting cycle.
+- **Per-Land Misstrauensvotum** — single-chamber federal Bundestag only this cycle. Modeling Land-level government dissolution requires a Landtag actor system. Cycle 5+.
+- **Frontend `bill_ueberweisung_ohne_aussprache` rendering** — compact "Überwiesen" entry on bill page + bills feed. Backend ships this cycle; frontend in a follow-up.
+- **Empirical tuning of veto-impact threshold (0.6)** — calibration against historical Bundespräsident vetoes after a 4-year sim run. P3 polish.
 
