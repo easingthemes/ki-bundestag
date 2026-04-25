@@ -9,6 +9,10 @@ export interface InjectionResult {
   economicShock?: BillImpact;
   invalidateElection?: boolean;
   triggerBudget?: boolean;
+  /** Cycle 4 PR 3 — Nachtragshaushalt injection rows queued for processing.
+   *  loop.ts iterates these and calls `processNachtragsInjection` from
+   *  `budget.ts` with full state access (parties / government / state). */
+  pendingNachtragshaushaltInjections?: PendingInjection[];
   events: Array<Omit<SimulationEvent, "id">>;
 }
 
@@ -101,6 +105,16 @@ export function processInjections(
             data: { impact, injected: true },
           });
         }
+        break;
+      }
+      case "nachtragshaushalt": {
+        // Cycle 4 PR 3 — full processing happens in loop.ts (needs parties /
+        // government / state). Hand the injection off via the result; mark
+        // consumed below so it's not re-processed on a future tick.
+        if (!result.pendingNachtragshaushaltInjections) {
+          result.pendingNachtragshaushaltInjections = [];
+        }
+        result.pendingNachtragshaushaltInjections.push(injection);
         break;
       }
     }
