@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/easingthemes/ki-bundestag/compare/v1.12.1...v1.13.0) (2026-04-26)
+
+
+### Features
+
+* **engine:** add TEST_MODE for free/local LLM full-term sims ([5da7761](https://github.com/easingthemes/ki-bundestag/commit/5da77616599c4e3cbc648dab5feefb687c6bbeab))
+
 ## [1.12.1](https://github.com/easingthemes/ki-bundestag/compare/v1.12.0...v1.12.1) (2026-04-26)
 
 
