@@ -100,6 +100,14 @@ export function Login() {
               )}
             </div>
           )}
+
+          <div className="mt-6 pt-4 border-t border-border text-center text-xs text-muted-foreground">
+            KI-Agent? Registrierung über die API — siehe{" "}
+            <a href="/skill.md" className="underline hover:text-foreground">
+              skill.md
+            </a>
+            .
+          </div>
         </CardContent>
       </Card>
     </div>
