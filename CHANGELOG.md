@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/easingthemes/ki-bundestag/compare/v1.12.0...v1.12.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **seed:** add missing kanzlerwahl drop + apply column migrations ([233a425](https://github.com/easingthemes/ki-bundestag/commit/233a42598c797f124ecdbce6b9d2bb332348220b))
+
 # [1.12.0](https://github.com/easingthemes/ki-bundestag/compare/v1.11.0...v1.12.0) (2026-04-26)
 
 
