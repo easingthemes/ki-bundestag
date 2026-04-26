@@ -156,29 +156,30 @@ function coerceFields(action: Record<string, unknown>): Record<string, unknown> 
     }
   }
 
-  // Bill / motion / amendment / interpellation actions with everything stuffed
-  // into `content`: split into title + description so the validator accepts.
-  // Open-weight models often emit a single narrative paragraph instead of
-  // separate fields; rather than reject, we recover what we can.
-  const contentSplitTypes = new Set([
-    "propose_bill",
-    "propose_amendment",
-    "submit_motion",
-    "file_interpellation",
-    "call_vertrauensfrage",
-    "file_misstrauensvotum",
-    "file_inquiry_committee",
-    "file_constitutional_challenge",
-    "propose_fiscal_emergency",
-    "request_enquete_kommission",
-    "campaign_statement",
-  ]);
-  if (typeof out.type === "string" && contentSplitTypes.has(out.type)) {
-    if (!out.title && typeof out.content === "string") {
-      out.title = synthesizeTitle(out.content);
-    }
-    if (!out.description && typeof out.content === "string") {
-      out.description = out.content;
+  // Bill / motion / amendment / interpellation actions: salvage missing
+  // title + description from any non-structural string field on the action.
+  // Open-weight models routinely route narrative text to invented field names
+  // (`reason`, `details`, `narrative`, etc.); rather than reject the action,
+  // we re-route the content. CRITICAL: this only fires when the model produced
+  // SOME usable text — actions with no salvageable string remain incomplete
+  // and get rejected by the validator (preserves the diagnostic signal for
+  // prompt-improvement work).
+  if (typeof out.type === "string" && SALVAGE_TARGET_TYPES.has(out.type)) {
+    const hasTitle = typeof out.title === "string" && out.title.trim().length > 0;
+    const hasDescription = typeof out.description === "string" && out.description.trim().length > 0;
+    if (!hasTitle || !hasDescription) {
+      const source = findSalvageSource(out);
+      if (source) {
+        if (!hasTitle) {
+          out.title = synthesizeTitle(source.value);
+          logSalvage(out.type, "title", source.key);
+        }
+        if (!hasDescription) {
+          out.description = source.value;
+          logSalvage(out.type, "description", source.key);
+        }
+      }
+      // No candidate: leave action incomplete, validator will reject it.
     }
   }
 
@@ -226,6 +227,75 @@ function coerceVoteValue(action: Record<string, unknown>): Record<string, unknow
     return { ...action, vote: aliased };
   }
   return action;
+}
+
+/**
+ * Action types that need `title` + `description` salvage when the model
+ * routes narrative text to invented field names. Listed explicitly rather
+ * than computed so a future action type doesn't accidentally inherit
+ * salvage behaviour (some action types like `nothing` or `vote` shouldn't).
+ */
+const SALVAGE_TARGET_TYPES = new Set([
+  "propose_bill",
+  "propose_amendment",
+  "submit_motion",
+  "file_interpellation",
+  "call_vertrauensfrage",
+  "file_misstrauensvotum",
+  "file_inquiry_committee",
+  "file_constitutional_challenge",
+  "propose_fiscal_emergency",
+  "request_enquete_kommission",
+  "campaign_statement",
+]);
+
+/**
+ * Fields we never salvage FROM (they have structural meaning, not narrative
+ * content). The salvage source must be a non-reserved string field with
+ * substantial text.
+ */
+const SALVAGE_BLACKLIST = new Set([
+  "type", "title", "description",
+  "billId", "vote", "motionType", "interpellationType", "targetMinistry",
+  "category", "impact", "impactChange",
+  "proposedChancellor", "proposedChancellorPartyId", "targetPartyId",
+  "activeCrisisId", "interpellationId",
+]);
+
+/** Minimum string length for a field to count as a salvage candidate.
+ *  10 chars excludes party IDs ("spd", "afd") and short fragments ("...", "x")
+ *  while accepting brief but real content like "Some narrative" or "Body text". */
+const MIN_SALVAGE_LENGTH = 10;
+
+/**
+ * Search for the best salvage source on an action — the longest non-reserved
+ * string field with at least MIN_SALVAGE_LENGTH characters. Returns null when
+ * the action has no usable narrative text, in which case salvage is skipped
+ * and the action remains incomplete (validator rejects it). This is by design:
+ * empty actions must surface as failures so prompt-improvement work can see
+ * them, not be silently fabricated through.
+ */
+function findSalvageSource(
+  action: Record<string, unknown>,
+): { key: string; value: string } | null {
+  let best: { key: string; value: string } | null = null;
+  for (const [k, v] of Object.entries(action)) {
+    if (SALVAGE_BLACKLIST.has(k)) continue;
+    if (typeof v !== "string") continue;
+    const trimmed = v.trim();
+    if (trimmed.length < MIN_SALVAGE_LENGTH) continue;
+    if (!best || v.length > best.value.length) {
+      best = { key: k, value: v };
+    }
+  }
+  return best;
+}
+
+/** Observability: emit one line per salvage event so volume is grep-able. */
+function logSalvage(actionType: string, targetField: string, sourceField: string): void {
+  console.warn(
+    `  [test-mode salvage] ${actionType} filled ${targetField} from "${sourceField}"`,
+  );
 }
 
 /**

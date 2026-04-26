@@ -364,6 +364,124 @@ describe("coerceTestModeActions", () => {
     });
   });
 
+  describe("v3: salvage from arbitrary string fields (not just `content`)", () => {
+    it("salvages from `reason` when title + description missing", () => {
+      const input = {
+        actions: [{
+          type: "bill_proposed",
+          reason: "Um die langfristige Stabilität des Rentensystems zu gewährleisten, beantragen wir dieses Gesetz.",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].title).toBeDefined();
+      expect(out.actions[0].description).toBe(input.actions[0].reason);
+    });
+
+    it("salvages from arbitrary invented field name", () => {
+      const input = {
+        actions: [{
+          type: "submit_motion",
+          narrative: "Wir reichen Antrag auf Einsetzung einer Kommission ein.",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].description).toBe(input.actions[0].narrative);
+    });
+
+    it("picks the longest candidate when multiple non-reserved fields exist", () => {
+      const short = "Brief note";
+      const long = "Eine längere Beschreibung des vorgeschlagenen Gesetzes mit ausführlicher Begründung.";
+      const input = {
+        actions: [{
+          type: "propose_bill",
+          summary: short,
+          rationale: long,
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].description).toBe(long);
+    });
+
+    it("CRITICAL: empty action with no salvageable text remains incomplete (validator must reject)", () => {
+      // Load-bearing test — preserves the diagnostic signal for prompt-
+      // improvement work. If this ever passes a fabricated value, the
+      // mocking layer is hiding model errors.
+      const input = { actions: [{ type: "propose_bill" }] };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].title).toBeUndefined();
+      expect(out.actions[0].description).toBeUndefined();
+    });
+
+    it("does not salvage from short fields (< 10 chars) — avoids party IDs / ellipses", () => {
+      const input = {
+        actions: [{
+          type: "propose_bill",
+          target: "AfD",
+          status: "...",
+          tag: "x",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].title).toBeUndefined();
+      expect(out.actions[0].description).toBeUndefined();
+    });
+
+    it("does not salvage from structural fields (billId, vote, motionType, etc.)", () => {
+      const input = {
+        actions: [{
+          type: "propose_bill",
+          billId: "bill-1-aq9ih9zrmofpjf8p",
+          motionType: "motion",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      // billId is >10 chars but blacklisted as a salvage source
+      expect(out.actions[0].title).toBeUndefined();
+      expect(out.actions[0].description).toBeUndefined();
+    });
+
+    it("does not salvage when title + description are already set", () => {
+      const input = {
+        actions: [{
+          type: "propose_bill",
+          title: "Real Title",
+          description: "Real description here",
+          extra_field: "Some other narrative content that should be ignored",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].title).toBe("Real Title");
+      expect(out.actions[0].description).toBe("Real description here");
+    });
+
+    it("salvages title only when description already exists", () => {
+      const input = {
+        actions: [{
+          type: "submit_motion",
+          description: "Existing description text",
+          subject: "An invented subject field with substantive content",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].description).toBe("Existing description text");
+      expect(typeof out.actions[0].title).toBe("string");
+    });
+
+    it("does NOT trigger salvage on action types outside SALVAGE_TARGET_TYPES (e.g. vote)", () => {
+      const input = {
+        actions: [{
+          type: "vote",
+          billId: "bill-1",
+          vote: "yes",
+          commentary: "A long bit of commentary that would otherwise be salvaged",
+        }],
+      };
+      const out = coerceTestModeActions(input) as { actions: Array<Record<string, unknown>> };
+      expect(out.actions[0].title).toBeUndefined();
+      expect(out.actions[0].description).toBeUndefined();
+    });
+  });
+
   describe("safety", () => {
     it("returns null/non-object inputs unchanged", () => {
       expect(coerceTestModeActions(null)).toBe(null);
