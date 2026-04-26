@@ -148,4 +148,54 @@ router.get("/api/admin/costs/daily", requireAdmin, (req, res) => {
   }
 });
 
+// DELETE /api/admin/agents/:userId — hard-delete a bot user and its rows.
+// Bots only — humans must use OAuth-side account deletion. Useful for sweeping
+// orphaned test agents whose API keys were lost. Sim-DB rows that reference
+// userId (citizen_questions, pending_injections.data) are NOT FK-constrained
+// and are left in place — they show up as authored by `null` in API responses.
+router.delete("/api/admin/agents/:userId", requireAdmin, (req, res) => {
+  const userId = req.params.userId;
+  const userRaw = getUserSqlite();
+
+  const user = userRaw.prepare("SELECT id, display_name, is_bot FROM users WHERE id = ?").get(userId) as { id: string; display_name: string; is_bot: number } | undefined;
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (user.is_bot !== 1) {
+    res.status(400).json({ error: "Only bot users can be deleted via this endpoint" });
+    return;
+  }
+
+  // Tables in users.db that FK to users.id — delete in any order since the
+  // user row is the parent. Wrapped in a transaction for atomicity.
+  const tables = [
+    "agent_api_keys",
+    "user_actions",
+    "notifications",
+    "member_signals",
+    "internal_votes",
+    "question_votes",
+    "referendum_votes",
+    "mdb_applications",
+    "mdb_votes",
+    "mdb_speeches",
+  ];
+  const txn = userRaw.transaction(() => {
+    for (const t of tables) {
+      userRaw.prepare(`DELETE FROM ${t} WHERE user_id = ?`).run(userId);
+    }
+    userRaw.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  });
+  try {
+    txn();
+  } catch (err) {
+    logger.error("[admin] delete agent failed", err);
+    res.status(500).json({ error: "Failed to delete agent" });
+    return;
+  }
+
+  res.json({ deleted: true, userId, displayName: user.display_name });
+});
+
 export default router;
