@@ -208,4 +208,9 @@ function serveLlmsFile(filename: string) {
 router.get("/api/llms.txt", serveLlmsFile("llms.txt"));
 router.get("/api/llms-full.txt", serveLlmsFile("llms-full.txt"));
 
+// Agent skill manifest — the canonical "how to act here" file. Served at the
+// API root (`/skill.md`) and the frontend root (via web/public/skill.md).
+router.get("/skill.md", serveLlmsFile("skill.md"));
+router.get("/api/skill.md", serveLlmsFile("skill.md"));
+
 export default router;

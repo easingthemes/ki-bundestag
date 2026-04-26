@@ -282,12 +282,16 @@ export function preFilterQuestions(
 }
 
 /**
- * Pre-filter speeches: skip very short ones (auto-neutral, no AI needed).
+ * Pre-filter speeches: skip very short ones (auto-neutral, no AI needed),
+ * then cap at top N by length to bound AI cost when many MdBs/bots speak
+ * on the same bill. `cap` of `Infinity` disables the top-N pass.
+ *
  * Returns { toEval, autoNeutral } where autoNeutral speeches get 0 impact.
  */
 export function preFilterSpeeches(
   speeches: SpeechItem[],
   minLength = 50,
+  cap: number = Infinity,
 ): { toEval: SpeechItem[]; autoNeutral: SpeechItem[] } {
   const toEval: SpeechItem[] = [];
   const autoNeutral: SpeechItem[] = [];
@@ -297,6 +301,12 @@ export function preFilterSpeeches(
     } else {
       autoNeutral.push(s);
     }
+  }
+  if (Number.isFinite(cap) && toEval.length > cap) {
+    // Sort by length desc — longer speeches typically carry more substance.
+    toEval.sort((a, b) => b.content.length - a.content.length);
+    const dropped = toEval.splice(cap);
+    for (const s of dropped) autoNeutral.push(s);
   }
   return { toEval, autoNeutral };
 }

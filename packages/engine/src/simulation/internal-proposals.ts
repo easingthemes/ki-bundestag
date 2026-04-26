@@ -5,6 +5,7 @@ import { submitBatch, type BatchResult } from "../agent/batch-client.js";
 import { buildProposalRankPrompt, type ProposalItem, type PartyContext } from "../agent/group-prompts.js";
 import { getDb, getUserDb, schema } from "../db/index.js";
 import { createNotification } from "./event-queue.js";
+import { PROPOSAL_INPUT_CAP_PER_PARTY } from "../config/index.js";
 
 /** Max proposals a party can accept per review cycle in batch mode. */
 const MAX_ACCEPT_PER_PARTY = 2;
@@ -72,7 +73,8 @@ export async function reviewInternalProposals(currentDay: number): Promise<void>
         gte(schema.internalProposals.totalVotes, 3),
       ))
       .all()
-      .sort((a, b) => b.voteScore - a.voteScore);
+      .sort((a, b) => b.voteScore - a.voteScore)
+      .slice(0, PROPOSAL_INPUT_CAP_PER_PARTY);
 
     if (proposals.length === 0) continue;
 

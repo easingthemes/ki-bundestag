@@ -47,6 +47,13 @@ router.post("/api/bills/:id/signal", (req, res) => {
   if (requireParticipatory(req, res, "bill_signals")) return;
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  // Bot-only daily cap (humans have no entry in BOT_SIM_DAY_LIMITS for signal_bill).
+  const sigCap = checkUserDailyLimit(token, "signal_bill");
+  if (!sigCap.allowed) {
+    res.status(429).json({ error: `Daily signal limit reached (${sigCap.used}/${sigCap.limit})` }); return;
+  }
+
   const userDb = getUserDb();
   const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }

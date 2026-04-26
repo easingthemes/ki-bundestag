@@ -17,6 +17,7 @@ import { getDb, getUserDb, schema } from "../db/index.js";
 import { parseAIJson, logAICall } from "../agent/ai-json.js";
 import { submitBatch, chunkItems, type BatchResult } from "../agent/batch-client.js";
 import { buildSpeechFlagPrompt, preFilterSpeeches, type SpeechItem } from "../agent/group-prompts.js";
+import { SPEECH_INPUT_CAP_PER_BILL } from "../config/index.js";
 
 /**
  * Process speeches submitted since the last sim day.
@@ -76,7 +77,7 @@ export async function processDaySpeeches(currentDay: number): Promise<number> {
 
   for (const [billId, billSpeeches] of speechesByBill) {
     const bill = billInfo.get(billId) ?? { title: "Unknown Bill", description: "" };
-    const { toEval, autoNeutral } = preFilterSpeeches(billSpeeches);
+    const { toEval, autoNeutral } = preFilterSpeeches(billSpeeches, 50, SPEECH_INPUT_CAP_PER_BILL);
 
     // Auto-neutral for very short speeches
     for (const s of autoNeutral) {

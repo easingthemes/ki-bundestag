@@ -7,6 +7,7 @@ import passport from "passport";
 import { closeDb, logger } from "@ki-bundestag/engine";
 
 import { sessionTracking, flushLastActive } from "./middleware/index.js";
+import { apiKeyAuth } from "./middleware/api-key.js";
 import { voteLimiter, actionLimiter, adminLimiter } from "./middleware/rate-limit.js";
 import { SQLiteSessionStore } from "./session-store.js";
 import { configurePassport } from "./passport-config.js";
@@ -25,6 +26,7 @@ import adminRouter from "./routes/admin.js";
 import quizRouter from "./routes/quiz.js";
 import markdownRouter from "./routes/markdown.js";
 import petitionsRouter from "./routes/petitions.js";
+import agentsRouter from "./routes/agents.js";
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
@@ -78,6 +80,10 @@ configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Bearer-token auth for AI agents — runs after Passport so a valid Bearer key
+// overrides whatever session might exist on the request.
+app.use(apiKeyAuth);
+
 app.use(sessionTracking);
 
 // Rate limiting — POST-only for user actions, all methods for admin brute-force protection
@@ -104,6 +110,7 @@ app.use(adminRouter);
 app.use(quizRouter);
 app.use(markdownRouter);
 app.use(petitionsRouter);
+app.use(agentsRouter);
 
 // Global error handler — must be last middleware, after all routes
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
