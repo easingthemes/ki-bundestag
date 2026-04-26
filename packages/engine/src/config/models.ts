@@ -4,7 +4,7 @@
  * Per-party and per-role model mappings, plus pricing tiers.
  */
 
-export type Provider = "anthropic" | "xai";
+export type Provider = "anthropic" | "xai" | "openai-compatible";
 
 export interface ModelConfig {
   provider: Provider;
@@ -46,6 +46,14 @@ export const STANDARD_PRICING: Record<string, PricingTier> = {
   "claude-haiku-4-5-20251001": { input: 0.80e-6, output: 4.00e-6 },
   "claude-sonnet-4-5-20250929": { input: 3.00e-6, output: 15.00e-6 },
   "grok-3-mini": { input: 0.30e-6, output: 0.50e-6 },
+  // Free test models (Ollama local + Groq free tier) — tracked at $0 for cost reports
+  "gemma3:4b": { input: 0, output: 0 },
+  "gemma3:12b": { input: 0, output: 0 },
+  "llama3.2:3b": { input: 0, output: 0 },
+  "qwen3:8b": { input: 0, output: 0 },
+  "llama-3.3-70b-versatile": { input: 0, output: 0 },
+  "llama-3.1-8b-instant": { input: 0, output: 0 },
+  "gemma2-9b-it": { input: 0, output: 0 },
 };
 
 /** Conservative default pricing when model is unknown */
