@@ -249,7 +249,9 @@ export async function runDay(): Promise<number> {
   // Clean up any leftover data from a previous failed attempt at this day
   cleanupPartialDay(currentDay);
   setTrackingDay(currentDay);
-  const startDateStr = (meta as any).startDate as string | null;
+  // R6 (Cycle 5 PR 4 / PR #165 review): schema-sim.ts declares startDate, so
+  // the previous Drizzle-row-cast pattern is stale — the field is typed directly.
+  const startDateStr = meta.startDate;
   const startDate: Date | undefined = startDateStr ? new Date(startDateStr) : undefined;
 
   if (startDate) {
@@ -260,8 +262,8 @@ export async function runDay(): Promise<number> {
     console.log(`\n=== DAY ${currentDay} ===`);
   }
 
-  // Read context depth setting
-  const rawDepth = ((meta as any).contextDepth as string) ?? "normal";
+  // R6 (Cycle 5 PR 4): contextDepth is now declared on simulationMeta — no cast.
+  const rawDepth: string = meta.contextDepth ?? "normal";
   const contextDepth: ContextDepth = isValidContextDepth(rawDepth) ? rawDepth : "normal";
   const depthConfig = getDepthConfig(contextDepth);
 
@@ -293,7 +295,8 @@ export async function runDay(): Promise<number> {
       gdpGrowth: state.gdpGrowth,
     },
     publicSentiment: state.publicSentiment,
-    provisionalBudget: (state as any).provisionalBudget ?? false,
+    // R6 (Cycle 5 PR 4): provisionalBudget is declared on nationalState — no cast.
+    provisionalBudget: state.provisionalBudget ?? false,
     // Cycle 4 PR 2 — Schuldenbremse-Aussetzung flag.
     schuldenbremseSuspended: state.schuldenbremseSuspended,
   };
@@ -441,7 +444,8 @@ export async function runDay(): Promise<number> {
   }
 
   let nextElectionDay = meta.nextElectionDay ?? TIME_CONFIG.TERM_DAYS;
-  const budgetRetryDay: number | null = (meta as any).budgetRetryDay ?? null;
+  // R6 (Cycle 5 PR 4): budgetRetryDay is declared on simulationMeta — no cast.
+  const budgetRetryDay: number | null = meta.budgetRetryDay ?? null;
 
   // 3a2. Handle election invalidation
   if (injections.invalidateElection) {

@@ -14,6 +14,12 @@ const dbMockState: {
   recordedMetaUpdates: [],
 };
 
+// R9 (Cycle 4 PR #165 review / Cycle 5 PR 4): this mock returns plain `vi.fn()`
+// for `eq`/`and`/`sql`. The mock is fragile — it silently returns wrong-typed
+// values if a helper starts using a new export. Currently safe because budget.ts
+// callers never inspect the where-clause arg shape; they only check whether
+// `where()` was called. If you add a helper that DOES inspect the arg shape
+// (e.g. via the eq() return value), replace this with a typed mock.
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), sql: vi.fn() }));
 
 vi.mock("../db/index.js", () => {
