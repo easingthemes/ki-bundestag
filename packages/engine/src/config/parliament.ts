@@ -295,6 +295,57 @@ export const ANHOERUNG_TONE_INFLUENCE = 0.05;
  */
 export const ANHOERUNG_EXPERTS_PER_HEARING = 3;
 
+// ── Cycle 5 PR 2 — Enquete-Kommission ───────────────────────────────
+
+/**
+ * S10: total MdB slots in an Enquete-Kommission. Real Bundestag Enqueten
+ * typically have ~17. Sum-invariant (Σ === 17) enforced by largest-remainder
+ * allocation in `selectEnqueteMembers`.
+ */
+export const ENQUETE_MDB_SLOTS = 17;
+
+/** S7: min/max Kommission duration (uniform draw [MIN, MAX]). Real Enqueten
+ *  run ~1–2 years; we span 360–720 sim days. */
+export const ENQUETE_DURATION_MIN_DAYS = 360;
+export const ENQUETE_DURATION_MAX_DAYS = 720;
+
+/** S8: max simultaneous proposed+active Kommissionen (Bundestag-clogging cap). */
+export const ENQUETE_MAX_ACTIVE = 2;
+
+/** S9: min sim days between Enquete proposals (rate-limit). */
+export const ENQUETE_RATE_LIMIT_DAYS = 90;
+
+/** S10: external expert slots per Kommission (uniform draw [MIN, MAX]). */
+export const ENQUETE_EXPERT_SLOTS_MIN = 4;
+export const ENQUETE_EXPERT_SLOTS_MAX = 6;
+
+/** S11: persistent-crisis duration (sim days) above which `enqueteOpportunity`
+ *  surfaces in agent context for both coalition + opposition. */
+export const ENQUETE_PERSISTENT_CRISIS_THRESHOLD_DAYS = 60;
+
+/**
+ * S12: Bundestag-Beschluss vote tally constants for Enquete-Kommissionen.
+ *
+ *   - Proposing party: 100% yes (their proposal)
+ *   - Coalition (non-pariah): 98% Bernoulli yes (cross-party support norm —
+ *     Enqueten are typically bipartisan in real Bundestag)
+ *   - Opposition (non-pariah): 85% baseline + sentiment-adjusted (capped at
+ *     ±10pp from baseline)
+ *   - Pariah parties (PARIAH_PARTIES set): 50% Bernoulli (no consistent stance)
+ *
+ * 50k LCG convergence test asserts pass-rate ≥ 92% for typical configurations.
+ */
+export const ENQUETE_PROPOSING_YES_RATE = 1.00;
+export const ENQUETE_COALITION_YES_RATE = 0.98;
+export const ENQUETE_OPPOSITION_YES_BASE = 0.85;
+export const ENQUETE_PARIAH_YES_RATE = 0.50;
+export const ENQUETE_OPPOSITION_SENTIMENT_ADJ_CAP = 0.10;
+
+/** Q9/R7-style soft watchdog: rows with status='active' AND scheduledEndDay
+ *  ≤ currentDay - this transition to 'lapsed' on the daily tick. Value matches
+ *  the inquiry watchdog grace window (30 sim days). */
+export const ENQUETE_WATCHDOG_GRACE_DAYS = 30;
+
 // ── Parliamentary calendar ──────────────────────────────────────────
 /**
  * Abstract calendar rule: even ISO weeks are Sitzungswochen, minus recess

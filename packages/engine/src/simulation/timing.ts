@@ -147,6 +147,12 @@ export const IMPORTANT_EVENTS = [
   "nachtragshaushalt_proposed",
   "nachtragshaushalt_passed",
   "nachtragshaushalt_rejected",
+  // Cycle 5 PR 2 — Enquete-Kommission lifecycle headlines (S15). The
+  // `enquete_rejected` event lives in ROUTINE_EVENTS instead: a rejected
+  // proposal is procedural noise, not a structural moment.
+  "enquete_proposed",
+  "enquete_convened",
+  "enquete_concluded",
 ] as const;
 
 // Cycle 5 PR 1 — `ausschussanhoerung_held` deliberately stays at the default
@@ -176,6 +182,10 @@ export const ROUTINE_EVENTS = [
   "kurzintervention",
   "zwischenfrage",
   "erklaerung_zur_abstimmung",
+  // Cycle 5 PR 2 — Enquete-Kommission rejection (S15). A rejected proposal
+  // is procedural noise; the `enquete_proposed`/`enquete_convened`/
+  // `enquete_concluded` events live in IMPORTANT_EVENTS for the headline tier.
+  "enquete_rejected",
 ] as const;
 
 /**

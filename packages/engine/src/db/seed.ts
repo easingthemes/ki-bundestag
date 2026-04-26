@@ -428,6 +428,7 @@ export function seedDatabase() {
     DROP TABLE IF EXISTS crises;
     DROP TABLE IF EXISTS bills;
     DROP TABLE IF EXISTS national_state;
+    DROP TABLE IF EXISTS enquete_commissions;
     DROP TABLE IF EXISTS ausschussanhoerungen;
     DROP TABLE IF EXISTS experts;
     DROP TABLE IF EXISTS parties;

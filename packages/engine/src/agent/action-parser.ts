@@ -72,6 +72,30 @@ export interface FiscalEmergencyValidationContext {
   currentDay: number;
 }
 
+/**
+ * Cycle 5 PR 2 — context required to validate `request_enquete_kommission`.
+ *
+ * Caller (loop.ts) computes these once per day (active count + last-proposed
+ * day are global; everything else is constant) and passes the same bag to
+ * every party. Computing them once here keeps the parser DB-free.
+ *
+ * Bipartisan (S17): unlike `InquiryValidationContext`, the visibility flag
+ * (`enqueteOpportunity`) is set on BOTH coalition + opposition agents — this
+ * context bag is identical across all parties.
+ */
+export interface EnqueteValidationContext {
+  /** Current sim day (for S9 rate-limit check). */
+  currentDay: number;
+  /** Combined proposed+active Kommissionen count (S8 cap). */
+  activeEnqueteCount: number;
+  /** Last sim day on which any Enquete was proposed (S9 rate-limit). NULL = none yet. */
+  lastEnqueteProposedDay: number | null;
+  /** S8 cap (for the error-message text — passed in to avoid coupling to constants). */
+  maxActive: number;
+  /** S9 cooldown days (for the error-message text). */
+  rateLimitDays: number;
+}
+
 const VALID_CATEGORIES: BillCategory[] = [
   "economy", "social", "environment", "immigration",
   "defense", "education", "healthcare", "infrastructure",
@@ -128,6 +152,7 @@ export function validateActions(
   isCoalitionLeader: boolean = false,
   inquiryContext?: InquiryValidationContext,
   fiscalEmergencyContext?: FiscalEmergencyValidationContext,
+  enqueteContext?: EnqueteValidationContext,
 ): ValidationResult {
   const validated: AgentAction[] = [];
   const errors: ValidationError[] = [];
@@ -143,6 +168,7 @@ export function validateActions(
   let constitutionalChallengeCount = 0;
   let inquiryCount = 0;
   let fiscalEmergencyCount = 0;
+  let enqueteCount = 0;
   const votedBills = new Set<string>();
   const inParliament = hasFraktion;
 
@@ -547,6 +573,57 @@ export function validateActions(
           }
         }
         fiscalEmergencyCount++;
+        validated.push(action);
+        break;
+      }
+
+      case "request_enquete_kommission": {
+        // Cycle 5 PR 2 — Enquete-Kommission proposal. Bipartisan per S17 —
+        // available to BOTH coalition + opposition Fraktion-bearing parties.
+        // Same-tick simple-majority Bundestag-Beschluss (vote happens in
+        // loop step 10 alongside other action processing).
+        if (!inParliament) {
+          console.warn(`[${partyId}] Enquete request without Fraktion, skipping`);
+          errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: "Enquete-Kommission requires Fraktion (party has no seats in parliament)", fixable: false });
+          continue;
+        }
+        if (activeElection) {
+          console.warn(`[${partyId}] Enquete request during active election, skipping`);
+          errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: "Enquete-Kommission not allowed during active election", fixable: false });
+          continue;
+        }
+        if (enqueteCount >= 1) {
+          console.warn(`[${partyId}] More than 1 Enquete request, skipping`);
+          errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: "Maximum 1 Enquete-Kommission request per turn", fixable: true });
+          continue;
+        }
+        if (!action.title || !action.rationale) {
+          console.warn(`[${partyId}] Enquete request missing title/rationale, skipping`);
+          errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: "Enquete-Kommission missing required title or rationale", fixable: false });
+          continue;
+        }
+        if (!VALID_MINISTRY_PORTFOLIOS.includes(action.topic)) {
+          console.warn(`[${partyId}] Invalid Enquete topic ${action.topic}, skipping`);
+          errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: `Invalid topic "${action.topic}" — valid: ${VALID_MINISTRY_PORTFOLIOS.join(", ")}`, fixable: true });
+          continue;
+        }
+        if (enqueteContext) {
+          // S8 active-cap (global proposed+active count).
+          if (enqueteContext.activeEnqueteCount >= enqueteContext.maxActive) {
+            console.warn(`[${partyId}] Enquete blocked by active-cap (${enqueteContext.activeEnqueteCount}/${enqueteContext.maxActive})`);
+            errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: `Enquete-Kommission cap reached: max ${enqueteContext.maxActive} active`, fixable: false });
+            continue;
+          }
+          // S9 rate-limit (global last-proposed day).
+          if (enqueteContext.lastEnqueteProposedDay != null
+              && enqueteContext.currentDay - enqueteContext.lastEnqueteProposedDay < enqueteContext.rateLimitDays) {
+            const remaining = enqueteContext.rateLimitDays - (enqueteContext.currentDay - enqueteContext.lastEnqueteProposedDay);
+            console.warn(`[${partyId}] Enquete blocked by ${enqueteContext.rateLimitDays}-day cooldown (${remaining}d remaining)`);
+            errors.push({ actionIndex: i, actionType: "request_enquete_kommission", message: `Enquete-Kommission rate-limit: ${enqueteContext.rateLimitDays}-day cooldown (${remaining}d remaining)`, fixable: false });
+            continue;
+          }
+        }
+        enqueteCount++;
         validated.push(action);
         break;
       }
