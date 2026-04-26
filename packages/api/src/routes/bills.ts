@@ -48,12 +48,6 @@ router.post("/api/bills/:id/signal", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
-  // Bot-only daily cap (humans have no entry in BOT_SIM_DAY_LIMITS for signal_bill).
-  const sigCap = checkUserDailyLimit(token, "signal_bill");
-  if (!sigCap.allowed) {
-    res.status(429).json({ error: `Daily signal limit reached (${sigCap.used}/${sigCap.limit})` }); return;
-  }
-
   const userDb = getUserDb();
   const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
   if (users.length === 0) { res.status(401).json({ error: "User not found" }); return; }
@@ -71,14 +65,31 @@ router.post("/api/bills/:id/signal", (req, res) => {
     .where(and(eq(schema.memberSignals.billId, req.params.id), eq(schema.memberSignals.userId, token)))
     .all();
 
+  // Idempotent re-signal: same bill + same direction = no state change, no
+  // quota burn. Without this, an agent that re-affirms a yes vote spends a
+  // signal_bill quota slot for no behaviour change.
+  const isIdempotent = existing.length > 0 && existing[0].signal === signal;
+
+  if (!isIdempotent) {
+    // Bot-only daily cap (humans have no entry in BOT_SIM_DAY_LIMITS for signal_bill).
+    const sigCap = checkUserDailyLimit(token, "signal_bill");
+    if (!sigCap.allowed) {
+      res.status(429).json({ error: `Daily signal limit reached (${sigCap.used}/${sigCap.limit})` }); return;
+    }
+  }
+
   if (existing.length > 0) {
-    userDb.update(schema.memberSignals).set({ signal, createdAt: Date.now() }).where(eq(schema.memberSignals.id, existing[0].id)).run();
+    if (!isIdempotent) {
+      userDb.update(schema.memberSignals).set({ signal, createdAt: Date.now() }).where(eq(schema.memberSignals.id, existing[0].id)).run();
+    }
   } else {
     userDb.insert(schema.memberSignals).values({ id: `sig-${randomUUID().slice(0, 8)}`, billId: req.params.id, userId: token, signal, createdAt: Date.now() }).run();
   }
 
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
-  try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
+  if (!isIdempotent) {
+    try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
+  }
   const allSignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
   res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
 });
@@ -90,7 +101,7 @@ router.post("/api/bills/:id/amendment", (req, res) => {
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const { allowed, limit, used } = checkUserDailyLimit(token, "submit_amendment");
-  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} amendments in 24h). Try again later.` }); return; }
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} amendments). Try again later.` }); return; }
 
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }
@@ -170,7 +181,7 @@ router.post("/api/bills/:id/speech", (req, res) => {
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const { allowed, limit, used } = checkUserDailyLimit(token, "submit_speech");
-  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} speeches in 24h). Try again later.` }); return; }
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} speeches). Try again later.` }); return; }
 
   const seat = getUserSeat(token);
   if (!seat) { res.status(403).json({ error: "You don't have an active Bundestag seat" }); return; }

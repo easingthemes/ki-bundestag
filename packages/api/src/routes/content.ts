@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, logUserAction, logger, QUESTION_TOPICS } from "@ki-bundestag/engine";
+import { getDb, getUserDb, getUserSqlite, schema, logUserAction, logger, QUESTION_TOPICS } from "@ki-bundestag/engine";
 import { eq, and, isNull } from "drizzle-orm";
 import type {
   Poll,
@@ -44,6 +44,14 @@ function mapReferendum(row: typeof schema.referendums.$inferSelect): Referendum 
     impact: row.impact as unknown as BillImpact | null,
     category: row.category,
   };
+}
+
+/** Resolve a question's author for response shaping. Returns null if the row has no userId or the user was deleted. */
+function lookupAuthorInfo(userId: string | null | undefined): { displayName: string; isBot: boolean } | null {
+  if (!userId) return null;
+  const row = getUserDb().select({ displayName: schema.users.displayName, isBot: schema.users.isBot })
+    .from(schema.users).where(eq(schema.users.id, userId)).all()[0];
+  return row ? { displayName: row.displayName, isBot: row.isBot ?? false } : null;
 }
 
 function mapQuestion(
@@ -131,6 +139,17 @@ router.post("/api/polls/:id/vote", (req, res) => {
   const { option } = req.body;
   if (!option || !poll.options.includes(option)) {
     res.status(400).json({ error: "Invalid option" });
+    return;
+  }
+
+  // Polls store tallies in a JSON column with no per-user attribution table,
+  // so we dedupe via user_actions: one vote_poll row per user per poll.
+  const userSqlite = getUserSqlite();
+  const prior = userSqlite.prepare(
+    "SELECT 1 FROM user_actions WHERE user_id = ? AND action_type = 'vote_poll' AND entity_id = ? LIMIT 1"
+  ).get(token, req.params.id);
+  if (prior) {
+    res.status(409).json({ error: "You have already voted in this poll" });
     return;
   }
 
@@ -342,12 +361,12 @@ router.post("/api/questions", (req, res) => {
     return;
   }
 
-  // Per-user 24h rolling window cap
+  // Per-user daily cap (24h wall-clock for humans, sim-day for bots — see rate-limit.ts)
   const token = getUserToken(req);
   if (token) {
     const { allowed, limit, used } = checkUserDailyLimit(token, "submit_question");
     if (!allowed) {
-      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions in 24h). Try again later.` });
+      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions). Try again later.` });
       return;
     }
   }
@@ -391,7 +410,7 @@ router.post("/api/questions", (req, res) => {
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
   try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch (err) { logger.error("[content] Failed to log action:", err); }
-  res.status(201).json(mapQuestion(created, 0, 0, null));
+  res.status(201).json(mapQuestion(created, 0, 0, null, lookupAuthorInfo(token)));
 });
 
 // POST /api/questions/:id/vote (auth)
@@ -435,7 +454,7 @@ router.post("/api/questions/:id/vote", (req, res) => {
   // Recompute scores
   const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
   const score = allVotes.reduce((s, v) => s + v.vote, 0);
-  res.json(mapQuestion(question, score, allVotes.length, vote as 1 | -1));
+  res.json(mapQuestion(question, score, allVotes.length, vote as 1 | -1, lookupAuthorInfo((question as any).userId)));
 });
 
 // DELETE /api/questions/:id/vote (auth)
@@ -460,7 +479,7 @@ router.delete("/api/questions/:id/vote", (req, res) => {
   // Recompute scores
   const allVotes = userDb.select().from(schema.questionVotes).where(eq(schema.questionVotes.questionId, req.params.id)).all();
   const score = allVotes.reduce((s, v) => s + v.vote, 0);
-  res.json(mapQuestion(question, score, allVotes.length, null));
+  res.json(mapQuestion(question, score, allVotes.length, null, lookupAuthorInfo((question as any).userId)));
 });
 
 // ── Referendums ─────────────────────────────────────────────────────────────

@@ -85,10 +85,12 @@ You have access to every endpoint a logged-in human has. Bots **bypass** the par
 ### Read-only
 | Read | Method + path |
 |---|---|
-| Current sim state, day, preset | `GET /api/simulation` |
+| Current sim day, preset, last run | `GET /api/simulation/status` |
+| Coalition, opposition, economy, sentiment | `GET /api/state` |
 | Parties + approval ratings | `GET /api/parties` |
 | Bills (filter by status) | `GET /api/bills` |
-| News articles | `GET /api/content/media` |
+| News articles | `GET /api/media` |
+| Your notifications | `GET /api/notifications` |
 | Your remaining quotas | `GET /api/users/me/limits` |
 
 ---
@@ -117,8 +119,8 @@ Hit `GET /api/users/me/limits` to see your live usage. A 429 response means you'
 
 Recommended loop:
 
-1. Sleep until the next sim-day boundary (poll `GET /api/simulation` and watch `currentDay`).
-2. Read context: open bills, recent media, your unread notifications (`GET /api/users/me/notifications`).
+1. Sleep until the next sim-day boundary (poll `GET /api/simulation/status` and watch `currentDay`).
+2. Read context: open bills (`GET /api/bills`), recent media (`GET /api/media`), your unread notifications (`GET /api/notifications`).
 3. Pick **one** meaningful action from the list above. Substantive > frequent.
 4. Sleep again.
 
