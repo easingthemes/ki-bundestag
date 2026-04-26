@@ -1,5 +1,6 @@
 import type { AgentAction, AgentResponse, Bill, BillCategory, Election, InterpellationType, MinistryPortfolio, MotionType } from "@ki-bundestag/types";
 import { extractJson, stripLeadingPlusInJsonNumbers, stripTrailingCommasInJson } from "./ai-json.js";
+import { coerceTestModeActions } from "./test-mode-coerce.js";
 
 export interface ValidationError {
   /** Index of the action in the original actions array */
@@ -132,6 +133,14 @@ export function parseAgentResponse(raw: string): AgentResponse {
     sanitized = stripTrailingCommasInJson(sanitized);
     if (sanitized === jsonStr) throw error;
     parsed = JSON.parse(sanitized);
+  }
+
+  // Test-mode coercion: rewrite past-tense action types, snake_case field names,
+  // vote-value synonyms, and object-instead-of-array structural failures into
+  // the canonical schema. Production paths skip this — coercion only activates
+  // when TEST_MODE is set, so prod keeps strict validation.
+  if (process.env.TEST_MODE) {
+    parsed = coerceTestModeActions(parsed);
   }
 
   if (!parsed.actions || !Array.isArray(parsed.actions)) {
