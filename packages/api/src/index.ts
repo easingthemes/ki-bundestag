@@ -118,6 +118,18 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+// Last-resort net so a schema-drift / unhandled rejection doesn't kill the
+// process and trigger a PM2 restart loop. Express 4 routes synchronous throws
+// to the error middleware above, but anything that escapes (e.g. an unawaited
+// promise rejection in a setInterval callback, or a throw outside a request
+// scope) would otherwise crash Node. Log + keep running.
+process.on("uncaughtException", (err) => {
+  logger.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error("[unhandledRejection]", reason);
+});
+
 const server = app.listen(PORT, () => {
   logger.info(`API server running on http://localhost:${PORT}`);
 });
