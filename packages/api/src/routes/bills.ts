@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, getSqlite, getUserSeat, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, and } from "drizzle-orm";
-import type { Bill } from "@ki-bundestag/types";
+import type { Bill, MdbAmendmentInjectionPayload } from "@ki-bundestag/types";
 import { mapBill } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
 import { checkUserDailyLimit } from "../middleware/rate-limit.js";
@@ -134,18 +134,21 @@ router.post("/api/bills/:id/amendment", (req, res) => {
   const userDb = getUserDb();
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
 
+  // S24/R10: typed `MdbAmendmentInjectionPayload` (no `as any`). TypeScript
+  // narrows the engine consumer's `injection.data` via the discriminant.
+  const payload: MdbAmendmentInjectionPayload = {
+    billId: req.params.id,
+    title: title.trim(),
+    description: description.trim(),
+    impactChange,
+    partyId: seat.partyId,
+    userId: token,
+    proposerName: user?.displayName ?? "MdB",
+  };
   db.insert(schema.pendingInjections).values({
     id: randomUUID(),
     type: "mdb_amendment",
-    data: {
-      billId: req.params.id,
-      title: title.trim(),
-      description: description.trim(),
-      impactChange,
-      partyId: seat.partyId,
-      userId: token,
-      proposerName: user?.displayName ?? "MdB",
-    } as any,
+    data: payload,
     consumed: false,
   }).run();
 

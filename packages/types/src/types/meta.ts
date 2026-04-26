@@ -90,7 +90,10 @@ export type SimulationEventType =
   | "enquete_proposed"
   | "enquete_convened"
   | "enquete_rejected"
-  | "enquete_concluded";
+  | "enquete_concluded"
+  // Cycle 5 PR 3 — Schuldenbremse-Aussetzung auto-restore at expiry day (S22).
+  // Routine tier per S15 — closes the Cycle 4 silent-restore gap.
+  | "schuldenbremse_expired";
 
 export interface SimulationEvent {
   id: string;
@@ -118,9 +121,9 @@ export interface PartyHistoryEntry {
   seatCount: number;
 }
 
-export interface PendingInjection {
-  id: string;
-  type: "crisis" | "election" | "economic_shock" | "invalidate_election" | "budget" | "nachtragshaushalt";
-  data: Record<string, unknown>;
-  consumed: boolean;
-}
+// Cycle 5 PR 3 (S24, R10) — `PendingInjection` has been retyped as a
+// discriminated union. The canonical declaration now lives in
+// `./economy.ts` so it can reference `BillImpact`, `MotionType`, etc.
+// without circular imports through `meta.ts`. Re-exported via the package
+// barrel.
+export type { PendingInjection, PendingInjectionType, NachtragsInjectionPayload } from "./economy.js";
