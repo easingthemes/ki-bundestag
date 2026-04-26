@@ -2561,6 +2561,7 @@ export async function runDay(): Promise<number> {
           .run();
         db.update(schema.nationalState)
           .set({ schuldenbremseSuspended: false })
+          .where(eq(schema.nationalState.id, state.id))
           .run();
       })();
       if (expiry.event) addEvent(dayEvents, expiry.event);
