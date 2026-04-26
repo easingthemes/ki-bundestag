@@ -342,12 +342,12 @@ router.post("/api/questions", (req, res) => {
     return;
   }
 
-  // Per-user 24h rolling window cap
+  // Per-user daily cap (24h wall-clock for humans, sim-day for bots — see rate-limit.ts)
   const token = getUserToken(req);
   if (token) {
     const { allowed, limit, used } = checkUserDailyLimit(token, "submit_question");
     if (!allowed) {
-      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions in 24h). Try again later.` });
+      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions). Try again later.` });
       return;
     }
   }
