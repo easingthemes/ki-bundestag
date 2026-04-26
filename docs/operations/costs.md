@@ -300,4 +300,94 @@ Recommended concurrency by model on M1 Pro 32 GB:
 - **Cleanup messages on rerun** (`[Cleanup] Removed N leftover rows from failed day X`) are normal after a Ctrl-C'd run — the runner self-heals partial state at startup.
 - **Cosmetic logging issue:** `[AI] ... | 0ms | OK` — every test-mode log line reports `0ms` latency. The `logAICall()` start-time isn't threaded through the `openai-compatible-client` path. Doesn't affect cost tracking, fallback decisions, or correctness.
 
+### Single-line code change worth doing regardless of model choice
+
+`packages/engine/src/agent/openai-compatible-client.ts` currently sends a plain `/v1/chat/completions` POST **without** `response_format: {type: "json_object"}`. Adding it activates server-side JSON-mode constraint:
+
+- **Ollama** — grammar-constrained JSON output for any model that supports it (most modern ones do).
+- **Groq, DeepSeek, OpenAI, OpenRouter, Together, Fireworks** — all support `response_format` natively via their OpenAI-compatible endpoints.
+
+This is the single highest-leverage change available. It might unblock the existing tested models (gemma3:12b, qwen2.5:14b) without touching anything else, and it strictly improves every other path. Single-line patch; cheapest fix in the whole exercise.
+
+### Untested local Ollama models worth trying (research, April 2026)
+
+Three models stand out in 2026 community benchmarks for strict JSON / function-calling adherence — all fit in M1 Pro 32 GB with green pressure:
+
+| Tag | Disk | Why try it | Caveat |
+|---|---|---|---|
+| **`hermes3:8b`** | 4.7 GB | Nous Research model **purpose-trained** for JSON + function-calling. Eval scores: 84% structured-JSON, 90% function-calling. ChatML format, no `<think>` blocks. Most likely Ollama model to actually clear `"Unknown action type"`. | None known — best first try |
+| **`qwen3:14b`** | 9.3 GB | Community consensus 2026 "most stable tool calling"; rarely hallucinates calls or drops parameters | Emits `<think>` blocks by default — add `/no_think` or `thinking: false` in the system prompt to suppress |
+| **`deepseek-r1:14b`** | 9.0 GB | R1-0528 update fixed function-calling and JSON adherence; strong reasoning improves action selection | Emits `<think>...</think>` reasoning before JSON. `parseAIJson()` doesn't strip these — needs a one-line regex (`/<think>.*?<\/think>/s`) added before `JSON.parse()`. Code change required. |
+
+DeepSeek V3 (685B) and DeepSeek-Coder-V2 (236B) are too large for any local setup; only viable via cloud API.
+
+### Cheapest cloud-API options (April 2026)
+
+When Ollama can't deliver the parse rate you need (or you don't want to fight it), the cheapest cloud paths — ranked by total cost for our token volume (~66M input + ~15M output per term, ~2.7M + ~600K per 60-day smoke):
+
+| Rank | Provider / Model | $/M in | $/M out | Per-term | 60-day smoke | JSON mode | Notes |
+|---|---|---|---|---|---|---|---|
+| 1 | **OpenRouter `:free`** (e.g. `openai/gpt-oss-120b:free`, `meta-llama/llama-3.3-70b-instruct:free`) | $0 | $0 | $0 (rate-limited) | **$0** | Yes | 50 req/day without credits; 1,000 req/day with $10 deposit; 20 RPM. 60-day smoke (~600 calls) fits in one day's allowance |
+| 2 | **Gemini 2.5 Flash** (AI Studio free tier) | $0 | $0 | N/A (rate-limited) | **$0** | Yes | 1,500 req/day; 60-day smoke fits free. Set `thinkingBudget: 0` to avoid thinking-as-output billing |
+| 3 | **Groq `llama-3.1-8b-instant`** (Dev tier) | $0.05 | $0.08 | **$4.50** | $0.18 | Yes | Cheapest paid option overall. Risk: 8B may produce enum errors like other small models — probe first |
+| 4 | **Fireworks Llama 8B** (serverless + batch) | ~$0.10 | ~$0.10 | ~**$8.10** (w/ 50% batch) | $0.33 | Yes | $1 signup credit |
+| 5 | **Together `Qwen3.5-9B`** | $0.10 | $0.15 | **$8.85** | $0.36 | Yes | 9B model, low risk |
+| 6 | **OpenAI `gpt-4.1-nano`** | $0.10 | $0.40 | **$12.60** | $0.51 | Yes (full Schema) | Best JSON enforcement in cheap tier; $5 new-account credit |
+| 7 | **DeepSeek `deepseek-v4-flash`** | $0.14 | $0.28 | **$13.44** (drops to ~$5 with 80% cache hit) | $0.55 | Yes | Best balance of cheap + reliable. No free tier |
+| 8 | **Cerebras Llama 70B** | $0.60 | $0.60 | $48.60 | $1.98 | 1 of 5 models | 8K context cap may truncate briefings — check first |
+| 9 | **Groq `llama-3.3-70b-versatile`** (Dev tier) | $0.59 | $0.79 | $50.79 | $2.07 | Yes | Quality good, expensive |
+| 10 | **Anthropic Haiku 4.5** (batch + cache) | $0.50* | $2.50* | ~**$55** | $2.85 | Yes | Production reliability; 5× more expensive than gpt-4.1-nano |
+
+\* Batch API price; production path on this codebase already uses this.
+
+### Decision tree: which path to actually run
+
+**You need a 5–60 day smoke (verify plumbing, exercise Cycle 5 paths, no calibration math):**
+
+```bash
+# Cheapest: OpenRouter free tier — gpt-oss-120b supports JSON + 131K context
+TEST_MODE=custom \
+TEST_BASE_URL=https://openrouter.ai/api/v1 \
+TEST_API_KEY=sk-or-... \
+TEST_MODEL=openai/gpt-oss-120b:free \
+TEST_MODE_CONCURRENCY=2 \
+npm run simulate 60
+
+# Alternative: Gemini Flash free tier (no deposit needed)
+TEST_MODE=custom \
+TEST_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai \
+TEST_API_KEY=... \
+TEST_MODEL=gemini-2.5-flash \
+npm run simulate 60
+```
+
+**You need a real 1461-day term run for calibration band verification:**
+
+```bash
+# Best $/term value: DeepSeek v4-flash at ~$13/term, JSON mode native, no rate-limit pain
+TEST_MODE=custom \
+TEST_BASE_URL=https://api.deepseek.com/v1 \
+TEST_API_KEY=sk-... \
+TEST_MODEL=deepseek-v4-flash \
+npm run simulate 1461
+
+# Cheapest paid option ($4.50/term) — but 8B enum-reliability risk:
+TEST_MODE=custom \
+TEST_BASE_URL=https://api.groq.com/openai/v1 \
+TEST_API_KEY=$GROQ_API_KEY \
+TEST_MODEL=llama-3.1-8b-instant \
+TEST_MODE_CONCURRENCY=1 \
+npm run simulate 1461
+```
+
+**You want to keep iterating offline (local Ollama):**
+
+```bash
+# Most likely to work: Hermes 3 — purpose-trained for JSON
+ollama pull hermes3:8b
+TEST_MODE=ollama TEST_MODEL=hermes3:8b TEST_MODE_CONCURRENCY=2 npm run simulate 5
+```
+
+If `hermes3:8b` still produces `Unknown action type` errors, that's strong signal the `response_format: {type: "json_object"}` patch is the actual missing piece — apply that first, then re-test all the local models we already pulled.
+
 Reference: see `TECHNICAL.md` → "Test Mode" for implementation, `agent/test-mode.ts` for resolution logic, and `.env.example` for all knobs.
