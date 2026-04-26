@@ -41,7 +41,7 @@ import { updateFraktionen, getActiveFraktionen, FRAKTION_LEADERS } from "./frakt
 import { tallyMotionVotes, motionSentimentImpact } from "./motions.js";
 import { formCabinet, getActiveGovernment, dissolveGovernment, isGovernmentBill as checkIsGovernmentBill } from "./government.js";
 import { startKanzlerwahl, runPhase1, runPhase2Round, runPhase3 } from "./kanzlerwahl.js";
-import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus } from "@ki-bundestag/types";
+import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus, NachtragsInjectionPayload } from "@ki-bundestag/types";
 import { nextSitzungsTag, isSitzungsTag } from "./parliament-calendar.js";
 import {
   scheduleWeeklyParliamentaryQA,
@@ -69,7 +69,7 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import {
   generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote,
   applyBudgetEconomicEffect, BUDGET_TOTAL,
-  tallySchuldenbremseVote, applySchuldenbremseAussetzung, checkSchuldenbremseExpiry, findFiscalEmergencyOpportunity,
+  tallySchuldenbremseVote, applySchuldenbremseAussetzung, applySchuldenbremseExpiry, findFiscalEmergencyOpportunity,
   processNachtragsInjection,
 } from "./budget.js";
 import { SCHULDENBREMSE_SUSPENSION_DURATION } from "../config/budget.js";
@@ -2472,10 +2472,15 @@ export async function runDay(): Promise<number> {
 
           // S19: queue Nachtragshaushalt injection. PR 3 implements the
           // consumer; this PR just queues the work item.
+          // S24/R10 (Cycle 5 PR 3): typed `NachtragsInjectionPayload` —
+          // no `as any` needed; the discriminated union narrows at consumption.
+          const nachtragsPayload: NachtragsInjectionPayload = {
+            activeCrisisId: action.activeCrisisId ?? null,
+          };
           db.insert(schema.pendingInjections).values({
             id: `inj-nachtrag-${currentDay}-${generateId()}`,
             type: "nachtragshaushalt",
-            data: { activeCrisisId: action.activeCrisisId ?? null } as any,
+            data: nachtragsPayload,
             consumed: false,
           }).run();
 
@@ -2531,17 +2536,34 @@ export async function runDay(): Promise<number> {
 
   progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries, fiscal emergency, enquete)
 
-  // 10g3. Cycle 4 PR 2 — Schuldenbremse expiry check. Silent flag-clear at
-  // expiry (no event per spec — keeps the event-type list at the planned
-  // count). Runs unconditionally so the flag can clear during election phases.
+  // 10g3. Cycle 4 PR 2 / Cycle 5 PR 3 (S22) — Schuldenbremse expiry check.
+  //
+  // S22 closes the Cycle 4 silent-restore gap. Now uses the pure helper
+  // `applySchuldenbremseExpiry` which returns a typed `schuldenbremse_expired`
+  // event when the flag clears; loop.ts persists the DB write under the
+  // simulationMeta `id` (PR #165 R2 — WHERE clause required).
+  //
+  // Runs unconditionally so the flag can clear during election phases too.
   try {
-    const cleared = checkSchuldenbremseExpiry(currentDay);
-    if (cleared) {
-      nationalState.schuldenbremseSuspended = false;
-      console.log("  [Schuldenbremse] expiry day reached — suspension cleared");
+    const expiry = applySchuldenbremseExpiry(nationalState, meta, currentDay);
+    if (expiry.expired) {
+      // R2 lesson: WHERE clause on simulationMeta updates. nationalState is
+      // single-row in this codebase but we still scope the update by id
+      // for symmetry + future-safety.
+      getSqlite().transaction(() => {
+        db.update(schema.simulationMeta)
+          .set({ schuldenbremseSuspendedUntilDay: null })
+          .where(eq(schema.simulationMeta.id, meta.id))
+          .run();
+        db.update(schema.nationalState)
+          .set({ schuldenbremseSuspended: false })
+          .run();
+      })();
+      if (expiry.event) addEvent(dayEvents, expiry.event);
+      console.log("  [Schuldenbremse] expiry day reached — suspension cleared, event emitted");
     }
   } catch (err) {
-    console.error("[Loop] Error in checkSchuldenbremseExpiry:", err);
+    console.error("[Loop] Error in applySchuldenbremseExpiry:", err);
   }
 
   // 10g2. Cycle 4 PR 1 — Untersuchungsausschuss daily tick (hearings + watchdog +

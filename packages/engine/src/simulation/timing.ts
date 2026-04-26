@@ -186,6 +186,9 @@ export const ROUTINE_EVENTS = [
   // is procedural noise; the `enquete_proposed`/`enquete_convened`/
   // `enquete_concluded` events live in IMPORTANT_EVENTS for the headline tier.
   "enquete_rejected",
+  // Cycle 5 PR 3 (S22) — Schuldenbremse-Aussetzung auto-restore. Routine tier
+  // per S15 — no agent surfaces it; it's a procedural housekeeping moment.
+  "schuldenbremse_expired",
 ] as const;
 
 /**
