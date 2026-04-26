@@ -300,14 +300,14 @@ Recommended concurrency by model on M1 Pro 32 GB:
 - **Cleanup messages on rerun** (`[Cleanup] Removed N leftover rows from failed day X`) are normal after a Ctrl-C'd run — the runner self-heals partial state at startup.
 - **Cosmetic logging issue:** `[AI] ... | 0ms | OK` — every test-mode log line reports `0ms` latency. The `logAICall()` start-time isn't threaded through the `openai-compatible-client` path. Doesn't affect cost tracking, fallback decisions, or correctness.
 
-### Single-line code change worth doing regardless of model choice
+### `response_format` JSON-mode patch (applied — PR #170)
 
-`packages/engine/src/agent/openai-compatible-client.ts` currently sends a plain `/v1/chat/completions` POST **without** `response_format: {type: "json_object"}`. Adding it activates server-side JSON-mode constraint:
+`packages/engine/src/agent/openai-compatible-client.ts` now sends `response_format: {type: "json_object"}` with every `/v1/chat/completions` POST. Activates server-side JSON-mode constraint:
 
 - **Ollama** — grammar-constrained JSON output for any model that supports it (most modern ones do).
 - **Groq, DeepSeek, OpenAI, OpenRouter, Together, Fireworks** — all support `response_format` natively via their OpenAI-compatible endpoints.
 
-This is the single highest-leverage change available. It might unblock the existing tested models (gemma3:12b, qwen2.5:14b) without touching anything else, and it strictly improves every other path. Single-line patch; cheapest fix in the whole exercise.
+> **Resume marker (session-state, remove after smoke results land):** Post-fix smoke results are PENDING. Next step is to re-run `gemma3:12b` (and/or any new model) and append a "Post-response_format-fix empirical results" subsection here comparing first-pass JSON success rate to the pre-fix table above. If the patch unblocks the existing local models, the cloud-API matrix below becomes optional rather than necessary.
 
 ### Untested local Ollama models worth trying (research, April 2026)
 
