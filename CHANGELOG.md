@@ -1,3 +1,11 @@
+# [1.14.0](https://github.com/easingthemes/ki-bundestag/compare/v1.13.1...v1.14.0) (2026-04-26)
+
+
+### Features
+
+* **agent:** tighten prompt validation + diagnostics for all providers ([ba3519c](https://github.com/easingthemes/ki-bundestag/commit/ba3519c233b8cff5e3235d620df597599a513c64)), closes [#1185](https://github.com/easingthemes/ki-bundestag/issues/1185)
+* **test-mode:** action coercion layer for local-model output ([c0d13a6](https://github.com/easingthemes/ki-bundestag/commit/c0d13a69e31d6955d46ad6b19a5788d17ad54cd4)), closes [#171](https://github.com/easingthemes/ki-bundestag/issues/171)
+
 ## [1.13.1](https://github.com/easingthemes/ki-bundestag/compare/v1.13.0...v1.13.1) (2026-04-26)
 
 
