@@ -156,7 +156,10 @@ export function resolveExpiredPolls(
     .filter((p: any) => p.active);
 
   for (const row of activePolls) {
-    if (row.expiresOnDay != null && row.expiresOnDay <= currentDay) {
+    // Polls created before expiresOnDay was added (or by code paths that forgot
+    // to set it) need a fallback expiry: createdOnDay + POLL_ACTIVE_DAYS.
+    const effectiveExpiry = row.expiresOnDay ?? (row.createdOnDay + POLL_ACTIVE_DAYS);
+    if (effectiveExpiry <= currentDay) {
       // Close the poll
       db.update(schema.polls)
         .set({ active: false })
