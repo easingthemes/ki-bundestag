@@ -39,6 +39,11 @@ export async function callOpenAICompatible(opts: {
     headers["Authorization"] = `Bearer ${config.apiKey}`;
   }
 
+  // Activate server-side JSON-mode constraint. Every prompt in this codebase
+  // already explicitly instructs the model to return JSON, so the OpenAI
+  // strict-mode requirement (prompt must mention "JSON") is satisfied.
+  // Supported by Ollama, Groq, OpenRouter, OpenAI, DeepSeek, Together,
+  // Fireworks via the OpenAI-compatible `/v1/chat/completions` endpoint.
   const body = {
     model: config.model.model,
     messages: [
@@ -46,6 +51,7 @@ export async function callOpenAICompatible(opts: {
       { role: "user", content: prompt },
     ],
     max_tokens: maxTokens,
+    response_format: { type: "json_object" as const },
   };
 
   const url = `${config.baseURL.replace(/\/$/, "")}/chat/completions`;
