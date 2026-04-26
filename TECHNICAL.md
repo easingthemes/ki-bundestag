@@ -310,6 +310,7 @@ See [docs/operations/hosting.md](docs/operations/hosting.md) for full setup guid
 |---|---|
 | [Hosting & Deployment](docs/operations/hosting.md) | Hetzner setup, Caddy, PM2, CI/CD, backups |
 | [API Costs & Pricing](docs/operations/costs.md) | Token pricing, tier limits, cost estimates |
+| [Test Mode — Empirical Findings](docs/operations/test-mode-empirical.md) | What works at $0 with `TEST_MODE=ollama` after PRs #170/#171/#172, gap list, decision matrix |
 | [Batch Timing Log](docs/operations/timing.md) | Observed batch API latency data |
 | [Cost Analysis](docs/operations/analysis.md) | Measured cost data from production runs |
 | [Bundestag Reference](docs/research/bundestag-reference.md) | German parliamentary rules and structure |
