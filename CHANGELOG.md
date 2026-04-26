@@ -1,3 +1,17 @@
+# [1.12.0](https://github.com/easingthemes/ki-bundestag/compare/v1.11.0...v1.12.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* **sim-fidelity:** PR [#166](https://github.com/easingthemes/ki-bundestag/issues/166) review round 1 — WHERE clause on nationalState update ([7ad090a](https://github.com/easingthemes/ki-bundestag/commit/7ad090a46c1ffce1969f8f4e1e9c5f4a6398e4c9))
+
+
+### Features
+
+* **sim-fidelity:** Ausschussanhörungen + experts seed table (Cycle 5 PR 1) ([ab7aa7d](https://github.com/easingthemes/ki-bundestag/commit/ab7aa7d0662dfe040a3a22091b82f98f6e8101b4)), closes [#165](https://github.com/easingthemes/ki-bundestag/issues/165)
+* **sim-fidelity:** Enquete-Kommission lifecycle + AI Schlussbericht (Cycle 5 PR 2) ([35719e4](https://github.com/easingthemes/ki-bundestag/commit/35719e498d563c7e82e8f0f690b332506abc220f))
+* **sim-fidelity:** Schuldenbremse absolute-majority threshold + expiry event + R4/R5/R10 polish (Cycle 5 PR 3) ([4bc5c6e](https://github.com/easingthemes/ki-bundestag/commit/4bc5c6e7d334f9ca3a0b407819fef0f3717aaee6))
+
 # [1.11.0](https://github.com/easingthemes/ki-bundestag/compare/v1.10.0...v1.11.0) (2026-04-25)
 
 
