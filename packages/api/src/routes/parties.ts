@@ -209,7 +209,7 @@ router.post("/api/parties/:id/proposals", (req, res) => {
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const { allowed, limit, used } = checkUserDailyLimit(token, "submit_proposal");
-  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} proposals in 24h). Try again later.` }); return; }
+  if (!allowed) { res.status(429).json({ error: `Daily limit reached (${used}/${limit} proposals). Try again later.` }); return; }
 
   const userDb = getUserDb();
   const users = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all();
