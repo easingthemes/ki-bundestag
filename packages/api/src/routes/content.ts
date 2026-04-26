@@ -391,7 +391,15 @@ router.post("/api/questions", (req, res) => {
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
   try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch (err) { logger.error("[content] Failed to log action:", err); }
-  res.status(201).json(mapQuestion(created, 0, 0, null));
+
+  // Backfill authorInfo so the POST response shape matches GET /api/questions/:id.
+  let authorInfo: { displayName: string; isBot: boolean } | null = null;
+  if (token) {
+    const userDb = getUserDb();
+    const author = userDb.select({ displayName: schema.users.displayName, isBot: schema.users.isBot }).from(schema.users).where(eq(schema.users.id, token)).all()[0];
+    if (author) authorInfo = { displayName: author.displayName, isBot: author.isBot ?? false };
+  }
+  res.status(201).json(mapQuestion(created, 0, 0, null, authorInfo));
 });
 
 // POST /api/questions/:id/vote (auth)
