@@ -89,6 +89,9 @@ async function attemptSemanticRetry(
       console.log(`  [Agent] ${ctx.party.id}: semantic retry improved (${validationResult.errors.length} → ${retryValidation.errors.length} errors)`);
     } else {
       console.warn(`  [Agent] ${ctx.party.id}: semantic retry did not improve validation`);
+      if (process.env.TEST_MODE && retryResult.text) {
+        console.warn(`  [test-mode] ${ctx.party.id} retry raw output (first 1500 chars):\n${retryResult.text.slice(0, 1500)}`);
+      }
     }
 
     return { actions: retryValidation.valid, retried: true };
@@ -321,7 +324,14 @@ export async function processPartyAgentResult(
     enqueteContext,
   );
 
-  if (validationResult.errors.length > 0) validationOk = false;
+  if (validationResult.errors.length > 0) {
+    validationOk = false;
+    // Test-mode-only: dump raw model output so we can see exactly which
+    // action types / shapes the local model is producing. Prod is unaffected.
+    if (process.env.TEST_MODE && result.text) {
+      console.warn(`  [test-mode] ${ctx.party.id} raw model output (first 1500 chars):\n${result.text.slice(0, 1500)}`);
+    }
+  }
 
   logAICall({ task: `agent:${ctx.party.id}`, model: result.model, provider: result.provider as Provider, latencyMs: 0, parseOk, validationOk });
 

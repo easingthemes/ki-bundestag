@@ -1,5 +1,6 @@
 import type { AgentAction, AgentResponse, Bill, BillCategory, Election, InterpellationType, MinistryPortfolio, MotionType } from "@ki-bundestag/types";
 import { extractJson, stripLeadingPlusInJsonNumbers, stripTrailingCommasInJson } from "./ai-json.js";
+import { coerceTestModeActions } from "./test-mode-coerce.js";
 
 export interface ValidationError {
   /** Index of the action in the original actions array */
@@ -134,6 +135,14 @@ export function parseAgentResponse(raw: string): AgentResponse {
     parsed = JSON.parse(sanitized);
   }
 
+  // Test-mode coercion: rewrite past-tense action types, snake_case field names,
+  // vote-value synonyms, and object-instead-of-array structural failures into
+  // the canonical schema. Production paths skip this — coercion only activates
+  // when TEST_MODE is set, so prod keeps strict validation.
+  if (process.env.TEST_MODE) {
+    parsed = coerceTestModeActions(parsed);
+  }
+
   if (!parsed.actions || !Array.isArray(parsed.actions)) {
     throw new Error("Response must have an 'actions' array");
   }
@@ -182,7 +191,10 @@ export function validateActions(
           continue;
         }
         if (!action.billId || !VALID_VOTES.includes(action.vote)) {
-          console.warn(`[${partyId}] Invalid vote action, skipping`);
+          const reason = !action.billId
+            ? "missing billId"
+            : `invalid vote value "${action.vote}"`;
+          console.warn(`[${partyId}] Invalid vote action (${reason}), skipping`);
           errors.push({ actionIndex: i, actionType: "vote", message: `Invalid vote — billId or vote value missing/invalid (valid votes: ${VALID_VOTES.join(", ")})`, fixable: true });
           continue;
         }
@@ -273,7 +285,12 @@ export function validateActions(
           continue;
         }
         if (!action.title || !action.statement) {
-          console.warn(`[${partyId}] Statement missing fields, skipping`);
+          const missing = !action.title && !action.statement
+            ? "title+statement"
+            : !action.title
+              ? "title"
+              : "statement";
+          console.warn(`[${partyId}] Statement missing ${missing}, skipping`);
           errors.push({ actionIndex: i, actionType: "statement", message: "Statement missing required title or statement text", fixable: false });
           continue;
         }
@@ -632,9 +649,12 @@ export function validateActions(
         validated.push(action);
         break;
 
-      default:
-        console.warn(`[${partyId}] Unknown action type, skipping`);
-        errors.push({ actionIndex: i, actionType: (action as any).type ?? "unknown", message: `Unknown action type "${(action as any).type ?? "undefined"}"`, fixable: true });
+      default: {
+        const t = (action as any).type ?? "undefined";
+        console.warn(`[${partyId}] Unknown action type "${t}", skipping`);
+        errors.push({ actionIndex: i, actionType: t === "undefined" ? "unknown" : t, message: `Unknown action type "${t}"`, fixable: true });
+        break;
+      }
     }
   }
 

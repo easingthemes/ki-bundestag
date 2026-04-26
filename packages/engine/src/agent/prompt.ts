@@ -45,11 +45,15 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
   // Build rules dynamically based on capabilities
   const rules: string[] = [
     "You must respond with ONLY valid JSON matching the schema below. No other text.",
+    "Use ONLY the action type strings listed under VALID ACTION TYPES. Past-tense or passive forms (e.g. \"bill_proposed\", \"motion_submitted\", \"interpellation_filed\") are INVALID — use the imperative form (e.g. \"propose_bill\", \"submit_motion\", \"file_interpellation\").",
+    "Use ONLY bill IDs explicitly listed in the prompt. Do NOT invent, guess, or abbreviate bill IDs. If the THIRD READING list is empty, do not emit any vote actions.",
+    "Field names are case-sensitive and exact. Use \"billId\" (camelCase), not \"bill_id\". Use \"title\" and \"statement\" (not \"name\", \"content\", \"description\", or \"statement_text\") for statement actions.",
     "You may take 1-3 actions per turn.",
   ];
 
   if (caps.canVote) {
     rules.push(`You MUST submit a vote action for every bill listed under "THIRD READING — MANDATORY VOTES". Missing a vote is an error.`);
+    rules.push("Vote values must be EXACTLY one of: \"yes\", \"no\", \"abstain\". Synonyms like \"pass\", \"for\", \"against\", \"oppose\" are INVALID.");
   }
 
   if (caps.canPropose) {
@@ -123,67 +127,96 @@ export function buildSystemPrompt(partyId?: string, capabilities?: PartyCapabili
   rules.push("Impact numbers must be plain numbers, not strings. Do NOT use leading + signs on positive numbers (write 0.5, not +0.5).");
   rules.push("Do NOT include trailing commas in JSON arrays or objects.");
   rules.push("ALL text content (bill titles, descriptions, statements, reasons, amendment descriptions) MUST be written in German. Do not use English for any user-visible text.");
-  rules.push("Use ONLY bill IDs explicitly listed in the prompt. Do NOT invent or guess bill IDs.");
 
   const numberedRules = rules.map((r, i) => `${i + 1}. ${r}`).join("\n");
 
-  // Build schema dynamically — only include action types the party can use
+  // Build schema dynamically — only include action types the party can use.
+  // We also build a parallel list of valid `type` strings (validActionTypes)
+  // to surface as an explicit closed enum above the schema. Small open-weight
+  // models (and Haiku at low frequency) tend to invent past-tense action names
+  // like "bill_proposed" instead of "propose_bill" when the closed enum is only
+  // implicit in the schema. See docs/research/agent-output-failures.md.
   const schemaEntries: string[] = [];
+  const validActionTypes: string[] = [];
 
   if (caps.canVote) {
-    schemaEntries.push(`    {"type":"vote","billId":"<bill id>","vote":"yes"|"no"|"abstain","reason":"<brief>"}`);
+    schemaEntries.push(`    {"type":"vote","billId":"<EXACT_BILL_ID_FROM_THIRD_READING_LIST>","vote":"yes"|"no"|"abstain","reason":"<brief>"}`);
+    validActionTypes.push("vote");
   }
 
   if (caps.canPropose) {
     schemaEntries.push(`    {"type":"propose_bill","title":"<title>","description":"<1-2 sentences>","category":"economy"|"social"|"environment"|"immigration"|"defense"|"education"|"healthcare"|"infrastructure","impact":{"budget":<num>,"unemployment":<num>,"inflation":<num>,"gdpGrowth":<num>,"publicSentiment":<num>}}`);
+    validActionTypes.push("propose_bill");
   }
 
   if (caps.canAmend) {
-    schemaEntries.push(`    {"type":"propose_amendment","billId":"<second_reading bill id>","title":"<title>","description":"<1-2 sentences>","impactChange":{"budget":<num>,"unemployment":<num>,"inflation":<num>,"gdpGrowth":<num>,"publicSentiment":<num>}}`);
+    schemaEntries.push(`    {"type":"propose_amendment","billId":"<EXACT_BILL_ID_FROM_SECOND_READING_LIST>","title":"<title>","description":"<1-2 sentences>","impactChange":{"budget":<num>,"unemployment":<num>,"inflation":<num>,"gdpGrowth":<num>,"publicSentiment":<num>}}`);
+    validActionTypes.push("propose_amendment");
   }
 
   schemaEntries.push(`    {"type":"statement","title":"<headline>","statement":"<1-2 sentence public statement>"}`);
+  validActionTypes.push("statement");
 
   if (caps.hasFraktion) {
     schemaEntries.push(`    {"type":"submit_motion","motionType":"motion"|"resolution","title":"<title>","description":"<1-2 sentences>"}`);
+    validActionTypes.push("submit_motion");
   }
 
   if (caps.hasFraktion && caps.isOpposition) {
     schemaEntries.push(`    {"type":"file_interpellation","interpellationType":"kleine"|"große","title":"<title>","question":"<1-2 sentence question>","targetMinistry":"finance"|"labour"|"environment"|"interior"|"defence"|"education"|"health"|"infrastructure"}`);
+    validActionTypes.push("file_interpellation");
   }
 
   if (caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"campaign_statement","title":"<headline>","promise":"<1-2 sentence promise>"}`);
+    validActionTypes.push("campaign_statement");
   }
 
   if (caps.isCoalitionLeader && !caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"call_vertrauensfrage","title":"<title>","description":"<1-2 sentences>"}`);
+    validActionTypes.push("call_vertrauensfrage");
     // Cycle 4 PR 2 — Schuldenbremse-Aussetzung schema entry.
     schemaEntries.push(`    {"type":"propose_fiscal_emergency","title":"<title>","description":"<1-2 sentences>","activeCrisisId":"<crisis id or null>","justification":"<1-2 sentence Art. 115 GG case>"}`);
+    validActionTypes.push("propose_fiscal_emergency");
   }
 
   if (caps.isOpposition && caps.hasFraktion && !caps.hasActiveElection) {
     schemaEntries.push(`    {"type":"file_misstrauensvotum","title":"<title>","description":"<1-2 sentences>","proposedChancellor":"<name>","proposedChancellorPartyId":"<party id>"}`);
+    validActionTypes.push("file_misstrauensvotum");
     // Cycle 4 PR 1 — at least one of targetPartyId / targetMinistry must be present (S17).
     schemaEntries.push(`    {"type":"file_inquiry_committee","subject":"<1-line German subject>","targetPartyId":"<coalition party id or null>","targetMinistry":"finance"|"labour"|"environment"|"interior"|"defence"|"education"|"health"|"infrastructure"|null}`);
+    validActionTypes.push("file_inquiry_committee");
   }
 
   if (caps.hasFraktion && !caps.hasActiveElection) {
-    schemaEntries.push(`    {"type":"file_constitutional_challenge","billId":"<recently passed bill id>","title":"<title>","arguments":"<1-2 sentence constitutional basis>"}`);
+    schemaEntries.push(`    {"type":"file_constitutional_challenge","billId":"<EXACT_BILL_ID_FROM_RECENTLY_PASSED_LIST>","title":"<title>","arguments":"<1-2 sentence constitutional basis>"}`);
+    validActionTypes.push("file_constitutional_challenge");
   }
 
   schemaEntries.push(`    {"type":"nothing"}`);
+  validActionTypes.push("nothing");
 
   const schema = `{"actions":[\n${schemaEntries.join(",\n")}\n]}`;
 
-  // Compact example showing correct output format
-  const example = `EXAMPLE (2 votes + 1 statement):
-{"actions":[{"type":"vote","billId":"bill-abc","vote":"yes","reason":"Aligns with our social policy goals"},{"type":"vote","billId":"bill-xyz","vote":"no","reason":"Unacceptable fiscal impact"},{"type":"statement","title":"Party responds to crisis","statement":"We call for immediate government action to address the economic downturn."}]}`;
+  // Explicit closed-enum surface for action `type` strings. Listing them as a
+  // bulleted set above the schema makes the closed nature unmistakable to
+  // weaker models that otherwise invent past-tense / passive variants.
+  const validTypesBlock = `VALID ACTION TYPES — the "type" field MUST be EXACTLY one of these strings (no other strings, no synonyms, no past-tense forms):
+${validActionTypes.map(t => `  - "${t}"`).join("\n")}`;
+
+  // Compact example. Bill IDs are intentionally written as <ALL_CAPS_PLACEHOLDER>
+  // markers rather than realistic-looking values like "bill-abc" — the placeholder
+  // form is impossible to mistake for a real ID and discourages copy-paste of the
+  // example pattern into the actual response.
+  const example = `EXAMPLE (2 votes + 1 statement) — replace <PLACEHOLDERS> with REAL ids/values from the prompt above:
+{"actions":[{"type":"vote","billId":"<EXACT_BILL_ID_FROM_THIRD_READING_LIST>","vote":"yes","reason":"Aligns with our social policy goals"},{"type":"vote","billId":"<EXACT_BILL_ID_FROM_THIRD_READING_LIST>","vote":"no","reason":"Unacceptable fiscal impact"},{"type":"statement","title":"Party responds to crisis","statement":"We call for immediate government action to address the economic downturn."}]}`;
 
   return `${profileSection}You are an AI agent controlling a political party in the German Bundestag simulation. Act in character as the party leadership.
 
 RULES:
 ${numberedRules}
+
+${validTypesBlock}
 
 RESPONSE SCHEMA:
 ${schema}
@@ -530,11 +563,37 @@ export function buildValidationRetryPrompt(
     );
   }
 
+  // Targeted recovery hints — add only if the relevant error class is present.
+  // Keeps the retry prompt small when not needed.
+  const hints: string[] = [];
+  if (errors.some(e => e.message.startsWith("Unknown action type"))) {
+    hints.push(
+      'Hint for "Unknown action type" errors: re-read the VALID ACTION TYPES list above. Do NOT use past-tense or passive variants like "bill_proposed", "motion_submitted", "interpellation_filed", "interpellation_answered", "kurzintervention". Use the imperative forms exactly as listed.',
+    );
+  }
+  if (errors.some(e => e.actionType === "vote" && e.message.startsWith("Invalid vote"))) {
+    hints.push(
+      'Hint for "Invalid vote" errors: the "vote" field must be exactly one of "yes", "no", "abstain". The "billId" field must be camelCase (not "bill_id"). Synonyms like "pass", "for", "against" are rejected.',
+    );
+  }
+  if (errors.some(e => e.message.includes("does not exist"))) {
+    hints.push(
+      'Hint for "Bill does not exist" errors: only use the exact bill IDs listed under THIRD READING / SECOND READING / RECENTLY PASSED in the prompt. Do not invent IDs from bill titles.',
+    );
+  }
+  if (errors.some(e => e.actionType === "statement" && e.message.includes("missing"))) {
+    hints.push(
+      'Hint for "Statement missing" errors: a statement action requires both "title" (headline) and "statement" (1-2 sentence text). Field names like "content", "description", "statement_text" are invalid.',
+    );
+  }
+
+  const hintBlock = hints.length > 0 ? `\n\n${hints.join("\n\n")}` : "";
+
   return `${originalUserPrompt}
 
 --- VALIDATION ERRORS IN YOUR PREVIOUS RESPONSE ---
 Your previous response had the following errors:
-${errorLines.join("\n")}
+${errorLines.join("\n")}${hintBlock}
 
 Re-generate your complete actions JSON. Keep actions that were valid, fix or remove the invalid ones. You MUST vote on all third-reading bills.
 ---`;
