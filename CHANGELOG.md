@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/easingthemes/ki-bundestag/compare/v1.14.0...v1.15.0) (2026-04-26)
+
+
+### Features
+
+* **agents:** self-service registration + bot-aware rate limits ([320b0d3](https://github.com/easingthemes/ki-bundestag/commit/320b0d310c1226891857748d2d024e29069cb892))
+
 # [1.14.0](https://github.com/easingthemes/ki-bundestag/compare/v1.13.1...v1.14.0) (2026-04-26)
 
 
