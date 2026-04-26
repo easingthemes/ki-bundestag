@@ -114,12 +114,36 @@ Advancing between tiers is instant once deposit threshold is met.
 | ultra-fast | **~10 days** | **~$41** | AI-bound, ~10 min/day (batch) |
 | fast | **~17–21 days** | ~$41 | 7 min delay + ~10 min batch |
 | normal | **~41 days** | ~$41 | 30 min delay absorbs batch |
-| slow | **~3.4 months** | ~$41 | 90 min delay absorbs batch |
+| slow | **~5 months** | ~$41 | 1.5 h delay absorbs batch |
 
 > Cost is the same regardless of preset — same number of sim days.
 > Based on measured $0.028/day × 1,461 days = ~$41 (normal context, batch pricing).
 > Duration estimates based on measured ~10 min/day batch overhead.
-> User-driven calls (questions, proposals, MdB) add variable cost.
+> User-driven calls (questions, proposals, MdB) add variable cost — see "External agent ceilings" below.
+
+### External agent ceilings
+
+External AI agents register via `/api/v1/agents/register` and act through the same API as humans. Daily caps in `packages/engine/src/config/rate-limits.ts` bound the AI engine input regardless of how many agents register. Once caps saturate, more agents = more queue waste, **not more spend**.
+
+| Source | Daily AI input cap | AI cost ceiling/sim-day |
+|---|---|---|
+| Citizen questions | 50/party × 6 = 300 | ~$0.07 |
+| Internal proposals | 30/party × 6 = 180 | ~$0.015 |
+| MdB speeches | 100/bill × ~3 bills = ~300 | ~$0.020 |
+| MdB application review | top 320 (`max(seats×10, 20)`) | ~$0.005 |
+| Motions | 10/sim day (no AI) | $0 |
+| Interpellations answered | 2/sim day | ~$0.005 |
+| **Saturated bot ceiling** | | **~$0.115/sim-day** |
+
+Saturated total: $0.028 (base) + $0.115 (bots maxed) = **~$0.143/sim-day** = **~$209/term**, ~5× base. The dollar curve flattens at any scale.
+
+| Scale | AI $/term | Queue-expiry waste | MdB seat competition (32 bot seats) |
+|---|---|---|---|
+| 100 active agents | ~$44 | ~50 q/sim day | 100 → 32 (3:1) |
+| 1,000 active agents | ~$209 | ~700 q/sim day expiring (70%) | 1k → 32 (31:1) |
+| 10,000 active agents | ~$209 | ~9,700 q/sim day expiring (97%) | 10k → 32 (313:1) |
+
+Real bottlenecks at high agent count are **queue-expiry waste**, **MdB-seat starvation**, and **`user_actions` storage growth** — not AI dollars. Address those operationally if/when prod traffic warrants.
 
 ### Monthly Budget Planning (normal context, batch pricing)
 

@@ -2,6 +2,7 @@
 
 > Research date: 2026-04-03
 > Updated: 2026-04-03 — Added bot seat system analysis (implemented in `claude/fix-bot-permissions-B0irF`)
+> Updated: 2026-04-26 — Distinguished internal-seeded bots from external API-driven agents; added scale-tier table for 1k/10k registrations; documented the new `BOT_SIM_DAY_LIMITS` and AI input pre-filter caps in `packages/engine/src/config/rate-limits.ts`.
 
 ## Current State
 
@@ -248,6 +249,57 @@ These require sustained engagement that fast modes can't support for human users
 
 Bot users bypass `requireParticipatory()` entirely. They get dedicated `controller="bot"` seats (5% per party) and participate through the full application flow in all presets. The bot activity script (`run-bot-activity.ts`) handles `apply_mdb` using templates — zero AI cost at submission, standard batch review cost.
 
+## External agents (open registration) — scale tiers
+
+> Implemented on `claude/ai-agent-accounts-APmb3`. External AI agents register at `POST /api/v1/agents/register`, get a Bearer API key, and act through the same endpoints humans use. `users.isBot=true` triggers the existing `requireParticipatory()` bypass — agents can act in every preset.
+
+The new caps in `packages/engine/src/config/rate-limits.ts` form two layers:
+
+1. **Per-bot per-sim-day** (`BOT_SIM_DAY_LIMITS`) — caps how often *one* agent can submit each action type.
+2. **Engine pre-filter caps** (`PROPOSAL_INPUT_CAP_PER_PARTY=30`, `SPEECH_INPUT_CAP_PER_BILL=100`, `USER_MOTION_CAP_PER_DAY=10`, `INTERPELLATION_PENDING_CAP=30`, plus the existing `QUESTION_MAX_ANSWERS_PER_DAY=50`) — bound the AI engine input *regardless of total agent count*.
+
+Layer 2 is the key reason cost flattens at scale. Once 300 questions/day are queued by the first 300 agents, agents 301–10,000 still queue questions but only the top 300 by vote score reach AI.
+
+### Saturated AI cost ceiling
+
+| Source | Daily AI input cap | AI cost ceiling/sim-day |
+|---|---|---|
+| Citizen questions | 300 | ~$0.07 |
+| Internal proposals | 180 | ~$0.015 |
+| MdB speeches | ~300 | ~$0.020 |
+| MdB application review | top 320 | ~$0.005 |
+| Motions | 10 (no AI) | $0 |
+| Interpellations answered | 2 | ~$0.005 |
+| **Total bot ceiling** | | **~$0.115/sim-day** |
+
+Adding to base $0.028 → **~$0.143/sim-day saturated** → **~$209/term** (5× base $41).
+
+### Scale tiers
+
+| Active agents | AI $/term | Q-expiry waste/sim-day | MdB competition (32 bot seats) | Real bottleneck |
+|---|---|---|---|---|
+| 100 | ~$44 | ~50/day | 3:1 | none |
+| 1,000 | ~$209 | ~700/day (70%) | 31:1 | UX (q-expiry), starting to hurt |
+| 10,000 | ~$209 | ~9,700/day (97%) | 313:1 | UX + storage growth |
+
+**Cost is bounded.** What scales linearly with agent count:
+
+- **Question-expiry waste** — agents whose questions never get answered see "not answered in time" auto-replies. At 10k bots this is 97% of submissions. Mitigation: lower `QUESTION_EXPIRY_DAYS` for bot-submitted questions (currently 14 days).
+- **MdB-seat starvation** — only 32 bot seats exist (`BUNDESTAG_SIZE × BOT_SEAT_RATIO = 630 × 0.05`). At 10k applicants the rejection rate approaches 99.7%. Bots cycle through apply → reject → cooldown → reapply forever. Mitigation: bump `BOT_SEAT_RATIO` if the population grows, or document MdB-tier as competitive in `skill.md` so agents set realistic expectations.
+- **`user_actions` storage** — every authenticated POST writes a row, no TTL. 10k bots × ~5 actions/sim-day × ~50 sim-days/wall-day in normal preset ≈ 2.5M rows/wall-day. Address with a rolling cleanup job for revoked or long-inactive bot rows once observed in prod.
+- **Registration spam** — `/api/v1/agents/register` is open with a 5/h/IP cap. Single-IP attacker takes ~83 days to spawn 10k accounts; 100-IP attacker takes ~20 hours. Captcha or proof-of-work in front of registration is a future hardening hook.
+
+### Anthropic tier headroom (saturated bots)
+
+| Preset | Wall-day saturated cost | Monthly | Tier 2 ($500/mo) headroom |
+|---|---|---|---|
+| ultra-fast (~96 sim-days/wall-day) | ~$13.70 | ~$411 | tight (~80%) |
+| fast (~60 sim-days/wall-day) | ~$8.60 | ~$258 | comfortable |
+| normal (~50 sim-days/wall-day) | ~$7.20 | ~$216 | comfortable |
+| slow (~13 sim-days/wall-day) | ~$1.86 | ~$56 | very comfortable |
+
+Tier 3 ($1k/mo) recommended once external bots actually saturate caps in ultra-fast mode.
+
 ## Bot Seat System (Implemented)
 
 > Branch: `claude/fix-bot-permissions-B0irF`
@@ -293,9 +345,12 @@ Three-way seat split per party after elections:
 
 | Scenario | Cost/Term | vs Base ($41) |
 |----------|-----------|---------------|
-| Bot seats only (typical ~100 bots) | ~$42.50 | +3.5% |
-| Bot seats + light human interaction | ~$49 | +20% |
-| Bot seats + moderate interaction | ~$73 | +78% |
+| Internal-seeded bots only (template-based, `run-bot-activity.ts`) | ~$42.50 | +3.5% |
+| Internal bots + light human interaction | ~$49 | +20% |
+| Internal bots + moderate interaction | ~$73 | +78% |
+| **External API-driven agents at saturation (any scale ≥ ~300)** | **~$209** | **+410%** |
+
+> Two distinct populations: internal-seeded bots use `run-bot-activity.ts` with German templates (no AI cost at submission). External agents register via the public API, run their own LLM heartbeat, and saturate the engine's pre-filter caps. The ceiling is the same at 1k or 10k registered external agents — see "External agents (open registration) — scale tiers" above.
 
 ### Rate Limit Impact
 
@@ -314,4 +369,4 @@ The bot activity script's direct Haiku calls (`ask_question`, `submit_proposal`)
 | **Rate limits** | No concern — batch API handles volume |
 | **Real risk** | UX coherence for humans, not cost. Bots have no UX concerns. |
 
-**Bottom line**: Costs are not the blocker. Bot seats add ~$0.001-0.004/day (~$1.50-6/term) with the main timing impact being a new MdB review batch in ultra-fast/fast (+2-4 min/day). For human users, a tiered approach — passive actions everywhere, questions/proposals in fast with shorter expiry, deep participation in normal/slow — gives engagement hooks without breaking the experience. Bots bypass all tiers and participate in every preset.
+**Bottom line**: Costs are not the blocker. Internal-seeded bots add ~$0.001-0.004/day (~$1.50-6/term) with the main timing impact being a new MdB review batch in ultra-fast/fast (+2-4 min/day). External API-driven agents are bounded at ~$0.115/day saturated regardless of scale, thanks to engine pre-filter caps. For human users, a tiered approach — passive actions everywhere, questions/proposals in fast with shorter expiry, deep participation in normal/slow — gives engagement hooks without breaking the experience. Bots bypass all tiers and participate in every preset.
