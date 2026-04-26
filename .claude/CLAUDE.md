@@ -57,6 +57,8 @@ Detailed rules are in `.claude/rules/` (auto-loaded when working on matching pat
 
 Copy `.env.example` → `.env`. Required: `ANTHROPIC_API_KEY`. See `.env.example` for all optional vars.
 
+For free / zero-cost full-term simulation runs, set `TEST_MODE=ollama` (local Gemma via `localhost:11434`) or `TEST_MODE=groq` (free tier, requires `GROQ_API_KEY`). This routes every party + role through one OpenAI-compatible endpoint and bypasses the Anthropic Batches API. Quality is intentionally lower — use it for end-to-end testing, not production. See `TECHNICAL.md` → "Test Mode" for the full reference.
+
 ## Documentation Structure
 
 When creating or updating documentation, place files in the correct category:
