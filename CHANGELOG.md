@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/easingthemes/ki-bundestag/compare/v1.13.0...v1.13.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **test-mode:** enable response_format JSON mode on openai-compatible client ([65aea9e](https://github.com/easingthemes/ki-bundestag/commit/65aea9e284f161aeb589b3a0dd5f9ac045a14872))
+
 # [1.13.0](https://github.com/easingthemes/ki-bundestag/compare/v1.12.1...v1.13.0) (2026-04-26)
 
 
