@@ -113,6 +113,19 @@ export const mdbSpeeches = sqliteTable("mdb_speeches", {
   createdAt: integer("created_at").notNull(),
 });
 
+// ── Agent API Keys (Bearer auth for AI agents) ──
+
+export const agentApiKeys = sqliteTable("agent_api_keys", {
+  id: text("id").primaryKey(),                          // UUID
+  userId: text("user_id").notNull().references(() => users.id),
+  hashedKey: text("hashed_key").notNull().unique(),     // SHA-256 of plaintext key
+  keyPreview: text("key_preview").notNull(),            // last 8 chars, for display
+  description: text("description"),
+  createdAt: integer("created_at").notNull(),           // ms epoch
+  lastUsedAt: integer("last_used_at"),                  // ms epoch
+  revokedAt: integer("revoked_at"),                     // ms epoch, null = active
+});
+
 // ── User Action Logging (analytics) ──
 
 export const userActions = sqliteTable("user_actions", {
