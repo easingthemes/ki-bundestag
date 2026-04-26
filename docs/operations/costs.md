@@ -150,3 +150,25 @@ Advancing between tiers is instant once deposit threshold is met.
 - [ ] **Skip media on some days** — Generate articles every 2-3 days instead of daily
 - [ ] **Token budget tuning** — Reduce `maxTokens` where responses are short
 - [ ] **Haiku 3 while available** — Switch from Haiku 4.5 ($1/$5) to Haiku 3 ($0.25/$1.25) = 75% cheaper (retires Apr 19)
+
+---
+
+## Free testing alternatives (TEST_MODE)
+
+For full-term simulations, CI runs, and end-to-end tests where production-grade quality is unnecessary, set `TEST_MODE` to route every party + role through a single OpenAI-compatible endpoint and bypass the Anthropic Batches API entirely. Quality is intentionally lower; the goal is unlimited zero-cost runs.
+
+| `TEST_MODE` | Endpoint | Default model | Cost | Quotas |
+|---|---|---|---|---|
+| `ollama` | `http://localhost:11434/v1` | `gemma3:4b` | $0 (local) | None — bound by local hardware |
+| `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | $0 (free tier) | 30 RPM, 6K TPM, 14.4K req/day; `gemma2-9b-it` has 15K TPM |
+| `custom` | `TEST_BASE_URL` | `TEST_MODEL` | depends | depends |
+
+Per-term sizing on Groq's free tier (~11 calls/sim-day measured):
+
+| Daily req cap | Sim days/day | Term (1461 days) |
+|---|---|---|
+| 14,400 / 11 ≈ **1,300 sim days** | bound by 30 RPM (~2 sim days/min) | **~1.1 terms/day** in throughput |
+
+Ollama has no quota — the limit is local GPU/CPU throughput. On a modest M-series Mac, expect 5–15 sec per call with `gemma3:4b`, so ~1–3 minutes per sim day with `TEST_MODE_CONCURRENCY=4`.
+
+Reference: see `TECHNICAL.md` → "Test Mode" for implementation, `agent/test-mode.ts` for resolution logic, and `.env.example` for all knobs.

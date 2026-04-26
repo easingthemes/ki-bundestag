@@ -11,6 +11,7 @@ import {
   type Provider,
   type ModelConfig,
 } from "../config/index.js";
+import { getTestMode } from "./test-mode.js";
 
 // Re-export for external consumers
 export { PARTY_MODELS, ROLE_MODELS } from "../config/index.js";
@@ -22,8 +23,13 @@ export type RoleKey = keyof typeof ROLE_MODELS;
  * Get model config for a specific party, with env var override support.
  * Env override format: MODEL_PARTY_<ID>=<provider>:<model>
  * Example: MODEL_PARTY_AFD=xai:grok-4
+ *
+ * When TEST_MODE is set, every party resolves to the same test model.
  */
 export function getPartyModel(partyId: string): ModelConfig {
+  const test = getTestMode();
+  if (test) return test.model;
+
   const envKey = `MODEL_PARTY_${partyId.toUpperCase()}`;
   const envOverride = process.env[envKey];
 
@@ -43,8 +49,11 @@ export function getPartyModel(partyId: string): ModelConfig {
  * Override format: <provider>:<model> or just <model> (assumes anthropic)
  */
 export function getRoleModel(roleKey: RoleKey): ModelConfig {
+  const test = getTestMode();
+  if (test) return test.model;
+
   const base = ROLE_MODELS[roleKey];
-  
+
   // Legacy env var support (backward compat)
   const envMap: Record<RoleKey, string> = {
     daily: "MODEL_DAILY",

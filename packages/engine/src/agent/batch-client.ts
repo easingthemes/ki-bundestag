@@ -32,6 +32,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { callAI, AIProviderLimitError, AIProviderAuthError, detectLimitError, parseResetTime, markProviderLimited, markProviderAuthFailed, isProviderAuthFailed } from "./client.js";
 import { getPartyModel, getRoleModel, type Provider, type RoleKey, type ModelConfig } from "./model-config.js";
 import { recordAICall, calculateCost, getTrackingDay } from "./cost-tracker.js";
+import { isTestMode, getTestMode } from "./test-mode.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -377,6 +378,13 @@ async function submitXaiBatch(requests: BatchRequest[]): Promise<BatchResult[]> 
 export async function submitBatch(requests: BatchRequest[]): Promise<BatchResult[]> {
   if (requests.length === 0) return [];
 
+  // TEST_MODE: skip the Anthropic Batches API (which the test endpoint
+  // doesn't implement) and fan requests out as parallel sync calls.
+  // Same return shape — downstream processors are unchanged.
+  if (isTestMode()) {
+    return submitTestModeBatch(requests);
+  }
+
   // Split by provider
   const anthropicReqs: BatchRequest[] = [];
   const xaiReqs: BatchRequest[] = [];
@@ -401,6 +409,65 @@ export async function submitBatch(requests: BatchRequest[]): Promise<BatchResult
   ]);
 
   return [...anthropicResults, ...xaiResults];
+}
+
+// ---------------------------------------------------------------------------
+// Test mode (Ollama / Groq / custom) — parallel sync calls, no batch API
+// ---------------------------------------------------------------------------
+
+const TEST_MODE_CONCURRENCY = Number(process.env.TEST_MODE_CONCURRENCY ?? 4);
+
+async function submitTestModeBatch(requests: BatchRequest[]): Promise<BatchResult[]> {
+  const test = getTestMode();
+  console.log(
+    `  [Batch] TEST_MODE=${test?.preset} — fanning out ${requests.length} requests (concurrency=${TEST_MODE_CONCURRENCY})`,
+  );
+
+  const results: BatchResult[] = new Array(requests.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= requests.length) return;
+      const req = requests[i];
+      try {
+        const r = await callAI({
+          system: req.system,
+          prompt: req.prompt,
+          maxTokens: req.maxTokens,
+          partyId: req.partyId,
+          roleKey: req.roleKey,
+        });
+        results[i] = {
+          customId: req.customId,
+          text: r.text,
+          model: r.model,
+          provider: r.provider,
+          inputTokens: r.inputTokens,
+          outputTokens: r.outputTokens,
+        };
+      } catch (err) {
+        console.warn(`  [Batch] test-mode call failed for ${req.customId}: ${(err as Error).message}`);
+        const config = resolveModel(req);
+        results[i] = {
+          customId: req.customId,
+          text: "",
+          model: config.model,
+          provider: config.provider,
+          inputTokens: 0,
+          outputTokens: 0,
+        };
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(TEST_MODE_CONCURRENCY, requests.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 // ---------------------------------------------------------------------------

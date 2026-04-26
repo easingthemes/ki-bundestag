@@ -9,6 +9,8 @@ import {
   type ModelConfig,
 } from "./model-config.js";
 import { recordAICall, calculateCost, getTrackingDay } from "./cost-tracker.js";
+import { getTestMode } from "./test-mode.js";
+import { callOpenAICompatible } from "./openai-compatible-client.js";
 
 // ---------------------------------------------------------------------------
 // Provider circuit breaker — skip API calls when a provider is known-limited
@@ -256,6 +258,20 @@ export async function callAI(opts: {
     }
   }
 
+  // Test mode: route through the OpenAI-compatible client (Ollama/Groq/custom).
+  // Skips Vercel AI SDK entirely — keeps the test path zero-dep.
+  if (config.provider === "openai-compatible") {
+    const testCfg = getTestMode();
+    if (!testCfg) {
+      throw new Error("[AI] openai-compatible provider requested but TEST_MODE is not set");
+    }
+    return callOpenAICompatibleWithRetry({
+      ...opts,
+      config,
+      testCfg,
+    });
+  }
+
   const model = getModel(config.provider, config.model);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -320,5 +336,53 @@ export async function callAI(opts: {
   }
 
   // Unreachable, but satisfies TypeScript
+  throw new Error("[AI] Unexpected: retry loop exited without return or throw") as never;
+}
+
+async function callOpenAICompatibleWithRetry(opts: {
+  system: string;
+  prompt: string;
+  maxTokens: number;
+  partyId?: string;
+  roleKey?: RoleKey;
+  config: ModelConfig;
+  testCfg: NonNullable<ReturnType<typeof getTestMode>>;
+}): Promise<AICallResult> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const startMs = Date.now();
+      const { text, inputTokens, outputTokens } = await callOpenAICompatible({
+        config: opts.testCfg,
+        system: opts.system,
+        prompt: opts.prompt,
+        maxTokens: opts.maxTokens,
+      });
+      const latencyMs = Date.now() - startMs;
+
+      recordAICall({
+        dayNumber: getTrackingDay(),
+        task: opts.partyId ? `call:${opts.partyId}` : `call:${opts.roleKey ?? "daily"}`,
+        provider: opts.config.provider,
+        model: opts.config.model,
+        inputTokens,
+        outputTokens,
+        costUsd: calculateCost(opts.config.model, inputTokens, outputTokens, false),
+        latencyMs,
+        success: true,
+      });
+
+      return { text, model: opts.config.model, provider: opts.config.provider, inputTokens, outputTokens };
+    } catch (err) {
+      const status = (err as { status?: number }).status ?? 0;
+      const transient = status === 429 || status >= 500 || isNetworkError(err);
+      if (transient && attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAYS[attempt];
+        console.warn(`  [AI] Transient ${opts.testCfg.preset} error (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
   throw new Error("[AI] Unexpected: retry loop exited without return or throw") as never;
 }

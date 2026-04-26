@@ -42,6 +42,7 @@ Context depth: `low` (~$0.020/day), `normal` (~$0.028/day, measured), `high` (~$
 ### Infrastructure
 
 - **Batch API** — All simulation AI calls go through the Anthropic Message Batches API (50% cost discount). Requests grouped into phases: A (party agents), B (interpellations + discipline), C (media + summary), mid-cycle (polls + referendums), negotiations. xAI requests fall back to sequential calls.
+- **Test mode (free/local LLMs)** — Set `TEST_MODE=ollama|groq|custom` to override every party + role with a single OpenAI-compatible endpoint and bypass the Anthropic Batches API (parallel sync `callAI()` instead). For unlimited zero-cost full-term simulation runs; quality is intentionally lower. See [Test Mode](#test-mode-freelocal-llms-for-cost-free-runs) below.
 - **Circuit breaker** — Per-provider rate limit tracking with TTL-based auto-reset. Hard limit errors → stored with `resetAt` timestamp. Subsequent calls throw `AIProviderLimitError` immediately.
 - **Transient retry** — Network errors and HTTP 429s retry up to 2× with [2s, 5s] delays.
 - **Shared JSON parser** — `parseAIJson()` in `ai-json.ts`: code-fence stripping, sanitization (leading `+`, trailing commas), typed validation with per-module fallback policies.
@@ -59,6 +60,27 @@ Anthropic's structured output (`output_config.format.json_schema`) was used for 
 Structured output was disabled entirely. All parties now use `parseAgentResponse()` — the same parse pipeline (code-fence stripping, trailing comma cleanup, sanitizers) that always worked for AfD/xAI. Semantic validation + retry still catches malformed responses.
 
 See: [Anthropic docs on schema complexity limits](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#schema-complexity-limits), [anthropic-sdk-python#1185](https://github.com/anthropics/anthropic-sdk-python/issues/1185).
+
+### Test Mode (free/local LLMs for cost-free runs)
+
+Set `TEST_MODE` to route every party + role through a single OpenAI-compatible endpoint instead of paid Anthropic/xAI calls. Use this for full-term simulations, CI runs, and end-to-end tests where quality is not the priority.
+
+| `TEST_MODE` | Endpoint | Default model | API key |
+|---|---|---|---|
+| `ollama` | `http://localhost:11434/v1` | `gemma3:4b` | none (local) |
+| `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` (free tier: 14.4K req/day, 30 RPM) |
+| `custom` | `TEST_BASE_URL` (required) | `TEST_MODEL` (required) | `TEST_API_KEY` (optional) |
+
+Override knobs (apply to any preset): `TEST_MODEL`, `TEST_BASE_URL`, `TEST_API_KEY`, `TEST_MODE_CONCURRENCY` (default 4 — parallel in-flight calls per fan-out batch).
+
+Implementation:
+
+- `agent/test-mode.ts` resolves the env vars into a cached `TestModeConfig`. `getPartyModel()` and `getRoleModel()` short-circuit to the test model when `TEST_MODE` is set, leaving party/role config tables otherwise untouched.
+- `agent/openai-compatible-client.ts` is a minimal direct-`fetch` chat-completions client (no Vercel AI SDK dependency for the test path). `callAI()` routes the new `openai-compatible` provider through it, with the same 2× retry on 429/5xx/network errors.
+- `submitBatch()` checks `isTestMode()` first and fans requests out as parallel sync `callAI()` calls (Ollama and Groq don't implement Anthropic's batch protocol). The returned `BatchResult[]` shape is identical, so all `processXxxBatchResult()` consumers are unchanged.
+- Cost tracking records test models at `$0` for known free models (Gemma/Llama/Qwen entries in `STANDARD_PRICING`); custom models fall back to `DEFAULT_PRICING` and report nominal cost.
+
+Production path is fully untouched when `TEST_MODE` is unset — the Anthropic batches code, circuit breakers, and xAI fallback all behave exactly as before.
 
 ### Simulation Safety: Partial Failure Detection
 
@@ -253,6 +275,10 @@ Copy `.env.example` to `.env`. See the file for all options.
 | `USER_DATABASE_PATH` | Optional | Path to users.db |
 | `MODEL_DAILY` / `MODEL_NEGOTIATION` / `MODEL_SYNTHESIS` | Optional | Role model overrides |
 | `MODEL_PARTY_<ID>` | Optional | Per-party model override (`provider:model-id`) |
+| `TEST_MODE` | Optional | `ollama` / `groq` / `custom` — route all calls through a free OpenAI-compatible endpoint and bypass the Anthropic Batches API. See [Test Mode](#test-mode-freelocal-llms-for-cost-free-runs). |
+| `TEST_MODEL` / `TEST_BASE_URL` / `TEST_API_KEY` | Optional | Override the active `TEST_MODE` preset's model, endpoint, or auth |
+| `TEST_MODE_CONCURRENCY` | Optional | Parallel in-flight calls per fan-out batch (default `4`) |
+| `GROQ_API_KEY` | Optional | Used when `TEST_MODE=groq` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional | Google OAuth |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Optional | GitHub OAuth |
 | `SESSION_SECRET` | Optional | Session encryption |

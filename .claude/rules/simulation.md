@@ -11,13 +11,14 @@ paths:
 AI calls use **Vercel AI SDK v6** with per-party and per-role model selection (`packages/engine/src/agent/model-config.ts`).
 
 - **`submitBatch()`** in `batch-client.ts` — ALL simulation AI calls go through the Anthropic Message Batches API (50% discount). Zero sequential `callAI()` calls remain in the loop.
-- **`callAI()`** accepts `{system, prompt, maxTokens, partyId?, roleKey?}` — used internally by `submitBatch()` for xAI sequential fallback
+- **`callAI()`** accepts `{system, prompt, maxTokens, partyId?, roleKey?}` — used internally by `submitBatch()` for xAI sequential fallback and for the test-mode fan-out
 - **Batch groups**: A (party agents), B (interpellations + discipline), C (media + summary), mid-cycle (polls + referendums), negotiations, user-driven (Q&A + speeches + apps + proposals)
 - Each module exports `buildXxxBatchRequest()` and `processXxxBatchResult()` — `loop.ts` collects and submits them as single batches
 - Transient-error retry (2 retries, 2s+5s backoff) for 429s and network errors
 - Per-provider circuit breaker with TTL-based `resetAt` timestamp
 - **Shared JSON parser**: `parseAIJson()` in `ai-json.ts` handles code-fence stripping, sanitization, and typed validation
 - **Observability**: `logAICall()` emits `[AI] <task> | <provider>/<model> | <ms>ms | OK|PARSE_FAIL|VALIDATION_FAIL`
+- **Test mode**: when `TEST_MODE=ollama|groq|custom` is set, `getPartyModel()` / `getRoleModel()` short-circuit to a single OpenAI-compatible model and `submitBatch()` fans requests out as parallel sync `callAI()` calls instead of using the Anthropic Batches API. Same `BatchResult[]` shape — downstream `processXxxBatchResult()` consumers are untouched. See `agent/test-mode.ts` + `agent/openai-compatible-client.ts`.
 
 ## runDay() Flow (loop.ts)
 
