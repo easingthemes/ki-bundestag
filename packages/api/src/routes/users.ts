@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getDb, getUserDb, schema, getSqlite, getUserSqlite, deactivateUserSeat, getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, logUserAction, logger, dayToDate } from "@ki-bundestag/engine";
 import { eq, desc, gte, asc, and, count } from "drizzle-orm";
 import { getUserToken } from "../middleware/index.js";
-import { USER_DAILY_LIMITS, getUserDailyCount } from "../middleware/rate-limit.js";
+import { USER_DAILY_LIMITS, BOT_SIM_DAY_LIMITS, getUserDailyCount, getBotSimDayCount } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -466,15 +466,29 @@ router.post("/api/notifications/read-all", (req, res) => {
   res.json({ marked: count });
 });
 
-// GET /api/users/me/limits — per-user 24h rolling window usage
+// GET /api/users/me/limits — daily usage (24h wall-clock for humans, sim-day for bots)
 router.get("/api/users/me/limits", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
+  const userDb = getUserDb();
+  const me = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  const isBot = me?.isBot === true;
+
   const limits: Record<string, { used: number; limit: number; remaining: number }> = {};
-  for (const [actionType, limit] of Object.entries(USER_DAILY_LIMITS)) {
-    const used = getUserDailyCount(token, actionType);
-    limits[actionType] = { used, limit, remaining: Math.max(0, limit - used) };
+  if (isBot) {
+    const sim = getSqlite();
+    const meta = sim.prepare("SELECT current_day FROM simulation_meta LIMIT 1").get() as { current_day: number } | undefined;
+    const simDay = meta?.current_day ?? 0;
+    for (const [actionType, limit] of Object.entries(BOT_SIM_DAY_LIMITS)) {
+      const used = getBotSimDayCount(token, actionType, simDay);
+      limits[actionType] = { used, limit, remaining: Math.max(0, limit - used) };
+    }
+  } else {
+    for (const [actionType, limit] of Object.entries(USER_DAILY_LIMITS)) {
+      const used = getUserDailyCount(token, actionType);
+      limits[actionType] = { used, limit, remaining: Math.max(0, limit - used) };
+    }
   }
   res.json(limits);
 });

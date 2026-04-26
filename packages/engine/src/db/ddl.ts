@@ -703,6 +703,18 @@ export const USER_TABLE_DDL = `
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS agent_api_keys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    hashed_key TEXT NOT NULL UNIQUE,
+    key_preview TEXT NOT NULL,
+    description TEXT,
+    created_at INTEGER NOT NULL,
+    last_used_at INTEGER,
+    revoked_at INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS user_actions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -825,6 +837,7 @@ export const USER_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql:
   { table: "sessions", column: "_table", sql: "CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired)" },
   { table: "users", column: "is_bot", sql: "ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0" },
   { table: "users", column: "bot_profile", sql: "ALTER TABLE users ADD COLUMN bot_profile TEXT" },
+  { table: "agent_api_keys", column: "_table", sql: "CREATE TABLE IF NOT EXISTS agent_api_keys (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, hashed_key TEXT NOT NULL UNIQUE, key_preview TEXT NOT NULL, description TEXT, created_at INTEGER NOT NULL, last_used_at INTEGER, revoked_at INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))" },
 ];
 
 /**
@@ -875,4 +888,16 @@ export const USER_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "idx_user_actions_user_type", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_type ON user_actions(user_id, action_type)" },
   { name: "idx_user_actions_created_at", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at)" },
   { name: "idx_user_actions_user_day", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_day ON user_actions(user_id, sim_day)" },
+  { name: "idx_user_actions_user_type_day", sql: "CREATE INDEX IF NOT EXISTS idx_user_actions_user_type_day ON user_actions(user_id, action_type, sim_day)" },
+  { name: "idx_agent_api_keys_user", sql: "CREATE INDEX IF NOT EXISTS idx_agent_api_keys_user ON agent_api_keys(user_id)" },
+  { name: "idx_agent_api_keys_hashed", sql: "CREATE INDEX IF NOT EXISTS idx_agent_api_keys_hashed ON agent_api_keys(hashed_key)" },
+  // One-vote-per-item enforcement at the DB level. Each migration first
+  // dedupes (keeping the most recent row by created_at) so the UNIQUE index
+  // can be built even if app-level checks failed under concurrency. Idempotent
+  // — once the index exists, dedupe on a clean table is a no-op.
+  { name: "idx_member_signals_bill_user_unique", sql: "DELETE FROM member_signals WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY bill_id, user_id ORDER BY created_at DESC) AS rn FROM member_signals) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_member_signals_bill_user_unique ON member_signals(bill_id, user_id)" },
+  { name: "idx_internal_votes_proposal_user_unique", sql: "DELETE FROM internal_votes WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY proposal_id, user_id ORDER BY created_at DESC) AS rn FROM internal_votes) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_internal_votes_proposal_user_unique ON internal_votes(proposal_id, user_id)" },
+  { name: "idx_question_votes_question_user_unique", sql: "DELETE FROM question_votes WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY question_id, user_id ORDER BY created_at DESC) AS rn FROM question_votes) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_question_votes_question_user_unique ON question_votes(question_id, user_id)" },
+  { name: "idx_referendum_votes_referendum_user_unique", sql: "DELETE FROM referendum_votes WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY referendum_id, user_id ORDER BY created_at DESC) AS rn FROM referendum_votes) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_referendum_votes_referendum_user_unique ON referendum_votes(referendum_id, user_id)" },
+  { name: "idx_mdb_votes_bill_user_unique", sql: "DELETE FROM mdb_votes WHERE id NOT IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY bill_id, user_id ORDER BY created_at DESC) AS rn FROM mdb_votes) WHERE rn = 1); CREATE UNIQUE INDEX IF NOT EXISTS idx_mdb_votes_bill_user_unique ON mdb_votes(bill_id, user_id)" },
 ];

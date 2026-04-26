@@ -23,3 +23,11 @@ export { calculateMatch, calculateAllMatches } from "./simulation/index.js";
 export type { QuizAnswer, QuizResult } from "./simulation/index.js";
 export { listPetitions, getPetition } from "./simulation/petitions.js";
 export type { Petition, PetitionStatus, PetitionOutcome } from "./simulation/petitions.js";
+export {
+  USER_DAILY_LIMITS,
+  BOT_SIM_DAY_LIMITS,
+  PROPOSAL_INPUT_CAP_PER_PARTY,
+  SPEECH_INPUT_CAP_PER_BILL,
+  USER_MOTION_CAP_PER_DAY,
+  INTERPELLATION_PENDING_CAP,
+} from "./config/rate-limits.js";

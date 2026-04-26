@@ -11,6 +11,7 @@ import type { Motion, SimulationEvent } from "@ki-bundestag/types";
 import { getDb, schema } from "../db/index.js";
 import { getActiveGovernment } from "./government.js";
 import { tallyMotionVotes, motionSentimentImpact } from "./motions.js";
+import { USER_MOTION_CAP_PER_DAY } from "../config/index.js";
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
@@ -34,10 +35,17 @@ export function processMdbActions(
   const result: MdbActionResult = { events: [], sentimentDelta: 0 };
 
   // Load unconsumed MdB injections
-  const rows = db.select().from(schema.pendingInjections).all()
+  const allRows = db.select().from(schema.pendingInjections).all()
     .filter((r: any) => !r.consumed && typeof r.type === "string" && (r.type as string).startsWith("mdb_"));
 
-  if (rows.length === 0) return result;
+  if (allRows.length === 0) return result;
+
+  // Cap motion processing per sim day so user/bot volume doesn't bypass the
+  // ±0.5/day sentiment ceiling (each motion applies a delta). Excess motions
+  // stay queued for next sim day. FIFO by id (insertion order).
+  const motionRows = allRows.filter(r => r.type === "mdb_motion").slice(0, USER_MOTION_CAP_PER_DAY);
+  const otherRows = allRows.filter(r => r.type !== "mdb_motion");
+  const rows = [...motionRows, ...otherRows];
 
   const activeGov = getActiveGovernment();
 
