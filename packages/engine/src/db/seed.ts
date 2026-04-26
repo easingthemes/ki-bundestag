@@ -423,6 +423,7 @@ export function seedDatabase() {
     DROP TABLE IF EXISTS polls;
     DROP TABLE IF EXISTS party_history;
     DROP TABLE IF EXISTS simulation_meta;
+    DROP TABLE IF EXISTS kanzlerwahl;
     DROP TABLE IF EXISTS elections;
     DROP TABLE IF EXISTS simulation_events;
     DROP TABLE IF EXISTS crises;
@@ -436,6 +437,22 @@ export function seedDatabase() {
 
   // Recreate simulation schema
   sqlite.exec(SIM_TABLE_DDL);
+
+  // Apply column + index migrations — base DDL omits columns added via
+  // ALTER TABLE in later cycles (e.g. national_state.schuldenbremse_suspended,
+  // simulation_meta.cycle{4,5}_migrated). Mirrors migrateDatabase() above.
+  for (const m of SIM_COLUMN_MIGRATIONS) {
+    try {
+      sqlite.exec(m.sql);
+    } catch (err: any) {
+      if (!err.message?.includes("duplicate column")) {
+        throw err;
+      }
+    }
+  }
+  for (const m of SIM_INDEX_MIGRATIONS) {
+    sqlite.exec(m.sql);
+  }
 
   // User DB: preserve user accounts, clear bundestag-related activity
   const userSqlite = getUserSqlite();
