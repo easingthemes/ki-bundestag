@@ -18,6 +18,7 @@ import {
   getCostByDay,
   getCostByTask,
   getCostByModel,
+  logger,
 } from "@ki-bundestag/engine";
 import type { TimingPreset, ContextDepth } from "@ki-bundestag/engine";
 import { DEPTH_CONFIGS, isValidContextDepth } from "@ki-bundestag/engine";
@@ -34,58 +35,72 @@ router.get("/api/health", (_req, res) => {
 
 // GET /api/state
 router.get("/api/state", (_req, res) => {
-  const db = getDb();
-  const rows = db.select().from(schema.nationalState).all();
-  if (rows.length === 0) {
-    res.status(404).json({ error: "No state found" });
-    return;
+  try {
+    const db = getDb();
+    const rows = db.select().from(schema.nationalState).all();
+    if (rows.length === 0) {
+      res.status(404).json({ error: "No state found" });
+      return;
+    }
+    const s = rows[0];
+    const state: NationalState = {
+      coalitionParties: s.coalitionParties as unknown as string[],
+      oppositionParties: s.oppositionParties as unknown as string[],
+      economy: {
+        budget: s.budget,
+        unemployment: s.unemployment,
+        inflation: s.inflation,
+        gdpGrowth: s.gdpGrowth,
+      },
+      publicSentiment: s.publicSentiment,
+      provisionalBudget: (s as any).provisionalBudget ?? false,
+    };
+
+    // compute coalition cohesion: % of third-reading votes in last 14 days where
+    // ALL coalition partners voted the same way. Wrapped in its own try/catch so
+    // a schema-drift `bills` query failure (missing column on stale prod DB)
+    // returns a partial response instead of 500-ing the whole endpoint.
+    let coalitionCohesion: number | null = null;
+    try {
+      const metaForCohesion = db.select().from(schema.simulationMeta).all();
+      const currentDayForCohesion = metaForCohesion[0]?.currentDay ?? 0;
+      const recentBills = db.select().from(schema.bills)
+        .where(
+          and(
+            inArray(schema.bills.status, ["passed", "rejected", "struck_down"]),
+            gte(schema.bills.statusChangedOnDay, currentDayForCohesion - 14),
+          )
+        ).all();
+
+      const coalitionIds: string[] = s.coalitionParties as unknown as string[];
+      let cohesionNumerator = 0;
+      let cohesionDenominator = 0;
+
+      for (const bill of recentBills) {
+        const votes: Array<{ partyId: string; vote: string }> = (bill.votes as any) ?? [];
+        const coalitionVotes = votes.filter(v => coalitionIds.includes(v.partyId));
+        if (coalitionVotes.length < 2) continue;
+        const voteValues = new Set(coalitionVotes.map(v => v.vote));
+        cohesionDenominator++;
+        if (voteValues.size === 1) cohesionNumerator++;
+      }
+
+      coalitionCohesion = cohesionDenominator >= 3
+        ? Math.round((cohesionNumerator / cohesionDenominator) * 100)
+        : null;
+    } catch (cohesionErr) {
+      // Don't fail /api/state entirely if the bills query throws. Most likely
+      // cause: a column referenced by Drizzle's schema doesn't exist on the
+      // deployed DB yet (migration hasn't run). Log and degrade gracefully.
+      logger.error("[api/state] cohesion computation failed:", cohesionErr);
+    }
+
+    state.coalitionCohesion = coalitionCohesion;
+    res.json(state);
+  } catch (err) {
+    logger.error("[api/state] failed:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-  const s = rows[0];
-  const state: NationalState = {
-    coalitionParties: s.coalitionParties as unknown as string[],
-    oppositionParties: s.oppositionParties as unknown as string[],
-    economy: {
-      budget: s.budget,
-      unemployment: s.unemployment,
-      inflation: s.inflation,
-      gdpGrowth: s.gdpGrowth,
-    },
-    publicSentiment: s.publicSentiment,
-    provisionalBudget: (s as any).provisionalBudget ?? false,
-  };
-
-  // compute coalition cohesion: % of third-reading votes in last 14 days where
-  // ALL coalition partners voted the same way
-  const metaForCohesion = db.select().from(schema.simulationMeta).all();
-  const currentDayForCohesion = metaForCohesion[0]?.currentDay ?? 0;
-  const recentBills = db.select().from(schema.bills)
-    .where(
-      and(
-        inArray(schema.bills.status, ["passed", "rejected", "struck_down"]),
-        gte(schema.bills.statusChangedOnDay, currentDayForCohesion - 14),
-      )
-    ).all();
-
-  const coalitionIds: string[] = s.coalitionParties as unknown as string[];
-  let cohesionNumerator = 0;
-  let cohesionDenominator = 0;
-
-  for (const bill of recentBills) {
-    const votes: Array<{ partyId: string; vote: string }> = (bill.votes as any) ?? [];
-    const coalitionVotes = votes.filter(v => coalitionIds.includes(v.partyId));
-    if (coalitionVotes.length < 2) continue;
-    const voteValues = new Set(coalitionVotes.map(v => v.vote));
-    cohesionDenominator++;
-    if (voteValues.size === 1) cohesionNumerator++;
-  }
-
-  const coalitionCohesion = cohesionDenominator >= 3
-    ? Math.round((cohesionNumerator / cohesionDenominator) * 100)
-    : null;
-
-  state.coalitionCohesion = coalitionCohesion;
-
-  res.json(state);
 });
 
 // GET /api/simulation/status
