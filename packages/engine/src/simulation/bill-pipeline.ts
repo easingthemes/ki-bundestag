@@ -10,6 +10,7 @@ import { applyBillImpact } from "./economy.js";
 import { updateSentiment } from "./opinion.js";
 import { BILL_STAGE_DURATIONS, BUNDESRAT_DURATION, AUSFERTIGUNG_DURATION, INKRAFTTRETEN_OFFSET, GOVERNMENT_BILL_COMMITTEE_MULTIPLIER, UEBERWEISUNG_OHNE_AUSSPRACHE_PROBABILITY } from "../config/parliament.js";
 import { rollKurzintervention, rollZwischenfrage } from "./debate-formats.js";
+import { getAnhoerungToneForBill, applyAnhoerungToneToAmendProb } from "./anhoerungen.js";
 import { VERMITTLUNG_DURATION } from "../config/bundesrat.js";
 import {
   voteBundesrat,
@@ -350,33 +351,45 @@ export function advanceBillPipeline(
   for (const bill of committeeBills) {
     // Reject opposition bills that committee recommends rejecting (~40% chance).
     // Only evaluated once per bill — at the first day dwell >= minimum.
+    //
+    // Cycle 5 PR 1 / S4 / R11: nudge the rejection probability with the
+    // Ausschussanhörung tone scalar. Positive tone (expert endorsement) means
+    // the bill is more likely to get amended/refined — equivalently, less
+    // likely to be rejected outright. We invert via amendProb = 1 - rejectProb.
+    // Tone defaults to 0 when no Anhörung row exists (or row is scheduled/lapsed
+    // per S3), preserving the original 0.40 baseline. Bias capped at ±0.05.
     const isCoalitionBill = coalitionParties.includes(bill.proposedBy);
     if (
       bill.committeeRecommendation === "reject" &&
       !isCoalitionBill &&
       !bill.isGovernmentBill &&
-      dwellDays(bill, day) === (bill.stageMinDuration ?? BILL_STAGE_DURATIONS.committee.ordinary.min) &&
-      Math.random() < 0.40
+      dwellDays(bill, day) === (bill.stageMinDuration ?? BILL_STAGE_DURATIONS.committee.ordinary.min)
     ) {
-      bill.status = "rejected";
-      bill.statusChangedOnDay = day;
-      bill.stageEntryDay = day;
+      const baseRejectProb = 0.40;
+      const tone = getAnhoerungToneForBill(bill.id);
+      const amendProb = applyAnhoerungToneToAmendProb(1 - baseRejectProb, tone);
+      const rejectProb = 1 - amendProb;
+      if (Math.random() < rejectProb) {
+        bill.status = "rejected";
+        bill.statusChangedOnDay = day;
+        bill.stageEntryDay = day;
 
-      db.update(schema.bills)
-        .set({ status: "rejected", statusChangedOnDay: day, stageEntryDay: day })
-        .where(eq(schema.bills.id, bill.id))
-        .run();
+        db.update(schema.bills)
+          .set({ status: "rejected", statusChangedOnDay: day, stageEntryDay: day })
+          .where(eq(schema.bills.id, bill.id))
+          .run();
 
-      events.push({
-        dayNumber: day,
-        type: "bill_committee_rejected",
-        actor: "system",
-        title: `"${bill.title}" — Im Ausschuss abgelehnt`,
-        description: `Der Ausschuss ${bill.committeeName} hat die Ablehnung empfohlen. Der Entwurf wird nicht zur 2. Lesung zugelassen.`,
-        data: { billId: bill.id, committeeName: bill.committeeName },
-      });
-      console.log(`  [Pipeline] "${bill.title}" → rejected (committee)`);
-      continue;
+        events.push({
+          dayNumber: day,
+          type: "bill_committee_rejected",
+          actor: "system",
+          title: `"${bill.title}" — Im Ausschuss abgelehnt`,
+          description: `Der Ausschuss ${bill.committeeName} hat die Ablehnung empfohlen. Der Entwurf wird nicht zur 2. Lesung zugelassen.`,
+          data: { billId: bill.id, committeeName: bill.committeeName },
+        });
+        console.log(`  [Pipeline] "${bill.title}" → rejected (committee)`);
+        continue;
+      }
     }
 
     if (!onSitzungsTag) continue;

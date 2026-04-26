@@ -18,7 +18,9 @@ import {
   NACHTRAGSHAUSHALT_TOTAL_MAX,
   NACHTRAGSHAUSHALT_CRISIS_BOOST,
 } from "../config/index.js";
-import { CRISIS_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
+// S14 / R12: renamed from CRISIS_CATEGORY_TO_MINISTRY (Cycle 5 PR 1).
+// Same map content; new name reflects that it serves bills + crises.
+import { BILL_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
 import { getDb, getSqlite, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { MAJORITY_SEATS } from "../config/elections.js";
@@ -286,9 +288,53 @@ export function applySchuldenbremseAussetzung(currentDay: number): void {
 }
 
 /**
+ * S22 (Cycle 5 PR 3) — pure-helper variant of `checkSchuldenbremseExpiry`.
+ *
+ * Closes the Cycle 4 silent-restore gap. The previous helper mutated DB
+ * state in-place and returned a bool; the caller had no way to emit a
+ * narrative event. This variant takes minimal slices of state + meta,
+ * mutates `state.schuldenbremseSuspended` in-place, and returns the event
+ * for the caller to persist + emit (loop.ts owns the DB write under
+ * `simulationMeta.id` per PR #165 R2).
+ *
+ * No-op (returns `expired: false`, no event) when:
+ *   - `state.schuldenbremseSuspended` is already false, OR
+ *   - `meta.schuldenbremseSuspendedUntilDay` is null (no expiry recorded), OR
+ *   - `currentDay < meta.schuldenbremseSuspendedUntilDay` (not yet expired).
+ *
+ * Pure: no DB writes. Caller persists via Drizzle update with WHERE clause.
+ */
+export function applySchuldenbremseExpiry(
+  state: { schuldenbremseSuspended?: boolean },
+  meta: { schuldenbremseSuspendedUntilDay: number | null },
+  currentDay: number,
+): { expired: boolean; event?: Omit<SimulationEvent, "id"> } {
+  if (!state.schuldenbremseSuspended) return { expired: false };
+  if (meta.schuldenbremseSuspendedUntilDay == null) return { expired: false };
+  if (currentDay < meta.schuldenbremseSuspendedUntilDay) return { expired: false };
+
+  state.schuldenbremseSuspended = false;
+  return {
+    expired: true,
+    event: {
+      dayNumber: currentDay,
+      type: "schuldenbremse_expired",
+      actor: "system",
+      title: "Schuldenbremse wieder aktiv",
+      description: `Die nach Art. 115 GG ausgesetzte Schuldenbremse ist nach ${SCHULDENBREMSE_SUSPENSION_DURATION} Tagen automatisch wieder in Kraft getreten.`,
+      data: { suspendedUntilDay: meta.schuldenbremseSuspendedUntilDay },
+    },
+  };
+}
+
+/**
  * Q9 daily check. Auto-clears the suspension when the expiry day arrives.
  * Returns true if the flag was cleared this tick (caller may emit an event,
  * though the spec keeps the auto-restore moment silent — Open Item).
+ *
+ * Cycle 5 PR 3 (S22): superseded by `applySchuldenbremseExpiry` for new
+ * call paths that need to emit a `schuldenbremse_expired` event. This helper
+ * is retained for tests + any caller that just needs a bool ack.
  *
  * No-op when:
  *   - schuldenbremseSuspendedUntilDay is null (not suspended), OR
@@ -377,41 +423,75 @@ export function generateNachtragsAllocations(
   total: number,
 ): BudgetAllocations {
   // Start from coalition-weighted base allocation (same shape as regular budget,
-  // just scaled to `total` instead of BUDGET_TOTAL).
+  // just scaled to `total` instead of BUDGET_TOTAL). Raw (unrounded) shares
+  // are kept for the carry-the-remainder pass below (S23/R5).
   const baseFromCoalition = generateBudgetAllocations(coalitionParties);
   const scale = total / BUDGET_TOTAL;
-  const base: BudgetAllocations = MINISTRY_KEYS.reduce(
-    (acc, k) => ({ ...acc, [k]: Math.round(baseFromCoalition[k] * scale * 10) / 10 }),
-    {} as BudgetAllocations,
-  );
+  const baseRaw: Record<keyof BudgetAllocations, number> = {
+    finance: 0, labour: 0, environment: 0, interior: 0,
+    defence: 0, education: 0, health: 0, infrastructure: 0,
+  };
+  for (const k of MINISTRY_KEYS) baseRaw[k] = baseFromCoalition[k] * scale;
 
-  // No crisis category → return base (uniform-down-from-total) unchanged.
-  if (!crisisCategory) return base;
-  const boostedMinistry = CRISIS_CATEGORY_TO_MINISTRY[crisisCategory];
-  if (!boostedMinistry) return base;
+  // S23/R5: pick the raw (unrounded) shares before this point; the
+  // carry-the-remainder pass below rounds the first 7 to 0.1B EUR and
+  // assigns the last ministry `total - sum(first 7)` so Σ === total exactly.
+  const finalRaw: Record<keyof BudgetAllocations, number> = { ...baseRaw };
 
-  // Boost target by `total * boost-rate` (so 30% of total goes extra to the
-  // mapped ministry); rescale all OTHER ministries proportionally to keep
-  // sum == total. Note we boost relative to TOTAL, not the ministry's base
-  // share, so the boost magnitude is predictable regardless of base weights.
-  const boostDelta = total * NACHTRAGSHAUSHALT_CRISIS_BOOST;
-  const baseBoosted = base[boostedMinistry];
-  const newBoostedAmount = baseBoosted + boostDelta;
-  const remainingTotal = total - newBoostedAmount;
-  const otherSum = MINISTRY_KEYS
-    .filter(k => k !== boostedMinistry)
-    .reduce((s, k) => s + base[k], 0);
+  const boostedMinistry = crisisCategory ? BILL_CATEGORY_TO_MINISTRY[crisisCategory] : null;
+  if (boostedMinistry) {
+    // Boost target by `total * boost-rate` (so 30% of total goes extra to
+    // the mapped ministry); rescale all OTHER ministries proportionally to
+    // keep raw sum == total. Note we boost relative to TOTAL, not the
+    // ministry's base share, so the boost magnitude is predictable regardless
+    // of base weights.
+    const boostDelta = total * NACHTRAGSHAUSHALT_CRISIS_BOOST;
+    const newBoostedAmount = baseRaw[boostedMinistry] + boostDelta;
+    const remainingTotal = total - newBoostedAmount;
+    const otherSum = MINISTRY_KEYS
+      .filter(k => k !== boostedMinistry)
+      .reduce((s, k) => s + baseRaw[k], 0);
 
-  const result: BudgetAllocations = { finance: 0, labour: 0, environment: 0, interior: 0, defence: 0, education: 0, health: 0, infrastructure: 0 };
-  for (const k of MINISTRY_KEYS) {
-    if (k === boostedMinistry) {
-      result[k] = Math.round(newBoostedAmount * 10) / 10;
-    } else if (otherSum > 0) {
-      result[k] = Math.round(((base[k] / otherSum) * remainingTotal) * 10) / 10;
-    } else {
-      result[k] = 0;
+    finalRaw[boostedMinistry] = newBoostedAmount;
+    for (const k of MINISTRY_KEYS) {
+      if (k === boostedMinistry) continue;
+      finalRaw[k] = otherSum > 0 ? (baseRaw[k] / otherSum) * remainingTotal : 0;
     }
   }
+
+  return carryTheRemainder(finalRaw, total);
+}
+
+/**
+ * S23/R5 — carry-the-remainder rounding. Round first 7 ministries to 0.1B EUR
+ * each, last ministry gets `total - sum(first7)` so Σ === total exactly
+ * (modulo IEEE-754 precision; tests use `toBeCloseTo(total, 6)`).
+ *
+ * Closes the floating-point drift from the previous per-ministry independent
+ * `Math.round(x * 10) / 10` pattern. Pure helper, no allocation.
+ */
+function carryTheRemainder(
+  raw: Record<keyof BudgetAllocations, number>,
+  total: number,
+): BudgetAllocations {
+  const result: BudgetAllocations = {
+    finance: 0, labour: 0, environment: 0, interior: 0,
+    defence: 0, education: 0, health: 0, infrastructure: 0,
+  };
+  let runningSum = 0;
+  for (let i = 0; i < MINISTRY_KEYS.length - 1; i++) {
+    const k = MINISTRY_KEYS[i];
+    const rounded = Math.round(raw[k] * 10) / 10; // 0.1B EUR precision
+    result[k] = rounded;
+    runningSum += rounded;
+  }
+  // Last ministry carries the residual exactly — NOT rounded to 0.1B; that
+  // would re-introduce drift. With first-7 rounded to 0.1B and inputs that
+  // are 0.1B-aligned, the residual lands at 0.1B granularity naturally
+  // (modulo IEEE-754 precision). The Σ === total invariant test asserts
+  // closeness to 1e-6.
+  const lastKey = MINISTRY_KEYS[MINISTRY_KEYS.length - 1];
+  result[lastKey] = total - runningSum;
   return result;
 }
 
@@ -430,7 +510,7 @@ export function generateNachtragsAllocations(
  * via the passed `crises` array (not via DB).
  */
 export function processNachtragsInjection(
-  injection: PendingInjection,
+  injection: PendingInjection & { type: "nachtragshaushalt" },
   parties: Party[],
   government: Government,
   state: NationalState,
@@ -442,7 +522,9 @@ export function processNachtragsInjection(
 
   const total = NACHTRAGSHAUSHALT_TOTAL_MIN
     + Math.floor(rng() * (NACHTRAGSHAUSHALT_TOTAL_MAX - NACHTRAGSHAUSHALT_TOTAL_MIN + 1));
-  const activeCrisisId = (injection.data?.activeCrisisId as string | null | undefined) ?? null;
+  // S24/R10: typed `NachtragsInjectionPayload` — no `as any` needed. The
+  // discriminant on the parameter type narrows `data` to the payload shape.
+  const activeCrisisId = injection.data.activeCrisisId;
   const triggerCrisis = activeCrisisId
     ? crises.find(c => c.id === activeCrisisId) ?? null
     : null;

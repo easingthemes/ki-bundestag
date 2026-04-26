@@ -231,17 +231,26 @@ export const KURZINTERVENTION_PROBABILITY = 0.30;
 export const ZWISCHENFRAGE_PROBABILITY = 0.30;
 
 /**
- * Maps each `crises.category` (= BillCategory) to a ministry portfolio.
+ * Maps each `BillCategory` (= `CrisisCategory` alias, see economy.ts:24) to a
+ * ministry portfolio.
+ *
  * Used by:
- *   - PR 3 (S4): Nachtragshaushalt allocation crisis-boost
- *   - PR 1 (R5): findInquiryOpportunity — does this crisis embarrass govt?
- * Single source of truth (S18). All 8 BillCategory values mapped exhaustively.
+ *   - Cycle 4 PR 3 (S4): Nachtragshaushalt allocation crisis-boost
+ *   - Cycle 4 PR 1 (R5): findInquiryOpportunity — does this crisis embarrass govt?
+ *   - Cycle 5 PR 1 (S14): Ausschussanhörung expert selection (BillCategory →
+ *     MinistryPortfolio for the AI prompt + experts pool filter).
+ *
+ * Single source of truth. All 8 BillCategory values mapped exhaustively.
  *
  * Note on spellings: BillCategory uses US spelling (`defense`, `healthcare`),
  * MinistryPortfolio uses UK spelling (`defence`, `health`) — preserved as the
  * codebase has shipped both for several cycles now.
+ *
+ * S14 / R12: renamed from `CRISIS_CATEGORY_TO_MINISTRY` for clarity (the map
+ * now serves bills + crises). Backward-compatible alias retained for one cycle
+ * to avoid touching every existing callsite.
  */
-export const CRISIS_CATEGORY_TO_MINISTRY: Record<BillCategory, MinistryPortfolio> = {
+export const BILL_CATEGORY_TO_MINISTRY: Record<BillCategory, MinistryPortfolio> = {
   economy:        "finance",
   social:         "labour",
   environment:    "environment",
@@ -251,6 +260,91 @@ export const CRISIS_CATEGORY_TO_MINISTRY: Record<BillCategory, MinistryPortfolio
   healthcare:     "health",
   infrastructure: "infrastructure",
 };
+
+/** @deprecated S14 — alias kept for one cycle to avoid touching every Cycle 4 callsite. */
+export const CRISIS_CATEGORY_TO_MINISTRY = BILL_CATEGORY_TO_MINISTRY;
+
+// ── Cycle 5 PR 1 — Ausschussanhörungen ──────────────────────────────
+
+/** Q4/S6: base hearing probability before impact-weighting. */
+export const ANHOERUNG_BASE_PROBABILITY = 0.20;
+
+/** Q4/S6: linear coefficient on normalisedImpactMag in the trigger formula. */
+export const ANHOERUNG_IMPACT_COEFFICIENT = 0.40;
+
+/** Q4/S6: hard cap on hearing probability regardless of impact. */
+export const ANHOERUNG_PROBABILITY_CAP = 0.70;
+
+/**
+ * S4/R11: max bias on committee→2nd-reading amend probability from the AI
+ * tone scalar. Positive tone (endorsement) increases amend probability —
+ * endorsed bills benefit from refinement; negative tone reduces it.
+ *
+ * Wired into `bill-pipeline.ts` Stage 3 by adjusting the existing 0.40
+ * rejection roll inversely (amendProb = 1 - rejectProb).
+ */
+export const ANHOERUNG_TONE_INFLUENCE = 0.05;
+
+/**
+ * S5: experts invited per hearing.
+ *
+ * Constraint (test-asserted, S2): every MinistryPortfolio in MINISTRY_PORTFOLIOS
+ * must have ≥ ANHOERUNG_EXPERTS_PER_HEARING experts in EXPERTS_SEED whose
+ * expertiseAreas overlap that portfolio. `pickExpertsForHearing` throws
+ * otherwise — prevented at runtime by the seed-pool invariant.
+ */
+export const ANHOERUNG_EXPERTS_PER_HEARING = 3;
+
+// ── Cycle 5 PR 2 — Enquete-Kommission ───────────────────────────────
+
+/**
+ * S10: total MdB slots in an Enquete-Kommission. Real Bundestag Enqueten
+ * typically have ~17. Sum-invariant (Σ === 17) enforced by largest-remainder
+ * allocation in `selectEnqueteMembers`.
+ */
+export const ENQUETE_MDB_SLOTS = 17;
+
+/** S7: min/max Kommission duration (uniform draw [MIN, MAX]). Real Enqueten
+ *  run ~1–2 years; we span 360–720 sim days. */
+export const ENQUETE_DURATION_MIN_DAYS = 360;
+export const ENQUETE_DURATION_MAX_DAYS = 720;
+
+/** S8: max simultaneous proposed+active Kommissionen (Bundestag-clogging cap). */
+export const ENQUETE_MAX_ACTIVE = 2;
+
+/** S9: min sim days between Enquete proposals (rate-limit). */
+export const ENQUETE_RATE_LIMIT_DAYS = 90;
+
+/** S10: external expert slots per Kommission (uniform draw [MIN, MAX]). */
+export const ENQUETE_EXPERT_SLOTS_MIN = 4;
+export const ENQUETE_EXPERT_SLOTS_MAX = 6;
+
+/** S11: persistent-crisis duration (sim days) above which `enqueteOpportunity`
+ *  surfaces in agent context for both coalition + opposition. */
+export const ENQUETE_PERSISTENT_CRISIS_THRESHOLD_DAYS = 60;
+
+/**
+ * S12: Bundestag-Beschluss vote tally constants for Enquete-Kommissionen.
+ *
+ *   - Proposing party: 100% yes (their proposal)
+ *   - Coalition (non-pariah): 98% Bernoulli yes (cross-party support norm —
+ *     Enqueten are typically bipartisan in real Bundestag)
+ *   - Opposition (non-pariah): 85% baseline + sentiment-adjusted (capped at
+ *     ±10pp from baseline)
+ *   - Pariah parties (PARIAH_PARTIES set): 50% Bernoulli (no consistent stance)
+ *
+ * 50k LCG convergence test asserts pass-rate ≥ 92% for typical configurations.
+ */
+export const ENQUETE_PROPOSING_YES_RATE = 1.00;
+export const ENQUETE_COALITION_YES_RATE = 0.98;
+export const ENQUETE_OPPOSITION_YES_BASE = 0.85;
+export const ENQUETE_PARIAH_YES_RATE = 0.50;
+export const ENQUETE_OPPOSITION_SENTIMENT_ADJ_CAP = 0.10;
+
+/** Q9/R7-style soft watchdog: rows with status='active' AND scheduledEndDay
+ *  ≤ currentDay - this transition to 'lapsed' on the daily tick. Value matches
+ *  the inquiry watchdog grace window (30 sim days). */
+export const ENQUETE_WATCHDOG_GRACE_DAYS = 30;
 
 // ── Parliamentary calendar ──────────────────────────────────────────
 /**

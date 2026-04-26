@@ -109,14 +109,23 @@ export function rollZwischenfrage(
 }
 
 /** Input shape for `detectDisciplineBreaks`. Caller (loop.ts) joins
- *  `mdb_votes` with `bundestag_seats` to get the discipline level. */
+ *  `mdb_votes` with `bundestag_seats` to get the discipline level.
+ *
+ *  R7 (Cycle 4 PR #165 review / Cycle 5 PR 4): the caller is responsible
+ *  for resolving `mdbName` to the human user's displayName via the join
+ *  `mdb_votes.userId → users.id → users.displayName`. The helper stays
+ *  pure (no DB access) — the seat→application→user fallback path the spec
+ *  describes is equivalent to the userId→user join the caller already
+ *  performs (mdb_votes carries userId for every human seat vote).
+ *  Templated `MdB-Sitz #<seatId>` fallback only fires for AI-only seats
+ *  or when the user row is missing (data integrity edge case). */
 export interface DisciplineBreakInput {
   seatId: string;
   partyId: string;
   vote: VoteChoice;
   disciplineLevel: number;
   /** Optional friendly label. If absent, helper falls back to "MdB-Sitz #<seatId>"
-   *  (R18 — graceful for AI-only seats). */
+   *  (R7 / R18 — graceful for AI-only seats). */
   mdbName?: string | null;
 }
 

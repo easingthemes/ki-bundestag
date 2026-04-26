@@ -11,8 +11,10 @@ export interface InjectionResult {
   triggerBudget?: boolean;
   /** Cycle 4 PR 3 — Nachtragshaushalt injection rows queued for processing.
    *  loop.ts iterates these and calls `processNachtragsInjection` from
-   *  `budget.ts` with full state access (parties / government / state). */
-  pendingNachtragshaushaltInjections?: PendingInjection[];
+   *  `budget.ts` with full state access (parties / government / state).
+   *  Cycle 5 PR 3 (S24/R10) — narrowed to the nachtragshaushalt variant so
+   *  consumers see the typed `NachtragsInjectionPayload` directly. */
+  pendingNachtragshaushaltInjections?: Array<PendingInjection & { type: "nachtragshaushalt" }>;
   events: Array<Omit<SimulationEvent, "id">>;
 }
 
@@ -30,16 +32,21 @@ export function processInjections(
   const result: InjectionResult = { events: [] };
 
   for (const row of rows) {
-    const injection: PendingInjection = {
+    // S24/R10: cast through `unknown` to land in the discriminated union;
+    // the switch below narrows each branch's `data` payload by `type`. The
+    // DB column is JSON-serialised so Drizzle returns it as `unknown` —
+    // the runtime check is the discriminant itself.
+    const injection = {
       id: row.id,
       type: row.type as PendingInjection["type"],
-      data: row.data as unknown as Record<string, unknown>,
+      data: row.data as unknown,
       consumed: row.consumed,
-    };
+    } as PendingInjection;
 
     switch (injection.type) {
       case "crisis": {
-        const templateId = injection.data.templateId as string;
+        // S24/R10: TypeScript narrows `injection.data` to CrisisInjectionPayload.
+        const templateId = injection.data.templateId;
         if (templateId) {
           const crisis = triggerCrisisFromTemplate(templateId, currentDay, activeCrises);
           if (crisis) {
@@ -93,7 +100,8 @@ export function processInjections(
         break;
       }
       case "economic_shock": {
-        const impact = injection.data.impact as BillImpact | undefined;
+        // S24/R10: narrowed to EconomicShockInjectionPayload — impact is required.
+        const { impact } = injection.data;
         if (impact) {
           result.economicShock = impact;
           result.events.push({

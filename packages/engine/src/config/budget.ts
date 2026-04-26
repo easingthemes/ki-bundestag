@@ -93,13 +93,21 @@ export const FISCAL_EMERGENCY_COOLDOWN = 365;
  *  fiscal-emergency justification gate opens (Q5). */
 export const FISCAL_EMERGENCY_PROVISIONAL_BUDGET_DAYS = 30;
 
-/** Vote-tally tuning for tallySchuldenbremseVote (S12). Pure constants —
- *  no DB. Calibrated so that with sentiment 45 (baseline) and a high-severity
- *  crisis active, opposition yes share is ~45% (alongside the 95% coalition
- *  yes rate, suspension passes comfortably). With a low-severity crisis and
- *  sentiment 20 (very low), suspension narrowly fails. */
-export const SCHULDENBREMSE_COALITION_YES_RATE = 0.95;
-export const SCHULDENBREMSE_OPPOSITION_YES_BASE = 0.15;
+/**
+ * Vote-tally tuning for tallySchuldenbremseVote (S12, recalibrated S21/R4 in
+ * Cycle 5 PR 3).
+ *
+ * R4 lesson (PR #165): the previous coalition rate (0.95) made passage near-
+ * automatic when justified — too smooth for what is constitutionally a
+ * controversial fiscal instrument. Lowered to 0.88 to model dissent within
+ * the coalition. With this + the recalibrated opposition base, the 50k LCG
+ * convergence test asserts pass-rate ∈ [60%, 80%] when justification is met.
+ */
+export const SCHULDENBREMSE_COALITION_YES_RATE = 0.88;
+/** S21: opposition baseline yes share. Sentiment + crisis-severity boosts on
+ *  top (capped). Final value derived empirically via 50k convergence test in
+ *  budget.test.ts to land in the [60%, 80%] target band. */
+export const SCHULDENBREMSE_OPPOSITION_YES_BASE = 0.18;
 /** Map crisis severity → opposition-yes-share boost. */
 export const SCHULDENBREMSE_SEVERITY_BOOSTS: Record<"low" | "medium" | "high", number> = {
   low: 0.05,

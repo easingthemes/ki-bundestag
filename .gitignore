@@ -153,6 +153,7 @@ data/
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 .claude/subagent-log.txt
+.claude/worktrees/
 
 # dx workflow
 .ai/specs/
