@@ -149,6 +149,12 @@ export const IMPORTANT_EVENTS = [
   "nachtragshaushalt_rejected",
 ] as const;
 
+// Cycle 5 PR 1 — `ausschussanhoerung_held` deliberately stays at the default
+// "standard" tier (S15). Hearings fire ~14–36 times per term and are flavor
+// events alongside the bill_committee / bill_second_reading lifecycle —
+// listing them in IMPORTANT_EVENTS would dominate the night-mode queue, but
+// they're meatier than a routine `bill_committee` line and warrant standard
+// rendering. Same intent-via-omission pattern as `inquiry_hearing_held`.
 export const ROUTINE_EVENTS = [
   "statement",
   "poll",

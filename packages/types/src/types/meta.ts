@@ -82,7 +82,9 @@ export type SimulationEventType =
   // discipline-level ≥ 1 MdB seats voting against the party line.
   | "kurzintervention"
   | "zwischenfrage"
-  | "erklaerung_zur_abstimmung";
+  | "erklaerung_zur_abstimmung"
+  // Cycle 5 PR 1 — Ausschussanhörung (S15: standard tier; default classification).
+  | "ausschussanhoerung_held";
 
 export interface SimulationEvent {
   id: string;

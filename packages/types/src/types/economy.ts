@@ -1,4 +1,5 @@
 import type { BillCategory, BillImpact } from "./bills.js";
+import type { MinistryPortfolio } from "./elections.js";
 
 export interface EconomyState {
   budget: number;          // in billions EUR
@@ -66,4 +67,35 @@ export interface Budget {
   noSeats: number | null;
   economicEffect: Record<string, number> | null;
   revisionAttempt: number;
+}
+
+// Cycle 5 PR 1 — Ausschussanhörungen (S2: experts seed table; S3: lifecycle).
+// Q3=A: lightweight seed table with real names; expert rows are reused across
+// hearings + (Cycle 5 PR 2) Enquete-Kommissionen.
+export interface Expert {
+  id: string;
+  name: string;
+  affiliation: string;
+  /** Ministry portfolios this expert is qualified to advise on. */
+  expertiseAreas: MinistryPortfolio[];
+}
+
+/** S3: AI parse/validation failure → 'lapsed' (tone=0, testimonies=[]). */
+export type AusschussanhoerungStatus = "scheduled" | "held" | "lapsed";
+
+export interface AusschussanhoerungTestimony {
+  expertId: string;
+  statement: string;
+}
+
+export interface AusschussanhoerungRow {
+  id: string;
+  billId: string;
+  ministryFocus: MinistryPortfolio;
+  expertIds: string[];
+  testimonies: AusschussanhoerungTestimony[];
+  /** [-1, +1]; 0 until AI lands or on lapse (read by bill-pipeline as no-nudge). */
+  tone: number;
+  heldOnDay: number;
+  status: AusschussanhoerungStatus;
 }
