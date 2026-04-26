@@ -1,3 +1,19 @@
+# [1.16.0](https://github.com/easingthemes/ki-bundestag/compare/v1.15.0...v1.16.0) (2026-04-26)
+
+
+### Bug Fixes
+
+* **api:** /api/state crash + bills schema drift on prod ([ae31d72](https://github.com/easingthemes/ki-bundestag/commit/ae31d723745610d9d867aa4210d50644edc629d0))
+* **api:** drop misleading "in 24h" from cap-reached error messages ([eb9ac4f](https://github.com/easingthemes/ki-bundestag/commit/eb9ac4faff2bdd1f2f802f2739d41cf53fe5aeb1))
+* **content,polls:** block duplicate poll votes; close legacy polls; backfill author info ([0d0d6c8](https://github.com/easingthemes/ki-bundestag/commit/0d0d6c8c9e765f13809c2e07de3f02d26aa3ed1e))
+* **content:** backfill authorInfo on POST /api/questions response ([279146a](https://github.com/easingthemes/ki-bundestag/commit/279146a1d598a513cbed7c61414e819ce532ea3e))
+
+
+### Features
+
+* **agents:** mint endpoint, last-key revoke block, admin nuke; fix re-signal quota burn ([b14067a](https://github.com/easingthemes/ki-bundestag/commit/b14067afcbcbfd75510bd8439ca05e7721fa5ab0))
+* **test-mode:** generalize content salvage to any non-reserved string field ([d1c05c5](https://github.com/easingthemes/ki-bundestag/commit/d1c05c556e8719a3f6fb53a54c4b97ebdfb1286b))
+
 # [1.15.0](https://github.com/easingthemes/ki-bundestag/compare/v1.14.0...v1.15.0) (2026-04-26)
 
 
