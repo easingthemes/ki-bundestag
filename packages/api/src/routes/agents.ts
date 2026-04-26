@@ -147,12 +147,76 @@ router.get("/api/v1/agents/me", (req, res) => {
   });
 });
 
+/** Cap on simultaneous active keys per agent — bounds blast radius if any one leaks. */
+const MAX_ACTIVE_KEYS_PER_AGENT = 5;
+
+// POST /api/v1/agents/me/keys — mint a new API key for the calling agent
+// (key rotation + recovery from accidental revoke)
+router.post("/api/v1/agents/me/keys", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const userDb = getUserDb();
+  const me = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!me) { res.status(404).json({ error: "User not found" }); return; }
+  if (!me.isBot) { res.status(403).json({ error: "This endpoint is for agents only" }); return; }
+
+  const userSqlite = getUserSqlite();
+  const active = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM agent_api_keys WHERE user_id = ? AND revoked_at IS NULL"
+  ).get(token) as { cnt: number };
+  if (active.cnt >= MAX_ACTIVE_KEYS_PER_AGENT) {
+    res.status(429).json({ error: `Maximum ${MAX_ACTIVE_KEYS_PER_AGENT} active keys per agent. Revoke one first.` });
+    return;
+  }
+
+  const { description } = req.body as { description?: string };
+  const desc = typeof description === "string" ? description.trim().slice(0, 500) : null;
+
+  const apiKey = generateApiKey();
+  const hashed = hashApiKey(apiKey);
+  const id = randomUUID();
+  const now = Date.now();
+
+  try {
+    userSqlite.prepare(
+      "INSERT INTO agent_api_keys (id, user_id, hashed_key, key_preview, description, created_at, last_used_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)"
+    ).run(id, token, hashed, previewApiKey(apiKey), desc, now);
+  } catch (err) {
+    logger.error("[agents] mint key failed", err);
+    res.status(500).json({ error: "Failed to mint API key" });
+    return;
+  }
+
+  res.status(201).json({
+    id,
+    apiKey,
+    keyPreview: previewApiKey(apiKey),
+    description: desc,
+    createdAt: now,
+    note: "Save this apiKey now — it cannot be retrieved later. Send as `Authorization: Bearer <apiKey>`.",
+  });
+});
+
 // POST /api/v1/agents/me/keys/:id/revoke — revoke one of my keys
 router.post("/api/v1/agents/me/keys/:id/revoke", (req, res) => {
   const token = getUserToken(req);
   if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   const userSqlite = getUserSqlite();
+
+  // Refuse if this would leave the agent with zero usable keys — they would
+  // be locked out forever (no way to mint a new one without authenticating).
+  const otherActive = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM agent_api_keys WHERE user_id = ? AND revoked_at IS NULL AND id != ?"
+  ).get(token, req.params.id) as { cnt: number };
+  if (otherActive.cnt === 0) {
+    res.status(409).json({
+      error: "Cannot revoke your last active key — you would be locked out. Mint a replacement first via POST /api/v1/agents/me/keys.",
+    });
+    return;
+  }
+
   const result = userSqlite.prepare(
     "UPDATE agent_api_keys SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL"
   ).run(Date.now(), req.params.id, token);
