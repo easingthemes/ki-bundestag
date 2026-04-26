@@ -147,8 +147,20 @@ export const IMPORTANT_EVENTS = [
   "nachtragshaushalt_proposed",
   "nachtragshaushalt_passed",
   "nachtragshaushalt_rejected",
+  // Cycle 5 PR 2 — Enquete-Kommission lifecycle headlines (S15). The
+  // `enquete_rejected` event lives in ROUTINE_EVENTS instead: a rejected
+  // proposal is procedural noise, not a structural moment.
+  "enquete_proposed",
+  "enquete_convened",
+  "enquete_concluded",
 ] as const;
 
+// Cycle 5 PR 1 — `ausschussanhoerung_held` deliberately stays at the default
+// "standard" tier (S15). Hearings fire ~14–36 times per term and are flavor
+// events alongside the bill_committee / bill_second_reading lifecycle —
+// listing them in IMPORTANT_EVENTS would dominate the night-mode queue, but
+// they're meatier than a routine `bill_committee` line and warrant standard
+// rendering. Same intent-via-omission pattern as `inquiry_hearing_held`.
 export const ROUTINE_EVENTS = [
   "statement",
   "poll",
@@ -170,6 +182,13 @@ export const ROUTINE_EVENTS = [
   "kurzintervention",
   "zwischenfrage",
   "erklaerung_zur_abstimmung",
+  // Cycle 5 PR 2 — Enquete-Kommission rejection (S15). A rejected proposal
+  // is procedural noise; the `enquete_proposed`/`enquete_convened`/
+  // `enquete_concluded` events live in IMPORTANT_EVENTS for the headline tier.
+  "enquete_rejected",
+  // Cycle 5 PR 3 (S22) — Schuldenbremse-Aussetzung auto-restore. Routine tier
+  // per S15 — no agent surfaces it; it's a procedural housekeeping moment.
+  "schuldenbremse_expired",
 ] as const;
 
 /**

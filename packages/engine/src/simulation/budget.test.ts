@@ -14,6 +14,12 @@ const dbMockState: {
   recordedMetaUpdates: [],
 };
 
+// R9 (Cycle 4 PR #165 review / Cycle 5 PR 4): this mock returns plain `vi.fn()`
+// for `eq`/`and`/`sql`. The mock is fragile — it silently returns wrong-typed
+// values if a helper starts using a new export. Currently safe because budget.ts
+// callers never inspect the where-clause arg shape; they only check whether
+// `where()` was called. If you add a helper that DOES inspect the arg shape
+// (e.g. via the eq() return value), replace this with a typed mock.
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), sql: vi.fn() }));
 
 vi.mock("../db/index.js", () => {
@@ -78,6 +84,7 @@ import {
   shouldPresidentVeto,
   tallySchuldenbremseVote,
   applySchuldenbremseAussetzung,
+  applySchuldenbremseExpiry,
   checkSchuldenbremseExpiry,
   findFiscalEmergencyOpportunity,
   generateNachtragsAllocations,
@@ -361,6 +368,155 @@ describe("checkSchuldenbremseExpiry", () => {
   });
 });
 
+// ── Cycle 5 PR 3 — Schuldenbremse threshold + R4/R5 + S22 expiry event ──
+
+describe("tallySchuldenbremseVote — Cycle 5 PR 3 / S20+S21", () => {
+  // S21 / R4: with the recalibrated coalition rate (0.88) and opposition base
+  // (0.18 + sentiment + severity), pass-rate when justification is met (high
+  // severity, sentiment >= baseline) should land in [60%, 80%]. The threshold
+  // (S20 — `yes >= MAJORITY_SEATS`) is already enforced by the helper since
+  // Cycle 4 PR 2; this convergence drives the value of the opposition base.
+  it("converges to pass-rate ∈ [60%, 80%] when justification is met (50k LCG)", () => {
+    // Test scenario design (S21 calibration target):
+    //
+    // To exercise the [60%, 80%] band, the coalition must NOT trivially pass
+    // via unanimity. We use a 3-party coalition controlling exactly 315 seats
+    // (one below MAJORITY_SEATS=316), forcing the suspension to depend on at
+    // least one opposition yes vote even when all three coalition parties
+    // unanimously support it.
+    //
+    // With SCHULDENBREMSE_COALITION_YES_RATE = 0.88 (R4 / S21) and
+    // SCHULDENBREMSE_OPPOSITION_YES_BASE = 0.18 + 0.30 (high severity) = 0.48
+    // mean opposition yes share, the analytic pass-rate sits around 0.72:
+    //   - Coalition unanimity (0.88³ ≈ 0.681) needs 1 opposition seat → 0.86
+    //     conditional pass-rate → contributes ~0.586
+    //   - 2-of-3 coalition yes (~0.279 weight) needs ≥106 opposition seats →
+    //     ~0.47 conditional → contributes ~0.131
+    //   - Smaller branches contribute the rest
+    //
+    // The test asserts the [60%, 80%] band — the analytic ~0.72 sits in the
+    // middle with comfortable headroom for both the threshold (S20) and the
+    // recalibrated rates (S21/R4).
+    const parties: Party[] = [
+      makeParty("spd",    { coalitionRole: "leader",     seatCount: 105 }),
+      makeParty("gruene", { coalitionRole: "junior",     seatCount: 105 }),
+      makeParty("fdp",    { coalitionRole: "junior",     seatCount: 105 }),
+      makeParty("cdu",    { coalitionRole: "opposition", seatCount: 105 }),
+      makeParty("afd",    { coalitionRole: "opposition", seatCount: 105 }),
+      makeParty("linke",  { coalitionRole: "opposition", seatCount: 105 }),
+    ];
+    let passes = 0;
+    let state = 12345;
+    const lcg = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 2 ** 32; };
+    for (let i = 0; i < 50_000; i++) {
+      const r = tallySchuldenbremseVote(parties, ["spd", "gruene", "fdp"], 45, "high", lcg);
+      if (r.passed) passes++;
+    }
+    const passRate = passes / 50_000;
+    expect(passRate).toBeGreaterThanOrEqual(0.60);
+    expect(passRate).toBeLessThanOrEqual(0.80);
+  });
+
+  // S20: explicit threshold check. With yes=315, must FAIL (below MAJORITY_SEATS=316).
+  // With yes=316, must PASS.
+  it("requires yes >= MAJORITY_SEATS to pass (S20)", () => {
+    // Force coalition seats to total exactly 315 (below threshold).
+    const partiesBelow: Party[] = [
+      makeParty("spd",    { coalitionRole: "leader", seatCount: 315 }),
+      makeParty("cdu",    { coalitionRole: "opposition", seatCount: 100 }),
+    ];
+    // Force ALL coalition yes (rng=0), all opposition no (rng=1).
+    const yesAll = (() => { let i = 0; const rngs = [0, 1]; return () => rngs[i++] ?? 0; })();
+    const below = tallySchuldenbremseVote(partiesBelow, ["spd"], 45, null, yesAll);
+    expect(below.yesVotes).toBe(315);
+    expect(below.passed).toBe(false);
+
+    // Bump to 316 (threshold) — must pass.
+    const partiesAtThreshold: Party[] = [
+      makeParty("spd", { coalitionRole: "leader", seatCount: 316 }),
+      makeParty("cdu", { coalitionRole: "opposition", seatCount: 100 }),
+    ];
+    const yesAll2 = (() => { let i = 0; const rngs = [0, 1]; return () => rngs[i++] ?? 0; })();
+    const at = tallySchuldenbremseVote(partiesAtThreshold, ["spd"], 45, null, yesAll2);
+    expect(at.yesVotes).toBe(316);
+    expect(at.passed).toBe(true);
+  });
+});
+
+describe("generateNachtragsAllocations — Cycle 5 PR 3 / S23 / R5 carry-the-remainder", () => {
+  it("Σ allocations === total exactly across many totals (closes R5 drift gap)", () => {
+    // The previous per-ministry independent-rounding pattern accumulated
+    // floating-point drift. Carry-the-remainder fixes Σ === total within
+    // IEEE-754 precision regardless of total magnitude or boost shape.
+    for (const total of [50, 87.5, 99.9, 124.3, 150]) {
+      const allocBase = generateNachtragsAllocations(makeCoalitionParties(), null, total);
+      const sumBase = Object.values(allocBase).reduce((s, v) => s + v, 0);
+      expect(sumBase).toBeCloseTo(total, 6);
+
+      const allocBoosted = generateNachtragsAllocations(makeCoalitionParties(), "defense", total);
+      const sumBoosted = Object.values(allocBoosted).reduce((s, v) => s + v, 0);
+      expect(sumBoosted).toBeCloseTo(total, 6);
+    }
+  });
+
+  it("first 7 ministries land at 0.1B EUR precision (last carries remainder)", () => {
+    const allocations = generateNachtragsAllocations(makeCoalitionParties(), null, 87.5);
+    const ministries: (keyof typeof allocations)[] = [
+      "finance", "labour", "environment", "interior",
+      "defence", "education", "health", "infrastructure",
+    ];
+    // Spec contract: first 7 are rounded to 0.1B EUR; last (infrastructure)
+    // is the residual — guaranteed Σ === total but may carry sub-0.1B noise.
+    for (let i = 0; i < 7; i++) {
+      const v = allocations[ministries[i]];
+      expect(Math.round(v * 10) / 10).toBeCloseTo(v, 9);
+    }
+  });
+});
+
+describe("applySchuldenbremseExpiry — Cycle 5 PR 3 / S22 pure helper", () => {
+  it("returns expired=false when currentDay < suspendedUntilDay (no event)", () => {
+    const state = { schuldenbremseSuspended: true };
+    const r = applySchuldenbremseExpiry(state, { schuldenbremseSuspendedUntilDay: 200 }, 150);
+    expect(r.expired).toBe(false);
+    expect(r.event).toBeUndefined();
+    // State unchanged — the flag must NOT have been mutated before expiry.
+    expect(state.schuldenbremseSuspended).toBe(true);
+  });
+
+  it("returns expired=true + event when currentDay === suspendedUntilDay (boundary)", () => {
+    const state = { schuldenbremseSuspended: true };
+    const r = applySchuldenbremseExpiry(state, { schuldenbremseSuspendedUntilDay: 200 }, 200);
+    expect(r.expired).toBe(true);
+    expect(r.event?.type).toBe("schuldenbremse_expired");
+    expect(state.schuldenbremseSuspended).toBe(false);
+  });
+
+  it("returns expired=true + event when currentDay > suspendedUntilDay (post-boundary)", () => {
+    const state = { schuldenbremseSuspended: true };
+    const r = applySchuldenbremseExpiry(state, { schuldenbremseSuspendedUntilDay: 200 }, 250);
+    expect(r.expired).toBe(true);
+    expect(r.event?.type).toBe("schuldenbremse_expired");
+    expect(state.schuldenbremseSuspended).toBe(false);
+  });
+
+  it("no-op when state.schuldenbremseSuspended is false (already cleared)", () => {
+    const state = { schuldenbremseSuspended: false };
+    const r = applySchuldenbremseExpiry(state, { schuldenbremseSuspendedUntilDay: 200 }, 250);
+    expect(r.expired).toBe(false);
+    expect(r.event).toBeUndefined();
+  });
+
+  it("no-op when meta.schuldenbremseSuspendedUntilDay is null (no expiry recorded)", () => {
+    const state = { schuldenbremseSuspended: true };
+    const r = applySchuldenbremseExpiry(state, { schuldenbremseSuspendedUntilDay: null }, 1000);
+    expect(r.expired).toBe(false);
+    expect(r.event).toBeUndefined();
+    // State unchanged — without an expiry day we can't make the auto-restore call.
+    expect(state.schuldenbremseSuspended).toBe(true);
+  });
+});
+
 describe("findFiscalEmergencyOpportunity", () => {
   // Test 7: null when neither gate.
   it("returns null when no high-severity crisis AND provisionalBudget streak < 30 days", () => {
@@ -496,7 +652,12 @@ describe("processNachtragsInjection", () => {
     ];
   }
 
-  function makeNachtragInjection(activeCrisisId: string | null = null): PendingInjection {
+  // Cycle 5 PR 3 (S24/R10) — narrowed to the nachtragshaushalt variant; the
+  // discriminated `PendingInjection` union no longer accepts an open
+  // `Record<string, unknown>` payload at this entry point.
+  function makeNachtragInjection(
+    activeCrisisId: string | null = null,
+  ): PendingInjection & { type: "nachtragshaushalt" } {
     return {
       id: "inj-1",
       type: "nachtragshaushalt",

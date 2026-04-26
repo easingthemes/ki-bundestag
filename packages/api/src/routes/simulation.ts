@@ -448,10 +448,13 @@ router.post("/api/simulate/inject", requireAdmin, (req, res) => {
   }
 
   const id = `inj-${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+  // S24/R10 (Cycle 5 PR 3): admin endpoint accepts the 4 admin-injectable
+  // variants validated above. The runtime-validated `type` narrows the union
+  // at the consumption site (engine `processInjections` switch).
   db.insert(schema.pendingInjections).values({
     id,
     type,
-    data: (data || {}) as any,
+    data: data || {},
     consumed: false,
   }).run();
 

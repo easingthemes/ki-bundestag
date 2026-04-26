@@ -10,7 +10,12 @@ import type {
   Crisis,
   Fraktion,
   Interpellation,
+  InterpellationType,
+  MdbInterpellationInjectionPayload,
+  MdbMotionInjectionPayload,
+  MinistryPortfolio,
   Motion,
+  MotionType,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
 import { LIMITS } from "../validation.js";
@@ -477,17 +482,19 @@ router.post("/api/motions/submit", (req, res) => {
   const userDb = getUserDb();
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
 
+  // S24/R10: typed `MdbMotionInjectionPayload` (no `as any`).
+  const motionPayload: MdbMotionInjectionPayload = {
+    motionType: motionType as MotionType,
+    title: title.trim(),
+    description: description.trim(),
+    partyId: seat.partyId,
+    userId: token,
+    proposerName: user?.displayName ?? "MdB",
+  };
   db.insert(schema.pendingInjections).values({
     id: randomUUID(),
     type: "mdb_motion",
-    data: {
-      motionType,
-      title: title.trim(),
-      description: description.trim(),
-      partyId: seat.partyId,
-      userId: token,
-      proposerName: user?.displayName ?? "MdB",
-    } as any,
+    data: motionPayload,
     consumed: false,
   }).run();
 
@@ -544,18 +551,20 @@ router.post("/api/interpellations/submit", (req, res) => {
   const userDb = getUserDb();
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
 
+  // S24/R10: typed `MdbInterpellationInjectionPayload` (no `as any`).
+  const interpellationPayload: MdbInterpellationInjectionPayload = {
+    interpellationType: interpellationType as InterpellationType,
+    title: title.trim(),
+    question: question.trim(),
+    targetMinistry: targetMinistry as MinistryPortfolio,
+    partyId: seat.partyId,
+    userId: token,
+    proposerName: user?.displayName ?? "MdB",
+  };
   db.insert(schema.pendingInjections).values({
     id: randomUUID(),
     type: "mdb_interpellation",
-    data: {
-      interpellationType,
-      title: title.trim(),
-      question: question.trim(),
-      targetMinistry,
-      partyId: seat.partyId,
-      userId: token,
-      proposerName: user?.displayName ?? "MdB",
-    } as any,
+    data: interpellationPayload,
     consumed: false,
   }).run();
 

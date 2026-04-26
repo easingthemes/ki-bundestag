@@ -7,6 +7,7 @@ import { PARTIES, INITIAL_NATIONAL_STATE } from "./seed-data.js";
 import { SIM_TABLE_DDL, USER_TABLE_DDL, SIM_COLUMN_MIGRATIONS, USER_COLUMN_MIGRATIONS, SIM_INDEX_MIGRATIONS, USER_INDEX_MIGRATIONS } from "./ddl.js";
 import { BUNDESRAT_MODE_BY_CATEGORY } from "../config/bundesrat.js";
 import { BUNDESTAG_SIZE } from "../config/elections.js";
+import { EXPERTS_SEED } from "../config/experts.js";
 
 /**
  * Ensure all tables and columns exist without touching data.
@@ -339,6 +340,42 @@ export function migrateDatabase() {
     console.warn(`[Migrate] Cycle 4 backfill skipped (schema not ready): ${msg}`);
   }
 
+  // Cycle 5 PR 1 (todo 043) — EXPERTS_SEED population + idempotency-flag write.
+  //
+  // Schema-side changes (`experts`, `ausschussanhoerungen` tables + the
+  // `cycle5_migrated` column on simulation_meta) ship in SIM_TABLE_DDL /
+  // SIM_COLUMN_MIGRATIONS above so they're applied BEFORE this block runs
+  // (matches the Cycle 4 cycle4Migrated pattern).
+  //
+  // Per S13 / PR #165 R1: the `experts` and `ausschussanhoerungen` tables
+  // are created via SIM_TABLE_DDL only — no synthetic `_table` rows in
+  // SIM_COLUMN_MIGRATIONS. Seeding via INSERT OR IGNORE keyed on
+  // `experts.id` is idempotent — re-runs are no-ops for already-seeded rows.
+  //
+  // Idempotency: gated on `simulation_meta.cycle5_migrated` (S13).
+  try {
+    const cycle5Row = sqlite.prepare("SELECT cycle5_migrated FROM simulation_meta LIMIT 1").get() as { cycle5_migrated?: number } | undefined;
+    if (cycle5Row && !cycle5Row.cycle5_migrated) {
+      const seedTx = sqlite.transaction(() => {
+        const expertInsert = sqlite.prepare(
+          "INSERT OR IGNORE INTO experts (id, name, affiliation, expertise_areas) VALUES (?, ?, ?, ?)",
+        );
+        for (const e of EXPERTS_SEED) {
+          expertInsert.run(e.id, e.name, e.affiliation, JSON.stringify(e.expertiseAreas));
+        }
+        sqlite.prepare("UPDATE simulation_meta SET cycle5_migrated = 1").run();
+      });
+      seedTx();
+      console.log(`[Migrate] Cycle 5 — seeded ${EXPERTS_SEED.length} experts, set cycle5_migrated`);
+    }
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (!msg.includes("no such table") && !msg.includes("no such column")) {
+      throw err;
+    }
+    console.warn(`[Migrate] Cycle 5 seed skipped (schema not ready): ${msg}`);
+  }
+
   // ── User DB ──
   const userSqlite = getUserSqlite();
   userSqlite.exec(USER_TABLE_DDL);
@@ -391,6 +428,9 @@ export function seedDatabase() {
     DROP TABLE IF EXISTS crises;
     DROP TABLE IF EXISTS bills;
     DROP TABLE IF EXISTS national_state;
+    DROP TABLE IF EXISTS enquete_commissions;
+    DROP TABLE IF EXISTS ausschussanhoerungen;
+    DROP TABLE IF EXISTS experts;
     DROP TABLE IF EXISTS parties;
   `);
 
@@ -459,7 +499,21 @@ export function seedDatabase() {
     timingPreset: "normal",
     contextDepth: "normal",
     startDate: new Date().toISOString(),
+    // Cycle 5 PR 1 (S13) — fresh DB already has the schema; mark migration done
+    // so migrateDatabase()'s cycle5Migrated block stays a no-op.
+    cycle5Migrated: 1,
   }).run();
+
+  // Cycle 5 PR 1 (S2) — seed the EXPERTS pool. Idempotent via INSERT OR IGNORE
+  // keyed on `experts.id`. Same content the cycle5Migrated block writes for
+  // upgrade paths.
+  const expertSeedStmt = sqlite.prepare(
+    "INSERT OR IGNORE INTO experts (id, name, affiliation, expertise_areas) VALUES (?, ?, ?, ?)",
+  );
+  for (const e of EXPERTS_SEED) {
+    expertSeedStmt.run(e.id, e.name, e.affiliation, JSON.stringify(e.expertiseAreas));
+  }
+  console.log(`Seeded ${EXPERTS_SEED.length} experts`);
 
   // Insert initial fraktionen for parties with enough seats
   let fraktionCount = 0;

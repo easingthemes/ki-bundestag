@@ -212,4 +212,19 @@ describe("detectDisciplineBreaks", () => {
     const events = detectDisciplineBreaks(makeBill(), inputs, { spd: "yes" }, 100);
     expect(events[0].title).toBe("Erklärung zur Abstimmung: MdB-Sitz #seat-42");
   });
+
+  // R7 (Cycle 5 PR 4): caller-resolved real name takes precedence over the
+  // seat-id template. Documents the contract: `mdbName` set → real name in
+  // both title and description; the seatId template is the fallback path,
+  // never the primary source.
+  it("uses caller-resolved displayName when mdbName is set (R7 real-name path)", () => {
+    const inputs: DisciplineBreakInput[] = [
+      makeBreakInput({ seatId: "seat-77", vote: "no", mdbName: "Maria Schmidt" }),
+    ];
+    const events = detectDisciplineBreaks(makeBill(), inputs, { spd: "yes" }, 100);
+    expect(events[0].title).toBe("Erklärung zur Abstimmung: Maria Schmidt");
+    expect(events[0].title).not.toContain("MdB-Sitz");
+    expect(events[0].description).toContain("Maria Schmidt");
+    expect(events[0].description).not.toContain("seat-77");
+  });
 });

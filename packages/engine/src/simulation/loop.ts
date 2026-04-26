@@ -41,7 +41,7 @@ import { updateFraktionen, getActiveFraktionen, FRAKTION_LEADERS } from "./frakt
 import { tallyMotionVotes, motionSentimentImpact } from "./motions.js";
 import { formCabinet, getActiveGovernment, dissolveGovernment, isGovernmentBill as checkIsGovernmentBill } from "./government.js";
 import { startKanzlerwahl, runPhase1, runPhase2Round, runPhase3 } from "./kanzlerwahl.js";
-import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus } from "@ki-bundestag/types";
+import type { KanzlerwahlRound, KanzlerwahlState, KanzlerwahlStatus, NachtragsInjectionPayload } from "@ki-bundestag/types";
 import { nextSitzungsTag, isSitzungsTag } from "./parliament-calendar.js";
 import {
   scheduleWeeklyParliamentaryQA,
@@ -69,7 +69,7 @@ import { adjudicateChallenge, constitutionalCourtApprovalImpact } from "./consti
 import {
   generateBudgetAllocations, generateRevisedAllocations, tallyBudgetVote,
   applyBudgetEconomicEffect, BUDGET_TOTAL,
-  tallySchuldenbremseVote, applySchuldenbremseAussetzung, checkSchuldenbremseExpiry, findFiscalEmergencyOpportunity,
+  tallySchuldenbremseVote, applySchuldenbremseAussetzung, applySchuldenbremseExpiry, findFiscalEmergencyOpportunity,
   processNachtragsInjection,
 } from "./budget.js";
 import { SCHULDENBREMSE_SUSPENSION_DURATION } from "../config/budget.js";
@@ -82,10 +82,27 @@ import {
 import { FRAKTION_THRESHOLD as FRAKTION_THRESHOLD_FOR_INQUIRY } from "./fraktionen.js";
 import {
   INQUIRY_MAX_ACTIVE, INQUIRY_MIN_DAYS_BETWEEN_FILINGS, INQUIRY_THRESHOLD_PERCENT,
+  ENQUETE_MAX_ACTIVE, ENQUETE_RATE_LIMIT_DAYS,
 } from "../config/parliament.js";
 import { BUNDESTAG_SIZE } from "../config/elections.js";
-import type { FiscalEmergencyValidationContext, InquiryValidationContext } from "../agent/action-parser.js";
+import type { EnqueteValidationContext, FiscalEmergencyValidationContext, InquiryValidationContext } from "../agent/action-parser.js";
+import {
+  findEnqueteOpportunity,
+  countActiveEnqueteCommissions,
+  getLastEnqueteProposedDay,
+  applyEnqueteProposal,
+  tickEnqueteCommissions,
+  buildEnqueteFinalReportBatchRequest,
+  processEnqueteFinalReportBatchResult,
+} from "./enquete-commissions.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
+import {
+  maybeScheduleAnhoerung,
+  loadExpertPool,
+  buildAusschussanhoerungenBatchRequest,
+  processAusschussanhoerungenBatchResult,
+  type AnhoerungBatchInput,
+} from "./anhoerungen.js";
 import { detectDisciplineBreaks, type DisciplineBreakInput } from "./debate-formats.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
@@ -232,7 +249,9 @@ export async function runDay(): Promise<number> {
   // Clean up any leftover data from a previous failed attempt at this day
   cleanupPartialDay(currentDay);
   setTrackingDay(currentDay);
-  const startDateStr = (meta as any).startDate as string | null;
+  // R6 (Cycle 5 PR 4 / PR #165 review): schema-sim.ts declares startDate, so
+  // the previous Drizzle-row-cast pattern is stale — the field is typed directly.
+  const startDateStr = meta.startDate;
   const startDate: Date | undefined = startDateStr ? new Date(startDateStr) : undefined;
 
   if (startDate) {
@@ -243,8 +262,8 @@ export async function runDay(): Promise<number> {
     console.log(`\n=== DAY ${currentDay} ===`);
   }
 
-  // Read context depth setting
-  const rawDepth = ((meta as any).contextDepth as string) ?? "normal";
+  // R6 (Cycle 5 PR 4): contextDepth is now declared on simulationMeta — no cast.
+  const rawDepth: string = meta.contextDepth ?? "normal";
   const contextDepth: ContextDepth = isValidContextDepth(rawDepth) ? rawDepth : "normal";
   const depthConfig = getDepthConfig(contextDepth);
 
@@ -276,7 +295,8 @@ export async function runDay(): Promise<number> {
       gdpGrowth: state.gdpGrowth,
     },
     publicSentiment: state.publicSentiment,
-    provisionalBudget: (state as any).provisionalBudget ?? false,
+    // R6 (Cycle 5 PR 4): provisionalBudget is declared on nationalState — no cast.
+    provisionalBudget: state.provisionalBudget ?? false,
     // Cycle 4 PR 2 — Schuldenbremse-Aussetzung flag.
     schuldenbremseSuspended: state.schuldenbremseSuspended,
   };
@@ -424,7 +444,8 @@ export async function runDay(): Promise<number> {
   }
 
   let nextElectionDay = meta.nextElectionDay ?? TIME_CONFIG.TERM_DAYS;
-  const budgetRetryDay: number | null = (meta as any).budgetRetryDay ?? null;
+  // R6 (Cycle 5 PR 4): budgetRetryDay is declared on simulationMeta — no cast.
+  const budgetRetryDay: number | null = meta.budgetRetryDay ?? null;
 
   // 3a2. Handle election invalidation
   if (injections.invalidateElection) {
@@ -1262,11 +1283,41 @@ export async function runDay(): Promise<number> {
   // Hoisted so inactivity tracking can read it after the if-block
   const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
 
+  // Cycle 5 PR 1 (Q4 / S3) — Ausschussanhörung batch inputs collected during
+  // the bill pipeline pass; submitted together later (alongside batch group D
+  // which already carries inquiry hearings — same day-tick, same submission).
+  const anhoerungBatchInputs: AnhoerungBatchInput[] = [];
+
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
     const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties, startDate, nationalState);
     for (const ev of pipelineEvents) {
       addEvent(dayEvents, ev);
+    }
+
+    // Cycle 5 PR 1 / Q4 / S3 — for each bill that just entered the committee
+    // stage (bill_committee event from the pipeline), roll the Anhörung
+    // trigger and persist a `scheduled` row + queue the AI batch input.
+    // Reads the experts seed table once per day (small, ~30 rows).
+    try {
+      const newCommitteeBillIds = new Set(
+        pipelineEvents
+          .filter(ev => ev.type === "bill_committee")
+          .map(ev => (ev.data as { billId?: string } | undefined)?.billId)
+          .filter((id): id is string => typeof id === "string"),
+      );
+      if (newCommitteeBillIds.size > 0) {
+        const expertPool = loadExpertPool();
+        if (expertPool.length > 0) {
+          for (const bill of allBills) {
+            if (!newCommitteeBillIds.has(bill.id)) continue;
+            const input = maybeScheduleAnhoerung(bill, currentDay, expertPool);
+            if (input) anhoerungBatchInputs.push(input);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Loop] Error scheduling Ausschussanhörungen:", err);
     }
 
     // Collect bills for agent calls — fresh DB queries so the validator and prompt
@@ -1496,6 +1547,14 @@ export async function runDay(): Promise<number> {
     );
     const schuldenbremseSuspendedUntilDay = meta.schuldenbremseSuspendedUntilDay;
 
+    // Cycle 5 PR 2 — Enquete-Kommission opportunity (S11) + cap/rate-limit
+    // snapshot. Bipartisan per S17 — surfaced to BOTH coalition + opposition
+    // contexts (unlike inquiry which is opposition-only). Same global values
+    // re-used for every party's validation bag.
+    const enqueteOpportunity = findEnqueteOpportunity(activeCrises, currentDay);
+    const enqueteActiveCount = countActiveEnqueteCommissions();
+    const enqueteLastProposedDay = getLastEnqueteProposedDay();
+
     // Build agent contexts for all parties
     const agentContexts: AgentContext[] = [];
     for (const party of allParties) {
@@ -1533,6 +1592,9 @@ export async function runDay(): Promise<number> {
         // Cycle 4 PR 2 — only the coalition leader sees the fiscal-emergency
         // flag. The action-parser also enforces the leader-only check.
         fiscalEmergencyJustified: party.coalitionRole === "leader" && fiscalEmergencyOpportunity ? fiscalEmergencyOpportunity : undefined,
+        // Cycle 5 PR 2 (S17) — bipartisan: visible to BOTH coalition + opposition
+        // Fraktion-bearing parties when a persistent crisis surfaces.
+        enqueteOpportunity: !!fraktion && enqueteOpportunity ? enqueteOpportunity : undefined,
       });
     }
 
@@ -1575,8 +1637,17 @@ export async function runDay(): Promise<number> {
         schuldenbremseSuspendedUntilDay,
         currentDay,
       };
+      // Cycle 5 PR 2 — Enquete-Kommission validation context. Identical for
+      // every party (S17 — bipartisan; no per-party slot in the bag).
+      const enqueteCtx: EnqueteValidationContext = {
+        currentDay,
+        activeEnqueteCount: enqueteActiveCount,
+        lastEnqueteProposedDay: enqueteLastProposedDay,
+        maxActive: ENQUETE_MAX_ACTIVE,
+        rateLimitDays: ENQUETE_RATE_LIMIT_DAYS,
+      };
       const actions = await processPartyAgentResult(
-        result, ctx, thirdReadingBills, secondReadingBills, inquiryCtx, fiscalEmergencyCtx,
+        result, ctx, thirdReadingBills, secondReadingBills, inquiryCtx, fiscalEmergencyCtx, enqueteCtx,
       );
       partyActions.set(ctx.party.id, actions);
     }
@@ -2405,10 +2476,15 @@ export async function runDay(): Promise<number> {
 
           // S19: queue Nachtragshaushalt injection. PR 3 implements the
           // consumer; this PR just queues the work item.
+          // S24/R10 (Cycle 5 PR 3): typed `NachtragsInjectionPayload` —
+          // no `as any` needed; the discriminated union narrows at consumption.
+          const nachtragsPayload: NachtragsInjectionPayload = {
+            activeCrisisId: action.activeCrisisId ?? null,
+          };
           db.insert(schema.pendingInjections).values({
             id: `inj-nachtrag-${currentDay}-${generateId()}`,
             type: "nachtragshaushalt",
-            data: { activeCrisisId: action.activeCrisisId ?? null } as any,
+            data: nachtragsPayload,
             consumed: false,
           }).run();
 
@@ -2426,21 +2502,73 @@ export async function runDay(): Promise<number> {
         }
       }
     }
+
+    // 10i. Cycle 5 PR 2 — Enquete-Kommission proposals.
+    //
+    // Validation already happened in `validateActions` (Fraktion gate, no-election
+    // gate, S8 cap, S9 rate-limit, topic-validity, once-per-turn). First valid
+    // action wins; subsequent attempts in the same tick are skipped via the
+    // `enqueteProcessed` flag (per PR #165 R3 lesson — defense-in-depth here is
+    // the flag, not a try/catch around `applyEnqueteProposal`; pickEnqueteExperts
+    // throws are real S2 invariant violations and must propagate).
+    let enqueteProcessed = false;
+    for (const [partyId, actions] of partyActions) {
+      for (const action of actions) {
+        if (action.type !== "request_enquete_kommission" || enqueteProcessed) continue;
+        enqueteProcessed = true;
+
+        // Reuse the experts pool already loaded for Ausschussanhörungen if any
+        // committee bills landed; otherwise load it now (small, ~30 rows).
+        const expertPool = loadExpertPool();
+        const fraktionPartyIds = new Set(activeFraktionen.map(f => f.partyId));
+        const result = applyEnqueteProposal(
+          { proposingPartyId: partyId, topic: action.topic, title: action.title, rationale: action.rationale },
+          allParties,
+          fraktionPartyIds,
+          nationalState.coalitionParties,
+          nationalState.publicSentiment,
+          expertPool,
+          currentDay,
+        );
+        if (result) {
+          for (const ev of result.events) addEvent(dayEvents, ev);
+          console.log(`  [Enquete] ${result.status === "active" ? "PASSED" : "REJECTED"} request from ${partyId} (topic ${action.topic}, ${result.voteResult.yes}:${result.voteResult.no})`);
+        }
+      }
+    }
   }
 
-  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries, fiscal emergency)
+  progress.set(60); // Actions processed (proposals, votes, motions, confidence votes, inquiries, fiscal emergency, enquete)
 
-  // 10g3. Cycle 4 PR 2 — Schuldenbremse expiry check. Silent flag-clear at
-  // expiry (no event per spec — keeps the event-type list at the planned
-  // count). Runs unconditionally so the flag can clear during election phases.
+  // 10g3. Cycle 4 PR 2 / Cycle 5 PR 3 (S22) — Schuldenbremse expiry check.
+  //
+  // S22 closes the Cycle 4 silent-restore gap. Now uses the pure helper
+  // `applySchuldenbremseExpiry` which returns a typed `schuldenbremse_expired`
+  // event when the flag clears; loop.ts persists the DB write under the
+  // simulationMeta `id` (PR #165 R2 — WHERE clause required).
+  //
+  // Runs unconditionally so the flag can clear during election phases too.
   try {
-    const cleared = checkSchuldenbremseExpiry(currentDay);
-    if (cleared) {
-      nationalState.schuldenbremseSuspended = false;
-      console.log("  [Schuldenbremse] expiry day reached — suspension cleared");
+    const expiry = applySchuldenbremseExpiry(nationalState, meta, currentDay);
+    if (expiry.expired) {
+      // R2 lesson: WHERE clause on simulationMeta updates. nationalState is
+      // single-row in this codebase but we still scope the update by id
+      // for symmetry + future-safety.
+      getSqlite().transaction(() => {
+        db.update(schema.simulationMeta)
+          .set({ schuldenbremseSuspendedUntilDay: null })
+          .where(eq(schema.simulationMeta.id, meta.id))
+          .run();
+        db.update(schema.nationalState)
+          .set({ schuldenbremseSuspended: false })
+          .where(eq(schema.nationalState.id, state.id))
+          .run();
+      })();
+      if (expiry.event) addEvent(dayEvents, expiry.event);
+      console.log("  [Schuldenbremse] expiry day reached — suspension cleared, event emitted");
     }
   } catch (err) {
-    console.error("[Loop] Error in checkSchuldenbremseExpiry:", err);
+    console.error("[Loop] Error in applySchuldenbremseExpiry:", err);
   }
 
   // 10g2. Cycle 4 PR 1 — Untersuchungsausschuss daily tick (hearings + watchdog +
@@ -2459,12 +2587,32 @@ export async function runDay(): Promise<number> {
     for (const ev of tickResult.events) {
       addEvent(dayEvents, ev);
     }
+    // Cycle 5 PR 2 — Enquete daily tick (Q9 soft-watchdog + scheduled-end
+    // collection). Lapsed-event emission happens here (templated description,
+    // no AI); rows ready to conclude are passed to the AI Schlussbericht batch
+    // builder below (piggyback on group D).
+    const enqueteTick = tickEnqueteCommissions(currentDay);
+    for (const ev of enqueteTick.lapsedEvents) addEvent(dayEvents, ev);
+
     // Build batch group D: hearing summaries + final reports for non-watchdog
     // conclusions (watchdog conclusions get a templated description, no AI).
     const hearingItems = buildInquiryHearingBatchRequest(tickResult.hearingsToBatch, currentDay);
     const reportableConclusions = tickResult.concludedToReport.filter(c => !c.watchdog);
     const reportItems = buildInquiryFinalReportBatchRequest(reportableConclusions, currentDay);
-    const groupD: import("../agent/batch-client.js").BatchRequest[] = [...hearingItems, ...reportItems];
+    // Cycle 5 PR 1 / S3 — Ausschussanhörung items piggyback on group D so the
+    // day's "expert-witness" AI calls (inquiry hearings + Ausschussanhörungen)
+    // share one batch submission. Same daily tick, same failure-mode handling.
+    const anhoerungItems = buildAusschussanhoerungenBatchRequest(anhoerungBatchInputs);
+    // Cycle 5 PR 2 / S20-pattern — Enquete Schlussbericht items piggyback on
+    // group D too. Loaded experts pool only if there are concluding rows
+    // (avoids the disk hit on no-op days).
+    const enqueteExpertPool = enqueteTick.toConclude.length > 0 ? loadExpertPool() : [];
+    const enqueteItems = buildEnqueteFinalReportBatchRequest(
+      enqueteTick.toConclude, enqueteExpertPool,
+    );
+    const groupD: import("../agent/batch-client.js").BatchRequest[] = [
+      ...hearingItems, ...reportItems, ...anhoerungItems, ...enqueteItems,
+    ];
     if (groupD.length > 0) {
       let groupDResults: import("../agent/batch-client.js").BatchResult[] = [];
       try {
@@ -2481,6 +2629,23 @@ export async function runDay(): Promise<number> {
       );
       for (const ev of hearingEvents) addEvent(dayEvents, ev);
       processInquiryFinalReportBatchResult(groupDResults, reportableConclusions);
+      // Anhörung processor: writes 'held' or 'lapsed' (S3) and emits one
+      // ausschussanhoerung_held event per success.
+      if (anhoerungBatchInputs.length > 0) {
+        const anhoerungEvents = processAusschussanhoerungenBatchResult(
+          groupDResults, anhoerungBatchInputs, currentDay,
+        );
+        for (const ev of anhoerungEvents) addEvent(dayEvents, ev);
+      }
+      // Cycle 5 PR 2 — Enquete final-report processor: writes 'concluded' +
+      // finalReport (or templated fallback on AI failure) and emits one
+      // enquete_concluded event per row.
+      if (enqueteTick.toConclude.length > 0) {
+        const enqueteEvents = processEnqueteFinalReportBatchResult(
+          groupDResults, enqueteTick.toConclude, currentDay,
+        );
+        for (const ev of enqueteEvents) addEvent(dayEvents, ev);
+      }
     }
   } catch (err) {
     console.error("[Loop] Error in inquiry-committees tick:", err);

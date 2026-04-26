@@ -61,6 +61,10 @@ export interface AgentContext {
   // crisis exists OR provisionalBudget has been true for ≥ 30 sim days (Q5).
   // Absence means coalition leader should NOT propose Schuldenbremse-Aussetzung.
   fiscalEmergencyJustified?: { activeCrisisId?: string; provisionalBudgetDays: number };
+  // Cycle 5 PR 2 — bipartisan flag (S17) surfaced to BOTH coalition + opposition
+  // agents when a persistent crisis (≥ ENQUETE_PERSISTENT_CRISIS_THRESHOLD_DAYS)
+  // makes a long-form Enquete-Kommission warranted. Set by loop.ts step 5.
+  enqueteOpportunity?: { topic: MinistryPortfolio; crisisId: string; daysActive: number };
 }
 
 export interface ProposeBillAction {
@@ -150,6 +154,17 @@ export interface ProposeFiscalEmergencyAction {
   justification: string;
 }
 
+// Cycle 5 PR 2 — Enquete-Kommission request. Any Fraktion-bearing party
+// (coalition or opposition — bipartisan per S17). Same-tick simple-majority
+// Bundestag-Beschluss; pass → active commission, fail → rejected.
+export interface RequestEnqueteKommissionAction {
+  type: "request_enquete_kommission";
+  /** MinistryPortfolio enum value — the policy area to investigate. */
+  topic: MinistryPortfolio;
+  title: string;
+  rationale: string;
+}
+
 export interface NothingAction {
   type: "nothing";
 }
@@ -181,6 +196,7 @@ export type AgentAction =
   | FileConstitutionalChallengeAction
   | FileInquiryCommitteeAction
   | ProposeFiscalEmergencyAction
+  | RequestEnqueteKommissionAction
   | NothingAction;
 
 export interface AgentResponse {

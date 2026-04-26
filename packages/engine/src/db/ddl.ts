@@ -173,7 +173,9 @@ export const SIM_TABLE_DDL = `
     bundestag_size_migrated INTEGER NOT NULL DEFAULT 0,
     last_negotiation_round_day INTEGER,
     vertrauensfrage_suppressed_total INTEGER NOT NULL DEFAULT 0,
-    misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0
+    misstrauensvotum_suppressed_total INTEGER NOT NULL DEFAULT 0,
+    -- Cycle 5 PR 1 (S13) — idempotency flag for the cycle-5 migration block.
+    cycle5_migrated INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS party_history (
@@ -521,6 +523,47 @@ export const SIM_TABLE_DDL = `
     FOREIGN KEY (target_party_id) REFERENCES parties(id)
   );
 
+  -- Cycle 5 PR 1 — Ausschussanhörung expert pool (S2). Seeded once in
+  -- seed.ts cycle5Migrated block via INSERT OR IGNORE (idempotent).
+  -- Per S13/PR #165 R1: NO synthetic _table row in SIM_COLUMN_MIGRATIONS.
+  CREATE TABLE IF NOT EXISTS experts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    affiliation TEXT NOT NULL,
+    expertise_areas TEXT NOT NULL
+  );
+
+  -- Cycle 5 PR 1 — Ausschussanhörung lifecycle (S3).
+  -- Per S13/PR #165 R1: NO synthetic _table row in SIM_COLUMN_MIGRATIONS.
+  CREATE TABLE IF NOT EXISTS ausschussanhoerungen (
+    id TEXT PRIMARY KEY,
+    bill_id TEXT NOT NULL,
+    ministry_focus TEXT NOT NULL,
+    expert_ids TEXT NOT NULL,
+    testimonies TEXT NOT NULL DEFAULT '[]',
+    tone REAL NOT NULL DEFAULT 0,
+    held_on_day INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    FOREIGN KEY (bill_id) REFERENCES bills(id)
+  );
+
+  -- Cycle 5 PR 2 — Enquete-Kommission lifecycle (Q2=A, S12). Per S13/PR #165 R1:
+  -- NO synthetic _table row in SIM_COLUMN_MIGRATIONS.
+  CREATE TABLE IF NOT EXISTS enquete_commissions (
+    id TEXT PRIMARY KEY,
+    topic TEXT NOT NULL,
+    proposing_party_id TEXT NOT NULL,
+    party_member_ids TEXT NOT NULL,
+    expert_member_ids TEXT NOT NULL,
+    formed_on_day INTEGER NOT NULL,
+    scheduled_end_day INTEGER NOT NULL,
+    concluded_on_day INTEGER,
+    status TEXT NOT NULL DEFAULT 'proposed',
+    final_report TEXT,
+    vote_result TEXT,
+    FOREIGN KEY (proposing_party_id) REFERENCES parties(id)
+  );
+
   CREATE TABLE IF NOT EXISTS era_summaries (
     id TEXT PRIMARY KEY,
     start_day INTEGER NOT NULL,
@@ -761,6 +804,16 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   { table: "simulation_meta", column: "schuldenbremse_suspended_until_day", sql: "ALTER TABLE simulation_meta ADD COLUMN schuldenbremse_suspended_until_day INTEGER" },
   { table: "simulation_meta", column: "provisional_budget_since_day", sql: "ALTER TABLE simulation_meta ADD COLUMN provisional_budget_since_day INTEGER" },
   { table: "national_state", column: "schuldenbremse_suspended", sql: "ALTER TABLE national_state ADD COLUMN schuldenbremse_suspended INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 5 PR 1 — idempotency flag for the cycle-5 migration block (S13).
+  // Per S13 / PR #165 R1: the new tables (`experts`, `ausschussanhoerungen`)
+  // ship in SIM_TABLE_DDL above; NO synthetic `_table` rows added here. Only
+  // the flag column lives in this list; the EXPERTS_SEED INSERT OR IGNORE
+  // happens inside the cycle5Migrated-guarded transaction in seed.ts.
+  { table: "simulation_meta", column: "cycle5_migrated", sql: "ALTER TABLE simulation_meta ADD COLUMN cycle5_migrated INTEGER NOT NULL DEFAULT 0" },
+  // Cycle 5 PR 2 — Enquete rate-limit tracker (S9 ENQUETE_RATE_LIMIT_DAYS).
+  // The `enquete_commissions` table itself ships in SIM_TABLE_DDL; per S13 /
+  // PR #165 R1 NO synthetic _table row here.
+  { table: "simulation_meta", column: "last_enquete_proposed_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_enquete_proposed_day INTEGER" },
 ];
 
 /** Column migrations for user DB */
@@ -809,6 +862,10 @@ export const SIM_INDEX_MIGRATIONS: Array<{ name: string; sql: string }> = [
   // Cycle 4 PR 1 — active-cap lookups + per-party cap (R8) queries.
   { name: "idx_inquiry_committees_status", sql: "CREATE INDEX IF NOT EXISTS idx_inquiry_committees_status ON inquiry_committees(status)" },
   { name: "idx_inquiry_committees_filing_party", sql: "CREATE INDEX IF NOT EXISTS idx_inquiry_committees_filing_party ON inquiry_committees(filing_party_id, status)" },
+  // Cycle 5 PR 1 — bill-pipeline tone lookup at committee→2nd reading (S4).
+  { name: "idx_ausschussanhoerungen_bill", sql: "CREATE INDEX IF NOT EXISTS idx_ausschussanhoerungen_bill ON ausschussanhoerungen(bill_id)" },
+  // Cycle 5 PR 2 — active-cap + watchdog scans on Enquete-Kommissionen.
+  { name: "idx_enquete_commissions_status", sql: "CREATE INDEX IF NOT EXISTS idx_enquete_commissions_status ON enquete_commissions(status)" },
 ];
 
 /** Index migrations for user DB */
