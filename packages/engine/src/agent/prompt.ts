@@ -428,6 +428,14 @@ ${ctx.government.ministers.map(m => `    - ${m.portfolio}: ${m.name} (${m.partyI
     p2Sections.push(`FISKALNOTLAGE JUSTIFIED:\n  ${crisisHook}${provisionalHook}You (the coalition leader) may propose a Schuldenbremse-Aussetzung (Art. 115 GG). Pass triggers a Nachtragshaushalt — file only if the fiscal case is real, since opposition will scrutinize.`);
   }
 
+  // Cycle 5 PR 2 — Enquete-Kommission opportunity (S11). Bipartisan per S17 —
+  // surfaced to BOTH coalition + opposition agents. A persistent crisis (≥60d)
+  // makes a long-form policy commission worth proposing; the same-tick
+  // Bundestag-Beschluss has high pass probability for cross-party topics.
+  if (ctx.enqueteOpportunity) {
+    p2Sections.push(`ENQUETE-KOMMISSIONS-MÖGLICHKEIT:\n  A crisis in the policy area "${ctx.enqueteOpportunity.topic}" (id ${ctx.enqueteOpportunity.crisisId}) has been active for ${ctx.enqueteOpportunity.daysActive} days. The Bundestag may convene a cross-party Enquete-Kommission to develop long-term policy recommendations. Action: \`request_enquete_kommission\` with topic="${ctx.enqueteOpportunity.topic}". Available to both coalition and opposition Fraktionen.`);
+  }
+
   // Own recent actions (cross-day memory) — controlled by depth
   if (depth.ownActionsLookbackDays > 0 && ctx.recentOwnActions && ctx.recentOwnActions.length > 0) {
     const items = ctx.recentOwnActions.slice(0, depth.ownActionsMaxItems);

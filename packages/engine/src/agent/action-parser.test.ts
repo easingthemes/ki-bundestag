@@ -292,6 +292,119 @@ describe("validateActions — propose_fiscal_emergency", () => {
   });
 });
 
+// ── Cycle 5 PR 2 — request_enquete_kommission validation ────────────────
+
+describe("validateActions — request_enquete_kommission", () => {
+  const makeBill = (id: string): Bill => ({
+    id, title: "T", description: "D", category: "economy",
+    proposedBy: "spd", status: "third_reading",
+    impact: {}, votes: [], proposedOnDay: 1,
+  });
+
+  // S17 (bipartisan) — gates open, coalition party requesting Enquete is OK.
+  const okCtx = {
+    currentDay: 100,
+    activeEnqueteCount: 0,
+    lastEnqueteProposedDay: null,
+    maxActive: 2,
+    rateLimitDays: 90,
+  };
+
+  const validRequest: AgentAction = {
+    type: "request_enquete_kommission",
+    topic: "environment",
+    title: "Klimaneutrale Industriepolitik",
+    rationale: "Langfristige Empfehlungen für die ökologische Transformation der Industrie.",
+  };
+
+  it("passes for a Fraktion-bearing coalition party (S17 bipartisan)", () => {
+    const result = validateActions(
+      [validRequest], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      /* isOpposition */ false, false,
+      undefined, undefined, okCtx,
+    );
+    const enqueteActions = result.valid.filter(a => a.type === "request_enquete_kommission");
+    expect(enqueteActions).toHaveLength(1);
+    const enqueteErrors = result.errors.filter(e => e.actionType === "request_enquete_kommission");
+    expect(enqueteErrors).toHaveLength(0);
+  });
+
+  it("rejects when active cap is full (S8)", () => {
+    const fullCtx = { ...okCtx, activeEnqueteCount: 2 };
+    const result = validateActions(
+      [validRequest], [makeBill("b-1")], "linke",
+      undefined, true, [],
+      true, false,
+      undefined, undefined, fullCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "request_enquete_kommission");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(false);
+    expect(errs[0].message).toMatch(/cap|max/i);
+  });
+
+  it("rejects when within S9 rate-limit window (just inside 90 days)", () => {
+    const tightCtx = { ...okCtx, lastEnqueteProposedDay: 50 }; // 100 - 50 = 50 < 90
+    const result = validateActions(
+      [validRequest], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      false, false,
+      undefined, undefined, tightCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "request_enquete_kommission");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(false);
+    expect(errs[0].message).toMatch(/cooldown|rate-limit/i);
+  });
+
+  it("passes when just past the S9 rate-limit window", () => {
+    // currentDay - lastEnqueteProposedDay === rateLimitDays (boundary: equal is allowed).
+    const passCtx = { ...okCtx, lastEnqueteProposedDay: 10 }; // 100 - 10 = 90 === 90
+    const result = validateActions(
+      [validRequest], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      false, false,
+      undefined, undefined, passCtx,
+    );
+    const enqueteActions = result.valid.filter(a => a.type === "request_enquete_kommission");
+    expect(enqueteActions).toHaveLength(1);
+  });
+
+  it("rejects when party has no Fraktion", () => {
+    const result = validateActions(
+      [validRequest], [makeBill("b-1")], "spd",
+      undefined, /* hasFraktion */ false, [],
+      false, false,
+      undefined, undefined, okCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "request_enquete_kommission");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(false);
+    expect(errs[0].message).toMatch(/Fraktion/);
+  });
+
+  it("rejects an invalid topic (not a MinistryPortfolio enum value)", () => {
+    const badRequest: AgentAction = {
+      type: "request_enquete_kommission",
+      // @ts-expect-error — testing runtime validation of an invalid enum value.
+      topic: "economy",  // valid BillCategory but NOT a MinistryPortfolio
+      title: "X",
+      rationale: "Y rationale long enough to clear empty-string check.",
+    };
+    const result = validateActions(
+      [badRequest], [makeBill("b-1")], "spd",
+      undefined, true, [],
+      false, false,
+      undefined, undefined, okCtx,
+    );
+    const errs = result.errors.filter(e => e.actionType === "request_enquete_kommission");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].fixable).toBe(true);
+    expect(errs[0].message).toMatch(/topic|valid/i);
+  });
+});
+
 describe("buildValidationRetryPrompt", () => {
   it("includes original prompt and error details", () => {
     const errors: ValidationError[] = [

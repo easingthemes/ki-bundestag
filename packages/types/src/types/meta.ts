@@ -84,7 +84,13 @@ export type SimulationEventType =
   | "zwischenfrage"
   | "erklaerung_zur_abstimmung"
   // Cycle 5 PR 1 — Ausschussanhörung (S15: standard tier; default classification).
-  | "ausschussanhoerung_held";
+  | "ausschussanhoerung_held"
+  // Cycle 5 PR 2 — Enquete-Kommission lifecycle (S15: proposed/convened/concluded
+  // → IMPORTANT_EVENTS, rejected → ROUTINE_EVENTS).
+  | "enquete_proposed"
+  | "enquete_convened"
+  | "enquete_rejected"
+  | "enquete_concluded";
 
 export interface SimulationEvent {
   id: string;

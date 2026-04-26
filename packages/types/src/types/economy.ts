@@ -99,3 +99,42 @@ export interface AusschussanhoerungRow {
   heldOnDay: number;
   status: AusschussanhoerungStatus;
 }
+
+// Cycle 5 PR 2 — Enquete-Kommission (long-form policy commission).
+// Q2=A: mid-fidelity — establish + AI Schlussbericht only. Bipartisan
+// (S17 — visible to coalition + opposition agents). Lifecycle: proposed
+// (Bundestag-Beschluss vote happens same tick) → active OR rejected;
+// active rows transition to concluded via watchdog at scheduledEndDay.
+export type EnqueteCommissionStatus =
+  | "proposed"
+  | "active"
+  | "concluded"
+  | "rejected"
+  | "lapsed";
+
+export interface EnqueteVoteResult {
+  yes: number;
+  no: number;
+  abstain: number;
+  passed: boolean;
+}
+
+export interface EnqueteCommissionRow {
+  id: string;
+  topic: MinistryPortfolio;
+  proposingPartyId: string;
+  /** JSON: { [partyId]: number } — Σ === ENQUETE_MDB_SLOTS (largest-remainder method). */
+  partyMemberIds: Record<string, number>;
+  /** JSON: string[] of length [ENQUETE_EXPERT_SLOTS_MIN, ENQUETE_EXPERT_SLOTS_MAX]. */
+  expertMemberIds: string[];
+  formedOnDay: number;
+  /** formedOnDay + uniform draw [ENQUETE_DURATION_MIN_DAYS, ENQUETE_DURATION_MAX_DAYS]. */
+  scheduledEndDay: number;
+  /** null while active. */
+  concludedOnDay: number | null;
+  status: EnqueteCommissionStatus;
+  /** null until concluded; written by AI Schlussbericht batch processor. */
+  finalReport: string | null;
+  /** null until convened/rejected; same-tick simple-majority Bundestag-Beschluss tally. */
+  voteResult: EnqueteVoteResult | null;
+}

@@ -218,6 +218,10 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // Cycle 5 PR 1 — idempotency flag for the cycle-5 migration block (S13).
   // 1 = migration ran (EXPERTS_SEED inserted, flag set). 0 = not yet.
   cycle5Migrated: integer("cycle5_migrated").notNull().default(0),
+  // Cycle 5 PR 2 — sim day on which the most-recent Enquete-Kommission was
+  // proposed. Powers the S9 ENQUETE_RATE_LIMIT_DAYS rate-limit. NULL = no
+  // Enquete has been proposed yet (or the DB predates this column).
+  lastEnqueteProposedDay: integer("last_enquete_proposed_day"),
 });
 
 export const partyHistory = sqliteTable("party_history", {
@@ -574,6 +578,27 @@ export const ausschussanhoerungen = sqliteTable("ausschussanhoerungen", {
   tone: real("tone").notNull().default(0),              // [-1, +1]
   heldOnDay: integer("held_on_day").notNull(),
   status: text("status").notNull().default("scheduled"), // 'scheduled' | 'held' | 'lapsed'
+});
+
+// Cycle 5 PR 2 — Enquete-Kommission lifecycle (Q2=A: mid-fidelity establish +
+// AI Schlussbericht). Bundestag-Beschluss vote happens same tick (S12). Active
+// rows transition to `concluded` via the daily watchdog at scheduledEndDay
+// (with AI final-report submitted via batch group D piggyback). Stale rows
+// past scheduledEndDay + 30 transition to `lapsed` (soft-watchdog, R7/Q9).
+export const enqueteCommissions = sqliteTable("enquete_commissions", {
+  id: text("id").primaryKey(),                                          // 'enquete-{day}-{topic}'
+  topic: text("topic").notNull(),                                       // MinistryPortfolio enum value
+  proposingPartyId: text("proposing_party_id").notNull().references(() => parties.id),
+  partyMemberIds: text("party_member_ids").notNull(),                   // JSON: { [partyId]: number } (Σ === ENQUETE_MDB_SLOTS)
+  expertMemberIds: text("expert_member_ids").notNull(),                 // JSON: string[] of length [ENQUETE_EXPERT_SLOTS_MIN, ENQUETE_EXPERT_SLOTS_MAX]
+  formedOnDay: integer("formed_on_day").notNull(),
+  scheduledEndDay: integer("scheduled_end_day").notNull(),              // formedOnDay + draw(MIN, MAX)
+  concludedOnDay: integer("concluded_on_day"),                          // null while active
+  status: text("status", {
+    enum: ["proposed", "active", "concluded", "rejected", "lapsed"],
+  }).notNull().default("proposed"),
+  finalReport: text("final_report"),                                    // null until concluded (AI Schlussbericht)
+  voteResult: text("vote_result"),                                      // JSON {yes, no, abstain, passed}; null until convened/rejected
 });
 
 export const eraSummaries = sqliteTable("era_summaries", {
