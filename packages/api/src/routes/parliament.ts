@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getDb, getUserDb, schema, getCrisisTemplates, getUserSeat, getSqlite } from "@ki-bundestag/engine";
+import { getDb, getUserDb, schema, getCrisisTemplates, getUserSeat, getSqlite, logUserAction, INTERPELLATION_PENDING_CAP } from "@ki-bundestag/engine";
 import { eq, and, sql } from "drizzle-orm";
 import type {
   BillImpact,
@@ -18,6 +18,7 @@ import type {
   MotionType,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
+import { checkUserDailyLimit } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -463,19 +464,18 @@ router.post("/api/motions/submit", (req, res) => {
 
   // Cooldown: max 1 pending motion at a time per user
   const sqlite = getSqlite();
-  // Check user-filed motions via pending_injections
-  const recentUserMotion = sqlite.prepare(
-    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_motion' AND json_extract(data, '$.userId') = ?"
+  const unconsumed = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_motion' AND consumed = 0 AND json_extract(data, '$.userId') = ?"
   ).get(token) as { cnt: number };
-  if (recentUserMotion.cnt > 0) {
-    // Count how many were filed in last 7 days (from motions table, attributed to this party by user)
-    // Simpler: just limit to 1 pending at a time
-    const unconsumed = sqlite.prepare(
-      "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_motion' AND consumed = 0 AND json_extract(data, '$.userId') = ?"
-    ).get(token) as { cnt: number };
-    if (unconsumed.cnt > 0) {
-      res.status(429).json({ error: "You already have a pending motion" }); return;
-    }
+  if (unconsumed.cnt > 0) {
+    res.status(429).json({ error: "You already have a pending motion" }); return;
+  }
+
+  // Per-user daily cap (sim-day for bots, wall-clock for humans — humans have no
+  // submit_motion entry, so this is effectively bot-only).
+  const motionCap = checkUserDailyLimit(token, "submit_motion");
+  if (!motionCap.allowed) {
+    res.status(429).json({ error: `Daily motion limit reached (${motionCap.used}/${motionCap.limit})` }); return;
   }
 
   // Get user display name
@@ -497,6 +497,9 @@ router.post("/api/motions/submit", (req, res) => {
     data: motionPayload,
     consumed: false,
   }).run();
+
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  logUserAction(token, "submit_motion", meta?.currentDay ?? 0, undefined, "motion", { motionType });
 
   res.json({ status: "queued", message: "Motion will be processed on next simulation day" });
 });
@@ -548,6 +551,21 @@ router.post("/api/interpellations/submit", (req, res) => {
     res.status(429).json({ error: "You already have a pending interpellation" }); return;
   }
 
+  // Global queue cap — only 2 are answered per sim day, so an unbounded queue
+  // would grow forever. Reject newcomers when the backlog is at the ceiling.
+  const queueDepth = sqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM pending_injections WHERE type = 'mdb_interpellation' AND consumed = 0"
+  ).get() as { cnt: number };
+  if (queueDepth.cnt >= INTERPELLATION_PENDING_CAP) {
+    res.status(503).json({ error: `Interpellation queue is full (${queueDepth.cnt}/${INTERPELLATION_PENDING_CAP}). Try again later.` }); return;
+  }
+
+  // Per-user daily cap (sim-day for bots).
+  const intCap = checkUserDailyLimit(token, "submit_interpellation");
+  if (!intCap.allowed) {
+    res.status(429).json({ error: `Daily interpellation limit reached (${intCap.used}/${intCap.limit})` }); return;
+  }
+
   const userDb = getUserDb();
   const user = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
 
@@ -567,6 +585,9 @@ router.post("/api/interpellations/submit", (req, res) => {
     data: interpellationPayload,
     consumed: false,
   }).run();
+
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+  logUserAction(token, "submit_interpellation", meta?.currentDay ?? 0, undefined, "interpellation", { interpellationType, targetMinistry });
 
   res.json({ status: "queued", message: "Interpellation will be processed on next simulation day" });
 });

@@ -1,5 +1,8 @@
 import rateLimit from "express-rate-limit";
-import { getUserSqlite } from "@ki-bundestag/engine";
+import { getUserSqlite, getSqlite, USER_DAILY_LIMITS, BOT_SIM_DAY_LIMITS } from "@ki-bundestag/engine";
+
+// Re-exported so existing callers (`users.ts`) keep working.
+export { USER_DAILY_LIMITS, BOT_SIM_DAY_LIMITS };
 
 /** General rate limit for user-facing POST endpoints (votes, submissions) */
 export const actionLimiter = rateLimit({
@@ -29,26 +32,24 @@ export const adminLimiter = rateLimit({
 });
 
 // ---------------------------------------------------------------------------
-// Per-user 24h rolling window caps
+// Per-user daily caps — wall-clock for humans, sim-day for bots.
+// Limit values live in @ki-bundestag/engine/config/rate-limits.ts so an
+// admin panel can tune them at runtime without touching the API.
 // ---------------------------------------------------------------------------
 
-/**
- * Per-user daily limits for content-generating actions (24h rolling window).
- * These caps are preset-independent — they bound what a real human can realistically
- * do in a day, regardless of how many sim days pass in that period.
- */
-export const USER_DAILY_LIMITS: Record<string, number> = {
-  submit_question: 5,
-  submit_speech: 5,
-  submit_proposal: 2,
-  submit_amendment: 3,
-  // apply_mdb: already limited to 1 active + cooldown, no daily cap needed
-};
+function getUserIsBot(userId: string): boolean {
+  const userSqlite = getUserSqlite();
+  const row = userSqlite.prepare("SELECT is_bot FROM users WHERE id = ?").get(userId) as { is_bot: number } | undefined;
+  return row?.is_bot === 1;
+}
 
-/**
- * Check if a user has exceeded their 24h rolling window cap for an action type.
- * Returns the count used so far, or null if no limit applies.
- */
+function getCurrentSimDay(): number {
+  const sim = getSqlite();
+  const row = sim.prepare("SELECT current_day FROM simulation_meta LIMIT 1").get() as { current_day: number } | undefined;
+  return row?.current_day ?? 0;
+}
+
+/** Count human-style actions in the last 24h wall-clock. */
 export function getUserDailyCount(userId: string, actionType: string): number {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const userSqlite = getUserSqlite();
@@ -58,11 +59,27 @@ export function getUserDailyCount(userId: string, actionType: string): number {
   return row.cnt;
 }
 
+/** Count bot-style actions in the current sim day. */
+export function getBotSimDayCount(userId: string, actionType: string, simDay: number): number {
+  const userSqlite = getUserSqlite();
+  const row = userSqlite.prepare(
+    "SELECT COUNT(*) as cnt FROM user_actions WHERE user_id = ? AND action_type = ? AND sim_day = ?"
+  ).get(userId, actionType, simDay) as { cnt: number };
+  return row.cnt;
+}
+
 /**
  * Check if a user has exceeded their daily limit for an action type.
- * Returns { allowed: true } or { allowed: false, limit, used }.
+ * Dispatches on `isBot`: humans get a 24h wall-clock window, bots get
+ * a per-sim-day window. Returns `{allowed, limit, used}`.
  */
 export function checkUserDailyLimit(userId: string, actionType: string): { allowed: boolean; limit: number; used: number } {
+  if (getUserIsBot(userId)) {
+    const limit = BOT_SIM_DAY_LIMITS[actionType];
+    if (limit == null) return { allowed: true, limit: 0, used: 0 };
+    const used = getBotSimDayCount(userId, actionType, getCurrentSimDay());
+    return { allowed: used < limit, limit, used };
+  }
   const limit = USER_DAILY_LIMITS[actionType];
   if (limit == null) return { allowed: true, limit: 0, used: 0 };
   const used = getUserDailyCount(userId, actionType);
