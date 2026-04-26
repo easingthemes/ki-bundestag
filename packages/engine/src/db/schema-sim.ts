@@ -215,6 +215,9 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // NULL when not in provisional state. Used by findFiscalEmergencyOpportunity
   // to compute the 30-day streak gate. R15 backfill (PR 1) seeds in-flight rows.
   provisionalBudgetSinceDay: integer("provisional_budget_since_day"),
+  // Cycle 5 PR 1 — idempotency flag for the cycle-5 migration block (S13).
+  // 1 = migration ran (EXPERTS_SEED inserted, flag set). 0 = not yet.
+  cycle5Migrated: integer("cycle5_migrated").notNull().default(0),
 });
 
 export const partyHistory = sqliteTable("party_history", {
@@ -544,6 +547,33 @@ export const inquiryCommittees = sqliteTable("inquiry_committees", {
   finalReport: text("final_report"),                           // populated at conclusion (S21)
   hearingCount: integer("hearing_count").notNull().default(0),
   lastHearingDay: integer("last_hearing_day"),
+});
+
+// Cycle 5 PR 1 — Ausschussanhörung expert pool (Q3=A, S2).
+// Seeded once via INSERT OR IGNORE in seed.ts cycle5Migrated block (S13).
+// Expert rows are referenced by both Ausschussanhörungen (PR 1) and
+// Enquete-Kommissionen (PR 2) via JSON-encoded id arrays.
+export const experts = sqliteTable("experts", {
+  id: text("id").primaryKey(),                       // 'expert-diw-fratzscher'
+  name: text("name").notNull(),                      // 'Prof. Dr. Marcel Fratzscher'
+  affiliation: text("affiliation").notNull(),        // 'DIW Berlin'
+  /** JSON array of MinistryPortfolio[] — invariant: ≥3 experts per portfolio (S2). */
+  expertiseAreas: text("expertise_areas").notNull(),
+});
+
+// Cycle 5 PR 1 — Ausschussanhörung lifecycle row (Q4 auto-trigger, S3 lifecycle).
+// Row written `status='scheduled'` synchronously when bill_committee fires;
+// AI batch updates to 'held' (with testimonies + tone) or 'lapsed' (tone=0).
+// Pipeline reads tone=0 as no-nudge gracefully (S3).
+export const ausschussanhoerungen = sqliteTable("ausschussanhoerungen", {
+  id: text("id").primaryKey(),                          // 'anhoerung-{billId}-{day}'
+  billId: text("bill_id").notNull().references(() => bills.id),
+  ministryFocus: text("ministry_focus").notNull(),      // MinistryPortfolio (mapped via S14)
+  expertIds: text("expert_ids").notNull(),              // JSON: string[] length === ANHOERUNG_EXPERTS_PER_HEARING
+  testimonies: text("testimonies").notNull().default("[]"), // JSON: [{expertId, statement}]
+  tone: real("tone").notNull().default(0),              // [-1, +1]
+  heldOnDay: integer("held_on_day").notNull(),
+  status: text("status").notNull().default("scheduled"), // 'scheduled' | 'held' | 'lapsed'
 });
 
 export const eraSummaries = sqliteTable("era_summaries", {

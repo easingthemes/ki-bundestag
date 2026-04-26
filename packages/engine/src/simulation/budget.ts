@@ -18,7 +18,9 @@ import {
   NACHTRAGSHAUSHALT_TOTAL_MAX,
   NACHTRAGSHAUSHALT_CRISIS_BOOST,
 } from "../config/index.js";
-import { CRISIS_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
+// S14 / R12: renamed from CRISIS_CATEGORY_TO_MINISTRY (Cycle 5 PR 1).
+// Same map content; new name reflects that it serves bills + crises.
+import { BILL_CATEGORY_TO_MINISTRY } from "../config/parliament.js";
 import { getDb, getSqlite, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { MAJORITY_SEATS } from "../config/elections.js";
@@ -387,7 +389,7 @@ export function generateNachtragsAllocations(
 
   // No crisis category → return base (uniform-down-from-total) unchanged.
   if (!crisisCategory) return base;
-  const boostedMinistry = CRISIS_CATEGORY_TO_MINISTRY[crisisCategory];
+  const boostedMinistry = BILL_CATEGORY_TO_MINISTRY[crisisCategory];
   if (!boostedMinistry) return base;
 
   // Boost target by `total * boost-rate` (so 30% of total goes extra to the

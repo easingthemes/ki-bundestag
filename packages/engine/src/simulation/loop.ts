@@ -86,6 +86,13 @@ import {
 import { BUNDESTAG_SIZE } from "../config/elections.js";
 import type { FiscalEmergencyValidationContext, InquiryValidationContext } from "../agent/action-parser.js";
 import { advanceBillPipeline } from "./bill-pipeline.js";
+import {
+  maybeScheduleAnhoerung,
+  loadExpertPool,
+  buildAusschussanhoerungenBatchRequest,
+  processAusschussanhoerungenBatchResult,
+  type AnhoerungBatchInput,
+} from "./anhoerungen.js";
 import { detectDisciplineBreaks, type DisciplineBreakInput } from "./debate-formats.js";
 import { seedCommittees, shouldSeedCommittees, assignCommitteeMemberships } from "./committees.js";
 import { buildSummaryBatchRequest, processSummaryBatchResult } from "./summary.js";
@@ -1262,11 +1269,41 @@ export async function runDay(): Promise<number> {
   // Hoisted so inactivity tracking can read it after the if-block
   const partyActions = new Map<string, import("@ki-bundestag/types").AgentAction[]>();
 
+  // Cycle 5 PR 1 (Q4 / S3) — Ausschussanhörung batch inputs collected during
+  // the bill pipeline pass; submitted together later (alongside batch group D
+  // which already carries inquiry hearings — same day-tick, same submission).
+  const anhoerungBatchInputs: AnhoerungBatchInput[] = [];
+
   if (!skipPartyAgents) {
     // === BILL PIPELINE — multi-stage lifecycle ===
     const pipelineEvents = advanceBillPipeline(currentDay, allBills, allParties, nationalState.coalitionParties, startDate, nationalState);
     for (const ev of pipelineEvents) {
       addEvent(dayEvents, ev);
+    }
+
+    // Cycle 5 PR 1 / Q4 / S3 — for each bill that just entered the committee
+    // stage (bill_committee event from the pipeline), roll the Anhörung
+    // trigger and persist a `scheduled` row + queue the AI batch input.
+    // Reads the experts seed table once per day (small, ~30 rows).
+    try {
+      const newCommitteeBillIds = new Set(
+        pipelineEvents
+          .filter(ev => ev.type === "bill_committee")
+          .map(ev => (ev.data as { billId?: string } | undefined)?.billId)
+          .filter((id): id is string => typeof id === "string"),
+      );
+      if (newCommitteeBillIds.size > 0) {
+        const expertPool = loadExpertPool();
+        if (expertPool.length > 0) {
+          for (const bill of allBills) {
+            if (!newCommitteeBillIds.has(bill.id)) continue;
+            const input = maybeScheduleAnhoerung(bill, currentDay, expertPool);
+            if (input) anhoerungBatchInputs.push(input);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Loop] Error scheduling Ausschussanhörungen:", err);
     }
 
     // Collect bills for agent calls — fresh DB queries so the validator and prompt
@@ -2464,7 +2501,13 @@ export async function runDay(): Promise<number> {
     const hearingItems = buildInquiryHearingBatchRequest(tickResult.hearingsToBatch, currentDay);
     const reportableConclusions = tickResult.concludedToReport.filter(c => !c.watchdog);
     const reportItems = buildInquiryFinalReportBatchRequest(reportableConclusions, currentDay);
-    const groupD: import("../agent/batch-client.js").BatchRequest[] = [...hearingItems, ...reportItems];
+    // Cycle 5 PR 1 / S3 — Ausschussanhörung items piggyback on group D so the
+    // day's "expert-witness" AI calls (inquiry hearings + Ausschussanhörungen)
+    // share one batch submission. Same daily tick, same failure-mode handling.
+    const anhoerungItems = buildAusschussanhoerungenBatchRequest(anhoerungBatchInputs);
+    const groupD: import("../agent/batch-client.js").BatchRequest[] = [
+      ...hearingItems, ...reportItems, ...anhoerungItems,
+    ];
     if (groupD.length > 0) {
       let groupDResults: import("../agent/batch-client.js").BatchResult[] = [];
       try {
@@ -2481,6 +2524,14 @@ export async function runDay(): Promise<number> {
       );
       for (const ev of hearingEvents) addEvent(dayEvents, ev);
       processInquiryFinalReportBatchResult(groupDResults, reportableConclusions);
+      // Anhörung processor: writes 'held' or 'lapsed' (S3) and emits one
+      // ausschussanhoerung_held event per success.
+      if (anhoerungBatchInputs.length > 0) {
+        const anhoerungEvents = processAusschussanhoerungenBatchResult(
+          groupDResults, anhoerungBatchInputs, currentDay,
+        );
+        for (const ev of anhoerungEvents) addEvent(dayEvents, ev);
+      }
     }
   } catch (err) {
     console.error("[Loop] Error in inquiry-committees tick:", err);
