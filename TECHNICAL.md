@@ -315,5 +315,6 @@ See [docs/operations/hosting.md](docs/operations/hosting.md) for full setup guid
 | [Bundestag Reference](docs/research/bundestag-reference.md) | German parliamentary rules and structure |
 | [Abgeordnetenwatch Features](docs/research/abgeordnetenwatch-features.md) | Implementation record for features inspired by abgeordnetenwatch.de |
 | [Abgeordnetenwatch API](docs/research/abgeordnetenwatch-api.md) | External API endpoints and integration guide |
+| [Agent Output Failures](docs/research/agent-output-failures.md) | Empirical VALIDATION_FAIL catalog + upstream Anthropic schema-limit context (issue #1185) |
 | [Marketing Strategy](docs/marketing/strategy.md) | Launch plan for social media and dev communities |
 | [Roadmap](docs/todo/README.md) | Completed work + open items |
