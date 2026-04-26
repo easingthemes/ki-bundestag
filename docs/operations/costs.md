@@ -307,7 +307,7 @@ Recommended concurrency by model on M1 Pro 32 GB:
 - **Ollama** — grammar-constrained JSON output for any model that supports it (most modern ones do).
 - **Groq, DeepSeek, OpenAI, OpenRouter, Together, Fireworks** — all support `response_format` natively via their OpenAI-compatible endpoints.
 
-> **Resume marker (session-state, remove after smoke results land):** Post-fix smoke results are PENDING. Next step is to re-run `gemma3:12b` (and/or any new model) and append a "Post-response_format-fix empirical results" subsection here comparing first-pass JSON success rate to the pre-fix table above. If the patch unblocks the existing local models, the cloud-API matrix below becomes optional rather than necessary.
+After PRs #170, #171, and #172 landed, `TEST_MODE=ollama` with `gemma3:12b` runs a 1-day simulation end-to-end at $0. Empirical findings, the three-PR progression, the gap list, and operational notes are in [test-mode-empirical.md](./test-mode-empirical.md).
 
 ### Untested local Ollama models worth trying (research, April 2026)
 
@@ -380,14 +380,13 @@ TEST_MODE_CONCURRENCY=1 \
 npm run simulate 1461
 ```
 
-**You want to keep iterating offline (local Ollama):**
+**You want to keep iterating offline (local Ollama, $0):**
 
 ```bash
-# Most likely to work: Hermes 3 — purpose-trained for JSON
-ollama pull hermes3:8b
-TEST_MODE=ollama TEST_MODEL=hermes3:8b TEST_MODE_CONCURRENCY=2 npm run simulate 5
+# Validated default — completes a full day on M1 Pro 32 GB after PRs #170 + #171 + #172
+TEST_MODE=ollama TEST_MODEL=gemma3:12b TEST_MODE_CONCURRENCY=2 npm run simulate 5
 ```
 
-If `hermes3:8b` still produces `Unknown action type` errors, that's strong signal the `response_format: {type: "json_object"}` patch is the actual missing piece — apply that first, then re-test all the local models we already pulled.
+For empirical findings, gap list, and alternate local models to try, see [test-mode-empirical.md](./test-mode-empirical.md).
 
-Reference: see `TECHNICAL.md` → "Test Mode" for implementation, `agent/test-mode.ts` for resolution logic, and `.env.example` for all knobs.
+Reference: `TECHNICAL.md` → "Test Mode" for implementation, `agent/test-mode.ts` for env-var resolution, `agent/test-mode-coerce.ts` for the coercion layer, `docs/research/agent-output-failures.md` for the failure catalog and prompt-improvement rationale, `.env.example` for all knobs.
