@@ -175,30 +175,72 @@ Ollama has no quota — the limit is local GPU/CPU throughput. On a modest M-ser
 
 The default `gemma3:4b` is sufficient to validate the test-mode plumbing but **not** strong enough to exercise simulation logic — its JSON adherence on the agent-action schema is too weak. Empirical findings from a 5-day smoke run on M1 Pro / 32 GB / `TEST_MODE_CONCURRENCY=4`:
 
-| Model | Size | First-pass agent JSON | Per-day wall clock | Verdict |
+| Provider / Model | Size | First-pass agent JSON | Semantic retry behaviour | Verdict |
 |---|---|---|---|---|
-| `gemma3:4b` | ~3.3 GB | 1 of 6 parties OK; rest hit `VALIDATION_FAIL` (markdown fences, unknown action types) → fallback to `abstain-all:after-retry` | ~7 min | Plumbing-only validation; not useful for calibration |
-| `gemma3:12b` | ~9 GB | Same failure modes as 4b — `VALIDATION_FAIL` on every party tested (SPD: 6 errors, CDU: 4 errors), "Unknown action type"/"Statement missing fields" pattern identical, semantic retry also fails. Size bump did **not** improve JSON adherence on this schema. | TBD | Not useful — same fallback rate as 4b |
-| `qwen2.5:14b` | ~9 GB | TBD | TBD | Recommended next try — different model family, generally stronger at structured output |
+| Ollama `gemma3:4b` | ~3.3 GB | 1/6 parties OK; rest hit `VALIDATION_FAIL` (markdown fences, unknown action types) → fallback to `abstain-all:after-retry` | Parse-fails entirely — `Response must have an 'actions' array` | Plumbing-only validation; not useful for calibration |
+| Ollama `gemma3:12b` | ~9 GB | Same failure modes as 4b on every party tested (SPD: 6 errors, CDU: 4, Grüne: 6); size bump did **not** improve JSON adherence on this schema | Parse-fails identically to 4b | Not useful — same fallback rate as 4b |
+| Ollama `qwen2.5:14b` | ~9 GB | Lower error counts than Gemma (SPD: 3, CDU: 1, Grüne: 2, FDP: 3, AfD: 3), but no party reaches 0 errors; "Unknown action type" persists on every party | Actually executes (not parse-fail) — but produces same/different validation errors at similar rates. CDU went 1 → 3 errors after retry (worse). FDP retry hit `Bad Unicode escape in JSON at position 288` → parse-fail | Marginally better than Gemma but **still unusable for simulation logic** — every party falls back |
+| Groq `llama-3.3-70b-versatile` | cloud | **No `"Unknown action type"` errors at all.** Real bills proposed, real statements made (e.g. SPD: "Gesetz zur Förderung von sozialer Gerechtigkeit"; Linke: "Gesetz zur Einführung einer progressiven Erwerbstätigenversicherung"). New failure mode: `"Vote for non-existent bill, skipping"` (model hallucinates bill titles plausibly). | Untested in practice — semantic retry calls were all 429'd by TPM limit before completing | **Quality-wise the only viable path so far** — but free tier TPM-bound, see below |
 
-**Failure modes seen with the Gemma family (4b and 12b both):**
+**Failure modes by model class:**
 
-- Markdown code fences (` ```json `) wrap responses, bypassing the parse pipeline; `parseAIJson()`'s strip handles the common case but the model sometimes nests fences or emits trailing prose.
-- Action types invented outside the registered enum (`"Unknown action type, skipping"`).
-- Statement actions emitted with missing required fields (`"Statement missing fields, skipping"`).
-- Default Ollama context (`context_length: 4096` per `/api/ps`) is below the agent prompt size (full state + recent events + bills + media + budget). Day-6 onward shows transient errors consistent with context eviction under concurrency=4.
+*Ollama (all three tested — gemma3:4b, gemma3:12b, qwen2.5:14b):*
 
-**Important: scaling Gemma up didn't fix the schema-adherence problem.** `gemma3:12b` produced the same `VALIDATION_FAIL` / `Unknown action type` failure pattern as `gemma3:4b` on the agent-action schema, with semantic retry also failing. This suggests the issue is **schema/prompt-shape vs. model-family fit**, not model size — Gemma's instruction-tuning likely doesn't cover the specific action-type enum used here. Bigger Gemma is not the answer.
+- **`"Unknown action type, skipping"`** — appears on every party of every Ollama model. The model invents action types not in the registered enum.
+- **`"Statement missing fields, skipping"`** — statement actions emitted without required fields.
+- **`"Invalid vote action, skipping"`** — most often on `qwen2.5:14b` retry attempts.
+- Markdown code fences on Gemma in particular; `parseAIJson()`'s strip handles the common case but nested fences or trailing prose break it.
+- **Bad Unicode escapes** — observed on qwen retry (`Bad Unicode escape in JSON at position 288`).
+- Default Ollama context (`context_length: 4096` per `/api/ps`) is below the agent prompt size; day-6 onward shows context-eviction symptoms under concurrency=4.
 
-**When agents fall back to `abstain-all:after-retry`, no actual simulation decisions are made** — bills don't get votes, motions don't fire, etc. A run dominated by fallbacks tells you the AI plumbing works but produces zero calibration signal.
+*Groq Llama 3.3 70b — fundamentally different failure shape:*
 
-**Updated recommendation order:**
+- **No `"Unknown action type"` errors at all.** The 70b model follows the action-type enum from `prompt.ts` correctly. Two parties (SPD, Linke) actually produced valid bill proposals + statements.
+- New failure mode: **`"Vote for non-existent bill, skipping"`** — the model hallucinates plausible-sounding German bill titles (e.g. "Gesetz zur Stabilisierung der Rentenbeiträge…") that don't exist in current state. This is model-side hallucination of context, not enum drift.
+- **TPM rate-limit pressure dominates** the run on free tier (see below).
 
-1. **`TEST_MODE=groq`** — `llama-3.3-70b-versatile` has stronger JSON adherence than any Gemma tested here, zero local memory cost, free tier (30 RPM / 14.4K req/day ≈ 1300 sim days/day throughput). Best operational fit unless you specifically need offline.
-2. **`qwen2.5:14b`** locally — different model family, generally stronger at structured output. Try this if you must stay offline. Requires green memory pressure (see pre-flight below).
-3. **`gemma3:12b` / `gemma3:4b`** — only useful for plumbing validation, not for exercising simulation logic.
+**Cross-model conclusion (revised after Groq data): it's a model-capability issue, not a prompt-side drift.**
 
-If first-pass success drops below ~70% on any choice, drop concurrency to 2 before swapping models.
+Earlier hypothesis (after only Ollama data): three open-weight models all hitting `"Unknown action type"` looked like prompt drift between `prompt.ts` and `action-parser.ts`. The Groq run disproves this — the same prompt works cleanly on Llama 3.3 70b. The Ollama models are simply not capable enough to follow the action-type enum: smaller/older models invent plausible-but-rejected variants. The prompt is fine.
+
+This means **Ollama isn't a usable path for exercising real simulation logic on this codebase**, regardless of which model in this size class you pick. Bigger isn't the answer (gemma3:12b proved that); different family isn't either (qwen2.5:14b proved that). Ollama is good for plumbing validation only. For actual agent decisions you need a frontier-class model — Anthropic Haiku in production, Llama 3.3 70b via Groq, or equivalent.
+
+### Groq free-tier operational notes
+
+The Groq free tier on `llama-3.3-70b-versatile` is **TPM-bound, not just RPM-bound** — the limiting constraint for this codebase is tokens per minute, not requests per minute:
+
+| Limit | Free tier | Single batch (concurrency=4) cost | Result |
+|---|---|---|---|
+| RPM (requests/min) | 30 | 6 requests | OK |
+| **TPM (tokens/min)** | **12,000** | **~30,000–40,000** (6 parties × ~5–7K tokens each) | **2.5–3× over budget → 429 storm** |
+
+Day-6 logs showed 4 of 6 parties getting 429'd before the first response landed; semantic retries also 429'd. Net: most parties fell back to `abstain-all` not because of model output but because they never got a model output.
+
+**Workarounds for free tier:**
+
+- **`TEST_MODE_CONCURRENCY=1`** — serialize all calls so token cost spreads across the minute. Still tight at ~6 × 5K = 30K tokens per agent batch, so even serial may hit TPM toward end of minute. Likely needs an additional `setTimeout` between calls in `test-mode.ts`, or a higher-TPM model.
+- **Smaller Groq model** — `gemma2-9b-it` has 15K TPM and lower per-call token cost. JSON adherence may be weaker than 70b; worth testing.
+- **Pay for Groq Dev tier** — the simplest path if zero-cost isn't a hard requirement.
+
+**Despite the rate-limit churn, what *did* land was high-quality:**
+
+When a Llama 3.3 70b call slipped through the TPM window on day 6, the output was genuinely usable:
+
+- SPD: proposed `"Gesetz zur Förderung von sozialer Gerechtigkeit und Armutsbekämpfung"` (Govt. Bill) + statement; the German legislative title is plausible and on-message for the SPD's policy profile.
+- Die Linke: proposed `"Gesetz zur Einführung einer progressiven Erwerbstätigenversicherung"` + statement.
+- Both parties' validation errors were `"Vote for non-existent bill, …"` — a hallucinated-context issue, not a schema/enum issue.
+
+**Day 7 first observed Cycle 5 code path firing on a non-Anthropic model:** when SPD's day-6 bill advanced to committee, `[AI] ausschussanhoerung | openai-compatible/llama-3.3-70b-versatile | 1ms | OK` — the Cycle 5 Ausschussanhörung table is exercised end-to-end via test-mode. Plumbing-wise the path works for any TEST_MODE provider, not just Anthropic.
+
+**Wall-clock note:** day 6 took 42.4s, day 7 took 17.4s — counterintuitively a fully-TPM-blocked day runs *faster* than a partial-success day, because 429s return in milliseconds while real generations take seconds. This is worth knowing if you're measuring throughput from logs.
+
+**Updated recommendation order (post Groq + Ollama empirical):**
+
+1. **Anthropic Haiku batch (production path)** — only path that reliably exercises simulation logic at full agent quality. Use real money.
+2. **`TEST_MODE=groq` + `TEST_MODE_CONCURRENCY=1`** + possibly `TEST_MODEL=gemma2-9b-it` — likely viable for free; needs ≥1 successful 5-day smoke to confirm. **Best zero-cost path**, but TPM limit is the real bottleneck.
+3. **`TEST_MODE=ollama` (any model)** — plumbing validation only. Will not exercise real simulation logic on this codebase regardless of model size or family. Use for end-to-end pipeline tests, not calibration.
+
+When agents fall back to `abstain-all`, **no actual simulation decisions happen** — bills don't get votes, motions don't fire. A run dominated by fallbacks validates AI plumbing but produces zero calibration signal.
 
 ### Memory pre-flight — required before launching local Ollama
 
