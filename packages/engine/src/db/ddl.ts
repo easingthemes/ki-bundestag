@@ -829,6 +829,10 @@ export const SIM_COLUMN_MIGRATIONS: Array<{ table: string; column: string; sql: 
   // The `enquete_commissions` table itself ships in SIM_TABLE_DDL; per S13 /
   // PR #165 R1 NO synthetic _table row here.
   { table: "simulation_meta", column: "last_enquete_proposed_day", sql: "ALTER TABLE simulation_meta ADD COLUMN last_enquete_proposed_day INTEGER" },
+  // Wall-clock ISO timestamp the next sim day is scheduled to start. Written
+  // by runner-auto before sleeping; consumed by /api/simulation/status so
+  // agents can sleep precisely instead of polling.
+  { table: "simulation_meta", column: "next_day_at", sql: "ALTER TABLE simulation_meta ADD COLUMN next_day_at TEXT" },
 ];
 
 /** Column migrations for user DB */
