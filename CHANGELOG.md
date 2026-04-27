@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/easingthemes/ki-bundestag/compare/v1.16.0...v1.17.0) (2026-04-27)
+
+
+### Features
+
+* **agents:** bill enrichment, nextDayAt, action quotas, /context digest ([53bc10a](https://github.com/easingthemes/ki-bundestag/commit/53bc10a1fb3a5e7cbf88797ab1a8612eb2de5d6e))
+
 # [1.16.0](https://github.com/easingthemes/ki-bundestag/compare/v1.15.0...v1.16.0) (2026-04-26)
 
 
