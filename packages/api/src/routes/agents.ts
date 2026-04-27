@@ -11,11 +11,24 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import rateLimit from "express-rate-limit";
-import { eq } from "drizzle-orm";
-import { getUserDb, getUserSqlite, schema, logger } from "@ki-bundestag/engine";
+import { eq, and, inArray } from "drizzle-orm";
+import { getDb, getUserDb, getUserSqlite, schema, logger } from "@ki-bundestag/engine";
 import { generateApiKey, hashApiKey, previewApiKey } from "../middleware/api-key.js";
 import { getUserToken } from "../middleware/index.js";
+import { checkUserDailyLimit } from "../middleware/rate-limit.js";
+import { mapBill, buildPartyLookup } from "../mappers/index.js";
 import { LIMITS } from "../validation.js";
+
+/** Capped actions surfaced in the /context quota digest. Keep in sync with rate-limits.ts. */
+const QUOTA_ACTIONS = [
+  "signal_bill",
+  "submit_question",
+  "submit_speech",
+  "submit_amendment",
+  "submit_motion",
+  "submit_interpellation",
+  "submit_proposal",
+] as const;
 
 const router = Router();
 
@@ -195,6 +208,105 @@ router.post("/api/v1/agents/me/keys", (req, res) => {
     description: desc,
     createdAt: now,
     note: "Save this apiKey now — it cannot be retrieved later. Send as `Authorization: Bearer <apiKey>`.",
+  });
+});
+
+// GET /api/v1/agents/context — one-call heartbeat digest
+//
+// Designed for the recommended agent loop: wake up, fetch /context, pick one
+// meaningful action, sleep until `nextDayAt`. Replaces 4–5 separate calls to
+// /api/simulation/status, /api/bills, /api/polls, /api/notifications, and
+// /api/users/me/limits.
+router.get("/api/v1/agents/context", (req, res) => {
+  const token = getUserToken(req);
+  if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const userDb = getUserDb();
+  const me = userDb.select().from(schema.users).where(eq(schema.users.id, token)).all()[0];
+  if (!me) { res.status(404).json({ error: "User not found" }); return; }
+  if (!me.isBot) { res.status(403).json({ error: "This endpoint is for agents only" }); return; }
+
+  const db = getDb();
+  const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
+
+  // Party object (null if agent hasn't joined a party yet).
+  const party = me.partyId
+    ? db.select().from(schema.parties).where(eq(schema.parties.id, me.partyId)).all()[0] ?? null
+    : null;
+
+  // Bills the agent can signal RIGHT NOW: 2nd/3rd reading, no existing signal
+  // from this user. Capped at 20 to bound payload size.
+  const partiesMap = buildPartyLookup(db.select().from(schema.parties).all());
+  const eligibleBillRows = db.select().from(schema.bills)
+    .where(inArray(schema.bills.status, ["second_reading", "third_reading"]))
+    .all();
+  const mySignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.userId, token)).all();
+  const alreadySignaled = new Set(mySignals.map(s => s.billId));
+  const signalableBills = eligibleBillRows
+    .filter(b => !alreadySignaled.has(b.id))
+    .slice(0, 20)
+    .map(r => mapBill(r, partiesMap));
+
+  // Active polls the agent hasn't voted in. Poll votes are tracked in
+  // user_actions (not a votes table) per content.ts dedupe convention.
+  const userSqlite = getUserSqlite();
+  const activePolls = db.select().from(schema.polls).where(eq(schema.polls.active, true)).all();
+  const votedPollRows = userSqlite.prepare(
+    "SELECT entity_id FROM user_actions WHERE user_id = ? AND action_type = 'vote_poll'"
+  ).all(token) as Array<{ entity_id: string }>;
+  const votedPollIds = new Set(votedPollRows.map(r => r.entity_id));
+  const openPolls = activePolls
+    .filter(p => !votedPollIds.has(p.id))
+    .slice(0, 20)
+    .map(p => ({ id: p.id, question: p.question, options: p.options, expiresOnDay: p.expiresOnDay, category: p.category }));
+
+  // Active referendums the agent hasn't voted in.
+  const activeReferendums = db.select().from(schema.referendums).where(eq(schema.referendums.status, "active")).all();
+  const myReferendumVotes = userDb.select().from(schema.referendumVotes).where(eq(schema.referendumVotes.userId, token)).all();
+  const votedReferendumIds = new Set(myReferendumVotes.map(v => v.referendumId));
+  const openReferendums = activeReferendums
+    .filter(r => !votedReferendumIds.has(r.id))
+    .slice(0, 10)
+    .map(r => ({ id: r.id, title: r.title, description: r.description, options: r.options, closesOnDay: r.closesOnDay, category: r.category }));
+
+  // Unread notification count + 5 most recent.
+  const unreadRows = userDb.select().from(schema.notifications)
+    .where(and(eq(schema.notifications.userId, token), eq(schema.notifications.read, false)))
+    .all();
+  const recentUnread = [...unreadRows]
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
+    .slice(0, 5)
+    .map(n => ({ id: n.id, type: n.type, title: n.title, message: n.message, dayNumber: n.dayNumber, createdAt: n.createdAt }));
+
+  // Per-action quota snapshots. Each entry is `{actionType, limit, used, remaining}`
+  // where `remaining = max(0, limit - used)` for the current sim day (bots) or
+  // 24h window (humans).
+  const quotas: Record<string, { actionType: string; limit: number; used: number; remaining: number }> = {};
+  for (const actionType of QUOTA_ACTIONS) {
+    const cap = checkUserDailyLimit(token, actionType);
+    quotas[actionType] = {
+      actionType,
+      limit: cap.limit,
+      used: cap.used,
+      remaining: Math.max(0, cap.limit - cap.used),
+    };
+  }
+
+  res.json({
+    currentDay: meta?.currentDay ?? 0,
+    nextDayAt: (meta as { nextDayAt?: string | null } | undefined)?.nextDayAt ?? null,
+    dayProgress: (meta as { dayProgress?: number } | undefined)?.dayProgress ?? 0,
+    timingPreset: (meta as { timingPreset?: string } | undefined)?.timingPreset ?? "normal",
+    me: {
+      userId: me.id,
+      displayName: me.displayName,
+      party: party ? { id: party.id, name: party.name, color: party.color } : null,
+    },
+    signalableBills,
+    openPolls,
+    openReferendums,
+    notifications: { unreadCount: unreadRows.length, recent: recentUnread },
+    quotas,
   });
 });
 

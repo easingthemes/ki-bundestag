@@ -10,7 +10,7 @@ import type {
   BillImpact,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
-import { checkUserDailyLimit } from "../middleware/rate-limit.js";
+import { checkUserDailyLimit, quotaSnapshot } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -363,12 +363,14 @@ router.post("/api/questions", (req, res) => {
 
   // Per-user daily cap (24h wall-clock for humans, sim-day for bots — see rate-limit.ts)
   const token = getUserToken(req);
+  let questionCap: { limit: number; used: number } | null = null;
   if (token) {
-    const { allowed, limit, used } = checkUserDailyLimit(token, "submit_question");
-    if (!allowed) {
-      res.status(429).json({ error: `Daily limit reached (${used}/${limit} questions). Try again later.` });
+    const cap = checkUserDailyLimit(token, "submit_question");
+    if (!cap.allowed) {
+      res.status(429).json({ error: `Daily limit reached (${cap.used}/${cap.limit} questions). Try again later.` });
       return;
     }
+    questionCap = { limit: cap.limit, used: cap.used };
   }
 
   if (!question || typeof question !== "string" || question.trim().length < LIMITS.QUESTION_MIN) {
@@ -410,7 +412,8 @@ router.post("/api/questions", (req, res) => {
 
   const created = db.select().from(schema.citizenQuestions).where(eq(schema.citizenQuestions.id, id)).all()[0];
   try { if (token) logUserAction(token, "submit_question", currentDay, id, "question", { targetPartyId }); } catch (err) { logger.error("[content] Failed to log action:", err); }
-  res.status(201).json(mapQuestion(created, 0, 0, null, lookupAuthorInfo(token)));
+  const quota = questionCap ? quotaSnapshot("submit_question", questionCap.used, questionCap.limit) : null;
+  res.status(201).json({ ...mapQuestion(created, 0, 0, null, lookupAuthorInfo(token)), quota });
 });
 
 // POST /api/questions/:id/vote (auth)

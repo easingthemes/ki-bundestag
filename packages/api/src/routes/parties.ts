@@ -3,9 +3,9 @@ import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, gte, asc, and, inArray } from "drizzle-orm";
 import type { Bill, BillVote, PartyHistoryEntry, SimulationEvent } from "@ki-bundestag/types";
-import { mapParty, getMemberCounts, mapBill } from "../mappers/index.js";
+import { mapParty, getMemberCounts, mapBill, buildPartyLookup } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
-import { checkUserDailyLimit } from "../middleware/rate-limit.js";
+import { checkUserDailyLimit, quotaSnapshot } from "../middleware/rate-limit.js";
 
 const router = Router();
 
@@ -139,7 +139,8 @@ router.get("/api/parties/:id/bills", (req, res) => {
   const rows = db.select().from(schema.bills)
     .where(eq(schema.bills.proposedBy, req.params.id))
     .all();
-  res.json(rows.map(mapBill));
+  const partiesMap = buildPartyLookup(db.select().from(schema.parties).all());
+  res.json(rows.map(r => mapBill(r, partiesMap)));
 });
 
 // ── GET /api/parties/:id/votes ──────────────────────────────────────────────
@@ -148,10 +149,11 @@ router.get("/api/parties/:id/votes", (req, res) => {
   const db = getDb();
   const partyId = req.params.id;
   const allBills = db.select().from(schema.bills).all();
+  const partiesMap = buildPartyLookup(db.select().from(schema.parties).all());
   const result: Array<{ bill: Bill; vote: BillVote }> = [];
 
   for (const row of allBills) {
-    const bill = mapBill(row);
+    const bill = mapBill(row, partiesMap);
     const vote = bill.votes.find(v => v.partyId === partyId);
     if (vote) {
       result.push({ bill, vote });
@@ -259,7 +261,7 @@ router.post("/api/parties/:id/proposals", (req, res) => {
   userDb.update(schema.users).set({ lastActive: Date.now() }).where(eq(schema.users.id, token)).run();
   try { logUserAction(token, "submit_proposal", currentDay, id, "proposal", { partyId: req.params.id, category }); } catch (err) { logger.error("[parties] Failed to log action:", err); }
   const row = userDb.select().from(schema.internalProposals).where(eq(schema.internalProposals.id, id)).all()[0];
-  res.status(201).json(mapProposal(row));
+  res.status(201).json({ ...mapProposal(row), quota: quotaSnapshot("submit_proposal", used, limit) });
 });
 
 // ── GET /api/proposals/:id ──────────────────────────────────────────────────

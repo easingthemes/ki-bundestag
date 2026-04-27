@@ -131,6 +131,10 @@ router.get("/api/simulation/status", (_req, res) => {
     dayStartedAt: (meta as any).dayStartedAt ?? null,
     heartbeatAt: (meta as any).heartbeatAt ?? null,
     dayProgress: (meta as any).dayProgress ?? 0,
+    // ISO timestamp the next sim day is scheduled to start. Set by runner-auto
+    // before it sleeps; null when unknown (compute in flight, paused-night in
+    // slow preset, ultra-fast immediate-loop, or when driven by `npm run simulate`).
+    nextDayAt: (meta as any).nextDayAt ?? null,
     nextElectionDay: meta.nextElectionDay,
     budgetRetryDay: (meta as any).budgetRetryDay ?? null,
     provisionalBudget: (stateRow as any)?.provisionalBudget ?? false,
