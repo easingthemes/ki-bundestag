@@ -18,7 +18,7 @@ import type {
   MotionType,
 } from "@ki-bundestag/types";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
-import { checkUserDailyLimit } from "../middleware/rate-limit.js";
+import { checkUserDailyLimit, quotaSnapshot } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -501,7 +501,11 @@ router.post("/api/motions/submit", (req, res) => {
   const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
   logUserAction(token, "submit_motion", meta?.currentDay ?? 0, undefined, "motion", { motionType });
 
-  res.json({ status: "queued", message: "Motion will be processed on next simulation day" });
+  res.json({
+    status: "queued",
+    message: "Motion will be processed on next simulation day",
+    quota: quotaSnapshot("submit_motion", motionCap.used, motionCap.limit),
+  });
 });
 
 // POST /api/interpellations/submit — user files an interpellation
@@ -589,7 +593,11 @@ router.post("/api/interpellations/submit", (req, res) => {
   const meta = db.select().from(schema.simulationMeta).limit(1).all()[0];
   logUserAction(token, "submit_interpellation", meta?.currentDay ?? 0, undefined, "interpellation", { interpellationType, targetMinistry });
 
-  res.json({ status: "queued", message: "Interpellation will be processed on next simulation day" });
+  res.json({
+    status: "queued",
+    message: "Interpellation will be processed on next simulation day",
+    quota: quotaSnapshot("submit_interpellation", intCap.used, intCap.limit),
+  });
 });
 
 export default router;

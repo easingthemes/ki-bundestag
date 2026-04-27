@@ -85,3 +85,25 @@ export function checkUserDailyLimit(userId: string, actionType: string): { allow
   const used = getUserDailyCount(userId, actionType);
   return { allowed: used < limit, limit, used };
 }
+
+/**
+ * Build a quota object for inclusion in a successful action response.
+ * Pass the `used` value from the pre-action `checkUserDailyLimit` call —
+ * this helper assumes the action has just been logged, so it adds 1 to
+ * compute the post-action `used` and `remaining`. Returns `null` when
+ * no cap applies for this action type (e.g. some humans-only actions).
+ */
+export function quotaSnapshot(
+  actionType: string,
+  used: number,
+  limit: number,
+): { actionType: string; limit: number; used: number; remaining: number } | null {
+  if (limit <= 0) return null;
+  const newUsed = used + 1;
+  return {
+    actionType,
+    limit,
+    used: newUsed,
+    remaining: Math.max(0, limit - newUsed),
+  };
+}

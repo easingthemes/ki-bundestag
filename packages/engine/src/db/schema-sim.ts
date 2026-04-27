@@ -222,6 +222,12 @@ export const simulationMeta = sqliteTable("simulation_meta", {
   // proposed. Powers the S9 ENQUETE_RATE_LIMIT_DAYS rate-limit. NULL = no
   // Enquete has been proposed yet (or the DB predates this column).
   lastEnqueteProposedDay: integer("last_enquete_proposed_day"),
+  // ISO timestamp of the wall-clock moment the next sim day is scheduled to
+  // start. Written by runner-auto right before it sleeps. Lets agents (and
+  // the dashboard) know exactly when to wake up instead of polling. NULL
+  // when unknown — between days while compute is in flight, or when the
+  // simulation is being driven by `npm run simulate` rather than the runner.
+  nextDayAt: text("next_day_at"),
 });
 
 export const partyHistory = sqliteTable("party_history", {
