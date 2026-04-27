@@ -3,9 +3,9 @@ import { randomUUID } from "crypto";
 import { getDb, getUserDb, schema, getSqlite, getUserSeat, logUserAction, logger } from "@ki-bundestag/engine";
 import { eq, and } from "drizzle-orm";
 import type { Bill, MdbAmendmentInjectionPayload } from "@ki-bundestag/types";
-import { mapBill } from "../mappers/index.js";
+import { mapBill, buildPartyLookup } from "../mappers/index.js";
 import { getUserToken, requireParticipatory } from "../middleware/index.js";
-import { checkUserDailyLimit } from "../middleware/rate-limit.js";
+import { checkUserDailyLimit, quotaSnapshot } from "../middleware/rate-limit.js";
 import { LIMITS } from "../validation.js";
 
 const router = Router();
@@ -16,7 +16,8 @@ router.get("/api/bills", (req, res) => {
   const allRows = db.select().from(schema.bills).all();
   const status = req.query.status as string | undefined;
   const rows = status ? allRows.filter((b: { status: string }) => b.status === status) : allRows;
-  const bills: Bill[] = rows.map(mapBill);
+  const partiesMap = buildPartyLookup(db.select().from(schema.parties).all());
+  const bills: Bill[] = rows.map(r => mapBill(r, partiesMap));
   res.json(bills);
 });
 
@@ -28,7 +29,8 @@ router.get("/api/bills/:id", (req, res) => {
     res.status(404).json({ error: "Bill not found" });
     return;
   }
-  res.json(mapBill(rows[0]));
+  const partiesMap = buildPartyLookup(db.select().from(schema.parties).all());
+  res.json(mapBill(rows[0], partiesMap));
 });
 
 // GET /api/bills/:id/signal
@@ -70,12 +72,12 @@ router.post("/api/bills/:id/signal", (req, res) => {
   // signal_bill quota slot for no behaviour change.
   const isIdempotent = existing.length > 0 && existing[0].signal === signal;
 
-  if (!isIdempotent) {
-    // Bot-only daily cap (humans have no entry in BOT_SIM_DAY_LIMITS for signal_bill).
-    const sigCap = checkUserDailyLimit(token, "signal_bill");
-    if (!sigCap.allowed) {
-      res.status(429).json({ error: `Daily signal limit reached (${sigCap.used}/${sigCap.limit})` }); return;
-    }
+  // Hold the pre-action cap snapshot so we can attach `quota` to the success
+  // response. On idempotent re-signals no quota is burned, so we re-check
+  // (without enforcing) just for reporting parity.
+  let sigCap = checkUserDailyLimit(token, "signal_bill");
+  if (!isIdempotent && !sigCap.allowed) {
+    res.status(429).json({ error: `Daily signal limit reached (${sigCap.used}/${sigCap.limit})` }); return;
   }
 
   if (existing.length > 0) {
@@ -91,7 +93,11 @@ router.post("/api/bills/:id/signal", (req, res) => {
     try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "signal_bill", md?.day ?? 0, req.params.id, "bill", { signal }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
   }
   const allSignals = userDb.select().from(schema.memberSignals).where(eq(schema.memberSignals.billId, req.params.id)).all();
-  res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal });
+  // Quota: increment by 1 on real signal-burns, leave as-is on idempotent calls.
+  const quota = isIdempotent
+    ? (sigCap.limit > 0 ? { actionType: "signal_bill", limit: sigCap.limit, used: sigCap.used, remaining: Math.max(0, sigCap.limit - sigCap.used) } : null)
+    : quotaSnapshot("signal_bill", sigCap.used, sigCap.limit);
+  res.json({ yes: allSignals.filter(s => s.signal === "yes").length, no: allSignals.filter(s => s.signal === "no").length, userSignal: signal, quota });
 });
 
 // POST /api/bills/:id/amendment — user proposes an amendment
@@ -171,7 +177,7 @@ router.post("/api/bills/:id/amendment", (req, res) => {
   }).run();
 
   try { const md = db.select({ day: schema.simulationMeta.currentDay }).from(schema.simulationMeta).limit(1).all()[0]; logUserAction(token, "submit_amendment", md?.day ?? 0, req.params.id, "bill"); } catch (err) { logger.error("[bills] Failed to log action:", err); }
-  res.json({ status: "queued", message: "Amendment will be processed on next simulation day" });
+  res.json({ status: "queued", message: "Amendment will be processed on next simulation day", quota: quotaSnapshot("submit_amendment", used, limit) });
 });
 
 // POST /api/bills/:id/speech — submit a speech on a bill
@@ -236,7 +242,7 @@ router.post("/api/bills/:id/speech", (req, res) => {
   }).run();
 
   try { logUserAction(token, "submit_speech", currentDay, req.params.id, "bill", { reading }); } catch (err) { logger.error("[bills] Failed to log action:", err); }
-  res.json({ id: speechId, billId: req.params.id, reading, content: content.trim(), dayNumber: currentDay });
+  res.json({ id: speechId, billId: req.params.id, reading, content: content.trim(), dayNumber: currentDay, quota: quotaSnapshot("submit_speech", used, limit) });
 });
 
 // GET /api/bills/:id/speeches — all speeches for a bill, grouped by reading

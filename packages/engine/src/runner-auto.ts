@@ -13,6 +13,14 @@ function clearDayStarted(): void {
   } catch { /* best-effort */ }
 }
 
+/** Persist the wall-clock instant the next sim day is scheduled to start. */
+function writeNextDayAt(at: Date | null): void {
+  try {
+    const iso = at ? at.toISOString() : null;
+    getSqlite().prepare("UPDATE simulation_meta SET next_day_at = ?").run(iso);
+  } catch { /* best-effort — column missing on un-migrated DBs */ }
+}
+
 /** Read current day number from DB */
 function readCurrentDay(): number {
   try {
@@ -206,14 +214,18 @@ async function main() {
     const delay = getDelayMs(preset);
     if (delay > 0 && delay !== Infinity) {
       const delaySec = Math.round(delay / 1000);
+      writeNextDayAt(new Date(Date.now() + delay));
       console.log(`  [Runner] Next day in ${delaySec}s`);
       // Sleep in 5s chunks so SIGINT is responsive
       const chunks = Math.ceil(delay / 5000);
       for (let i = 0; i < chunks && running; i++) {
         await sleep(Math.min(5000, delay - i * 5000));
       }
+    } else {
+      // ultra-fast (0) or paused-night (Infinity): nextDayAt is unknown.
+      // Clear so /api/simulation/status doesn't return a stale future timestamp.
+      writeNextDayAt(null);
     }
-    // ultra-fast (delay=0): no wait, loop immediately
   }
 
   // Final summary

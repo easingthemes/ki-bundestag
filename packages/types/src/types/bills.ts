@@ -97,6 +97,8 @@ export interface Bill {
   vetoedByPresident?: boolean;
   memberInitiative?: boolean;
   proposerDisplayName?: string;
+  /** Enriched proposing-party object. Populated when the route pre-loaded the parties table; null/undefined otherwise. Saves agents an extra `/api/parties` round-trip. */
+  proposingParty?: { id: string; name: string; color: string } | null;
   /** Day the bill entered its current stage. Drives min-dwell gating. */
   stageEntryDay?: number;
   /** Minimum days the bill must spend in the current stage (persisted per-bill). */

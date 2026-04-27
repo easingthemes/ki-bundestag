@@ -1,13 +1,29 @@
 import { schema } from "@ki-bundestag/engine";
 import type { Bill, BillImpact, BillVote, BundesratVoteResult } from "@ki-bundestag/types";
 
-export function mapBill(row: typeof schema.bills.$inferSelect): Bill {
+/**
+ * Optional party-lookup map. When supplied, mapBill populates the enriched
+ * `proposingParty` field so agents don't need a separate `/api/parties` call.
+ * Pass `undefined` (or omit) and `proposingParty` is left undefined.
+ */
+export type PartyLookup = Record<string, { id: string; name: string; color: string }>;
+
+/** Build a PartyLookup from the parties table. Cheap query — 6 rows. */
+export function buildPartyLookup(rows: Array<{ id: string; name: string; color: string }>): PartyLookup {
+  const map: PartyLookup = {};
+  for (const r of rows) map[r.id] = { id: r.id, name: r.name, color: r.color };
+  return map;
+}
+
+export function mapBill(row: typeof schema.bills.$inferSelect, parties?: PartyLookup): Bill {
+  const proposingParty = parties && row.proposedBy ? parties[row.proposedBy] ?? null : undefined;
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     category: row.category as Bill["category"],
     proposedBy: row.proposedBy,
+    proposingParty,
     status: row.status as Bill["status"],
     impact: (row.impact && typeof row.impact === 'object' ? row.impact : {}) as BillImpact,
     votes: (Array.isArray(row.votes) ? row.votes : []) as BillVote[],
