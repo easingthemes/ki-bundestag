@@ -159,7 +159,7 @@ const anthropicRequests: BatchRequest[] = [
   { customId: "agent-cdu-day5", system: "sys", prompt: "user", maxTokens: 512 },
 ];
 
-// xAI-routed request (afd → grok-3-mini)
+// xAI-routed request (afd → grok-4.3)
 const xaiRequests: BatchRequest[] = [
   { customId: "agent-afd-day5", system: "sys", prompt: "user", maxTokens: 512, partyId: "afd" },
 ];
@@ -399,7 +399,7 @@ describe("submitBatch — xAI sequential fallback", () => {
   it("returns results from sequential callAI for xAI requests", async () => {
     mockCallAI.mockResolvedValueOnce({
       text: "AfD response",
-      model: "grok-3-mini",
+      model: "grok-4.3",
       provider: "xai",
       inputTokens: 100,
       outputTokens: 40,
@@ -424,7 +424,7 @@ describe("submitBatch — xAI sequential fallback", () => {
       .mockRejectedValueOnce(new Error("xAI internal error"))
       .mockResolvedValueOnce({
         text: "second ok",
-        model: "grok-3-mini",
+        model: "grok-4.3",
         provider: "xai",
         inputTokens: 50,
         outputTokens: 20,
@@ -449,7 +449,7 @@ describe("submitBatch — xAI sequential fallback", () => {
     mockCallAI
       .mockResolvedValueOnce({
         text: "first ok",
-        model: "grok-3-mini",
+        model: "grok-4.3",
         provider: "xai",
         inputTokens: 50,
         outputTokens: 20,
@@ -499,7 +499,7 @@ describe("submitBatch — mixed providers (Anthropic + xAI)", () => {
     // xAI sequential
     mockCallAI.mockResolvedValueOnce({
       text: "AfD",
-      model: "grok-3-mini",
+      model: "grok-4.3",
       provider: "xai",
       inputTokens: 80,
       outputTokens: 30,

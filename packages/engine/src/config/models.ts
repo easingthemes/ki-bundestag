@@ -17,7 +17,7 @@ export const PARTY_MODELS: Record<string, ModelConfig> = {
   cdu: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   gruene: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   fdp: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
-  afd: { provider: "xai", model: "grok-3-mini" },
+  afd: { provider: "xai", model: "grok-4.3" },
   linke: { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
 };
 
@@ -45,7 +45,7 @@ export const BATCH_PRICING: Record<string, PricingTier> = {
 export const STANDARD_PRICING: Record<string, PricingTier> = {
   "claude-haiku-4-5-20251001": { input: 0.80e-6, output: 4.00e-6 },
   "claude-sonnet-4-5-20250929": { input: 3.00e-6, output: 15.00e-6 },
-  "grok-3-mini": { input: 0.30e-6, output: 0.50e-6 },
+  "grok-4.3": { input: 1.25e-6, output: 2.50e-6 },
   // Free test models (Ollama local + Groq free tier) — tracked at $0 for cost reports
   "gemma3:4b": { input: 0, output: 0 },
   "gemma3:12b": { input: 0, output: 0 },
