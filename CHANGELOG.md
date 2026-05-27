@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/easingthemes/ki-bundestag/compare/v1.17.0...v1.17.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **engine:** replace dead xAI grok-3-mini slug for AfD agent ([75f40af](https://github.com/easingthemes/ki-bundestag/commit/75f40af887e5f3f44dd6f307a9c274615d473e53))
+
 # [1.17.0](https://github.com/easingthemes/ki-bundestag/compare/v1.16.0...v1.17.0) (2026-04-27)
 
 
