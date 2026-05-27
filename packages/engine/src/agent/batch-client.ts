@@ -355,7 +355,11 @@ async function submitXaiBatch(requests: BatchRequest[]): Promise<BatchResult[]> 
       });
       results.push({ customId: req.customId, text, model, provider, inputTokens, outputTokens });
     } catch (err) {
-      console.warn(`  [Batch] xAI call failed for ${req.customId}: ${(err as Error).message}`);
+      const e = err as { message?: string; statusCode?: number; responseBody?: string };
+      const detail = e.statusCode || e.responseBody
+        ? `HTTP ${e.statusCode ?? "?"} ${(e.responseBody ?? e.message ?? "").slice(0, 500)}`.trim()
+        : (err as Error).message;
+      console.warn(`  [Batch] xAI call failed for ${req.customId}: ${detail}`);
       const config = resolveModel(req);
       results.push({ customId: req.customId, text: "", model: config.model, provider: config.provider, inputTokens: 0, outputTokens: 0 });
       if (err instanceof AIProviderLimitError) break;

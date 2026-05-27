@@ -322,14 +322,14 @@ describe("submitBatch — all Anthropic requests succeed", () => {
 describe("submitBatch — xAI sequential fallback", () => {
   beforeEach(() => {
     // Switch model-config to return xAI for all requests in this block
-    mocks.getPartyModel.mockReturnValue({ provider: "xai", model: "grok-3-mini" });
-    mocks.getRoleModel.mockReturnValue({ provider: "xai", model: "grok-3-mini" });
+    mocks.getPartyModel.mockReturnValue({ provider: "xai", model: "grok-4.3" });
+    mocks.getRoleModel.mockReturnValue({ provider: "xai", model: "grok-4.3" });
   });
 
   it("returns successful xAI results", async () => {
     mocks.callAI.mockResolvedValueOnce({
       text: "xAI reply",
-      model: "grok-3-mini",
+      model: "grok-4.3",
       provider: "xai",
       inputTokens: 5,
       outputTokens: 3,
@@ -346,7 +346,7 @@ describe("submitBatch — xAI sequential fallback", () => {
       .mockRejectedValueOnce(new Error("xAI network error"))
       .mockResolvedValueOnce({
         text: "second ok",
-        model: "grok-3-mini",
+        model: "grok-4.3",
         provider: "xai",
         inputTokens: 5,
         outputTokens: 3,
