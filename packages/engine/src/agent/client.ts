@@ -282,6 +282,11 @@ export async function callAI(opts: {
         system: opts.system,
         prompt: opts.prompt,
         maxOutputTokens: opts.maxTokens,
+        // grok models have built-in reasoning; cap effort so reasoning tokens
+        // don't consume the whole (small) completion budget and starve the answer.
+        ...(config.provider === "xai"
+          ? { providerOptions: { xai: { reasoningEffort: "low" } } }
+          : {}),
       });
       const latencyMs = Date.now() - startMs;
 

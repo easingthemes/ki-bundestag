@@ -27,7 +27,7 @@ Uses [Vercel AI SDK v6](https://sdk.vercel.ai/) with per-party and per-role mode
 | Party agents | Provider | Model |
 |---|---|---|
 | SPD, CDU, Grüne, FDP, Linke | Anthropic | claude-haiku-4-5-20251001 |
-| AfD | xAI | grok-3-mini |
+| AfD | xAI | grok-4.3 |
 
 | Role | Default | Env override | Used for |
 |---|---|---|---|
