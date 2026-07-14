@@ -40,7 +40,7 @@ import { api, setErrorHandler, type User, type SimulationStatus, type BundestagS
 import { UserContext, useUser } from "./userContext";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu, Bell, Pencil, Check, X, Play, Pause, Square, Zap, Gauge, Timer, Snail } from "lucide-react";
+import { Menu, Bell, Pencil, Check, X, Play, Pause, Square, Zap, Gauge, Timer, Snail, TriangleAlert } from "lucide-react";
 import { deriveState } from "@/components/dashboard/SimStatusPill";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -529,6 +529,47 @@ function NotificationBell() {
   );
 }
 
+/* ── System notice banner (API budget outage) ─────────────────────── */
+
+// Bump this key to re-show the banner after users dismissed an older notice
+const SYSTEM_NOTICE_KEY = "ki-notice-api-budget-2026-07";
+
+function SystemNoticeBanner() {
+  const { t } = useTranslation();
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem(SYSTEM_NOTICE_KEY) === "1"
+  );
+
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    localStorage.setItem(SYSTEM_NOTICE_KEY, "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div
+      role="status"
+      className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 md:px-6 py-2.5"
+    >
+      <div className="max-w-[1280px] mx-auto flex items-start gap-2.5 text-sm leading-relaxed">
+        <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+        <p className="flex-1 min-w-0">
+          <strong className="font-semibold">{t("notice.apiBudgetTitle")}:</strong>{" "}
+          {t("notice.apiBudgetMessage")}
+        </p>
+        <button
+          onClick={dismiss}
+          className="p-1 -m-1 shrink-0 text-amber-600 hover:text-amber-900 bg-transparent border-none cursor-pointer transition-colors"
+          aria-label={t("notice.dismiss")}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Error toast ──────────────────────────────────────────────────── */
 
 function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
@@ -625,6 +666,9 @@ function App() {
         >
           {t("aria.skipToContent")}
         </a>
+
+        {/* System notice: API budget outage / simulation paused */}
+        <SystemNoticeBanner />
 
         {/* ── Top navigation bar ── */}
         <nav aria-label={t("aria.mainNavigation")} className="sticky top-0 z-50 bg-primary text-white px-4 md:px-6 flex items-center h-12 shadow-[0_1px_3px_rgba(0,0,0,0.12)]">
