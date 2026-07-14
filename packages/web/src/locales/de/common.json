@@ -53,6 +53,11 @@
   "footer": {
     "tagline": "KAI Bundestag — KI-gestützte Parlamentssimulation"
   },
+  "notice": {
+    "apiBudgetTitle": "Simulation pausiert",
+    "apiBudgetMessage": "Wegen ausgeschöpfter API-Budgets waren zuletzt mehrere KI-Modelle blockiert. Der aktuelle Stand der Simulation ist daher nicht repräsentativ. Die Simulation ist bis auf Weiteres pausiert.",
+    "dismiss": "Hinweis ausblenden"
+  },
   "actions": {
     "participate": "Du kannst teilnehmen",
     "mdbAction": "MdB-Aktion verfügbar",
