@@ -1,3 +1,7 @@
+# Extra sites from other projects on this server (e.g. kai-hausmeister n8n).
+# Each project deploys its own file into /etc/caddy/sites/. Empty folder is fine.
+import /etc/caddy/sites/*.caddy
+
 {$SITE_ADDRESS:localhost} {
     root * /opt/ki-bundestag/packages/web/dist
 
