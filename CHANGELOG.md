@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/easingthemes/ki-bundestag/compare/v1.18.0...v1.18.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **ops:** restart ki-simulate on deploy to reload source + .env ([59832e0](https://github.com/easingthemes/ki-bundestag/commit/59832e09b35fe1ed901b7967abeabcec8ebf31c7))
+
 # [1.18.0](https://github.com/easingthemes/ki-bundestag/compare/v1.17.1...v1.18.0) (2026-07-14)
 
 
